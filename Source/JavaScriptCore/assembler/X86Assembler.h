@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -253,6 +253,7 @@ private:
         OP2_CVTSS2SD_VsdWsd = 0x5A,
         OP2_SUBSD_VsdWsd    = 0x5C,
         OP2_DIVSD_VsdWsd    = 0x5E,
+        OP2_MOVMSKPD_VdEd   = 0x50,
         OP2_SQRTSD_VsdWsd   = 0x51,
         OP2_ANDNPD_VpdWpd   = 0x55,
         OP2_XORPD_VpdWpd    = 0x57,
@@ -263,6 +264,7 @@ private:
         OP2_3BYTE_ESCAPE    = 0xAE,
         OP2_IMUL_GvEv       = 0xAF,
         OP2_MOVZX_GvEb      = 0xB6,
+        OP2_BSR             = 0xBD,
         OP2_MOVSX_GvEb      = 0xBE,
         OP2_MOVZX_GvEw      = 0xB7,
         OP2_MOVSX_GvEw      = 0xBF,
@@ -820,6 +822,11 @@ public:
 
 #endif
 
+    void bsr_rr(RegisterID src, RegisterID dst)
+    {
+        m_formatter.twoByteOp(OP2_BSR, dst, src);
+    }
+
     void sarl_i8r(int imm, RegisterID dst)
     {
         if (imm == 1)
@@ -877,6 +884,16 @@ public:
             m_formatter.oneByteOp64(OP_GROUP2_Ev1, GROUP2_OP_SAR, dst);
         else {
             m_formatter.oneByteOp64(OP_GROUP2_EvIb, GROUP2_OP_SAR, dst);
+            m_formatter.immediate8(imm);
+        }
+    }
+
+    void shrq_i8r(int imm, RegisterID dst)
+    {
+        if (imm == 1)
+            m_formatter.oneByteOp64(OP_GROUP2_Ev1, GROUP2_OP_SHR, dst);
+        else {
+            m_formatter.oneByteOp64(OP_GROUP2_EvIb, GROUP2_OP_SHR, dst);
             m_formatter.immediate8(imm);
         }
     }
@@ -1789,6 +1806,12 @@ public:
     }
 
 #if CPU(X86_64)
+    void movmskpd_rr(XMMRegisterID src, RegisterID dst)
+    {
+        m_formatter.prefix(PRE_SSE_66);
+        m_formatter.twoByteOp64(OP2_MOVMSKPD_VdEd, dst, (RegisterID)src);
+    }
+
     void movq_rr(XMMRegisterID src, RegisterID dst)
     {
         m_formatter.prefix(PRE_SSE_66);

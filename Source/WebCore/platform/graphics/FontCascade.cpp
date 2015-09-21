@@ -33,25 +33,16 @@
 #include "WidthIterator.h"
 #include <wtf/MainThread.h>
 #include <wtf/MathExtras.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/AtomicStringHash.h>
 #include <wtf/text/StringBuilder.h>
 
 using namespace WTF;
 using namespace Unicode;
 
-namespace WTF {
-
-// allow compilation of OwnPtr<TextLayout> in source files that don't have access to the TextLayout class definition
-template <> void deleteOwnedPtr<WebCore::TextLayout>(WebCore::TextLayout* ptr)
-{
-    WebCore::FontCascade::deleteLayout(ptr);
-}
-
-}
-
 namespace WebCore {
 
-static Ref<FontGlyphs> retrieveOrAddCachedFontGlyphs(const FontDescription&, PassRefPtr<FontSelector>);
+static Ref<FontCascadeFonts> retrieveOrAddCachedFonts(const FontDescription&, RefPtr<FontSelector>&&);
 
 const uint8_t FontCascade::s_roundingHackCharacterTable[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 1 /*\t*/, 1 /*\n*/, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -108,7 +99,8 @@ TypesettingFeatures FontCascade::s_defaultTypesettingFeatures = 0;
 // ============================================================================================
 
 FontCascade::FontCascade()
-    : m_letterSpacing(0)
+    : m_weakPtrFactory(this)
+    , m_letterSpacing(0)
     , m_wordSpacing(0)
     , m_useBackslashAsYenSymbol(false)
     , m_typesettingFeatures(0)
@@ -117,6 +109,7 @@ FontCascade::FontCascade()
 
 FontCascade::FontCascade(const FontDescription& fd, float letterSpacing, float wordSpacing)
     : m_fontDescription(fd)
+    , m_weakPtrFactory(this)
     , m_letterSpacing(letterSpacing)
     , m_wordSpacing(wordSpacing)
     , m_useBackslashAsYenSymbol(useBackslashAsYenSignForFamily(fd.firstFamily()))
@@ -125,8 +118,9 @@ FontCascade::FontCascade(const FontDescription& fd, float letterSpacing, float w
 }
 
 // FIXME: We should make this constructor platform-independent.
-FontCascade::FontCascade(const FontPlatformData& font, FontSmoothingMode fontSmoothingMode)
-    : m_glyphs(FontGlyphs::createForPlatformFont(font))
+FontCascade::FontCascade(const FontPlatformData& fontData, FontSmoothingMode fontSmoothingMode)
+    : m_fonts(FontCascadeFonts::createForPlatformFont(fontData))
+    , m_weakPtrFactory(this)
     , m_letterSpacing(0)
     , m_wordSpacing(0)
     , m_useBackslashAsYenSymbol(false)
@@ -134,33 +128,17 @@ FontCascade::FontCascade(const FontPlatformData& font, FontSmoothingMode fontSmo
 {
     m_fontDescription.setFontSmoothing(fontSmoothingMode);
 #if PLATFORM(IOS)
-    m_fontDescription.setSpecifiedSize(CTFontGetSize(font.font()));
-    m_fontDescription.setComputedSize(CTFontGetSize(font.font()));
-    m_fontDescription.setIsItalic(CTFontGetSymbolicTraits(font.font()) & kCTFontTraitItalic);
-    m_fontDescription.setWeight((CTFontGetSymbolicTraits(font.font()) & kCTFontTraitBold) ? FontWeightBold : FontWeightNormal);
+    m_fontDescription.setSpecifiedSize(CTFontGetSize(fontData.font()));
+    m_fontDescription.setComputedSize(CTFontGetSize(fontData.font()));
+    m_fontDescription.setIsItalic(CTFontGetSymbolicTraits(fontData.font()) & kCTFontTraitItalic);
+    m_fontDescription.setWeight((CTFontGetSymbolicTraits(fontData.font()) & kCTFontTraitBold) ? FontWeightBold : FontWeightNormal);
 #endif
 }
-
-// FIXME: We should make this constructor platform-independent.
-#if PLATFORM(IOS)
-FontCascade::FontCascade(const FontPlatformData& font, PassRefPtr<FontSelector> fontSelector)
-    : m_glyphs(FontGlyphs::createForPlatformFont(font))
-    , m_letterSpacing(0)
-    , m_wordSpacing(0)
-    , m_typesettingFeatures(computeTypesettingFeatures())
-{
-    CTFontRef primaryFont = font.font();
-    m_fontDescription.setSpecifiedSize(CTFontGetSize(primaryFont));
-    m_fontDescription.setComputedSize(CTFontGetSize(primaryFont));
-    m_fontDescription.setIsItalic(CTFontGetSymbolicTraits(primaryFont) & kCTFontTraitItalic);
-    m_fontDescription.setWeight((CTFontGetSymbolicTraits(primaryFont) & kCTFontTraitBold) ? FontWeightBold : FontWeightNormal);
-    m_glyphs = retrieveOrAddCachedFontGlyphs(m_fontDescription, fontSelector.get());
-}
-#endif
 
 FontCascade::FontCascade(const FontCascade& other)
     : m_fontDescription(other.m_fontDescription)
-    , m_glyphs(other.m_glyphs)
+    , m_fonts(other.m_fonts)
+    , m_weakPtrFactory(this)
     , m_letterSpacing(other.m_letterSpacing)
     , m_wordSpacing(other.m_wordSpacing)
     , m_useBackslashAsYenSymbol(other.m_useBackslashAsYenSymbol)
@@ -171,7 +149,7 @@ FontCascade::FontCascade(const FontCascade& other)
 FontCascade& FontCascade::operator=(const FontCascade& other)
 {
     m_fontDescription = other.m_fontDescription;
-    m_glyphs = other.m_glyphs;
+    m_fonts = other.m_fonts;
     m_letterSpacing = other.m_letterSpacing;
     m_wordSpacing = other.m_wordSpacing;
     m_useBackslashAsYenSymbol = other.m_useBackslashAsYenSymbol;
@@ -186,47 +164,45 @@ bool FontCascade::operator==(const FontCascade& other) const
 
     if (m_fontDescription != other.m_fontDescription || m_letterSpacing != other.m_letterSpacing || m_wordSpacing != other.m_wordSpacing)
         return false;
-    if (m_glyphs == other.m_glyphs)
+    if (m_fonts == other.m_fonts)
         return true;
-    if (!m_glyphs || !other.m_glyphs)
+    if (!m_fonts || !other.m_fonts)
         return false;
-    if (m_glyphs->fontSelector() != other.m_glyphs->fontSelector())
+    if (m_fonts->fontSelector() != other.m_fonts->fontSelector())
         return false;
     // Can these cases actually somehow occur? All fonts should get wiped out by full style recalc.
-    if (m_glyphs->fontSelectorVersion() != other.m_glyphs->fontSelectorVersion())
+    if (m_fonts->fontSelectorVersion() != other.m_fonts->fontSelectorVersion())
         return false;
-    if (m_glyphs->generation() != other.m_glyphs->generation())
+    if (m_fonts->generation() != other.m_fonts->generation())
         return false;
     return true;
 }
 
-struct FontGlyphsCacheKey {
-    // This part of the key is shared with the lower level FontCache (caching FontData objects).
-    FontDescriptionFontDataCacheKey fontDescriptionCacheKey;
+struct FontCascadeCacheKey {
+    FontDescriptionKey fontDescriptionKey; // Shared with the lower level FontCache (caching Font objects)
     Vector<AtomicString, 3> families;
     unsigned fontSelectorId;
     unsigned fontSelectorVersion;
-    unsigned fontSelectorFlags;
 };
 
-struct FontGlyphsCacheEntry {
+struct FontCascadeCacheEntry {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    FontGlyphsCacheEntry(FontGlyphsCacheKey&& k, Ref<FontGlyphs>&& g)
-        : key(WTF::move(k))
-        , glyphs(WTF::move(g))
+    FontCascadeCacheEntry(FontCascadeCacheKey&& key, Ref<FontCascadeFonts>&& fonts)
+        : key(WTF::move(key))
+        , fonts(WTF::move(fonts))
     { }
-    FontGlyphsCacheKey key;
-    Ref<FontGlyphs> glyphs;
+    FontCascadeCacheKey key;
+    Ref<FontCascadeFonts> fonts;
 };
 
-typedef HashMap<unsigned, std::unique_ptr<FontGlyphsCacheEntry>, AlreadyHashed> FontGlyphsCache;
+typedef HashMap<unsigned, std::unique_ptr<FontCascadeCacheEntry>, AlreadyHashed> FontCascadeCache;
 
-static bool operator==(const FontGlyphsCacheKey& a, const FontGlyphsCacheKey& b)
+static bool operator==(const FontCascadeCacheKey& a, const FontCascadeCacheKey& b)
 {
-    if (a.fontDescriptionCacheKey != b.fontDescriptionCacheKey)
+    if (a.fontDescriptionKey != b.fontDescriptionKey)
         return false;
-    if (a.fontSelectorId != b.fontSelectorId || a.fontSelectorVersion != b.fontSelectorVersion || a.fontSelectorFlags != b.fontSelectorFlags)
+    if (a.fontSelectorId != b.fontSelectorId || a.fontSelectorVersion != b.fontSelectorVersion)
         return false;
     if (a.families.size() != b.families.size())
         return false;
@@ -237,95 +213,90 @@ static bool operator==(const FontGlyphsCacheKey& a, const FontGlyphsCacheKey& b)
     return true;
 }
 
-static FontGlyphsCache& fontGlyphsCache()
+static FontCascadeCache& fontCascadeCache()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(FontGlyphsCache, cache, ());
-    return cache;
+    static NeverDestroyed<FontCascadeCache> cache;
+    return cache.get();
 }
 
-void invalidateFontGlyphsCache()
+void invalidateFontCascadeCache()
 {
-    fontGlyphsCache().clear();
+    fontCascadeCache().clear();
 }
 
 void clearWidthCaches()
 {
-    for (auto it = fontGlyphsCache().begin(), end = fontGlyphsCache().end(); it != end; ++it)
-        it->value->glyphs.get().widthCache().clear();
+    for (auto& value : fontCascadeCache().values())
+        value->fonts.get().widthCache().clear();
 }
 
-static unsigned makeFontSelectorFlags(const FontDescription& description)
+static FontCascadeCacheKey makeFontCascadeCacheKey(const FontDescription& description, FontSelector* fontSelector)
 {
-    return static_cast<unsigned>(description.script()) << 1 | static_cast<unsigned>(description.smallCaps());
-}
-
-static void makeFontGlyphsCacheKey(FontGlyphsCacheKey& key, const FontDescription& description, FontSelector* fontSelector)
-{
-    key.fontDescriptionCacheKey = FontDescriptionFontDataCacheKey(description);
+    FontCascadeCacheKey key;
+    key.fontDescriptionKey = FontDescriptionKey(description);
     for (unsigned i = 0; i < description.familyCount(); ++i)
         key.families.append(description.familyAt(i));
     key.fontSelectorId = fontSelector ? fontSelector->uniqueId() : 0;
     key.fontSelectorVersion = fontSelector ? fontSelector->version() : 0;
-    key.fontSelectorFlags = fontSelector && fontSelector->resolvesFamilyFor(description) ? makeFontSelectorFlags(description) : 0;
+    return key;
 }
 
-static unsigned computeFontGlyphsCacheHash(const FontGlyphsCacheKey& key)
+// FIXME: Why can't we just teach HashMap about FontCascadeCacheKey instead of hashing a hash?
+static unsigned computeFontCascadeCacheHash(const FontCascadeCacheKey& key)
 {
     Vector<unsigned, 7> hashCodes;
     hashCodes.reserveInitialCapacity(4 + key.families.size());
 
-    hashCodes.uncheckedAppend(key.fontDescriptionCacheKey.computeHash());
+    hashCodes.uncheckedAppend(key.fontDescriptionKey.computeHash());
     hashCodes.uncheckedAppend(key.fontSelectorId);
     hashCodes.uncheckedAppend(key.fontSelectorVersion);
-    hashCodes.uncheckedAppend(key.fontSelectorFlags);
     for (unsigned i = 0; i < key.families.size(); ++i)
         hashCodes.uncheckedAppend(key.families[i].impl() ? CaseFoldingHash::hash(key.families[i]) : 0);
 
     return StringHasher::hashMemory(hashCodes.data(), hashCodes.size() * sizeof(unsigned));
 }
 
-void pruneUnreferencedEntriesFromFontGlyphsCache()
+void pruneUnreferencedEntriesFromFontCascadeCache()
 {
-    fontGlyphsCache().removeIf([](FontGlyphsCache::KeyValuePairType& entry) {
-        return entry.value->glyphs.get().hasOneRef();
+    fontCascadeCache().removeIf([](FontCascadeCache::KeyValuePairType& entry) {
+        return entry.value->fonts.get().hasOneRef();
     });
 }
 
 void pruneSystemFallbackFonts()
 {
-    for (auto& entry : fontGlyphsCache().values())
-        entry->glyphs->pruneSystemFallbacks();
+    for (auto& entry : fontCascadeCache().values())
+        entry->fonts->pruneSystemFallbacks();
 }
 
-static Ref<FontGlyphs> retrieveOrAddCachedFontGlyphs(const FontDescription& fontDescription, PassRefPtr<FontSelector> fontSelector)
+static Ref<FontCascadeFonts> retrieveOrAddCachedFonts(const FontDescription& fontDescription, RefPtr<FontSelector>&& fontSelector)
 {
-    FontGlyphsCacheKey key;
-    makeFontGlyphsCacheKey(key, fontDescription, fontSelector.get());
+    auto key = makeFontCascadeCacheKey(fontDescription, fontSelector.get());
 
-    unsigned hash = computeFontGlyphsCacheHash(key);
-    FontGlyphsCache::AddResult addResult = fontGlyphsCache().add(hash, std::unique_ptr<FontGlyphsCacheEntry>());
+    unsigned hash = computeFontCascadeCacheHash(key);
+    auto addResult = fontCascadeCache().add(hash, std::unique_ptr<FontCascadeCacheEntry>());
     if (!addResult.isNewEntry && addResult.iterator->value->key == key)
-        return addResult.iterator->value->glyphs.get();
+        return addResult.iterator->value->fonts.get();
 
-    std::unique_ptr<FontGlyphsCacheEntry>& newEntry = addResult.iterator->value;
-    newEntry = std::make_unique<FontGlyphsCacheEntry>(WTF::move(key), FontGlyphs::create(fontSelector));
-    Ref<FontGlyphs> glyphs = newEntry->glyphs.get();
+    auto& newEntry = addResult.iterator->value;
+    newEntry = std::make_unique<FontCascadeCacheEntry>(WTF::move(key), FontCascadeFonts::create(WTF::move(fontSelector)));
+    Ref<FontCascadeFonts> glyphs = newEntry->fonts.get();
 
     static const unsigned unreferencedPruneInterval = 50;
     static const int maximumEntries = 400;
     static unsigned pruneCounter;
-    // Referenced FontGlyphs would exist anyway so pruning them saves little memory.
+    // Referenced FontCascadeFonts would exist anyway so pruning them saves little memory.
     if (!(++pruneCounter % unreferencedPruneInterval))
-        pruneUnreferencedEntriesFromFontGlyphsCache();
+        pruneUnreferencedEntriesFromFontCascadeCache();
     // Prevent pathological growth.
-    if (fontGlyphsCache().size() > maximumEntries)
-        fontGlyphsCache().remove(fontGlyphsCache().begin());
+    if (fontCascadeCache().size() > maximumEntries)
+        fontCascadeCache().remove(fontCascadeCache().begin());
     return glyphs;
 }
 
-void FontCascade::update(PassRefPtr<FontSelector> fontSelector) const
+void FontCascade::update(RefPtr<FontSelector>&& fontSelector) const
 {
-    m_glyphs = retrieveOrAddCachedFontGlyphs(m_fontDescription, fontSelector.get());
+    m_fonts = retrieveOrAddCachedFonts(m_fontDescription, WTF::move(fontSelector));
     m_useBackslashAsYenSymbol = useBackslashAsYenSignForFamily(firstFamily());
     m_typesettingFeatures = computeTypesettingFeatures();
 }
@@ -384,7 +355,7 @@ float FontCascade::width(const TextRun& run, HashSet<const Font*>* fallbackFonts
 
     bool hasKerningOrLigatures = typesettingFeatures() & (Kerning | Ligatures);
     bool hasWordSpacingOrLetterSpacing = wordSpacing() || letterSpacing();
-    float* cacheEntry = m_glyphs->widthCache().add(run, std::numeric_limits<float>::quiet_NaN(), hasKerningOrLigatures, hasWordSpacingOrLetterSpacing, glyphOverflow);
+    float* cacheEntry = m_fonts->widthCache().add(run, std::numeric_limits<float>::quiet_NaN(), hasKerningOrLigatures, hasWordSpacingOrLetterSpacing, glyphOverflow);
     if (cacheEntry && !std::isnan(*cacheEntry))
         return *cacheEntry;
 
@@ -432,16 +403,17 @@ GlyphData FontCascade::glyphDataForCharacter(UChar32 c, bool mirror, FontVariant
     if (mirror)
         c = u_charMirror(c);
 
-    return m_glyphs->glyphDataForCharacter(c, m_fontDescription, variant);
+    return m_fonts->glyphDataForCharacter(c, m_fontDescription, variant);
 }
 
 #if !PLATFORM(COCOA)
-PassOwnPtr<TextLayout> FontCascade::createLayout(RenderText*, float, bool) const
+
+std::unique_ptr<TextLayout, TextLayoutDeleter> FontCascade::createLayout(RenderText&, float, bool) const
 {
     return nullptr;
 }
 
-void FontCascade::deleteLayout(TextLayout*)
+void TextLayoutDeleter::operator()(TextLayout*) const
 {
 }
 
@@ -450,9 +422,8 @@ float FontCascade::width(TextLayout&, unsigned, unsigned, HashSet<const Font*>*)
     ASSERT_NOT_REACHED();
     return 0;
 }
+
 #endif
-
-
 
 static const char* fontFamiliesWithInvalidCharWidth[] = {
     "American Typewriter",
@@ -585,6 +556,18 @@ void FontCascade::setShouldUseSmoothing(bool shouldUseSmoothing)
 bool FontCascade::shouldUseSmoothing()
 {
     return shouldUseFontSmoothing;
+}
+
+static bool antialiasedFontDilationIsEnabled = false;
+
+void FontCascade::setAntialiasedFontDilationEnabled(bool enabled)
+{
+    antialiasedFontDilationIsEnabled = enabled;
+}
+
+bool FontCascade::antialiasedFontDilationEnabled()
+{
+    return antialiasedFontDilationIsEnabled;
 }
 
 void FontCascade::setCodePath(CodePath p)
@@ -1000,9 +983,14 @@ bool FontCascade::isCJKIdeographOrSymbol(UChar32 c)
     return isCJKIdeograph(c);
 }
 
-unsigned FontCascade::expansionOpportunityCountInternal(const LChar* characters, size_t length, TextDirection direction, bool& isAfterExpansion)
+std::pair<unsigned, bool> FontCascade::expansionOpportunityCountInternal(const LChar* characters, size_t length, TextDirection direction, ExpansionBehavior expansionBehavior)
 {
     unsigned count = 0;
+    bool isAfterExpansion = (expansionBehavior & LeadingExpansionMask) == ForbidLeadingExpansion;
+    if ((expansionBehavior & LeadingExpansionMask) == ForceLeadingExpansion) {
+        ++count;
+        isAfterExpansion = true;
+    }
     if (direction == LTR) {
         for (size_t i = 0; i < length; ++i) {
             if (treatAsSpace(characters[i])) {
@@ -1020,13 +1008,25 @@ unsigned FontCascade::expansionOpportunityCountInternal(const LChar* characters,
                 isAfterExpansion = false;
         }
     }
-    return count;
+    if (!isAfterExpansion && (expansionBehavior & TrailingExpansionMask) == ForceTrailingExpansion) {
+        ++count;
+        isAfterExpansion = true;
+    } else if (isAfterExpansion && (expansionBehavior & TrailingExpansionMask) == ForbidTrailingExpansion) {
+        --count;
+        isAfterExpansion = false;
+    }
+    return std::make_pair(count, isAfterExpansion);
 }
 
-unsigned FontCascade::expansionOpportunityCountInternal(const UChar* characters, size_t length, TextDirection direction, bool& isAfterExpansion)
+std::pair<unsigned, bool> FontCascade::expansionOpportunityCountInternal(const UChar* characters, size_t length, TextDirection direction, ExpansionBehavior expansionBehavior)
 {
     static bool expandAroundIdeographs = canExpandAroundIdeographsInComplexText();
     unsigned count = 0;
+    bool isAfterExpansion = (expansionBehavior & LeadingExpansionMask) == ForbidLeadingExpansion;
+    if ((expansionBehavior & LeadingExpansionMask) == ForceLeadingExpansion) {
+        ++count;
+        isAfterExpansion = true;
+    }
     if (direction == LTR) {
         for (size_t i = 0; i < length; ++i) {
             UChar32 character = characters[i];
@@ -1070,14 +1070,63 @@ unsigned FontCascade::expansionOpportunityCountInternal(const UChar* characters,
             isAfterExpansion = false;
         }
     }
-    return count;
+    if (!isAfterExpansion && (expansionBehavior & TrailingExpansionMask) == ForceTrailingExpansion) {
+        ++count;
+        isAfterExpansion = true;
+    } else if (isAfterExpansion && (expansionBehavior & TrailingExpansionMask) == ForbidTrailingExpansion) {
+        --count;
+        isAfterExpansion = false;
+    }
+    return std::make_pair(count, isAfterExpansion);
 }
 
-unsigned FontCascade::expansionOpportunityCount(const StringView& stringView, TextDirection direction, bool& isAfterExpansion)
+std::pair<unsigned, bool> FontCascade::expansionOpportunityCount(const StringView& stringView, TextDirection direction, ExpansionBehavior expansionBehavior)
 {
+    // For each character, iterating from left to right:
+    //   If it is recognized as a space, insert an opportunity after it
+    //   If it is an ideograph, insert one opportunity before it and one opportunity after it
+    // Do this such a way so that there are not two opportunities next to each other.
     if (stringView.is8Bit())
-        return expansionOpportunityCountInternal(stringView.characters8(), stringView.length(), direction, isAfterExpansion);
-    return expansionOpportunityCountInternal(stringView.characters16(), stringView.length(), direction, isAfterExpansion);
+        return expansionOpportunityCountInternal(stringView.characters8(), stringView.length(), direction, expansionBehavior);
+    return expansionOpportunityCountInternal(stringView.characters16(), stringView.length(), direction, expansionBehavior);
+}
+
+bool FontCascade::leadingExpansionOpportunity(const StringView& stringView, TextDirection direction)
+{
+    if (!stringView.length())
+        return false;
+
+    UChar32 initialCharacter;
+    if (direction == LTR) {
+        initialCharacter = stringView[0];
+        if (U16_IS_LEAD(initialCharacter) && stringView.length() > 1 && U16_IS_TRAIL(stringView[1]))
+            initialCharacter = U16_GET_SUPPLEMENTARY(initialCharacter, stringView[1]);
+    } else {
+        initialCharacter = stringView[stringView.length() - 1];
+        if (U16_IS_TRAIL(initialCharacter) && stringView.length() > 1 && U16_IS_LEAD(stringView[stringView.length() - 2]))
+            initialCharacter = U16_GET_SUPPLEMENTARY(stringView[stringView.length() - 2], initialCharacter);
+    }
+
+    return canExpandAroundIdeographsInComplexText() && isCJKIdeographOrSymbol(initialCharacter);
+}
+
+bool FontCascade::trailingExpansionOpportunity(const StringView& stringView, TextDirection direction)
+{
+    if (!stringView.length())
+        return false;
+
+    UChar32 finalCharacter;
+    if (direction == LTR) {
+        finalCharacter = stringView[stringView.length() - 1];
+        if (U16_IS_TRAIL(finalCharacter) && stringView.length() > 1 && U16_IS_LEAD(stringView[stringView.length() - 2]))
+            finalCharacter = U16_GET_SUPPLEMENTARY(stringView[stringView.length() - 2], finalCharacter);
+    } else {
+        finalCharacter = stringView[0];
+        if (U16_IS_LEAD(finalCharacter) && stringView.length() > 1 && U16_IS_TRAIL(stringView[1]))
+            finalCharacter = U16_GET_SUPPLEMENTARY(finalCharacter, stringView[1]);
+    }
+
+    return treatAsSpace(finalCharacter) || (canExpandAroundIdeographsInComplexText() && isCJKIdeographOrSymbol(finalCharacter));
 }
 
 bool FontCascade::canReceiveTextEmphasis(UChar32 c)
@@ -1095,7 +1144,7 @@ bool FontCascade::canReceiveTextEmphasis(UChar32 c)
 
 bool FontCascade::isLoadingCustomFonts() const
 {
-    return m_glyphs && m_glyphs->isLoadingCustomFonts();
+    return m_fonts && m_fonts->isLoadingCustomFonts();
 }
     
 GlyphToPathTranslator::GlyphUnderlineType computeUnderlineType(const TextRun& textRun, const GlyphBuffer& glyphBuffer, int index)

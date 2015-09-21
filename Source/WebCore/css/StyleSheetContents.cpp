@@ -28,6 +28,8 @@
 #include "Document.h"
 #include "MediaList.h"
 #include "Node.h"
+#include "Page.h"
+#include "PageConsoleClient.h"
 #include "RuleSet.h"
 #include "SecurityOrigin.h"
 #include "StyleProperties.h"
@@ -64,6 +66,7 @@ StyleSheetContents::StyleSheetContents(StyleRuleImport* ownerRule, const String&
     , m_hasSyntacticallyValidCSSHeader(true)
     , m_didLoadErrorOccur(false)
     , m_usesRemUnits(false)
+    , m_usesStyleBasedEditability(false)
     , m_isMutable(false)
     , m_isInMemoryCache(false)
     , m_parserContext(context)
@@ -83,6 +86,7 @@ StyleSheetContents::StyleSheetContents(const StyleSheetContents& o)
     , m_hasSyntacticallyValidCSSHeader(o.m_hasSyntacticallyValidCSSHeader)
     , m_didLoadErrorOccur(false)
     , m_usesRemUnits(o.m_usesRemUnits)
+    , m_usesStyleBasedEditability(o.m_usesStyleBasedEditability)
     , m_isMutable(false)
     , m_isInMemoryCache(false)
     , m_parserContext(o.m_parserContext)
@@ -289,22 +293,27 @@ const AtomicString& StyleSheetContents::determineNamespace(const AtomicString& p
 
 void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cachedStyleSheet, const SecurityOrigin* securityOrigin)
 {
-    bool hasValidMIMEType = false;
-    String sheetText = cachedStyleSheet->sheetText(&hasValidMIMEType);
+    bool isSameOriginRequest = securityOrigin && securityOrigin->canRequest(baseURL());
+    CachedCSSStyleSheet::MIMETypeCheck mimeTypeCheck = isStrictParserMode(m_parserContext.mode) || !isSameOriginRequest ? CachedCSSStyleSheet::MIMETypeCheck::Strict : CachedCSSStyleSheet::MIMETypeCheck::Lax;
+    bool hasValidMIMEType = true;
+    String sheetText = cachedStyleSheet->sheetText(mimeTypeCheck, &hasValidMIMEType);
+
+    if (!hasValidMIMEType) {
+        ASSERT(sheetText.isNull());
+        if (auto* document = singleOwnerDocument()) {
+            if (auto* page = document->page()) {
+                if (isStrictParserMode(m_parserContext.mode))
+                    page->console().addMessage(MessageSource::Security, MessageLevel::Error, "Did not parse stylesheet at '" + cachedStyleSheet->url().stringCenterEllipsizedToLength() + "' because non CSS MIME types are not allowed in strict mode.");
+                else
+                    page->console().addMessage(MessageSource::Security, MessageLevel::Error, "Did not parse stylesheet at '" + cachedStyleSheet->url().stringCenterEllipsizedToLength() + "' because non CSS MIME types are not allowed for cross-origin stylesheets.");
+            }
+        }
+        return;
+    }
 
     CSSParser p(parserContext());
-    p.parseSheet(this, sheetText, 0, 0, true);
+    p.parseSheet(this, sheetText, TextPosition(), nullptr, true);
 
-    // If we're loading a stylesheet cross-origin, and the MIME type is not standard, require the CSS
-    // to at least start with a syntactically valid CSS rule.
-    // This prevents an attacker playing games by injecting CSS strings into HTML, XML, JSON, etc. etc.
-    if (!hasValidMIMEType && !hasSyntacticallyValidCSSHeader()) {
-        bool isCrossOriginCSS = !securityOrigin || !securityOrigin->canRequest(baseURL());
-        if (isCrossOriginCSS) {
-            clearRules();
-            return;
-        }
-    }
     if (m_parserContext.needsSiteSpecificQuirks && isStrictParserMode(m_parserContext.mode)) {
         // Work around <https://bugs.webkit.org/show_bug.cgi?id=28350>.
         DEPRECATED_DEFINE_STATIC_LOCAL(const String, mediaWikiKHTMLFixesStyleSheet, (ASCIILiteral("/* KHTML fix stylesheet */\n/* work around the horizontal scrollbars */\n#column-content { margin-left: 0; }\n\n")));
@@ -318,14 +327,13 @@ void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cached
 
 bool StyleSheetContents::parseString(const String& sheetText)
 {
-    return parseStringAtLine(sheetText, 0, false);
+    return parseStringAtPosition(sheetText, TextPosition(), false);
 }
 
-bool StyleSheetContents::parseStringAtLine(const String& sheetText, int startLineNumber, bool createdByParser)
+bool StyleSheetContents::parseStringAtPosition(const String& sheetText, const TextPosition& textPosition, bool createdByParser)
 {
     CSSParser p(parserContext());
-    p.parseSheet(this, sheetText, startLineNumber, 0, createdByParser);
-
+    p.parseSheet(this, sheetText, textPosition, nullptr, createdByParser);
     return true;
 }
 
@@ -426,24 +434,24 @@ void StyleSheetContents::addSubresourceStyleURLs(ListHashSet<URL>& urls)
     }
 }
 
-static bool childRulesHaveFailedOrCanceledSubresources(const Vector<RefPtr<StyleRuleBase>>& rules)
+static bool traverseSubresourcesInRules(const Vector<RefPtr<StyleRuleBase>>& rules, const std::function<bool (const CachedResource&)>& handler)
 {
     for (auto& rule : rules) {
         switch (rule->type()) {
         case StyleRuleBase::Style:
-            if (downcast<StyleRule>(*rule).properties().hasFailedOrCanceledSubresources())
+            if (downcast<StyleRule>(*rule).properties().traverseSubresources(handler))
                 return true;
             break;
         case StyleRuleBase::FontFace:
-            if (downcast<StyleRuleFontFace>(*rule).properties().hasFailedOrCanceledSubresources())
+            if (downcast<StyleRuleFontFace>(*rule).properties().traverseSubresources(handler))
                 return true;
             break;
         case StyleRuleBase::Media:
-            if (childRulesHaveFailedOrCanceledSubresources(downcast<StyleRuleMedia>(*rule).childRules()))
+            if (traverseSubresourcesInRules(downcast<StyleRuleMedia>(*rule).childRules(), handler))
                 return true;
             break;
         case StyleRuleBase::Region:
-            if (childRulesHaveFailedOrCanceledSubresources(downcast<StyleRuleRegion>(*rule).childRules()))
+            if (traverseSubresourcesInRules(downcast<StyleRuleRegion>(*rule).childRules(), handler))
                 return true;
             break;
         case StyleRuleBase::Import:
@@ -466,10 +474,35 @@ static bool childRulesHaveFailedOrCanceledSubresources(const Vector<RefPtr<Style
     return false;
 }
 
-bool StyleSheetContents::hasFailedOrCanceledSubresources() const
+bool StyleSheetContents::traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const
 {
-    ASSERT(isCacheable());
-    return childRulesHaveFailedOrCanceledSubresources(m_childRules);
+    for (auto& importRule : m_importRules) {
+        if (!importRule->styleSheet())
+            continue;
+        if (traverseSubresourcesInRules(importRule->styleSheet()->m_childRules, handler))
+            return true;
+    }
+    return traverseSubresourcesInRules(m_childRules, handler);
+}
+
+bool StyleSheetContents::subresourcesAllowReuse(CachePolicy cachePolicy) const
+{
+    bool hasFailedOrExpiredResources = traverseSubresources([cachePolicy](const CachedResource& resource) {
+        if (resource.loadFailedOrCanceled())
+            return true;
+        // We can't revalidate subresources individually so don't use reuse the parsed sheet if they need revalidation.
+        if (resource.makeRevalidationDecision(cachePolicy) != CachedResource::RevalidationDecision::No)
+            return true;
+        return false;
+    });
+    return !hasFailedOrExpiredResources;
+}
+
+bool StyleSheetContents::isLoadingSubresources() const
+{
+    return traverseSubresources([](const CachedResource& resource) {
+        return resource.isLoading();
+    });
 }
 
 StyleSheetContents* StyleSheetContents::parentStyleSheet() const

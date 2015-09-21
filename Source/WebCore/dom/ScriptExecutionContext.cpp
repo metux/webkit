@@ -81,6 +81,8 @@ ScriptExecutionContext::ScriptExecutionContext()
     , m_timerNestingLevel(0)
 #if !ASSERT_DISABLED
     , m_inScriptExecutionContextDestructor(false)
+#endif
+#if !ASSERT_DISABLED || ENABLE(SECURITY_ASSERTIONS)
     , m_activeDOMObjectRemovalForbidden(false)
 #endif
 {
@@ -174,14 +176,14 @@ void ScriptExecutionContext::didLoadResourceSynchronously(const ResourceRequest&
 {
 }
 
-bool ScriptExecutionContext::canSuspendActiveDOMObjects(Vector<ActiveDOMObject*>* unsuspendableObjects)
+bool ScriptExecutionContext::canSuspendActiveDOMObjectsForPageCache(Vector<ActiveDOMObject*>* unsuspendableObjects)
 {
     checkConsistency();
 
     bool canSuspend = true;
 
     m_activeDOMObjectAdditionForbidden = true;
-#if !ASSERT_DISABLED
+#if !ASSERT_DISABLED || ENABLE(SECURITY_ASSERTIONS)
     m_activeDOMObjectRemovalForbidden = true;
 #endif
 
@@ -191,7 +193,7 @@ bool ScriptExecutionContext::canSuspendActiveDOMObjects(Vector<ActiveDOMObject*>
     // canSuspend functions so it will not happen!
     NoEventDispatchAssertion assertNoEventDispatch;
     for (auto* activeDOMObject : m_activeDOMObjects) {
-        if (!activeDOMObject->canSuspend()) {
+        if (!activeDOMObject->canSuspendForPageCache()) {
             canSuspend = false;
             if (unsuspendableObjects)
                 unsuspendableObjects->append(activeDOMObject);
@@ -201,7 +203,7 @@ bool ScriptExecutionContext::canSuspendActiveDOMObjects(Vector<ActiveDOMObject*>
     }
 
     m_activeDOMObjectAdditionForbidden = false;
-#if !ASSERT_DISABLED
+#if !ASSERT_DISABLED || ENABLE(SECURITY_ASSERTIONS)
     m_activeDOMObjectRemovalForbidden = false;
 #endif
 
@@ -220,7 +222,7 @@ void ScriptExecutionContext::suspendActiveDOMObjects(ActiveDOMObject::ReasonForS
 #endif
 
     m_activeDOMObjectAdditionForbidden = true;
-#if !ASSERT_DISABLED
+#if !ASSERT_DISABLED || ENABLE(SECURITY_ASSERTIONS)
     m_activeDOMObjectRemovalForbidden = true;
 #endif
 
@@ -228,11 +230,12 @@ void ScriptExecutionContext::suspendActiveDOMObjects(ActiveDOMObject::ReasonForS
     // functions should not add new active DOM objects, nor execute arbitrary JavaScript.
     // An ASSERT_WITH_SECURITY_IMPLICATION or RELEASE_ASSERT will fire if this happens, but it's important to code
     // suspend functions so it will not happen!
+    NoEventDispatchAssertion assertNoEventDispatch;
     for (auto* activeDOMObject : m_activeDOMObjects)
         activeDOMObject->suspend(why);
 
     m_activeDOMObjectAdditionForbidden = false;
-#if !ASSERT_DISABLED
+#if !ASSERT_DISABLED || ENABLE(SECURITY_ASSERTIONS)
     m_activeDOMObjectRemovalForbidden = false;
 #endif
 
@@ -249,7 +252,7 @@ void ScriptExecutionContext::resumeActiveDOMObjects(ActiveDOMObject::ReasonForSu
     m_activeDOMObjectsAreSuspended = false;
 
     m_activeDOMObjectAdditionForbidden = true;
-#if !ASSERT_DISABLED
+#if !ASSERT_DISABLED || ENABLE(SECURITY_ASSERTIONS)
     m_activeDOMObjectRemovalForbidden = true;
 #endif
 
@@ -257,11 +260,12 @@ void ScriptExecutionContext::resumeActiveDOMObjects(ActiveDOMObject::ReasonForSu
     // functions should not add new active DOM objects, nor execute arbitrary JavaScript.
     // An ASSERT_WITH_SECURITY_IMPLICATION or RELEASE_ASSERT will fire if this happens, but it's important to code
     // resume functions so it will not happen!
+    NoEventDispatchAssertion assertNoEventDispatch;
     for (auto* activeDOMObject : m_activeDOMObjects)
         activeDOMObject->resume();
 
     m_activeDOMObjectAdditionForbidden = false;
-#if !ASSERT_DISABLED
+#if !ASSERT_DISABLED || ENABLE(SECURITY_ASSERTIONS)
     m_activeDOMObjectRemovalForbidden = false;
 #endif
 }
@@ -284,6 +288,7 @@ void ScriptExecutionContext::stopActiveDOMObjects()
     // stop functions should not add new active DOM objects, nor execute arbitrary JavaScript.
     // An ASSERT_WITH_SECURITY_IMPLICATION or RELEASE_ASSERT will fire if this happens, but it's important to code stop functions
     // so it will not happen!
+    NoEventDispatchAssertion assertNoEventDispatch;
     for (auto* activeDOMObject : possibleActiveDOMObjects) {
         // Check if this object was deleted already. If so, just skip it.
         // Calling contains on a possibly-already-deleted object is OK because we guarantee
@@ -435,7 +440,7 @@ double ScriptExecutionContext::minimumTimerInterval() const
     // workers, we will have to override it in the appropriate
     // subclass, and provide a way to enumerate a Document's dedicated
     // workers so we can update them all.
-    return Settings::defaultMinDOMTimerInterval();
+    return DOMTimer::defaultMinimumInterval();
 }
 
 void ScriptExecutionContext::didChangeTimerAlignmentInterval()
@@ -444,9 +449,9 @@ void ScriptExecutionContext::didChangeTimerAlignmentInterval()
         timer->didChangeAlignmentInterval();
 }
 
-double ScriptExecutionContext::timerAlignmentInterval() const
+double ScriptExecutionContext::timerAlignmentInterval(bool) const
 {
-    return Settings::defaultDOMTimerAlignmentInterval();
+    return DOMTimer::defaultAlignmentInterval();
 }
 
 JSC::VM& ScriptExecutionContext::vm()

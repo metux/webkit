@@ -29,6 +29,7 @@
 
 #include "APIArray.h"
 #include "APISecurityOrigin.h"
+#include "InjectedBundleFileHandle.h"
 #include "InjectedBundleHitTestResult.h"
 #include "InjectedBundleNodeHandle.h"
 #include "InjectedBundleRangeHandle.h"
@@ -94,7 +95,7 @@ WKFrameLoadState WKBundleFrameGetFrameLoadState(WKBundleFrameRef frameRef)
 
 WKArrayRef WKBundleFrameCopyChildFrames(WKBundleFrameRef frameRef)
 {
-    return toAPI(toImpl(frameRef)->childFrames().leakRef());    
+    return toAPI(&toImpl(frameRef)->childFrames().leakRef());    
 }
 
 JSGlobalContextRef WKBundleFrameGetJavaScriptContext(WKBundleFrameRef frameRef)
@@ -120,6 +121,11 @@ JSValueRef WKBundleFrameGetJavaScriptWrapperForNodeForWorld(WKBundleFrameRef fra
 JSValueRef WKBundleFrameGetJavaScriptWrapperForRangeForWorld(WKBundleFrameRef frameRef, WKBundleRangeHandleRef rangeHandleRef, WKBundleScriptWorldRef worldRef)
 {
     return toImpl(frameRef)->jsWrapperForWorld(toImpl(rangeHandleRef), toImpl(worldRef));
+}
+
+JSValueRef WKBundleFrameGetJavaScriptWrapperForFileForWorld(WKBundleFrameRef frameRef, WKBundleFileHandleRef fileHandleRef, WKBundleScriptWorldRef worldRef)
+{
+    return toImpl(frameRef)->jsWrapperForWorld(toImpl(fileHandleRef), toImpl(worldRef));
 }
 
 WKStringRef WKBundleFrameCopyName(WKBundleFrameRef frameRef)
@@ -232,6 +238,11 @@ bool WKBundleFrameContainsAnyFormControls(WKBundleFrameRef frameRef)
 void WKBundleFrameSetTextDirection(WKBundleFrameRef frameRef, WKStringRef directionRef)
 {
     toImpl(frameRef)->setTextDirection(toWTFString(directionRef));
+}
+
+void WKBundleFrameSetAccessibleName(WKBundleFrameRef frameRef, WKStringRef accessibleNameRef)
+{
+    toImpl(frameRef)->setAccessibleName(toWTFString(accessibleNameRef));
 }
 
 WKDataRef WKBundleFrameCopyWebArchive(WKBundleFrameRef frameRef)

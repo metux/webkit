@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,16 @@ enum PromotedLocationKind {
     InvalidPromotedLocationKind,
     
     StructurePLoc,
-    NamedPropertyPLoc
+    ActivationSymbolTablePLoc,
+    NamedPropertyPLoc,
+    ArgumentPLoc,
+    ArgumentCountPLoc,
+    ArgumentsCalleePLoc,
+
+    FunctionExecutablePLoc,
+    FunctionActivationPLoc,
+    ActivationScopePLoc,
+    ClosureVarPLoc,
 };
 
 class PromotedLocationDescriptor {
@@ -48,11 +57,22 @@ public:
         , m_info(info)
     {
     }
-    
+
+    PromotedLocationDescriptor(WTF::HashTableDeletedValueType)
+        : m_kind(InvalidPromotedLocationKind)
+        , m_info(1)
+    {
+    }
+
     bool operator!() const { return m_kind == InvalidPromotedLocationKind; }
+
+    explicit operator bool() const { return !!*this; }
     
     PromotedLocationKind kind() const { return m_kind; }
     unsigned info() const { return m_info; }
+    
+    OpInfo imm1() const { return OpInfo(static_cast<uint32_t>(m_kind)); }
+    OpInfo imm2() const { return OpInfo(static_cast<uint32_t>(m_info)); }
     
     unsigned hash() const
     {
@@ -74,12 +94,30 @@ public:
     {
         return m_kind == InvalidPromotedLocationKind && m_info;
     }
+
+    bool neededForMaterialization() const
+    {
+        switch (kind()) {
+        case NamedPropertyPLoc:
+        case ClosureVarPLoc:
+            return false;
+
+        default:
+            return true;
+        }
+    }
     
     void dump(PrintStream& out) const;
 
 private:
     PromotedLocationKind m_kind;
     unsigned m_info;
+};
+
+struct PromotedLocationDescriptorHash {
+    static unsigned hash(const PromotedLocationDescriptor& key) { return key.hash(); }
+    static bool equal(const PromotedLocationDescriptor& a, const PromotedLocationDescriptor& b) { return a == b; }
+    static const bool safeToCompareToEmptyOrDeleted = true;
 };
 
 class PromotedHeapLocation {
@@ -161,6 +199,16 @@ template<> struct DefaultHash<JSC::DFG::PromotedHeapLocation> {
 
 template<typename T> struct HashTraits;
 template<> struct HashTraits<JSC::DFG::PromotedHeapLocation> : SimpleClassHashTraits<JSC::DFG::PromotedHeapLocation> {
+    static const bool emptyValueIsZero = false;
+};
+
+template<typename T> struct DefaultHash;
+template<> struct DefaultHash<JSC::DFG::PromotedLocationDescriptor> {
+    typedef JSC::DFG::PromotedLocationDescriptorHash Hash;
+};
+
+template<typename T> struct HashTraits;
+template<> struct HashTraits<JSC::DFG::PromotedLocationDescriptor> : SimpleClassHashTraits<JSC::DFG::PromotedLocationDescriptor> {
     static const bool emptyValueIsZero = false;
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2010, 2013, 2015 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  *
  * This library is free software; you can redistribute it and/or
@@ -25,6 +25,7 @@
 #include "FrameLoaderTypes.h"
 #include "LayoutMilestones.h"
 #include "LayoutRect.h"
+#include "MediaProducer.h"
 #include "PageThrottler.h"
 #include "PageVisibilityState.h"
 #include "Pagination.h"
@@ -35,6 +36,7 @@
 #include "Supplementable.h"
 #include "ViewState.h"
 #include "ViewportArguments.h"
+#include "WheelEventTestTrigger.h"
 #include <memory>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
@@ -52,6 +54,10 @@
 #include <wtf/SchedulePair.h>
 #endif
 
+#if ENABLE(MEDIA_SESSION)
+#include "MediaSessionEvents.h"
+#endif
+
 namespace JSC {
 class Debugger;
 }
@@ -59,6 +65,7 @@ class Debugger;
 namespace WebCore {
 
 class AlternativeTextClient;
+class ApplicationCacheStorage;
 class BackForwardController;
 class BackForwardClient;
 class Chrome;
@@ -76,11 +83,13 @@ class FocusController;
 class Frame;
 class FrameLoaderClient;
 class HistoryItem;
+class HTMLMediaElement;
 class UserInputBridge;
 class InspectorClient;
 class InspectorController;
 class MainFrame;
 class MediaCanStartListener;
+class MediaPlaybackTarget;
 class PageConfiguration;
 class PageConsoleClient;
 class PageDebuggable;
@@ -108,7 +117,6 @@ class ViewStateChangeObserver;
 class VisitedLinkStore;
 
 typedef uint64_t LinkHash;
-class SharedBuffer;
 
 enum FindDirection { FindDirectionForward, FindDirectionBackward };
 
@@ -126,8 +134,6 @@ public:
     WEBCORE_EXPORT ~Page();
 
     WEBCORE_EXPORT uint64_t renderTreeSize() const;
-    
-    static std::unique_ptr<Page> createPageFromBuffer(PageConfiguration&, const SharedBuffer*, const String& mimeType, bool canHaveScrollbars, bool transparent);
 
     void setNeedsRecalcStyleInAllFrames();
 
@@ -193,7 +199,7 @@ public:
 
     WEBCORE_EXPORT String scrollingStateTreeAsText();
     WEBCORE_EXPORT String synchronousScrollingReasonsAsText();
-    WEBCORE_EXPORT Ref<ClientRectList> nonFastScrollableRects(const Frame*);
+    WEBCORE_EXPORT Ref<ClientRectList> nonFastScrollableRects();
 
     Settings& settings() const { return *m_settings; }
     ProgressTracker& progress() const { return *m_progress; }
@@ -256,6 +262,11 @@ public:
 
     WEBCORE_EXPORT void setPageScaleFactor(float scale, const IntPoint& origin, bool inStableState = true);
     float pageScaleFactor() const { return m_pageScaleFactor; }
+
+    // The view scale factor is multiplied into the page scale factor by all
+    // callers of setPageScaleFactor.
+    WEBCORE_EXPORT void setViewScaleFactor(float);
+    float viewScaleFactor() const { return m_viewScaleFactor; }
 
     WEBCORE_EXPORT void setZoomedOutPageScaleFactor(float);
     float zoomedOutPageScaleFactor() const { return m_zoomedOutPageScaleFactor; }
@@ -359,6 +370,7 @@ public:
     WEBCORE_EXPORT Color pageExtendedBackgroundColor() const;
 
     bool isCountingRelevantRepaintedObjects() const;
+    void setIsCountingRelevantRepaintedObjects(bool isCounting) { m_isCountingRelevantRepaintedObjects = isCounting; }
     void startCountingRelevantRepaintedObjects();
     void resetRelevantPaintedObjectCounter();
     void addRelevantRepaintedObject(RenderObject*, const LayoutRect& objectPaintRect);
@@ -403,6 +415,7 @@ public:
     void setLastSpatialNavigationCandidateCount(unsigned count) { m_lastSpatialNavigationCandidatesCount = count; }
     unsigned lastSpatialNavigationCandidateCount() const { return m_lastSpatialNavigationCandidatesCount; }
 
+    ApplicationCacheStorage& applicationCacheStorage() { return m_applicationCacheStorage; }
     DatabaseProvider& databaseProvider() { return m_databaseProvider; }
 
     StorageNamespaceProvider& storageNamespaceProvider() { return m_storageNamespaceProvider.get(); }
@@ -410,6 +423,9 @@ public:
 
     UserContentController* userContentController() { return m_userContentController.get(); }
     WEBCORE_EXPORT void setUserContentController(UserContentController*);
+
+    bool userContentExtensionsEnabled() const { return m_userContentExtensionsEnabled; }
+    void setUserContentExtensionsEnabled(bool enabled) { m_userContentExtensionsEnabled = enabled; }
 
     VisitedLinkStore& visitedLinkStore();
     WEBCORE_EXPORT void setVisitedLinkStore(Ref<VisitedLinkStore>&&);
@@ -419,10 +435,35 @@ public:
     WEBCORE_EXPORT void enableLegacyPrivateBrowsing(bool privateBrowsingEnabled);
     bool usesEphemeralSession() const { return m_sessionID.isEphemeral(); }
 
-    bool isPlayingAudio() const { return m_isPlayingAudio; }
-    void updateIsPlayingAudio();
+    MediaProducer::MediaStateFlags mediaState() const { return m_mediaState; }
+    void updateIsPlayingMedia(uint64_t);
     bool isMuted() const { return m_muted; }
     WEBCORE_EXPORT void setMuted(bool);
+
+#if ENABLE(MEDIA_SESSION)
+    WEBCORE_EXPORT void handleMediaEvent(MediaEventType);
+#endif
+
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    void addPlaybackTargetPickerClient(uint64_t);
+    void removePlaybackTargetPickerClient(uint64_t);
+    void showPlaybackTargetPicker(uint64_t, const WebCore::IntPoint&, bool);
+    void playbackTargetPickerClientStateDidChange(uint64_t, MediaProducer::MediaStateFlags);
+
+    WEBCORE_EXPORT void setPlaybackTarget(uint64_t, Ref<MediaPlaybackTarget>&&);
+    WEBCORE_EXPORT void playbackTargetAvailabilityDidChange(uint64_t, bool);
+    WEBCORE_EXPORT void setShouldPlayToPlaybackTarget(uint64_t, bool);
+#endif
+
+    RefPtr<WheelEventTestTrigger> testTrigger() const { return m_testTrigger; }
+    WEBCORE_EXPORT WheelEventTestTrigger& ensureTestTrigger();
+    void clearTrigger() { m_testTrigger = nullptr; }
+    bool expectsWheelEventTriggers() const { return !!m_testTrigger; }
+
+#if ENABLE(VIDEO)
+    bool allowsMediaDocumentInlinePlayback() const { return m_allowsMediaDocumentInlinePlayback; }
+    WEBCORE_EXPORT void setAllowsMediaDocumentInlinePlayback(bool);
+#endif
 
 private:
     WEBCORE_EXPORT void initGroup();
@@ -443,11 +484,6 @@ private:
     unsigned findMatchesForText(const String&, FindOptions, unsigned maxMatchCount, ShouldHighlightMatches, ShouldMarkMatches);
 
     MediaCanStartListener* takeAnyMediaCanStartListener();
-
-    void setMinimumTimerInterval(double);
-    double minimumTimerInterval() const;
-
-    double timerAlignmentInterval() const { return m_timerAlignmentInterval; }
 
     Vector<Ref<PluginViewBase>> pluginViews();
 
@@ -472,7 +508,7 @@ private:
 #if ENABLE(POINTER_LOCK)
     const std::unique_ptr<PointerLockController> m_pointerLockController;
 #endif
-    WEBCORE_EXPORT RefPtr<ScrollingCoordinator> m_scrollingCoordinator;
+    RefPtr<ScrollingCoordinator> m_scrollingCoordinator;
 
     const RefPtr<Settings> m_settings;
     const std::unique_ptr<ProgressTracker> m_progress;
@@ -504,6 +540,7 @@ private:
     float m_pageScaleFactor;
     float m_zoomedOutPageScaleFactor;
     float m_deviceScaleFactor;
+    float m_viewScaleFactor { 1 };
 
     float m_topContentInset;
     
@@ -536,10 +573,7 @@ private:
     ViewMode m_viewMode;
 #endif // ENABLE(VIEW_MODE_CSS_MEDIA)
 
-    double m_minimumTimerInterval;
-
     bool m_timerThrottlingEnabled;
-    double m_timerAlignmentInterval;
 
     bool m_isEditable;
     bool m_isPrerender;
@@ -574,10 +608,12 @@ private:
     unsigned m_lastSpatialNavigationCandidatesCount;
     unsigned m_framesHandlingBeforeUnloadEvent;
 
+    Ref<ApplicationCacheStorage> m_applicationCacheStorage;
     Ref<DatabaseProvider> m_databaseProvider;
     Ref<StorageNamespaceProvider> m_storageNamespaceProvider;
     RefPtr<UserContentController> m_userContentController;
     Ref<VisitedLinkStore> m_visitedLinkStore;
+    RefPtr<WheelEventTestTrigger> m_testTrigger;
 
     HashSet<ViewStateChangeObserver*> m_viewStateChangeObservers;
 
@@ -585,7 +621,10 @@ private:
 
     bool m_isClosing;
 
-    bool m_isPlayingAudio;
+    MediaProducer::MediaStateFlags m_mediaState { MediaProducer::IsNotPlaying };
+    
+    bool m_userContentExtensionsEnabled { true };
+    bool m_allowsMediaDocumentInlinePlayback { false };
 };
 
 inline PageGroup& Page::group()

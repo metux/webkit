@@ -151,10 +151,10 @@ void CSSValueList::addSubresourceStyleURLs(ListHashSet<URL>& urls, const StyleSh
         m_values[i].get().addSubresourceStyleURLs(urls, styleSheet);
 }
 
-bool CSSValueList::hasFailedOrCanceledSubresources() const
+bool CSSValueList::traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const
 {
     for (unsigned i = 0; i < m_values.size(); ++i) {
-        if (m_values[i].get().hasFailedOrCanceledSubresources())
+        if (m_values[i].get().traverseSubresources(handler))
             return true;
     }
     return false;
@@ -169,9 +169,9 @@ CSSValueList::CSSValueList(const CSSValueList& cloneFrom)
         m_values.uncheckedAppend(*cloneFrom.m_values[i]->cloneForCSSOM());
 }
 
-PassRefPtr<CSSValueList> CSSValueList::cloneForCSSOM() const
+Ref<CSSValueList> CSSValueList::cloneForCSSOM() const
 {
-    return adoptRef(new CSSValueList(*this));
+    return adoptRef(*new CSSValueList(*this));
 }
 
 } // namespace WebCore

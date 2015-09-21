@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +26,8 @@
 #include "config.h"
 #include "StackVisitor.h"
 
-#include "Arguments.h"
 #include "CallFrameInlines.h"
+#include "ClonedArguments.h"
 #include "Executable.h"
 #include "Interpreter.h"
 #include "JSCInlines.h"
@@ -149,7 +149,10 @@ void StackVisitor::readInlinedFrame(CallFrame* callFrame, CodeOrigin* codeOrigin
 
         m_frame.m_callFrame = callFrame;
         m_frame.m_inlineCallFrame = inlineCallFrame;
-        m_frame.m_argumentCountIncludingThis = inlineCallFrame->arguments.size();
+        if (inlineCallFrame->argumentCountRegister.isValid())
+            m_frame.m_argumentCountIncludingThis = callFrame->r(inlineCallFrame->argumentCountRegister.offset()).unboxedInt32();
+        else
+            m_frame.m_argumentCountIncludingThis = inlineCallFrame->arguments.size();
         m_frame.m_codeBlock = inlineCallFrame->baselineCodeBlock();
         m_frame.m_bytecodeOffset = codeOrigin->bytecodeIndex;
 
@@ -252,63 +255,24 @@ String StackVisitor::Frame::toString()
     return traceBuild.toString().impl();
 }
 
-Arguments* StackVisitor::Frame::createArguments()
+ClonedArguments* StackVisitor::Frame::createArguments()
 {
     ASSERT(m_callFrame);
     CallFrame* physicalFrame = m_callFrame;
-    VM& vm = physicalFrame->vm();
-    Arguments* arguments;
+    ClonedArguments* arguments;
     ArgumentsMode mode;
     if (Options::enableFunctionDotArguments())
-        mode = ClonedArgumentsCreationMode;
+        mode = ArgumentsMode::Cloned;
     else
-        mode = FakeArgumentValuesCreationMode;
+        mode = ArgumentsMode::FakeValues;
 #if ENABLE(DFG_JIT)
     if (isInlinedFrame()) {
         ASSERT(m_inlineCallFrame);
-        arguments = Arguments::create(vm, physicalFrame, m_inlineCallFrame, mode);
-        arguments->tearOff(physicalFrame, m_inlineCallFrame);
-        jsCast<Arguments*>((JSCell*)arguments);
+        arguments = ClonedArguments::createWithInlineFrame(physicalFrame, physicalFrame, m_inlineCallFrame, mode);
     } else 
 #endif
-    {
-        JSLexicalEnvironment* lexicalEnvironment = nullptr;
-        arguments = Arguments::create(vm, physicalFrame, lexicalEnvironment, mode);
-        arguments->tearOff(physicalFrame);
-    }
+        arguments = ClonedArguments::createWithMachineFrame(physicalFrame, physicalFrame, mode);
     return arguments;
-}
-
-Arguments* StackVisitor::Frame::existingArguments()
-{
-    if (codeBlock()->codeType() != FunctionCode)
-        return 0;
-    if (!codeBlock()->usesArguments())
-        return 0;
-    
-    VirtualRegister reg;
-        
-#if ENABLE(DFG_JIT)
-    if (isInlinedFrame())
-        reg = inlineCallFrame()->argumentsRegister;
-    else
-#endif // ENABLE(DFG_JIT)
-        reg = codeBlock()->argumentsRegister();
-
-    // Care should be taken here since exception fuzzing may raise exceptions in
-    // places where they would be otherwise impossible. Therefore, callFrame may
-    // lack activation even if the codeBlock signals need of activation. Also,
-    // even if codeBlock signals the use of arguments, the
-    // unmodifiedArgumentsRegister may not be initialized yet (neither locally
-    // nor in lexicalEnvironment).
-    JSValue result = jsUndefined();
-    if (codeBlock()->needsActivation() && callFrame()->hasActivation())
-        result = callFrame()->lexicalEnvironment()->registerAt(unmodifiedArgumentsRegister(reg).offset()).get();
-    if (!result || !result.isCell()) // Try local unmodifiedArgumentsRegister if lexicalEnvironment is not present (generally possible) or has not set up registers yet (only possible if fuzzing exceptions).
-        result = callFrame()->r(unmodifiedArgumentsRegister(reg).offset()).jsValue();
-    if (!result || !result.isCell()) // Protect against the case when exception fuzzing throws when unmodifiedArgumentsRegister is not set up yet (e.g., in op_enter).
-        return 0;
-    return jsCast<Arguments*>(result);
 }
 
 void StackVisitor::Frame::computeLineAndColumn(unsigned& line, unsigned& column)
@@ -327,8 +291,11 @@ void StackVisitor::Frame::computeLineAndColumn(unsigned& line, unsigned& column)
     unsigned divotColumn = 0;
     retrieveExpressionInfo(divot, unusedStartOffset, unusedEndOffset, divotLine, divotColumn);
 
-    line = divotLine + codeBlock->ownerExecutable()->lineNo();
+    line = divotLine + codeBlock->ownerExecutable()->firstLine();
     column = divotColumn + (divotLine ? 1 : codeBlock->firstLineColumnOffset());
+
+    if (codeBlock->ownerExecutable()->hasOverrideLineNumber())
+        line = codeBlock->ownerExecutable()->overrideLineNumber();
 }
 
 void StackVisitor::Frame::retrieveExpressionInfo(int& divot, int& startOffset, int& endOffset, unsigned& line, unsigned& column)
@@ -346,156 +313,106 @@ void StackVisitor::Frame::setToEnd()
 #endif
 }
 
-#ifndef NDEBUG
-
-static const char* jitTypeName(JITCode::JITType jitType)
-{
-    switch (jitType) {
-    case JITCode::None: return "None";
-    case JITCode::HostCallThunk: return "HostCallThunk";
-    case JITCode::InterpreterThunk: return "InterpreterThunk";
-    case JITCode::BaselineJIT: return "BaselineJIT";
-    case JITCode::DFGJIT: return "DFGJIT";
-    case JITCode::FTLJIT: return "FTLJIT";
-    }
-    return "<unknown>";
-}
-
 static void printIndents(int levels)
 {
     while (levels--)
         dataLogFString("   ");
 }
 
-static void printif(int indentLevels, const char* format, ...)
+template<typename... Types>
+void log(unsigned indent, const Types&... values)
 {
-    va_list argList;
-    va_start(argList, format);
+    printIndents(indent);
+    dataLog(values...);
+}
 
-    if (indentLevels)
-        printIndents(indentLevels);
+template<typename... Types>
+void logF(unsigned indent, const char* format, const Types&... values)
+{
+    printIndents(indent);
 
-#if COMPILER(CLANG) || COMPILER(GCC)
+#if COMPILER(GCC_OR_CLANG)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #pragma GCC diagnostic ignored "-Wmissing-format-attribute"
 #endif
 
-    WTF::dataLogFV(format, argList);
+    dataLogF(format, values...);
 
-#if COMPILER(CLANG) || COMPILER(GCC)
+#if COMPILER(GCC_OR_CLANG)
 #pragma GCC diagnostic pop
 #endif
-
-    va_end(argList);
 }
 
-void StackVisitor::Frame::print(int indentLevel)
+void StackVisitor::Frame::print(int indent)
 {
-    int i = indentLevel;
-
     if (!this->callFrame()) {
-        printif(i, "frame 0x0\n");
+        log(indent, "frame 0x0\n");
         return;
     }
 
     CodeBlock* codeBlock = this->codeBlock();
-    printif(i, "frame %p {\n", this->callFrame());
+    logF(indent, "frame %p {\n", this->callFrame());
 
-    CallFrame* callFrame = m_callFrame;
-    CallFrame* callerFrame = this->callerFrame();
-    void* returnPC = callFrame->hasReturnPC() ? callFrame->returnPC().value() : nullptr;
+    {
+        indent++;
 
-    printif(i, "   name '%s'\n", functionName().utf8().data());
-    printif(i, "   sourceURL '%s'\n", sourceURL().utf8().data());
+        CallFrame* callFrame = m_callFrame;
+        CallFrame* callerFrame = this->callerFrame();
+        void* returnPC = callFrame->hasReturnPC() ? callFrame->returnPC().value() : nullptr;
 
+        log(indent, "name: ", functionName(), "\n");
+        log(indent, "sourceURL: ", sourceURL(), "\n");
+
+        bool isInlined = false;
 #if ENABLE(DFG_JIT)
-    printif(i, "   isInlinedFrame %d\n", isInlinedFrame());
-    if (isInlinedFrame())
-        printif(i, "   InlineCallFrame %p\n", m_inlineCallFrame);
+        isInlined = isInlinedFrame();
+        log(indent, "isInlinedFrame: ", isInlinedFrame(), "\n");
+        if (isInlinedFrame())
+            logF(indent, "InlineCallFrame: %p\n", m_inlineCallFrame);
 #endif
 
-    printif(i, "   callee %p\n", callee());
-    printif(i, "   returnPC %p\n", returnPC);
-    printif(i, "   callerFrame %p\n", callerFrame);
-    unsigned locationRawBits = callFrame->locationAsRawBits();
-    printif(i, "   rawLocationBits %u 0x%x\n", locationRawBits, locationRawBits);
-    printif(i, "   codeBlock %p\n", codeBlock);
-    if (codeBlock) {
-        JITCode::JITType jitType = codeBlock->jitType();
-        if (callFrame->hasLocationAsBytecodeOffset()) {
-            unsigned bytecodeOffset = callFrame->locationAsBytecodeOffset();
-            printif(i, "      bytecodeOffset %u %p / %zu\n", bytecodeOffset, reinterpret_cast<void*>(bytecodeOffset), codeBlock->instructions().size());
+        logF(indent, "callee: %p\n", callee());
+        logF(indent, "returnPC: %p\n", returnPC);
+        logF(indent, "callerFrame: %p\n", callerFrame);
+        unsigned locationRawBits = callFrame->locationAsRawBits();
+        logF(indent, "rawLocationBits: %u 0x%x\n", locationRawBits, locationRawBits);
+        logF(indent, "codeBlock: %p ", codeBlock);
+        if (codeBlock)
+            dataLog(*codeBlock);
+        dataLog("\n");
+        if (codeBlock && !isInlined) {
+            indent++;
+
+            if (callFrame->hasLocationAsBytecodeOffset()) {
+                unsigned bytecodeOffset = callFrame->locationAsBytecodeOffset();
+                log(indent, "bytecodeOffset: ", bytecodeOffset, " of ", codeBlock->instructions().size(), "\n");
 #if ENABLE(DFG_JIT)
-        } else {
-            unsigned codeOriginIndex = callFrame->locationAsCodeOriginIndex();
-            printif(i, "      codeOriginIdex %u %p / %zu\n", codeOriginIndex, reinterpret_cast<void*>(codeOriginIndex), codeBlock->codeOrigins().size());
+            } else {
+                log(indent, "hasCodeOrigins: ", codeBlock->hasCodeOrigins(), "\n");
+                if (codeBlock->hasCodeOrigins()) {
+                    unsigned codeOriginIndex = callFrame->locationAsCodeOriginIndex();
+                    log(indent, "codeOriginIndex: ", codeOriginIndex, " of ", codeBlock->codeOrigins().size(), "\n");
+
+                    JITCode::JITType jitType = codeBlock->jitType();
+                    if (jitType != JITCode::FTLJIT) {
+                        JITCode* jitCode = codeBlock->jitCode().get();
+                        logF(indent, "jitCode: %p start %p end %p\n", jitCode, jitCode->start(), jitCode->end());
+                    }
+                }
 #endif
+            }
+            unsigned line = 0;
+            unsigned column = 0;
+            computeLineAndColumn(line, column);
+            log(indent, "line: ", line, "\n");
+            log(indent, "column: ", column, "\n");
+
+            indent--;
         }
-        unsigned line = 0;
-        unsigned column = 0;
-        computeLineAndColumn(line, column);
-        printif(i, "      line %d\n", line);
-        printif(i, "      column %d\n", column);
-        printif(i, "      jitType %d <%s> isOptimizingJIT %d\n", jitType, jitTypeName(jitType), JITCode::isOptimizingJIT(jitType));
-#if ENABLE(DFG_JIT)
-        printif(i, "      hasCodeOrigins %d\n", codeBlock->hasCodeOrigins());
-        if (codeBlock->hasCodeOrigins()) {
-            JITCode* jitCode = codeBlock->jitCode().get();
-            printif(i, "         jitCode %p start %p end %p\n", jitCode, jitCode->start(), jitCode->end());
-        }
-#endif
+        indent--;
     }
-    printif(i, "}\n");
+    log(indent, "}\n");
 }
-
-#endif // NDEBUG
 
 } // namespace JSC
-
-#ifndef NDEBUG
-using JSC::StackVisitor;
-
-// For debugging use
-JS_EXPORT_PRIVATE void debugPrintCallFrame(JSC::CallFrame*);
-JS_EXPORT_PRIVATE void debugPrintStack(JSC::CallFrame* topCallFrame);
-
-class DebugPrintFrameFunctor {
-public:
-    enum Action {
-        PrintOne,
-        PrintAll
-    };
-
-    DebugPrintFrameFunctor(Action action)
-        : m_action(action)
-    {
-    }
-
-    StackVisitor::Status operator()(StackVisitor& visitor)
-    {
-        visitor->print(2);
-        return m_action == PrintAll ? StackVisitor::Continue : StackVisitor::Done;
-    }
-
-private:
-    Action m_action;
-};
-
-void debugPrintCallFrame(JSC::CallFrame* callFrame)
-{
-    if (!callFrame)
-        return;
-    DebugPrintFrameFunctor functor(DebugPrintFrameFunctor::PrintOne);
-    callFrame->iterate(functor);
-}
-
-void debugPrintStack(JSC::CallFrame* topCallFrame)
-{
-    if (!topCallFrame)
-        return;
-    DebugPrintFrameFunctor functor(DebugPrintFrameFunctor::PrintAll);
-    topCallFrame->iterate(functor);
-}
-
-#endif // !NDEBUG

@@ -28,52 +28,55 @@
 
 #if ENABLE(NETWORK_CACHE)
 
-#include <wtf/MD5.h>
+#include <wtf/SHA1.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebKit {
+namespace NetworkCache {
 
-class NetworkCacheEncoder;
-class NetworkCacheDecoder;
+class Encoder;
+class Decoder;
 
-class NetworkCacheKey {
+class Key {
 public:
-    typedef MD5::Digest HashType;
+    typedef SHA1::Digest HashType;
 
-    NetworkCacheKey() { }
-    NetworkCacheKey(const NetworkCacheKey&);
-    NetworkCacheKey(NetworkCacheKey&&);
-    NetworkCacheKey(const String& method, const String& partition, const String& identifier);
+    Key() { }
+    Key(const Key&);
+    Key(Key&&) = default;
+    Key(const String& partition, const String& range, const String& identifier);
 
-    const String& method() const { return m_method; }
+    Key& operator=(const Key&);
+    Key& operator=(Key&&) = default;
+
+    bool isNull() const { return m_identifier.isNull(); }
+
     const String& partition() const { return m_partition; }
     const String& identifier() const { return m_identifier; }
 
     HashType hash() const { return m_hash; }
-    unsigned shortHash() const  { return toShortHash(m_hash); }
 
-    static unsigned toShortHash(const HashType& hash) { return *reinterpret_cast<const unsigned*>(hash.data()); }
     static bool stringToHash(const String&, HashType&);
 
     static size_t hashStringLength() { return 2 * sizeof(m_hash); }
     String hashAsString() const;
 
-    void encode(NetworkCacheEncoder&) const;
-    static bool decode(NetworkCacheDecoder&, NetworkCacheKey&);
+    void encode(Encoder&) const;
+    static bool decode(Decoder&, Key&);
 
-    bool operator==(const NetworkCacheKey&) const;
-    bool operator!=(const NetworkCacheKey& other) const { return !(*this == other); }
+    bool operator==(const Key&) const;
+    bool operator!=(const Key& other) const { return !(*this == other); }
 
 private:
     HashType computeHash() const;
-    void operator=(const NetworkCacheKey&) = delete;
 
-    String m_method;
     String m_partition;
     String m_identifier;
+    String m_range;
     HashType m_hash;
 };
 
+}
 }
 
 #endif

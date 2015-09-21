@@ -24,7 +24,7 @@
 #include <JavaScriptCore/JSStringRef.h>
 #include <JavaScriptCore/JSValueRef.h>
 #include <glib/gstdio.h>
-#include <wtf/gobject/GRefPtr.h>
+#include <wtf/glib/GRefPtr.h>
 
 class IsPlayingAudioWebViewTest : public WebViewTest {
 public:
@@ -96,11 +96,16 @@ static void testWebViewWebContextLifetime(WebViewTest* test, gconstpointer)
 
 static void testWebViewCustomCharset(WebViewTest* test, gconstpointer)
 {
+    test->loadHtml("<html><body>WebKitGTK+ custom encoding test</body></html>", nullptr);
     g_assert(!webkit_web_view_get_custom_charset(test->m_webView));
     webkit_web_view_set_custom_charset(test->m_webView, "utf8");
+    // Changing the charset reloads the page, so wait until reloaded.
+    test->waitUntilLoadFinished();
     g_assert_cmpstr(webkit_web_view_get_custom_charset(test->m_webView), ==, "utf8");
-    // Go back to the default charset.
-    webkit_web_view_set_custom_charset(test->m_webView, 0);
+
+    // Go back to the default charset and wait until reloaded.
+    webkit_web_view_set_custom_charset(test->m_webView, nullptr);
+    test->waitUntilLoadFinished();
     g_assert(!webkit_web_view_get_custom_charset(test->m_webView));
 }
 
@@ -475,7 +480,7 @@ static void testWebViewSave(SaveWebViewTest* test, gconstpointer)
     gchar buffer[512] = { 0 };
     gssize readBytes = 0;
     gssize totalBytesFromStream = 0;
-    while (readBytes = g_input_stream_read(test->m_inputStream.get(), &buffer, 512, 0, &error.outPtr())) {
+    while ((readBytes = g_input_stream_read(test->m_inputStream.get(), &buffer, 512, 0, &error.outPtr()))) {
         g_assert(!error);
         totalBytesFromStream += readBytes;
     }

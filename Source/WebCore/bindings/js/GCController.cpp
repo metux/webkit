@@ -32,6 +32,7 @@
 #include <heap/Heap.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/FastMalloc.h>
+#include <wtf/NeverDestroyed.h>
 
 using namespace JSC;
 
@@ -43,10 +44,10 @@ static void collect(void*)
     JSDOMWindow::commonVM().heap.collectAllGarbage();
 }
 
-GCController& gcController()
+GCController& GCController::singleton()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(GCController, staticGCController, ());
-    return staticGCController;
+    static NeverDestroyed<GCController> controller;
+    return controller;
 }
 
 GCController::GCController()
@@ -89,6 +90,17 @@ void GCController::garbageCollectNow()
     }
 }
 
+void GCController::garbageCollectNowIfNotDoneRecently()
+{
+#if USE(CF)
+    JSLockHolder lock(JSDOMWindow::commonVM());
+    if (!JSDOMWindow::commonVM().heap.isBusy())
+        JSDOMWindow::commonVM().heap.collectAllGarbageIfNotDoneRecently();
+#else
+    garbageCollectSoon();
+#endif
+}
+
 void GCController::garbageCollectOnAlternateThreadForDebugging(bool waitUntilDone)
 {
     ThreadIdentifier threadID = createThread(collect, 0, "WebCore: GCController");
@@ -101,28 +113,15 @@ void GCController::garbageCollectOnAlternateThreadForDebugging(bool waitUntilDon
     detachThread(threadID);
 }
 
-void GCController::releaseExecutableMemory()
-{
-    JSLockHolder lock(JSDOMWindow::commonVM());
-
-    // We shouldn't have any JavaScript running on our stack when this function is called.
-    // The following line asserts that, but to be safe we check this in release builds anyway.
-    ASSERT(!JSDOMWindow::commonVM().entryScope);
-    if (JSDOMWindow::commonVM().entryScope)
-        return;
-
-    JSDOMWindow::commonVM().releaseExecutableMemory();
-}
-
 void GCController::setJavaScriptGarbageCollectorTimerEnabled(bool enable)
 {
     JSDOMWindow::commonVM().heap.setGarbageCollectionTimerEnabled(enable);
 }
 
-void GCController::discardAllCompiledCode()
+void GCController::deleteAllCode()
 {
     JSLockHolder lock(JSDOMWindow::commonVM());
-    JSDOMWindow::commonVM().discardAllCode();
+    JSDOMWindow::commonVM().deleteAllCode();
 }
 
 } // namespace WebCore

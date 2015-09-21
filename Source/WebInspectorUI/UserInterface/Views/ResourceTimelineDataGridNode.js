@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,45 +23,38 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.ResourceTimelineDataGridNode = function(resourceTimelineRecord, graphOnly, graphDataSource)
+WebInspector.ResourceTimelineDataGridNode = class ResourceTimelineDataGridNode extends WebInspector.TimelineDataGridNode
 {
-    WebInspector.TimelineDataGridNode.call(this, graphOnly, graphDataSource);
+    constructor(resourceTimelineRecord, graphOnly, graphDataSource)
+    {
+        super(graphOnly, graphDataSource);
 
-    this._resource = resourceTimelineRecord.resource;
-    this._record = resourceTimelineRecord;
+        this._resource = resourceTimelineRecord.resource;
+        this._record = resourceTimelineRecord;
 
-    this._record.addEventListener(WebInspector.TimelineRecord.Event.Updated, graphOnly ? this._timelineRecordUpdated : this._needsRefresh, this);
+        this._record.addEventListener(WebInspector.TimelineRecord.Event.Updated, graphOnly ? this._timelineRecordUpdated : this._needsRefresh, this);
 
-    if (!graphOnly) {
-        this._resource.addEventListener(WebInspector.Resource.Event.URLDidChange, this._needsRefresh, this);
-        this._resource.addEventListener(WebInspector.Resource.Event.TypeDidChange, this._needsRefresh, this);
-        this._resource.addEventListener(WebInspector.Resource.Event.LoadingDidFinish, this._needsRefresh, this);
-        this._resource.addEventListener(WebInspector.Resource.Event.LoadingDidFail, this._needsRefresh, this);
-        this._resource.addEventListener(WebInspector.Resource.Event.SizeDidChange, this._needsRefresh, this);
-        this._resource.addEventListener(WebInspector.Resource.Event.TransferSizeDidChange, this._needsRefresh, this);
+        if (!graphOnly) {
+            this._resource.addEventListener(WebInspector.Resource.Event.URLDidChange, this._needsRefresh, this);
+            this._resource.addEventListener(WebInspector.Resource.Event.TypeDidChange, this._needsRefresh, this);
+            this._resource.addEventListener(WebInspector.Resource.Event.LoadingDidFinish, this._needsRefresh, this);
+            this._resource.addEventListener(WebInspector.Resource.Event.LoadingDidFail, this._needsRefresh, this);
+            this._resource.addEventListener(WebInspector.Resource.Event.SizeDidChange, this._needsRefresh, this);
+            this._resource.addEventListener(WebInspector.Resource.Event.TransferSizeDidChange, this._needsRefresh, this);
+        }
     }
-};
-
-WebInspector.Object.addConstructorFunctions(WebInspector.ResourceTimelineDataGridNode);
-
-WebInspector.ResourceTimelineDataGridNode.IconStyleClassName = "icon";
-WebInspector.ResourceTimelineDataGridNode.ErrorStyleClassName = "error";
-
-WebInspector.ResourceTimelineDataGridNode.prototype = {
-    constructor: WebInspector.ResourceTimelineDataGridNode,
-    __proto__: WebInspector.TimelineDataGridNode.prototype,
 
     // Public
 
     get records()
     {
         return [this._record];
-    },
+    }
 
     get resource()
     {
         return this._resource;
-    },
+    }
 
     get data()
     {
@@ -74,7 +67,6 @@ WebInspector.ResourceTimelineDataGridNode.prototype = {
         if (!this._graphOnly) {
             var zeroTime = this.graphDataSource ? this.graphDataSource.zeroTime : 0;
 
-            data.name = WebInspector.displayNameForURL(resource.url, resource.urlComponents);
             data.domain = WebInspector.displayNameForHost(resource.urlComponents.host);
             data.scheme = resource.urlComponents.scheme ? resource.urlComponents.scheme.toUpperCase() : "";
             data.method = resource.requestMethod;
@@ -92,40 +84,19 @@ WebInspector.ResourceTimelineDataGridNode.prototype = {
 
         this._cachedData = data;
         return data;
-    },
+    }
 
-    createCellContent: function(columnIdentifier, cell)
+    createCellContent(columnIdentifier, cell)
     {
         var resource = this._resource;
 
         if (resource.failed || resource.canceled || resource.statusCode >= 400)
-            cell.classList.add(WebInspector.ResourceTimelineDataGridNode.ErrorStyleClassName);
+            cell.classList.add("error");
 
         const emptyValuePlaceholderString = "\u2014";
         var value = this.data[columnIdentifier];
 
         switch (columnIdentifier) {
-        case "name":
-            cell.classList.add(WebInspector.ResourceTreeElement.ResourceIconStyleClassName);
-            cell.classList.add(resource.type);
-
-            var fragment = document.createDocumentFragment();
-
-            var goToButton = WebInspector.createGoToArrowButton();
-            goToButton.addEventListener("click", this._goToResource.bind(this));
-            fragment.appendChild(goToButton);
-
-            var icon = document.createElement("div");
-            icon.className = WebInspector.ResourceTimelineDataGridNode.IconStyleClassName;
-            fragment.appendChild(icon);
-
-            var text = document.createTextNode(value);
-            fragment.appendChild(text);
-
-            cell.title = resource.url;
-
-            return fragment;
-
         case "type":
             return WebInspector.Resource.displayNameForType(value);
 
@@ -149,10 +120,10 @@ WebInspector.ResourceTimelineDataGridNode.prototype = {
             return isNaN(value) ? emptyValuePlaceholderString : Number.secondsToString(value, true);
         }
 
-        return WebInspector.TimelineDataGridNode.prototype.createCellContent.call(this, columnIdentifier, cell);
-    },
+        return super.createCellContent(columnIdentifier, cell);
+    }
 
-    refresh: function()
+    refresh()
     {
         if (this._scheduledRefreshIdentifier) {
             cancelAnimationFrame(this._scheduledRefreshIdentifier);
@@ -161,12 +132,12 @@ WebInspector.ResourceTimelineDataGridNode.prototype = {
 
         delete this._cachedData;
 
-        WebInspector.TimelineDataGridNode.prototype.refresh.call(this);
-    },
+        super.refresh();
+    }
 
     // Private
 
-    _needsRefresh: function()
+    _needsRefresh()
     {
         if (this.dataGrid instanceof WebInspector.TimelineDataGrid) {
             this.dataGrid.dataGridNodeNeedsRefresh(this);
@@ -177,14 +148,9 @@ WebInspector.ResourceTimelineDataGridNode.prototype = {
             return;
 
         this._scheduledRefreshIdentifier = requestAnimationFrame(this.refresh.bind(this));
-    },
+    }
 
-    _goToResource: function(event)
-    {
-        WebInspector.resourceSidebarPanel.showSourceCode(this._resource);
-    },
-
-    _timelineRecordUpdated: function(event)
+    _timelineRecordUpdated(event)
     {
         if (this.isRecordVisible(this._record))
             this.needsGraphRefresh();

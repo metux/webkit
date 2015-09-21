@@ -52,6 +52,10 @@ class URL;
 class QuickLookHandle;
 #endif
 
+#if ENABLE(CONTENT_EXTENSIONS)
+enum class ResourceType : uint16_t;
+#endif
+
 class ResourceLoader : public RefCounted<ResourceLoader>, protected ResourceHandleClient {
 public:
     virtual ~ResourceLoader() = 0;
@@ -59,6 +63,8 @@ public:
     WEBCORE_EXPORT void cancel();
 
     virtual bool init(const ResourceRequest&);
+
+    void deliverResponseAndData(const ResourceResponse&, RefPtr<SharedBuffer>&&);
 
 #if PLATFORM(IOS)
     virtual bool startLoading()
@@ -71,10 +77,10 @@ public:
 #endif
 
     WEBCORE_EXPORT FrameLoader* frameLoader() const;
-    FrameLoader& dataProtocolFrameLoader() const;
     DocumentLoader* documentLoader() const { return m_documentLoader.get(); }
     const ResourceRequest& originalRequest() const { return m_originalRequest; }
-    
+
+    WEBCORE_EXPORT void start();
     WEBCORE_EXPORT void cancel(const ResourceError&);
     WEBCORE_EXPORT ResourceError cancelledError();
     ResourceError blockedError();
@@ -93,8 +99,7 @@ public:
     
     virtual bool isSubresourceLoader();
 
-    virtual void willSendRequest(ResourceRequest&, const ResourceResponse& redirectResponse);
-    virtual void willSendRequest(ResourceRequest&&, const ResourceResponse& redirectResponse, std::function<void(ResourceRequest&)> callback);
+    virtual void willSendRequest(ResourceRequest&&, const ResourceResponse& redirectResponse, std::function<void(ResourceRequest&&)>&& callback);
     virtual void didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent);
     virtual void didReceiveResponse(const ResourceResponse&);
     virtual void didReceiveData(const char*, unsigned, long long encodedDataLength, DataPayloadType);
@@ -143,11 +148,6 @@ public:
 protected:
     ResourceLoader(Frame*, ResourceLoaderOptions);
 
-    friend class ResourceLoadScheduler; // for access to start()
-    // start() actually sends the load to the network (unless the load is being
-    // deferred) and should only be called by ResourceLoadScheduler or setDefersLoading().
-    void start();
-
     void didFinishLoadingOnePart(double finishTime);
     void cleanupForError(const ResourceError&);
 
@@ -164,6 +164,8 @@ protected:
     virtual CFCachedURLResponseRef willCacheResponse(ResourceHandle*, CFCachedURLResponseRef) override;
 #endif
 
+    virtual void willSendRequestInternal(ResourceRequest&, const ResourceResponse& redirectResponse);
+
     RefPtr<ResourceHandle> m_handle;
     RefPtr<Frame> m_frame;
     RefPtr<DocumentLoader> m_documentLoader;
@@ -174,6 +176,8 @@ private:
     virtual void didCancel(const ResourceError&) = 0;
 
     void addDataOrBuffer(const char*, unsigned, SharedBuffer*, DataPayloadType);
+    void loadDataURL();
+    void finishNetworkLoad();
 
     // ResourceHandleClient
     virtual void willSendRequest(ResourceHandle*, ResourceRequest&, const ResourceResponse& redirectResponse) override;
@@ -224,6 +228,11 @@ private:
     ResourceRequest m_deferredRequest;
     ResourceLoaderOptions m_options;
     bool m_isQuickLookResource;
+
+#if ENABLE(CONTENT_EXTENSIONS)
+protected:
+    ResourceType m_resourceType;
+#endif
 };
 
 inline const ResourceResponse& ResourceLoader::response() const

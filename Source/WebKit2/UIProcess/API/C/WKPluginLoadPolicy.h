@@ -37,8 +37,18 @@ enum {
     kWKPluginLoadPolicyBlocked,
     kWKPluginLoadPolicyInactive,
     kWKPluginLoadPolicyLoadUnsandboxed,
+    kWKPluginLoadPolicyBlockedForCompatibility,
 };
 typedef uint32_t WKPluginLoadPolicy;
+
+enum {
+    kWKPluginLoadClientPolicyUndefined = 0,
+    kWKPluginLoadClientPolicyBlock,
+    kWKPluginLoadClientPolicyAsk,
+    kWKPluginLoadClientPolicyAllow,
+    kWKPluginLoadClientPolicyAllowAlways,
+};
+typedef uint32_t WKPluginLoadClientPolicy;
 
 #ifdef __cplusplus
 }

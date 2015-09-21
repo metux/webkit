@@ -32,7 +32,6 @@
 #include "WebProcess.h"
 #include <WebCore/DisplayRefreshMonitor.h>
 #include <WebCore/TransformationMatrix.h>
-#include <wtf/Functional.h>
 
 // Subclasses
 #if PLATFORM(COCOA)
@@ -96,7 +95,7 @@ void DrawingArea::dispatchAfterEnsuringUpdatedScrollPosition(std::function<void 
 }
 
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
-PassRefPtr<WebCore::DisplayRefreshMonitor> DrawingArea::createDisplayRefreshMonitor(PlatformDisplayID)
+RefPtr<WebCore::DisplayRefreshMonitor> DrawingArea::createDisplayRefreshMonitor(PlatformDisplayID)
 {
     return nullptr;
 }

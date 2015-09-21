@@ -147,7 +147,7 @@ void SVGImage::drawForContainer(GraphicsContext* context, const FloatSize contai
     ASSERT(observer);
 
     // Temporarily reset image observer, we don't want to receive any changeInRect() calls due to this relayout.
-    setImageObserver(0);
+    setImageObserver(nullptr);
 
     IntSize roundedContainerSize = roundedIntSize(containerSize);
     setContainerSize(roundedContainerSize);
@@ -289,7 +289,7 @@ bool SVGImage::hasRelativeWidth() const
     SVGSVGElement* rootElement = this->rootElement();
     if (!rootElement)
         return false;
-    return rootElement->intrinsicWidth().isPercent();
+    return rootElement->intrinsicWidth().isPercentOrCalculated();
 }
 
 bool SVGImage::hasRelativeHeight() const
@@ -297,7 +297,7 @@ bool SVGImage::hasRelativeHeight() const
     SVGSVGElement* rootElement = this->rootElement();
     if (!rootElement)
         return false;
-    return rootElement->intrinsicHeight().isPercent();
+    return rootElement->intrinsicHeight().isPercentOrCalculated();
 }
 
 void SVGImage::computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio)
@@ -350,11 +350,6 @@ bool SVGImage::dataChanged(bool allDataReceived)
         fillWithEmptyClients(pageConfiguration);
         m_chromeClient = std::make_unique<SVGImageChromeClient>(this);
         pageConfiguration.chromeClient = m_chromeClient.get();
-        m_loaderClient = std::make_unique<SVGFrameLoaderClient>(m_dataProtocolLoader);
-        pageConfiguration.loaderClientForMainFrame = m_loaderClient.get();
-
-        bool canHaveScrollbars = false; // SVG Images will always synthesize a viewBox, if it's not available, and thus never see scrollbars.
-        bool transparent = true; // SVG Images are transparent.
 
         // FIXME: If this SVG ends up loading itself, we might leak the world.
         // The Cache code does not know about CachedImages holding Frames and
@@ -362,7 +357,25 @@ bool SVGImage::dataChanged(bool allDataReceived)
         // This will become an issue when SVGImage will be able to load other
         // SVGImage objects, but we're safe now, because SVGImage can only be
         // loaded by a top-level document.
-        m_page = Page::createPageFromBuffer(pageConfiguration, data(), "image/svg+xml", canHaveScrollbars, transparent);
+        m_page = std::make_unique<Page>(pageConfiguration);
+        m_page->settings().setMediaEnabled(false);
+        m_page->settings().setScriptEnabled(false);
+        m_page->settings().setPluginsEnabled(false);
+
+        Frame& frame = m_page->mainFrame();
+        frame.setView(FrameView::create(frame));
+        frame.init();
+        FrameLoader& loader = frame.loader();
+        loader.forceSandboxFlags(SandboxAll);
+
+        frame.view()->setCanHaveScrollbars(false); // SVG Images will always synthesize a viewBox, if it's not available, and thus never see scrollbars.
+        frame.view()->setTransparent(true); // SVG Images are transparent.
+
+        ASSERT(loader.activeDocumentLoader()); // DocumentLoader should have been created by frame->init().
+        loader.activeDocumentLoader()->writer().setMIMEType("image/svg+xml");
+        loader.activeDocumentLoader()->writer().begin(URL()); // create the empty document
+        loader.activeDocumentLoader()->writer().addData(data()->data(), data()->size());
+        loader.activeDocumentLoader()->writer().end();
 
         // Set the intrinsic size before a container size is available.
         m_intrinsicSize = containerSize();

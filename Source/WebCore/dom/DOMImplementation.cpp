@@ -238,13 +238,13 @@ RefPtr<Document> DOMImplementation::createDocument(const String& namespaceURI,
     return doc;
 }
 
-RefPtr<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, const String& media, ExceptionCode&)
+Ref<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, const String& media, ExceptionCode&)
 {
     // FIXME: Title should be set.
     // FIXME: Media could have wrong syntax, in which case we should generate an exception.
-    auto sheet = CSSStyleSheet::create(StyleSheetContents::create());
-    sheet.get().setMediaQueries(MediaQuerySet::createAllowingDescriptionSyntax(media));
-    return WTF::move(sheet);
+    Ref<CSSStyleSheet> sheet = CSSStyleSheet::create(StyleSheetContents::create());
+    sheet->setMediaQueries(MediaQuerySet::createAllowingDescriptionSyntax(media));
+    return sheet;
 }
 
 static inline bool isValidXMLMIMETypeChar(UChar c)
@@ -289,18 +289,18 @@ bool DOMImplementation::isTextMIMEType(const String& mimeType)
     return false;
 }
 
-RefPtr<HTMLDocument> DOMImplementation::createHTMLDocument(const String& title)
+Ref<HTMLDocument> DOMImplementation::createHTMLDocument(const String& title)
 {
-    RefPtr<HTMLDocument> d = HTMLDocument::create(0, URL());
-    d->open();
-    d->write("<!doctype html><html><body></body></html>");
+    Ref<HTMLDocument> doc = HTMLDocument::create(nullptr, URL());
+    doc->open();
+    doc->write("<!doctype html><html><body></body></html>");
     if (!title.isNull())
-        d->setTitle(title);
-    d->setSecurityOriginPolicy(m_document.securityOriginPolicy());
-    return d;
+        doc->setTitle(title);
+    doc->setSecurityOriginPolicy(m_document.securityOriginPolicy());
+    return doc;
 }
 
-RefPtr<Document> DOMImplementation::createDocument(const String& type, Frame* frame, const URL& url)
+Ref<Document> DOMImplementation::createDocument(const String& type, Frame* frame, const URL& url)
 {
     // Plugins cannot take HTML and XHTML from us, and we don't even need to initialize the plugin database for those.
     if (type == "text/html")
@@ -318,10 +318,10 @@ RefPtr<Document> DOMImplementation::createDocument(const String& type, Frame* fr
     if (frame && !frame->isMainFrame() && MIMETypeRegistry::isPDFMIMEType(type) && frame->settings().useImageDocumentForSubframePDF())
         return ImageDocument::create(*frame, url);
 
-    PluginData* pluginData = 0;
+    PluginData* pluginData = nullptr;
     PluginData::AllowedPluginTypes allowedPluginTypes = PluginData::OnlyApplicationPlugins;
     if (frame && frame->page()) {
-        if (frame->loader().subframeLoader().allowPlugins(NotAboutToInstantiatePlugin))
+        if (frame->loader().subframeLoader().allowPlugins())
             allowedPluginTypes = PluginData::AllPlugins;
 
         pluginData = &frame->page()->pluginData();
@@ -329,7 +329,7 @@ RefPtr<Document> DOMImplementation::createDocument(const String& type, Frame* fr
 
     // PDF is one image type for which a plugin can override built-in support.
     // We do not want QuickTime to take over all image types, obviously.
-    if (MIMETypeRegistry::isPDFOrPostScriptMIMEType(type) && pluginData && pluginData->supportsMimeType(type, allowedPluginTypes))
+    if (MIMETypeRegistry::isPDFOrPostScriptMIMEType(type) && pluginData && pluginData->supportsWebVisibleMimeType(type, allowedPluginTypes))
         return PluginDocument::create(frame, url);
     if (Image::supportsType(type))
         return ImageDocument::create(*frame, url);
@@ -348,7 +348,7 @@ RefPtr<Document> DOMImplementation::createDocument(const String& type, Frame* fr
     // Everything else except text/plain can be overridden by plugins. In particular, Adobe SVG Viewer should be used for SVG, if installed.
     // Disallowing plug-ins to use text/plain prevents plug-ins from hijacking a fundamental type that the browser is expected to handle,
     // and also serves as an optimization to prevent loading the plug-in database in the common case.
-    if (type != "text/plain" && ((pluginData && pluginData->supportsMimeType(type, allowedPluginTypes)) || (frame && frame->loader().client().shouldAlwaysUsePluginDocument(type))))
+    if (type != "text/plain" && ((pluginData && pluginData->supportsWebVisibleMimeType(type, allowedPluginTypes)) || (frame && frame->loader().client().shouldAlwaysUsePluginDocument(type))))
         return PluginDocument::create(frame, url);
     if (isTextMIMEType(type))
         return TextDocument::create(frame, url);

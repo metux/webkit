@@ -32,14 +32,13 @@
 #include "JSCJSValue.h"
 #include "Structure.h"
 #include "TypeProfiler.h"
-#include <wtf/ByteSpinLock.h>
 
 namespace JSC {
 
 class TypeLocation;
 
 class TypeProfilerLog {
-
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     struct LogEntry {
     public:
@@ -63,7 +62,7 @@ public:
 
     ~TypeProfilerLog();
 
-    JS_EXPORT_PRIVATE void processLogEntries(String);
+    JS_EXPORT_PRIVATE void processLogEntries(const String&);
     LogEntry* logEndPtr() const { return m_logEndPtr; }
 
     static ptrdiff_t logStartOffset() { return OBJECT_OFFSETOF(TypeProfilerLog, m_logStartPtr); }

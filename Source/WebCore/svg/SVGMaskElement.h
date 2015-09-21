@@ -30,8 +30,6 @@
 #include "SVGUnitTypes.h"
 
 namespace WebCore {
-    
-class RenderLayer;
 
 class SVGMaskElement final : public SVGElement,
                              public SVGTests,
@@ -39,23 +37,18 @@ class SVGMaskElement final : public SVGElement,
 public:
     static Ref<SVGMaskElement> create(const QualifiedName&, Document&);
 
-    void addClientRenderLayer(RenderLayer*);
-    void removeClientRenderLayer(RenderLayer*);
-
 private:
     SVGMaskElement(const QualifiedName&, Document&);
 
     virtual bool isValid() const override { return SVGTests::isValid(); }
     virtual bool needsPendingResourceHandling() const override { return false; }
 
-    bool isSupportedAttribute(const QualifiedName&);
+    static bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
     virtual void childrenChanged(const ChildChange&) override;
 
-    HashSet<RenderLayer*> m_clientLayers;
-
-    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
     virtual bool selfHasRelativeLengths() const override { return true; }
 
@@ -66,7 +59,7 @@ private:
         DECLARE_ANIMATED_LENGTH(Y, y)
         DECLARE_ANIMATED_LENGTH(Width, width)
         DECLARE_ANIMATED_LENGTH(Height, height)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 
     // SVGTests

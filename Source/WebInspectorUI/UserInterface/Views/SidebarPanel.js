@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,67 +23,54 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.SidebarPanel = function(identifier, displayName, showToolTip, hideToolTip, image, element, role, label)
+WebInspector.SidebarPanel = class SidebarPanel extends WebInspector.Object
 {
-    WebInspector.Object.call(this);
+    constructor(identifier, displayName, element, role, label)
+    {
+        super();
 
-    this._identifier = identifier;
+        this._identifier = identifier;
+        this._displayName = displayName;
 
-    this._toolbarItem = new WebInspector.ActivateButtonToolbarItem(identifier, showToolTip, hideToolTip, displayName, image, null, "tab");
-    this._toolbarItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this.toggle, this);
-    this._toolbarItem.enabled = false;
+        this._savedScrollPosition = 0;
 
-    this._element = element || document.createElement("div");
-    this._element.classList.add(WebInspector.SidebarPanel.StyleClassName);
-    this._element.classList.add(identifier);
+        this._element = element || document.createElement("div");
+        this._element.classList.add("panel", identifier);
 
-    this._element.setAttribute("role", role || "group");
-    this._element.setAttribute("aria-label", label || displayName);
+        this._element.setAttribute("role", role || "group");
+        this._element.setAttribute("aria-label", label || displayName);
 
-    this._contentElement = document.createElement("div");
-    this._contentElement.className = WebInspector.SidebarPanel.ContentElementStyleClassName;
-    this._element.appendChild(this._contentElement);
-};
-
-WebInspector.SidebarPanel.StyleClassName = "panel";
-WebInspector.SidebarPanel.SelectedStyleClassName = "selected";
-WebInspector.SidebarPanel.ContentElementStyleClassName = "content";
-
-WebInspector.SidebarPanel.prototype = {
-    constructor: WebInspector.SidebarPanel,
-    __proto__: WebInspector.Object.prototype,
+        this._contentElement = document.createElement("div");
+        this._contentElement.className = "content";
+        this._element.appendChild(this._contentElement);
+    }
 
     // Public
 
     get identifier()
     {
         return this._identifier;
-    },
-
-    get toolbarItem()
-    {
-        return this._toolbarItem;
-    },
+    }
 
     get element()
     {
         return this._element;
-    },
+    }
 
     get contentElement()
     {
         return this._contentElement;
-    },
+    }
 
     get visible()
     {
         return this.selected && this._parentSidebar && !this._parentSidebar.collapsed;
-    },
+    }
 
     get selected()
     {
         return this._element.classList.contains(WebInspector.SidebarPanel.SelectedStyleClassName);
-    },
+    }
 
     set selected(flag)
     {
@@ -91,75 +78,81 @@ WebInspector.SidebarPanel.prototype = {
             this._element.classList.add(WebInspector.SidebarPanel.SelectedStyleClassName);
         else
             this._element.classList.remove(WebInspector.SidebarPanel.SelectedStyleClassName);
-    },
+    }
 
     get parentSidebar()
     {
         return this._parentSidebar;
-    },
+    }
 
-    show: function()
+    show()
     {
         if (!this._parentSidebar)
             return;
 
         this._parentSidebar.collapsed = false;
         this._parentSidebar.selectedSidebarPanel = this;
-    },
+    }
 
-    hide: function()
+    hide()
     {
         if (!this._parentSidebar)
             return;
 
         this._parentSidebar.collapsed = true;
         this._parentSidebar.selectedSidebarPanel = null;
-    },
+    }
 
-    toggle: function()
+    toggle()
     {
         if (this.visible)
             this.hide();
         else
             this.show();
-    },
+    }
 
-    added: function()
+    added()
     {
         console.assert(this._parentSidebar);
-        this._toolbarItem.enabled = true;
-        this._toolbarItem.activated = this.visible;
-    },
 
-    removed: function()
+        // Implemented by subclasses.
+    }
+
+    removed()
     {
         console.assert(!this._parentSidebar);
-        this._toolbarItem.enabled = false;
-        this._toolbarItem.activated = false;
-    },
 
-    willRemove: function()
+        // Implemented by subclasses.
+    }
+
+    willRemove()
     {
         // Implemented by subclasses.
-    },
+    }
 
-    shown: function()
+    shown()
+    {
+        this._contentElement.scrollTop = this._savedScrollPosition;
+
+        // Implemented by subclasses.
+    }
+
+    hidden()
+    {
+        this._savedScrollPosition = this._contentElement.scrollTop;
+
+        // Implemented by subclasses.
+    }
+
+    widthDidChange()
     {
         // Implemented by subclasses.
-    },
+    }
 
-    hidden: function()
+    visibilityDidChange()
     {
         // Implemented by subclasses.
-    },
-
-    widthDidChange: function()
-    {
-        // Implemented by subclasses.
-    },
-
-    visibilityDidChange: function()
-    {
-        this._toolbarItem.activated = this.visible;
     }
 };
+
+WebInspector.SidebarPanel.SelectedStyleClassName = "selected";

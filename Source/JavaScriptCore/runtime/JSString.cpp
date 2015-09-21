@@ -190,11 +190,11 @@ void JSRopeString::clearFibers() const
         u[i].number = 0;
 }
 
-AtomicStringImpl* JSRopeString::resolveRopeToExistingAtomicString(ExecState* exec) const
+RefPtr<AtomicStringImpl> JSRopeString::resolveRopeToExistingAtomicString(ExecState* exec) const
 {
     if (m_length > maxLengthForOnStackResolve) {
         resolveRope(exec);
-        if (AtomicStringImpl* existingAtomicString = AtomicString::find(m_value.impl())) {
+        if (RefPtr<AtomicStringImpl> existingAtomicString = AtomicStringImpl::lookUp(m_value.impl())) {
             m_value = *existingAtomicString;
             setIs8Bit(m_value.impl()->is8Bit());
             clearFibers();
@@ -206,7 +206,7 @@ AtomicStringImpl* JSRopeString::resolveRopeToExistingAtomicString(ExecState* exe
     if (is8Bit()) {
         LChar buffer[maxLengthForOnStackResolve];
         resolveRopeInternal8(buffer);
-        if (AtomicStringImpl* existingAtomicString = AtomicString::find(buffer, m_length)) {
+        if (RefPtr<AtomicStringImpl> existingAtomicString = AtomicStringImpl::lookUp(buffer, m_length)) {
             m_value = *existingAtomicString;
             setIs8Bit(m_value.impl()->is8Bit());
             clearFibers();
@@ -215,7 +215,7 @@ AtomicStringImpl* JSRopeString::resolveRopeToExistingAtomicString(ExecState* exe
     } else {
         UChar buffer[maxLengthForOnStackResolve];
         resolveRopeInternal16(buffer);
-        if (AtomicStringImpl* existingAtomicString = AtomicString::find(buffer, m_length)) {
+        if (RefPtr<AtomicStringImpl> existingAtomicString = AtomicStringImpl::lookUp(buffer, m_length)) {
             m_value = *existingAtomicString;
             setIs8Bit(m_value.impl()->is8Bit());
             clearFibers();
@@ -365,18 +365,6 @@ void JSRopeString::outOfMemory(ExecState* exec) const
         throwOutOfMemoryError(exec);
 }
 
-JSString* JSRopeString::getIndexSlowCase(ExecState* exec, unsigned i)
-{
-    ASSERT(isRope());
-    resolveRope(exec);
-    // Return a safe no-value result, this should never be used, since the excetion will be thrown.
-    if (exec->exception())
-        return jsEmptyString(exec);
-    ASSERT(!isRope());
-    RELEASE_ASSERT(i < m_value.length());
-    return jsSingleCharacterSubstring(exec, m_value, i);
-}
-
 JSValue JSString::toPrimitive(ExecState*, PreferredPrimitiveType) const
 {
     return const_cast<JSString*>(this);
@@ -385,18 +373,13 @@ JSValue JSString::toPrimitive(ExecState*, PreferredPrimitiveType) const
 bool JSString::getPrimitiveNumber(ExecState* exec, double& number, JSValue& result) const
 {
     result = this;
-    number = jsToNumber(value(exec));
+    number = jsToNumber(view(exec));
     return false;
-}
-
-bool JSString::toBoolean() const
-{
-    return m_length;
 }
 
 double JSString::toNumber(ExecState* exec) const
 {
-    return jsToNumber(value(exec));
+    return jsToNumber(view(exec));
 }
 
 inline StringObject* StringObject::create(VM& vm, JSGlobalObject* globalObject, JSString* string)
@@ -425,10 +408,9 @@ bool JSString::getStringPropertyDescriptor(ExecState* exec, PropertyName propert
         return true;
     }
     
-    unsigned i = propertyName.asIndex();
-    if (i < m_length) {
-        ASSERT(i != PropertyName::NotAnIndex); // No need for an explicit check, the above test would always fail!
-        descriptor.setDescriptor(getIndex(exec, i), DontDelete | ReadOnly);
+    Optional<uint32_t> index = parseIndex(propertyName);
+    if (index && index.value() < m_length) {
+        descriptor.setDescriptor(getIndex(exec, index.value()), DontDelete | ReadOnly);
         return true;
     }
     

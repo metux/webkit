@@ -43,7 +43,7 @@ namespace JSC {
 
     class ProfileGenerator : public RefCounted<ProfileGenerator>  {
     public:
-        static PassRefPtr<ProfileGenerator> create(ExecState*, const WTF::String& title, unsigned uid, PassRefPtr<Stopwatch>);
+        static Ref<ProfileGenerator> create(ExecState*, const WTF::String& title, unsigned uid, PassRefPtr<Stopwatch>);
 
         // Members
         const WTF::String& title() const;
@@ -61,7 +61,7 @@ namespace JSC {
 
     private:
         ProfileGenerator(ExecState*, const WTF::String& title, unsigned uid, PassRefPtr<Stopwatch>);
-        void addParentForConsoleStart(ExecState*);
+        void addParentForConsoleStart(ExecState*, double);
 
         void removeProfileStart();
         void removeProfileEnd();

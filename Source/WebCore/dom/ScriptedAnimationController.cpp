@@ -34,6 +34,8 @@
 #include "DocumentLoader.h"
 #include "FrameView.h"
 #include "InspectorInstrumentation.h"
+#include "Logging.h"
+#include "MainFrame.h"
 #include "RequestAnimationFrameCallback.h"
 #include "Settings.h"
 #include <wtf/Ref.h>
@@ -51,15 +53,8 @@ namespace WebCore {
 
 ScriptedAnimationController::ScriptedAnimationController(Document* document, PlatformDisplayID displayID)
     : m_document(document)
-    , m_nextCallbackId(0)
-    , m_suspendCount(0)
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
     , m_animationTimer(*this, &ScriptedAnimationController::animationTimerFired)
-    , m_lastAnimationFrameTimeMonotonic(0)
-#if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
-    , m_isUsingTimer(false)
-    , m_isThrottled(false)
-#endif
 #endif
 {
     windowScreenDidChange(displayID);
@@ -91,6 +86,8 @@ void ScriptedAnimationController::setThrottled(bool isThrottled)
     if (m_isThrottled == isThrottled)
         return;
 
+    LOG(Animations, "%p - Setting RequestAnimationFrame throttling state to %d in frame %p (isMainFrame: %d)", this, isThrottled, m_document->frame(), m_document->frame() ? m_document->frame()->isMainFrame() : 0);
+
     m_isThrottled = isThrottled;
     if (m_animationTimer.isActive()) {
         m_animationTimer.stop();
@@ -98,6 +95,15 @@ void ScriptedAnimationController::setThrottled(bool isThrottled)
     }
 #else
     UNUSED_PARAM(isThrottled);
+#endif
+}
+
+bool ScriptedAnimationController::isThrottled() const
+{
+#if USE(REQUEST_ANIMATION_FRAME_TIMER) && USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
+    return m_isThrottled;
+#else
+    return false;
 #endif
 }
 
@@ -173,7 +179,7 @@ void ScriptedAnimationController::windowScreenDidChange(PlatformDisplayID displa
     if (m_document->settings() && !m_document->settings()->requestAnimationFrameEnabled())
         return;
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
-    DisplayRefreshMonitorManager::sharedManager().windowScreenDidChange(displayID, this);
+    DisplayRefreshMonitorManager::sharedManager().windowScreenDidChange(displayID, *this);
 #else
     UNUSED_PARAM(displayID);
 #endif
@@ -187,7 +193,7 @@ void ScriptedAnimationController::scheduleAnimation()
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
     if (!m_isUsingTimer && !m_isThrottled) {
-        if (DisplayRefreshMonitorManager::sharedManager().scheduleAnimation(this))
+        if (DisplayRefreshMonitorManager::sharedManager().scheduleAnimation(*this))
             return;
 
         m_isUsingTimer = true;
@@ -226,9 +232,15 @@ void ScriptedAnimationController::displayRefreshFired(double monotonicTimeNow)
 
 
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
-PassRefPtr<DisplayRefreshMonitor> ScriptedAnimationController::createDisplayRefreshMonitor(PlatformDisplayID displayID) const
+RefPtr<DisplayRefreshMonitor> ScriptedAnimationController::createDisplayRefreshMonitor(PlatformDisplayID displayID) const
 {
-    return m_document->page()->chrome().client().createDisplayRefreshMonitor(displayID);
+    if (!m_document->page())
+        return nullptr;
+
+    if (auto monitor = m_document->page()->chrome().client().createDisplayRefreshMonitor(displayID))
+        return monitor;
+
+    return DisplayRefreshMonitor::createDefaultDisplayRefreshMonitor(displayID);
 }
 #endif
 

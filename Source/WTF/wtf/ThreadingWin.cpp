@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2015 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Google Inc. All rights reserved.
  * Copyright (C) 2009 Torch Mobile, Inc. All rights reserved.
  *
@@ -99,8 +99,6 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/HashMap.h>
 #include <wtf/MathExtras.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RandomNumberSeed.h>
 #include <wtf/WTFThreadData.h>
 
@@ -167,7 +165,6 @@ void initializeThreading()
     threadMapMutex();
     initializeRandomNumberGenerator();
     wtfThreadData();
-    s_dtoaP5Mutex = new Mutex;
     initializeDates();
 }
 
@@ -199,7 +196,7 @@ static void clearThreadHandleForIdentifier(ThreadIdentifier id)
 
 static unsigned __stdcall wtfThreadEntryPoint(void* param)
 {
-    OwnPtr<ThreadFunctionInvocation> invocation = adoptPtr(static_cast<ThreadFunctionInvocation*>(param));
+    std::unique_ptr<ThreadFunctionInvocation> invocation(static_cast<ThreadFunctionInvocation*>(param));
     invocation->function(invocation->data);
 
 #if !USE(PTHREADS) && OS(WINDOWS)
@@ -214,7 +211,7 @@ ThreadIdentifier createThreadInternal(ThreadFunction entryPoint, void* data, con
 {
     unsigned threadIdentifier = 0;
     ThreadIdentifier threadID = 0;
-    OwnPtr<ThreadFunctionInvocation> invocation = adoptPtr(new ThreadFunctionInvocation(entryPoint, data));
+    auto invocation = std::make_unique<ThreadFunctionInvocation>(entryPoint, data);
     HANDLE threadHandle = reinterpret_cast<HANDLE>(_beginthreadex(0, 0, wtfThreadEntryPoint, invocation.get(), 0, &threadIdentifier));
     if (!threadHandle) {
 #if !HAVE(ERRNO_H)
@@ -226,7 +223,7 @@ ThreadIdentifier createThreadInternal(ThreadFunction entryPoint, void* data, con
     }
 
     // The thread will take ownership of invocation.
-    ThreadFunctionInvocation* leakedInvocation = invocation.leakPtr();
+    ThreadFunctionInvocation* leakedInvocation = invocation.release();
     UNUSED_PARAM(leakedInvocation);
 
     threadID = static_cast<ThreadIdentifier>(threadIdentifier);

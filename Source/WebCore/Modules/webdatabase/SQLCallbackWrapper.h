@@ -29,7 +29,7 @@
 #define SQLCallbackWrapper_h
 
 #include "ScriptExecutionContext.h"
-#include <wtf/ThreadingPrimitives.h>
+#include <wtf/Lock.h>
 
 namespace WebCore {
 
@@ -58,14 +58,14 @@ public:
         ScriptExecutionContext* scriptExecutionContextPtr;
         T* callback;
         {
-            MutexLocker locker(m_mutex);
+            LockHolder locker(m_mutex);
             if (!m_callback) {
                 ASSERT(!m_scriptExecutionContext);
                 return;
             }
             if (m_scriptExecutionContext->isContextThread()) {
-                m_callback = 0;
-                m_scriptExecutionContext = 0;
+                m_callback = nullptr;
+                m_scriptExecutionContext = nullptr;
                 return;
             }
             scriptExecutionContextPtr = m_scriptExecutionContext.release().leakRef();
@@ -83,9 +83,9 @@ public:
 
     PassRefPtr<T> unwrap()
     {
-        MutexLocker locker(m_mutex);
+        LockHolder locker(m_mutex);
         ASSERT(!m_callback || m_scriptExecutionContext->isContextThread());
-        m_scriptExecutionContext = 0;
+        m_scriptExecutionContext = nullptr;
         return m_callback.release();
     }
 
@@ -93,7 +93,7 @@ public:
     bool hasCallback() const { return m_callback; }
 
 private:
-    Mutex m_mutex;
+    Lock m_mutex;
     RefPtr<T> m_callback;
     RefPtr<ScriptExecutionContext> m_scriptExecutionContext;
 };

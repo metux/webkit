@@ -1333,7 +1333,7 @@ void RenderMathMLOperator::resetStretchSize()
 
 FloatRect RenderMathMLOperator::boundsForGlyph(const GlyphData& data) const
 {
-    return data.font->boundsForGlyph(data.glyph);
+    return data.font && data.glyph ? data.font->boundsForGlyph(data.glyph) : FloatRect();
 }
 
 float RenderMathMLOperator::heightForGlyph(const GlyphData& data) const
@@ -1343,7 +1343,7 @@ float RenderMathMLOperator::heightForGlyph(const GlyphData& data) const
 
 float RenderMathMLOperator::advanceForGlyph(const GlyphData& data) const
 {
-    return data.font->widthForGlyph(data.glyph);
+    return data.font && data.glyph ? data.font->widthForGlyph(data.glyph) : 0;
 }
 
 void RenderMathMLOperator::computePreferredLogicalWidths()
@@ -1540,7 +1540,7 @@ RenderMathMLOperator::StretchyData RenderMathMLOperator::getDisplayStyleLargeOpe
 
     const auto& primaryFont = style().fontCascade().primaryFont();
     GlyphData baseGlyph = style().fontCascade().glyphDataForCharacter(character, !style().isLeftToRightDirection());
-    if (!primaryFont.mathData() || baseGlyph.font != &primaryFont)
+    if (!primaryFont.mathData() || baseGlyph.font != &primaryFont || !baseGlyph.font || !baseGlyph.glyph)
         return data;
 
     Vector<Glyph> sizeVariants;
@@ -1737,10 +1737,10 @@ void RenderMathMLOperator::updateStyle()
     }
 }
 
-int RenderMathMLOperator::firstLineBaseline() const
+Optional<int> RenderMathMLOperator::firstLineBaseline() const
 {
     if (m_stretchyData.mode() != DrawNormal)
-        return m_stretchHeightAboveBaseline;
+        return Optional<int>(m_stretchHeightAboveBaseline);
     return RenderMathMLToken::firstLineBaseline();
 }
 

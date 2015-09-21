@@ -178,8 +178,8 @@ void GraphicsContext::setStrokeColor(const Color& color, ColorSpace colorSpace)
 {
     m_state.strokeColor = color;
     m_state.strokeColorSpace = colorSpace;
-    m_state.strokeGradient.clear();
-    m_state.strokePattern.clear();
+    m_state.strokeGradient = nullptr;
+    m_state.strokePattern = nullptr;
     setPlatformStrokeColor(color, colorSpace);
 }
 
@@ -245,8 +245,8 @@ void GraphicsContext::setFillColor(const Color& color, ColorSpace colorSpace)
 {
     m_state.fillColor = color;
     m_state.fillColorSpace = colorSpace;
-    m_state.fillGradient.clear();
-    m_state.fillPattern.clear();
+    m_state.fillGradient = nullptr;
+    m_state.fillPattern = nullptr;
     setPlatformFillColor(color, colorSpace);
 }
 
@@ -262,28 +262,33 @@ void GraphicsContext::setShouldSmoothFonts(bool shouldSmoothFonts)
     setPlatformShouldSmoothFonts(shouldSmoothFonts);
 }
 
+void GraphicsContext::setAntialiasedFontDilationEnabled(bool antialiasedFontDilationEnabled)
+{
+    m_state.antialiasedFontDilationEnabled = antialiasedFontDilationEnabled;
+}
+
 void GraphicsContext::setStrokePattern(Ref<Pattern>&& pattern)
 {
-    m_state.strokeGradient.clear();
+    m_state.strokeGradient = nullptr;
     m_state.strokePattern = WTF::move(pattern);
 }
 
 void GraphicsContext::setFillPattern(Ref<Pattern>&& pattern)
 {
-    m_state.fillGradient.clear();
+    m_state.fillGradient = nullptr;
     m_state.fillPattern = WTF::move(pattern);
 }
 
 void GraphicsContext::setStrokeGradient(Ref<Gradient>&& gradient)
 {
     m_state.strokeGradient = WTF::move(gradient);
-    m_state.strokePattern.clear();
+    m_state.strokePattern = nullptr;
 }
 
 void GraphicsContext::setFillGradient(Ref<Gradient>&& gradient)
 {
     m_state.fillGradient = WTF::move(gradient);
-    m_state.fillPattern.clear();
+    m_state.fillPattern = nullptr;
 }
 
 void GraphicsContext::beginTransparencyLayer(float opacity)
@@ -567,8 +572,7 @@ void GraphicsContext::setCompositeOperation(CompositeOperator compositeOperation
 }
 
 #if !USE(CG)
-// Implement this if you want to go ahead and push the drawing mode into your native context
-// immediately.
+// Implement this if you want to go push the drawing mode into your native context immediately.
 void GraphicsContext::setPlatformTextDrawingMode(TextDrawingModeFlags)
 {
 }

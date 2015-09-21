@@ -25,11 +25,13 @@
 #include "CachedImage.h"
 #include "DocumentMarkerController.h"
 #include "Editor.h"
+#include "File.h"
 #include "Frame.h"
 #include "FrameSelection.h"
 #include "FrameTree.h"
 #include "HTMLAnchorElement.h"
 #include "HTMLAreaElement.h"
+#include "HTMLAttachmentElement.h"
 #include "HTMLAudioElement.h"
 #include "HTMLImageElement.h"
 #include "HTMLInputElement.h"
@@ -49,6 +51,7 @@
 #include "SVGNames.h"
 #include "Scrollbar.h"
 #include "ShadowRoot.h"
+#include "TextIterator.h"
 #include "UserGestureIndicator.h"
 #include "VisibleUnits.h"
 #include "XLinkNames.h"
@@ -187,6 +190,26 @@ bool HitTestResult::isSelected() const
     return frame->selection().contains(m_hitTestLocation.point());
 }
 
+String HitTestResult::selectedText() const
+{
+    if (!m_innerNonSharedNode)
+        return emptyString();
+
+    Frame* frame = m_innerNonSharedNode->document().frame();
+    if (!frame)
+        return emptyString();
+
+    // Look for a character that's not just a separator.
+    for (TextIterator it(frame->selection().toNormalizedRange().get()); !it.atEnd(); it.advance()) {
+        int length = it.text().length();
+        for (int i = 0; i < length; ++i) {
+            if (!(U_GET_GC_MASK(it.text()[i]) & U_GC_Z_MASK))
+                return frame->displayStringModifiedByEncoding(frame->editor().selectedText());
+        }
+    }
+    return emptyString();
+}
+
 String HitTestResult::spellingToolTip(TextDirection& dir) const
 {
     dir = LTR;
@@ -309,6 +332,25 @@ IntRect HitTestResult::imageRect() const
         return IntRect();
     return m_innerNonSharedNode->renderBox()->absoluteContentQuad().enclosingBoundingBox();
 }
+
+#if ENABLE(ATTACHMENT_ELEMENT)
+URL HitTestResult::absoluteAttachmentURL() const
+{
+    if (!m_innerNonSharedNode)
+        return URL();
+    
+    if (!(m_innerNonSharedNode->renderer() && m_innerNonSharedNode->renderer()->isAttachment()))
+        return URL();
+    
+    if (!is<HTMLAttachmentElement>(*m_innerNonSharedNode))
+        return URL();
+    File* attachmentFile = downcast<HTMLAttachmentElement>(*m_innerNonSharedNode).file();
+    if (!attachmentFile)
+        return URL();
+    
+    return URL::fileURLWithFileSystemPath(attachmentFile->path());
+}
+#endif
 
 URL HitTestResult::absoluteImageURL() const
 {
@@ -564,20 +606,6 @@ URL HitTestResult::absoluteLinkURL() const
     if (m_innerURLElement)
         return m_innerURLElement->absoluteLinkURL();
     return URL();
-}
-
-bool HitTestResult::isLiveLink() const
-{
-    if (!m_innerURLElement)
-        return false;
-
-    if (is<HTMLAnchorElement>(*m_innerURLElement))
-        return downcast<HTMLAnchorElement>(*m_innerURLElement).isLiveLink();
-
-    if (is<SVGAElement>(*m_innerURLElement))
-        return m_innerURLElement->isLink();
-
-    return false;
 }
 
 bool HitTestResult::isOverLink() const

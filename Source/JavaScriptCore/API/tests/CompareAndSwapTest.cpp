@@ -24,13 +24,11 @@
  */
 
 #include "config.h"
+#include "CompareAndSwapTest.h"
 
 #include <stdio.h>
-#include <thread>
 #include <wtf/Atomics.h>
-
-// Regression test for webkit.org/b/142513
-extern "C" void testCompareAndSwap();
+#include <wtf/Threading.h>
 
 class Bitmap {
 public:
@@ -75,7 +73,7 @@ struct Data {
     int numThreads;
 };
 
-static void* setBitThreadFunc(void* p)
+static void setBitThreadFunc(void* p)
 {
     Data* data = reinterpret_cast<Data*>(p);
     Bitmap* bitmap = data->bitmap;
@@ -92,27 +90,29 @@ static void* setBitThreadFunc(void* p)
         while (!bitmap->concurrentTestAndSet(i)) { }
 
     printf("   finished Thread %d\n", data->id);
-    pthread_exit(nullptr);
 }
 
 void testCompareAndSwap()
 {
     Bitmap bitmap;
     const int numThreads = 5;
-    pthread_t threadIDs[numThreads];
+    ThreadIdentifier threadIDs[numThreads];
     Data data[numThreads];
+
+    WTF::initializeThreading();
     
     printf("Starting %d threads for CompareAndSwap test.  Test should complete without hanging.\n", numThreads);
     for (int i = 0; i < numThreads; i++) {
         data[i].bitmap = &bitmap;
         data[i].id = i;
         data[i].numThreads = numThreads;
-        pthread_create(&threadIDs[i], 0, &setBitThreadFunc, &data[i]);
+        std::function<void()> threadFunc = std::bind(setBitThreadFunc, &data[i]);
+        threadIDs[i] = createThread("setBitThreadFunc", threadFunc);
     }
 
     printf("Waiting for %d threads to join\n", numThreads);
     for (int i = 0; i < numThreads; i++)
-        pthread_join(threadIDs[i], nullptr);
+        waitForThreadCompletion(threadIDs[i]);
 
     printf("PASS: CompareAndSwap test completed without a hang\n");
 }

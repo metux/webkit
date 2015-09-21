@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,69 +23,71 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.DatabaseTableContentView = function(representedObject)
+WebInspector.DatabaseTableContentView = class DatabaseTableContentView extends WebInspector.ContentView
 {
-    WebInspector.ContentView.call(this, representedObject);
+    constructor(representedObject)
+    {
+        super(representedObject);
 
-    this.element.classList.add(WebInspector.DatabaseTableContentView.StyleClassName);
+        this.element.classList.add("database-table");
 
-    this.update();
-};
+        this._refreshButtonNavigationItem = new WebInspector.ButtonNavigationItem("database-table-refresh", WebInspector.UIString("Refresh"), "Images/ReloadFull.svg", 13, 13);
+        this._refreshButtonNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._refreshButtonClicked, this);
 
-WebInspector.DatabaseTableContentView.StyleClassName = "database-table";
-
-WebInspector.DatabaseTableContentView.prototype = {
-    constructor: WebInspector.DatabaseTableContentView,
+        this.update();
+    }
 
     // Public
 
-    get allowedNavigationSidebarPanels()
+    get navigationItems()
     {
-        return [WebInspector.resourceSidebarPanel.identifier];
-    },
+        return [this._refreshButtonNavigationItem];
+    }
 
-    update: function()
+    update()
     {
         this.representedObject.database.executeSQL("SELECT * FROM \"" + this._escapeTableName(this.representedObject.name) + "\"", this._queryFinished.bind(this), this._queryError.bind(this));
-    },
+    }
 
-    updateLayout: function()
+    updateLayout()
     {
         if (this._dataGrid)
             this._dataGrid.updateLayout();
-    },
+    }
 
-    saveToCookie: function(cookie)
+    saveToCookie(cookie)
     {
         cookie.type = WebInspector.ContentViewCookieType.DatabaseTable;
         cookie.host = this.representedObject.host;
         cookie.name = this.representedObject.name;
         cookie.database = this.representedObject.database.name;
-    },
+    }
 
     get scrollableElements()
     {
         if (!this._dataGrid)
             return [];
         return [this._dataGrid.scrollContainer];
-    },
+    }
 
     // Private
 
-    _escapeTableName: function(name)
+    _escapeTableName(name)
     {
         return name.replace(/\"/g, "\"\"");
-    },
+    }
 
-    _queryFinished: function(columnNames, values)
+    _queryFinished(columnNames, values)
     {
         // It would be nice to do better than creating a new data grid each time the table is updated, but the table updating
         // doesn't happen very frequently. Additionally, using DataGrid's createSortableDataGrid makes our code much cleaner and it knows
         // how to sort arbitrary columns.
         this.element.removeChildren();
 
-        this._dataGrid = new WebInspector.DataGrid.createSortableDataGrid(columnNames, values);
+        this._dataGrid = WebInspector.DataGrid.createSortableDataGrid(columnNames, values);
         if (!this._dataGrid || !this._dataGrid.element) {
+            this._dataGrid = undefined;
+
             // If the DataGrid is empty, then we were returned a table with no columns. This can happen when a table has
             // no data, the SELECT query only returns column names when there is data.
             this.element.removeChildren();
@@ -95,13 +97,16 @@ WebInspector.DatabaseTableContentView.prototype = {
 
         this.element.appendChild(this._dataGrid.element);
         this._dataGrid.updateLayout();
-    },
+    }
 
-    _queryError: function(error)
+    _queryError(error)
     {
         this.element.removeChildren();
         this.element.appendChild(WebInspector.createMessageTextView(WebInspector.UIString("An error occured trying to\nread the “%s” table.").format(this.representedObject.name), true));
     }
-};
 
-WebInspector.DatabaseTableContentView.prototype.__proto__ = WebInspector.ContentView.prototype;
+    _refreshButtonClicked()
+    {
+        this.update();
+    }
+};

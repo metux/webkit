@@ -22,7 +22,7 @@
 #if USE(EGL)
 
 #include "GraphicsContext3D.h"
-#include <wtf/OwnPtr.h>
+#include "PlatformDisplay.h"
 
 #if USE(CAIRO)
 #include <cairo.h>
@@ -35,11 +35,9 @@
 #include "OpenGLShims.h"
 #endif
 
-#if PLATFORM(GTK)
-#include "GtkUtilities.h"
-#if PLATFORM(WAYLAND) && !defined(GTK_API_VERSION_2)
-#include "WaylandDisplay.h"
-#endif
+#if PLATFORM(X11)
+#include "PlatformDisplayX11.h"
+#include <X11/Xlib.h>
 #endif
 
 #if ENABLE(ACCELERATED_2D_CANVAS)
@@ -52,33 +50,9 @@
 
 namespace WebCore {
 
-static EGLDisplay gSharedEGLDisplay = EGL_NO_DISPLAY;
-
-#if USE(OPENGL_ES_2)
-static const EGLenum gGLAPI = EGL_OPENGL_ES_API;
-#else
-static const EGLenum gGLAPI = EGL_OPENGL_API;
-#endif
-
 static EGLDisplay sharedEGLDisplay()
 {
-    static bool initialized = false;
-    if (!initialized) {
-        initialized = true;
-#if PLATFORM(GTK) && PLATFORM(WAYLAND) && !defined(GTK_API_VERSION_2)
-        if (getDisplaySystemType() == DisplaySystemType::Wayland && WaylandDisplay::instance())
-            gSharedEGLDisplay = eglGetDisplay(WaylandDisplay::instance()->nativeDisplay());
-        else // Note that this branch continutes outside this #if-guarded segment.
-#endif
-#if PLATFORM(X11)
-            gSharedEGLDisplay = eglGetDisplay(GLContext::sharedX11Display());
-#else
-            gSharedEGLDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-#endif
-        if (gSharedEGLDisplay != EGL_NO_DISPLAY && (!eglInitialize(gSharedEGLDisplay, 0, 0) || !eglBindAPI(gGLAPI)))
-            gSharedEGLDisplay = EGL_NO_DISPLAY;
-    }
-    return gSharedEGLDisplay;
+    return PlatformDisplay::sharedDisplay().eglDisplay();
 }
 
 static const EGLint gContextAttributes[] = {
@@ -191,20 +165,20 @@ std::unique_ptr<GLContextEGL> GLContextEGL::createPixmapContext(EGLContext shari
         return nullptr;
     }
 
-    Pixmap pixmap = XCreatePixmap(sharedX11Display(), DefaultRootWindow(sharedX11Display()), 1, 1, depth);
+    Display* x11Display = downcast<PlatformDisplayX11>(PlatformDisplay::sharedDisplay()).native();
+    XUniquePixmap pixmap = XCreatePixmap(x11Display, DefaultRootWindow(x11Display), 1, 1, depth);
     if (!pixmap) {
         eglDestroyContext(display, context);
         return nullptr;
     }
 
-    EGLSurface surface = eglCreatePixmapSurface(display, config, pixmap, 0);
+    EGLSurface surface = eglCreatePixmapSurface(display, config, reinterpret_cast<EGLNativePixmapType>(pixmap.get()), 0);
     if (surface == EGL_NO_SURFACE) {
-        XFreePixmap(sharedX11Display(), pixmap);
         eglDestroyContext(display, context);
         return nullptr;
     }
 
-    return std::make_unique<GLContextEGL>(context, surface, pixmap);
+    return std::make_unique<GLContextEGL>(context, surface, WTF::move(pixmap));
 }
 #endif // PLATFORM(X11)
 
@@ -245,11 +219,11 @@ GLContextEGL::GLContextEGL(EGLContext context, EGLSurface surface, EGLSurfaceTyp
 }
 
 #if PLATFORM(X11)
-GLContextEGL::GLContextEGL(EGLContext context, EGLSurface surface, Pixmap pixmap)
+GLContextEGL::GLContextEGL(EGLContext context, EGLSurface surface, XUniquePixmap&& pixmap)
     : m_context(context)
     , m_surface(surface)
     , m_type(PixmapSurface)
-    , m_pixmap(pixmap)
+    , m_pixmap(WTF::move(pixmap))
 {
 }
 #endif
@@ -270,11 +244,6 @@ GLContextEGL::~GLContextEGL()
 
     if (m_surface)
         eglDestroySurface(display, m_surface);
-
-#if PLATFORM(X11)
-    if (m_pixmap)
-        XFreePixmap(sharedX11Display(), m_pixmap);
-#endif
 }
 
 bool GLContextEGL::canRenderToDefaultFramebuffer()
@@ -331,7 +300,7 @@ cairo_device_t* GLContextEGL::cairoDevice()
 }
 #endif
 
-#if USE(3D_GRAPHICS)
+#if ENABLE(GRAPHICS_CONTEXT_3D)
 PlatformGraphicsContext3D GLContextEGL::platformContext()
 {
     return m_context;

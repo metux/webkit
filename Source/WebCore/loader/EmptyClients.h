@@ -114,25 +114,22 @@ public:
     virtual void runJavaScriptAlert(Frame*, const String&) override { }
     virtual bool runJavaScriptConfirm(Frame*, const String&) override { return false; }
     virtual bool runJavaScriptPrompt(Frame*, const String&, const String&, String&) override { return false; }
-    virtual bool shouldInterruptJavaScript() override { return false; }
 
     virtual bool selectItemWritingDirectionIsNatural() override { return false; }
     virtual bool selectItemAlignmentFollowsMenuWritingDirection() override { return false; }
     virtual bool hasOpenedPopup() const override { return false; }
-    virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const override;
-    virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const override;
+    virtual RefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const override;
+    virtual RefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const override;
 
     virtual void setStatusbarText(const String&) override { }
 
     virtual KeyboardUIMode keyboardUIMode() override { return KeyboardAccessDefault; }
 
-    virtual IntRect windowResizerRect() const override { return IntRect(); }
-
     virtual void invalidateRootView(const IntRect&) override { }
     virtual void invalidateContentsAndRootView(const IntRect&) override { }
     virtual void invalidateContentsForSlowScroll(const IntRect&) override { }
     virtual void scroll(const IntSize&, const IntRect&, const IntRect&) override { }
-#if USE(TILED_BACKING_STORE)
+#if USE(COORDINATED_GRAPHICS)
     virtual void delegatedScrollRequested(const IntPoint&) { }
 #endif
 #if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
@@ -162,10 +159,6 @@ public:
 
 #if ENABLE(INPUT_TYPE_COLOR)
     virtual std::unique_ptr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&) override;
-#endif
-
-#if ENABLE(DATE_AND_TIME_INPUT_TYPES) && !PLATFORM(IOS)
-    virtual PassRefPtr<DateTimeChooser> openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&) override;
 #endif
 
     virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>) override;
@@ -227,7 +220,7 @@ public:
     virtual void needTouchEvents(bool) override { }
 #endif
     
-    virtual void numWheelEventHandlersChanged(unsigned) override { }
+    virtual void wheelEventHandlersChanged(bool) override { }
     
     virtual bool isEmptyChromeClient() const override { return true; }
 
@@ -321,6 +314,9 @@ public:
     virtual void willChangeTitle(DocumentLoader*) override { }
     virtual void didChangeTitle(DocumentLoader*) override { }
 
+    virtual void willReplaceMultipartContent() override { }
+    virtual void didReplaceMultipartContent() override { }
+
     virtual void committedLoad(DocumentLoader*, const char*, int) override { }
     virtual void finishedLoading(DocumentLoader*) override { }
 
@@ -347,7 +343,7 @@ public:
     virtual void didFinishLoad() override { }
     virtual void prepareForDataSourceReplacement() override { }
 
-    virtual PassRefPtr<DocumentLoader> createDocumentLoader(const ResourceRequest&, const SubstituteData&) override;
+    virtual Ref<DocumentLoader> createDocumentLoader(const ResourceRequest&, const SubstituteData&) override;
     virtual void updateCachedDocumentLoader(DocumentLoader&) override { }
     virtual void setTitle(const StringWithDirection&, const URL&) override { }
 
@@ -374,8 +370,8 @@ public:
     virtual void didDisplayInsecureContent() override { }
     virtual void didRunInsecureContent(SecurityOrigin*, const URL&) override { }
     virtual void didDetectXSS(const URL&, bool) override { }
-    virtual PassRefPtr<Frame> createFrame(const URL&, const String&, HTMLFrameOwnerElement*, const String&, bool, int, int) override;
-    virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const URL&, const Vector<String>&, const Vector<String>&, const String&, bool) override;
+    virtual RefPtr<Frame> createFrame(const URL&, const String&, HTMLFrameOwnerElement*, const String&, bool, int, int) override;
+    virtual RefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const URL&, const Vector<String>&, const Vector<String>&, const String&, bool) override;
     virtual void recreatePlugin(Widget*) override;
     virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const URL&, const Vector<String>&, const Vector<String>&) override;
 
@@ -446,11 +442,13 @@ public:
     virtual bool shouldChangeSelectedRange(Range*, Range*, EAffinity, bool) override { return false; }
 
     virtual bool shouldApplyStyle(StyleProperties*, Range*) override { return false; }
+    virtual void didApplyStyle() override { }
     virtual bool shouldMoveRangeAfterDelete(Range*, Range*) override { return false; }
 
     virtual void didBeginEditing() override { }
     virtual void respondToChangedContents() override { }
     virtual void respondToChangedSelection(Frame*) override { }
+    virtual void didChangeSelectionAndUpdateLayout() override { }
     virtual void discardedComposition(Frame*) override { }
     virtual void didEndEditing() override { }
     virtual void willWriteSelectionToPasteboard(Range*) override { }
@@ -562,6 +560,8 @@ public:
     virtual void speak(const String&) override { }
     virtual void stopSpeaking() override { }
 
+    virtual ContextMenuItem shareMenuItem(const HitTestResult&) override { return ContextMenuItem(); }
+
 #if PLATFORM(COCOA)
     virtual void searchWithSpotlight() override { }
 #endif
@@ -633,9 +633,9 @@ class EmptyProgressTrackerClient : public ProgressTrackerClient {
 };
 
 class EmptyDiagnosticLoggingClient final : public DiagnosticLoggingClient {
-    virtual void logDiagnosticMessage(const String&, const String&) override { }
-    virtual void logDiagnosticMessageWithResult(const String&, const String&, DiagnosticLoggingResultType) override { }
-    virtual void logDiagnosticMessageWithValue(const String&, const String&, const String&) override { }
+    virtual void logDiagnosticMessage(const String&, const String&, ShouldSample) override { }
+    virtual void logDiagnosticMessageWithResult(const String&, const String&, DiagnosticLoggingResultType, ShouldSample) override { }
+    virtual void logDiagnosticMessageWithValue(const String&, const String&, const String&, ShouldSample) override { }
 
     virtual void mainFrameDestroyed() override { }
 };

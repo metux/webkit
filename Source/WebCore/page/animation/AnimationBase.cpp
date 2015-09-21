@@ -36,9 +36,11 @@
 #include "Document.h"
 #include "EventNames.h"
 #include "FloatConversion.h"
+#include "GeometryUtilities.h"
 #include "Logging.h"
 #include "RenderBox.h"
 #include "RenderStyle.h"
+#include "RenderView.h"
 #include "UnitBezier.h"
 #include <algorithm>
 #include <wtf/CurrentTime.h>
@@ -68,19 +70,10 @@ static inline double solveStepsFunction(int numSteps, bool stepAtStart, double t
     return floor(numSteps * t) / numSteps;
 }
 
-AnimationBase::AnimationBase(const Animation& transition, RenderElement* renderer, CompositeAnimation* compositeAnimation)
-    : m_animationState(AnimationState::New)
-    , m_isAccelerated(false)
-    , m_transformFunctionListValid(false)
-    , m_filterFunctionListsMatch(false)
-    , m_startTime(0)
-    , m_pauseTime(-1)
-    , m_requestedStartTime(0)
-    , m_totalDuration(-1)
-    , m_nextIterationDuration(-1)
-    , m_object(renderer)
-    , m_animation(const_cast<Animation*>(&transition))
+AnimationBase::AnimationBase(Animation& animation, RenderElement* renderer, CompositeAnimation* compositeAnimation)
+    : m_object(renderer)
     , m_compositeAnimation(compositeAnimation)
+    , m_animation(animation)
 {
     // Compute the total duration
     if (m_animation->iterationCount() > 0)
@@ -104,9 +97,9 @@ bool AnimationBase::playStatePlaying() const
     return m_animation->playState() == AnimPlayStatePlaying;
 }
 
-bool AnimationBase::animationsMatch(const Animation* anim) const
+bool AnimationBase::animationsMatch(const Animation& animation) const
 {
-    return m_animation->animationsMatch(anim);
+    return m_animation->animationsMatch(animation);
 }
 
 #if !LOG_DISABLED
@@ -129,6 +122,26 @@ static const char* nameForState(AnimationBase::AnimationState state)
     }
     return "";
 }
+
+static const char* nameForStateInput(AnimationBase::AnimationStateInput input)
+{
+    switch (input) {
+    case AnimationBase::AnimationStateInput::MakeNew: return "MakeNew";
+    case AnimationBase::AnimationStateInput::StartAnimation: return "StartAnimation";
+    case AnimationBase::AnimationStateInput::RestartAnimation: return "RestartAnimation";
+    case AnimationBase::AnimationStateInput::StartTimerFired: return "StartTimerFired";
+    case AnimationBase::AnimationStateInput::StyleAvailable: return "StyleAvailable";
+    case AnimationBase::AnimationStateInput::StartTimeSet: return "StartTimeSet";
+    case AnimationBase::AnimationStateInput::LoopTimerFired: return "LoopTimerFired";
+    case AnimationBase::AnimationStateInput::EndTimerFired: return "EndTimerFired";
+    case AnimationBase::AnimationStateInput::PauseOverride: return "PauseOverride";
+    case AnimationBase::AnimationStateInput::ResumeOverride: return "ResumeOverride";
+    case AnimationBase::AnimationStateInput::PlayStateRunning: return "PlayStateRunning";
+    case AnimationBase::AnimationStateInput::PlayStatePaused: return "PlayStatePaused";
+    case AnimationBase::AnimationStateInput::EndAnimation: return "EndAnimation";
+    }
+    return "";
+}
 #endif
 
 void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
@@ -139,7 +152,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
     // If we get AnimationStateInput::RestartAnimation then we force a new animation, regardless of state.
     if (input == AnimationStateInput::MakeNew) {
         if (m_animationState == AnimationState::StartWaitStyleAvailable)
-            m_compositeAnimation->animationController()->removeFromAnimationsWaitingForStyle(this);
+            m_compositeAnimation->animationController().removeFromAnimationsWaitingForStyle(this);
         LOG(Animations, "%p AnimationState %s -> New", this, nameForState(m_animationState));
         m_animationState = AnimationState::New;
         m_startTime = 0;
@@ -152,7 +165,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
 
     if (input == AnimationStateInput::RestartAnimation) {
         if (m_animationState == AnimationState::StartWaitStyleAvailable)
-            m_compositeAnimation->animationController()->removeFromAnimationsWaitingForStyle(this);
+            m_compositeAnimation->animationController().removeFromAnimationsWaitingForStyle(this);
         LOG(Animations, "%p AnimationState %s -> New", this, nameForState(m_animationState));
         m_animationState = AnimationState::New;
         m_startTime = 0;
@@ -168,7 +181,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
 
     if (input == AnimationStateInput::EndAnimation) {
         if (m_animationState == AnimationState::StartWaitStyleAvailable)
-            m_compositeAnimation->animationController()->removeFromAnimationsWaitingForStyle(this);
+            m_compositeAnimation->animationController().removeFromAnimationsWaitingForStyle(this);
         LOG(Animations, "%p AnimationState %s -> Done", this, nameForState(m_animationState));
         m_animationState = AnimationState::Done;
         endAnimation();
@@ -197,6 +210,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
     switch (m_animationState) {
         case AnimationState::New:
             ASSERT(input == AnimationStateInput::StartAnimation || input == AnimationStateInput::PlayStateRunning || input == AnimationStateInput::PlayStatePaused);
+
             if (input == AnimationStateInput::StartAnimation || input == AnimationStateInput::PlayStateRunning) {
                 m_requestedStartTime = beginAnimationUpdateTime();
                 LOG(Animations, "%p AnimationState %s -> StartWaitTimer", this, nameForState(m_animationState));
@@ -206,6 +220,11 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
                 LOG(Animations, "%p AnimationState %s -> AnimationState::PausedNew", this, nameForState(m_animationState));
                 m_animationState = AnimationState::PausedNew;
             }
+
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+            if (m_animation->trigger() && m_animation->trigger()->isScrollAnimationTrigger())
+                m_compositeAnimation->animationController().addToAnimationsDependentOnScroll(this);
+#endif
             break;
         case AnimationState::StartWaitTimer:
             ASSERT(input == AnimationStateInput::StartTimerFired || input == AnimationStateInput::PlayStatePaused);
@@ -213,13 +232,13 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
             if (input == AnimationStateInput::StartTimerFired) {
                 ASSERT(param >= 0);
                 // Start timer has fired, tell the animation to start and wait for it to respond with start time
-                LOG(Animations, "%p AnimationState %s -> StartWaitStyleAvailable", this, nameForState(m_animationState));
+                LOG(Animations, "%p AnimationState %s -> StartWaitStyleAvailable (time is %f)", this, nameForState(m_animationState), param);
                 m_animationState = AnimationState::StartWaitStyleAvailable;
-                m_compositeAnimation->animationController()->addToAnimationsWaitingForStyle(this);
+                m_compositeAnimation->animationController().addToAnimationsWaitingForStyle(this);
 
                 // Trigger a render so we can start the animation
                 if (m_object && m_object->element())
-                    m_compositeAnimation->animationController()->addElementChangeToDispatch(*m_object->element());
+                    m_compositeAnimation->animationController().addElementChangeToDispatch(*m_object->element());
             } else {
                 ASSERT(!paused());
                 // We're waiting for the start timer to fire and we got a pause. Cancel the timer, pause and wait
@@ -233,7 +252,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
 
             if (input == AnimationStateInput::StyleAvailable) {
                 // Start timer has fired, tell the animation to start and wait for it to respond with start time
-                LOG(Animations, "%p AnimationState %s -> StartWaitResponse", this, nameForState(m_animationState));
+                LOG(Animations, "%p AnimationState %s -> StartWaitResponse (time is %f)", this, nameForState(m_animationState), param);
                 m_animationState = AnimationState::StartWaitResponse;
 
                 overrideAnimations();
@@ -253,7 +272,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
                         timeOffset = -m_animation->delay();
                     bool started = startAnimation(timeOffset);
 
-                    m_compositeAnimation->animationController()->addToAnimationsWaitingForStartTimeResponse(this, started);
+                    m_compositeAnimation->animationController().addToAnimationsWaitingForStartTimeResponse(this, started);
                     m_isAccelerated = started;
                 }
             } else {
@@ -268,6 +287,8 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
 
             if (input == AnimationStateInput::StartTimeSet) {
                 ASSERT(param >= 0);
+                LOG(Animations, "%p AnimationState %s -> StartTimeSet (time is %f)", this, nameForState(m_animationState), param);
+
                 // We have a start time, set it, unless the startTime is already set
                 if (m_startTime <= 0) {
                     m_startTime = param;
@@ -284,7 +305,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
 
                 // Dispatch updateStyleIfNeeded so we can start the animation
                 if (m_object && m_object->element())
-                    m_compositeAnimation->animationController()->addElementChangeToDispatch(*m_object->element());
+                    m_compositeAnimation->animationController().addElementChangeToDispatch(*m_object->element());
             } else {
                 // We are pausing while waiting for a start response. Cancel the animation and wait. When 
                 // we unpause, we will act as though the start timer just fired
@@ -299,6 +320,8 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
 
             if (input == AnimationStateInput::LoopTimerFired) {
                 ASSERT(param >= 0);
+                LOG(Animations, "%p AnimationState %s -> LoopTimerFired (time is %f)", this, nameForState(m_animationState), param);
+
                 // Loop timer fired, loop again or end.
                 onAnimationIteration(param);
 
@@ -315,15 +338,14 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
         case AnimationState::Ending:
 #if !LOG_DISABLED
             if (input != AnimationStateInput::EndTimerFired && input != AnimationStateInput::PlayStatePaused)
-                LOG_ERROR("State is AnimationState::Ending, but input is not AnimationStateInput::EndTimerFired or AnimationStateInput::PlayStatePaused. It is %d.", input);
+                LOG_ERROR("State is AnimationState::Ending, but input is not AnimationStateInput::EndTimerFired or AnimationStateInput::PlayStatePaused. It is %s.", nameForStateInput(input));
 #endif
             if (input == AnimationStateInput::EndTimerFired) {
-
                 ASSERT(param >= 0);
                 // End timer fired, finish up
                 onAnimationEnd(param);
 
-                LOG(Animations, "%p AnimationState %s -> Done", this, nameForState(m_animationState));
+                LOG(Animations, "%p AnimationState %s -> Done (time is %f)", this, nameForState(m_animationState), param);
                 m_animationState = AnimationState::Done;
                 
                 if (m_object) {
@@ -335,7 +357,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
 
                     // Fire off another style change so we can set the final value
                     if (m_object->element())
-                        m_compositeAnimation->animationController()->addElementChangeToDispatch(*m_object->element());
+                        m_compositeAnimation->animationController().addElementChangeToDispatch(*m_object->element());
                 }
             } else {
                 // We are pausing while running. Cancel the animation and wait
@@ -404,7 +426,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
                         m_isAccelerated = true;
                     } else {
                         bool started = startAnimation(beginAnimationUpdateTime() - m_startTime);
-                        m_compositeAnimation->animationController()->addToAnimationsWaitingForStartTimeResponse(this, started);
+                        m_compositeAnimation->animationController().addToAnimationsWaitingForStartTimeResponse(this, started);
                         m_isAccelerated = started;
                     }
                 }
@@ -416,7 +438,7 @@ void AnimationBase::updateStateMachine(AnimationStateInput input, double param)
                 
                 // We are paused but we got the callback that notifies us that an accelerated animation started.
                 // We ignore the start time and just move into the paused-run state.
-                LOG(Animations, "%p AnimationState %s -> PausedRun", this, nameForState(m_animationState));
+                LOG(Animations, "%p AnimationState %s -> PausedRun (time is %f)", this, nameForState(m_animationState), param);
                 m_animationState = AnimationState::PausedRun;
                 ASSERT(m_startTime == 0);
                 m_startTime = param;
@@ -456,12 +478,31 @@ void AnimationBase::fireAnimationEventsIfNeeded()
     
     // Check for start timeout
     if (m_animationState == AnimationState::StartWaitTimer) {
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+        if (m_animation->trigger() && m_animation->trigger()->isScrollAnimationTrigger()) {
+            if (m_object) {
+                float offset = m_compositeAnimation->animationController().scrollPosition();
+                ScrollAnimationTrigger& scrollTrigger = downcast<ScrollAnimationTrigger>(*m_animation->trigger().get());
+                if (offset > scrollTrigger.startValue().value())
+                    updateStateMachine(AnimationStateInput::StartTimerFired, 0);
+            }
+
+            return;
+        }
+#endif
         if (beginAnimationUpdateTime() - m_requestedStartTime >= m_animation->delay())
             updateStateMachine(AnimationStateInput::StartTimerFired, 0);
         return;
     }
-    
+
     double elapsedDuration = beginAnimationUpdateTime() - m_startTime;
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+    // If we are a triggered animation that depends on scroll, our elapsed
+    // time is determined by the scroll position.
+    if (m_animation->trigger() && m_animation->trigger()->isScrollAnimationTrigger())
+        elapsedDuration = getElapsedTime();
+#endif
+
     // FIXME: we need to ensure that elapsedDuration is never < 0. If it is, this suggests that
     // we had a recalcStyle() outside of beginAnimationUpdate()/endAnimationUpdate().
     // Also check in getTimeToNextEvent().
@@ -520,6 +561,17 @@ double AnimationBase::timeToNextService()
         return -1;
     
     if (m_animationState == AnimationState::StartWaitTimer) {
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+        if (m_animation->trigger()->isScrollAnimationTrigger()) {
+            if (m_object) {
+                float currentScrollOffset = m_object->view().frameView().scrollOffsetForFixedPosition().height().toFloat();
+                ScrollAnimationTrigger& scrollTrigger = downcast<ScrollAnimationTrigger>(*m_animation->trigger().get());
+                if (currentScrollOffset >= scrollTrigger.startValue().value() && (!scrollTrigger.hasEndValue() || currentScrollOffset <= scrollTrigger.endValue().value()))
+                    return 0;
+            }
+            return -1;
+        }
+#endif
         double timeFromNow = m_animation->delay() - (beginAnimationUpdateTime() - m_requestedStartTime);
         return std::max(timeFromNow, 0.0);
     }
@@ -564,7 +616,7 @@ double AnimationBase::fractionalTime(double scale, double elapsedTime, double of
     return fractionalTime;
 }
 
-double AnimationBase::progress(double scale, double offset, const TimingFunction* tf) const
+double AnimationBase::progress(double scale, double offset, const TimingFunction* timingFunction) const
 {
     if (preActive())
         return 0;
@@ -574,30 +626,30 @@ double AnimationBase::progress(double scale, double offset, const TimingFunction
 
     double elapsedTime = getElapsedTime();
 
-    double dur = m_animation->duration();
+    double duration = m_animation->duration();
     if (m_animation->iterationCount() > 0)
-        dur *= m_animation->iterationCount();
+        duration *= m_animation->iterationCount();
 
     if (fillingForwards())
-        elapsedTime = dur;
+        elapsedTime = duration;
 
     double fractionalTime = this->fractionalTime(scale, elapsedTime, offset);
 
-    if (m_animation->iterationCount() > 0 && elapsedTime >= dur) {
+    if (m_animation->iterationCount() > 0 && elapsedTime >= duration) {
         if (WTF::isIntegral(fractionalTime))
             return fractionalTime;
     }
 
-    if (!tf)
-        tf = m_animation->timingFunction().get();
+    if (!timingFunction)
+        timingFunction = m_animation->timingFunction().get();
 
-    switch (tf->type()) {
+    switch (timingFunction->type()) {
     case TimingFunction::CubicBezierFunction: {
-        const CubicBezierTimingFunction* function = static_cast<const CubicBezierTimingFunction*>(tf);
+        const CubicBezierTimingFunction* function = static_cast<const CubicBezierTimingFunction*>(timingFunction);
         return solveCubicBezierFunction(function->x1(), function->y1(), function->x2(), function->y2(), fractionalTime, m_animation->duration());
     }
     case TimingFunction::StepsFunction: {
-        const StepsTimingFunction* stepsTimingFunction = static_cast<const StepsTimingFunction*>(tf);
+        const StepsTimingFunction* stepsTimingFunction = static_cast<const StepsTimingFunction*>(timingFunction);
         return solveStepsFunction(stepsTimingFunction->numberOfSteps(), stepsTimingFunction->stepAtStart(), fractionalTime);
     }
     case TimingFunction::LinearFunction:
@@ -653,7 +705,7 @@ void AnimationBase::freezeAtTime(double t)
         onAnimationStartResponse(monotonicallyIncreasingTime());
     }
 
-    ASSERT(m_startTime);        // if m_startTime is zero, we haven't started yet, so we'll get a bad pause time.
+    ASSERT(m_startTime); // If m_startTime is zero, we haven't started yet, so we'll get a bad pause time.
     if (t <= m_animation->delay())
         m_pauseTime = m_startTime;
     else
@@ -668,12 +720,28 @@ double AnimationBase::beginAnimationUpdateTime() const
     if (!m_compositeAnimation)
         return 0;
 
-    return m_compositeAnimation->animationController()->beginAnimationUpdateTime();
+    return m_compositeAnimation->animationController().beginAnimationUpdateTime();
 }
 
 double AnimationBase::getElapsedTime() const
 {
-    if (paused())    
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+    if (m_animation->trigger() && m_animation->trigger()->isScrollAnimationTrigger()) {
+        ScrollAnimationTrigger& scrollTrigger = downcast<ScrollAnimationTrigger>(*m_animation->trigger().get());
+        if (scrollTrigger.hasEndValue() && m_object) {
+            float offset = m_compositeAnimation->animationController().scrollPosition();
+            float startValue = scrollTrigger.startValue().value();
+            if (offset < startValue)
+                return 0;
+            float endValue = scrollTrigger.endValue().value();
+            if (offset > endValue)
+                return m_animation->duration();
+            return m_animation->duration() * (offset - startValue) / (endValue - startValue);
+        }
+    }
+#endif
+
+    if (paused())
         return m_pauseTime - m_startTime;
     if (m_startTime <= 0)
         return 0;
@@ -697,6 +765,79 @@ void AnimationBase::play()
 void AnimationBase::pause()
 {
     // FIXME: implement this method
+}
+
+static bool containsRotation(const Vector<RefPtr<TransformOperation>>& operations)
+{
+    for (const auto& operation : operations) {
+        if (operation->type() == TransformOperation::ROTATE)
+            return true;
+    }
+    return false;
+}
+
+bool AnimationBase::computeTransformedExtentViaTransformList(const FloatRect& rendererBox, const RenderStyle& style, LayoutRect& bounds) const
+{
+    FloatRect floatBounds = bounds;
+    FloatPoint transformOrigin;
+    
+    bool applyTransformOrigin = containsRotation(style.transform().operations()) || style.transform().affectedByTransformOrigin();
+    if (applyTransformOrigin) {
+        float offsetX = style.transformOriginX().isPercent() ? rendererBox.x() : 0;
+        float offsetY = style.transformOriginY().isPercent() ? rendererBox.y() : 0;
+
+        transformOrigin.setX(floatValueForLength(style.transformOriginX(), rendererBox.width()) + offsetX);
+        transformOrigin.setY(floatValueForLength(style.transformOriginY(), rendererBox.height()) + offsetY);
+        // Ignore transformOriginZ because we'll bail if we encounter any 3D transforms.
+        
+        floatBounds.moveBy(-transformOrigin);
+    }
+
+    for (const auto& operation : style.transform().operations()) {
+        if (operation->type() == TransformOperation::ROTATE) {
+            // For now, just treat this as a full rotation. This could take angle into account to reduce inflation.
+            floatBounds = boundsOfRotatingRect(floatBounds);
+        } else {
+            TransformationMatrix transform;
+            operation->apply(transform, rendererBox.size());
+            if (!transform.isAffine())
+                return false;
+
+            if (operation->type() == TransformOperation::MATRIX || operation->type() == TransformOperation::MATRIX_3D) {
+                TransformationMatrix::Decomposed2Type toDecomp;
+                transform.decompose2(toDecomp);
+                // Any rotation prevents us from using a simple start/end rect union.
+                if (toDecomp.angle)
+                    return false;
+            }
+
+            floatBounds = transform.mapRect(floatBounds);
+        }
+    }
+
+    if (applyTransformOrigin)
+        floatBounds.moveBy(transformOrigin);
+
+    bounds = LayoutRect(floatBounds);
+    return true;
+}
+
+bool AnimationBase::computeTransformedExtentViaMatrix(const FloatRect& rendererBox, const RenderStyle& style, LayoutRect& bounds) const
+{
+    TransformationMatrix transform;
+    style.applyTransform(transform, rendererBox, RenderStyle::IncludeTransformOrigin);
+    if (!transform.isAffine())
+        return false;
+
+    TransformationMatrix::Decomposed2Type fromDecomp;
+    transform.decompose2(fromDecomp);
+    // Any rotation prevents us from using a simple start/end rect union.
+    if (fromDecomp.angle)
+        return false;
+
+    bounds = LayoutRect(transform.mapRect(bounds));
+    return true;
+
 }
 
 } // namespace WebCore

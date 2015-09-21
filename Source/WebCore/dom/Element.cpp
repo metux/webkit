@@ -39,6 +39,7 @@
 #include "ElementIterator.h"
 #include "ElementRareData.h"
 #include "EventDispatcher.h"
+#include "EventHandler.h"
 #include "FlowThreadController.h"
 #include "FocusController.h"
 #include "FocusEvent.h"
@@ -47,13 +48,10 @@
 #include "HTMLCanvasElement.h"
 #include "HTMLCollection.h"
 #include "HTMLDocument.h"
-#include "HTMLFormControlsCollection.h"
 #include "HTMLLabelElement.h"
 #include "HTMLNameCollection.h"
-#include "HTMLOptionsCollection.h"
 #include "HTMLParserIdioms.h"
 #include "HTMLSelectElement.h"
-#include "HTMLTableRowsCollection.h"
 #include "HTMLTemplateElement.h"
 #include "IdTargetObserverRegistry.h"
 #include "InsertionPoint.h"
@@ -63,6 +61,7 @@
 #include "NodeRenderStyle.h"
 #include "PlatformWheelEvent.h"
 #include "PointerLockController.h"
+#include "RenderFlowThread.h"
 #include "RenderLayer.h"
 #include "RenderNamedFlowFragment.h"
 #include "RenderRegion.h"
@@ -92,11 +91,6 @@ namespace WebCore {
 
 using namespace HTMLNames;
 using namespace XMLNames;
-
-static inline bool shouldIgnoreAttributeCase(const Element& element)
-{
-    return element.isHTMLElement() && element.document().isHTMLDocument();
-}
 
 static HashMap<Element*, Vector<RefPtr<Attr>>>& attrNodeListMap()
 {
@@ -240,12 +234,20 @@ bool Element::isMouseFocusable() const
 
 bool Element::shouldUseInputMethod()
 {
-    return isContentEditable(UserSelectAllIsAlwaysNonEditable);
+    return computeEditability(UserSelectAllIsAlwaysNonEditable, ShouldUpdateStyle::Update) != Editability::ReadOnly;
+}
+
+static bool isForceEvent(const PlatformMouseEvent& platformEvent)
+{
+    return platformEvent.type() == PlatformEvent::MouseForceChanged || platformEvent.type() == PlatformEvent::MouseForceDown || platformEvent.type() == PlatformEvent::MouseForceUp;
 }
 
 bool Element::dispatchMouseEvent(const PlatformMouseEvent& platformEvent, const AtomicString& eventType, int detail, Element* relatedTarget)
 {
     if (isDisabledFormControl())
+        return false;
+
+    if (isForceEvent(platformEvent) && !document().hasListenerTypeForEventType(platformEvent.type()))
         return false;
 
     RefPtr<MouseEvent> mouseEvent = MouseEvent::create(eventType, document().defaultView(), platformEvent, detail, relatedTarget);
@@ -296,6 +298,10 @@ bool Element::dispatchWheelEvent(const PlatformWheelEvent& event)
 bool Element::dispatchKeyEvent(const PlatformKeyboardEvent& platformEvent)
 {
     RefPtr<KeyboardEvent> event = KeyboardEvent::create(platformEvent, document().defaultView());
+    if (Frame* frame = document().frame()) {
+        if (frame->eventHandler().accessibilityPreventsEventPropogation(event.get()))
+            event->stopPropagation();
+    }
     return EventDispatcher::dispatchEvent(this, event) && !event->defaultHandled();
 }
 
@@ -303,11 +309,6 @@ void Element::dispatchSimulatedClick(Event* underlyingEvent, SimulatedClickMouse
 {
     EventDispatcher::dispatchSimulatedClick(this, underlyingEvent, eventOptions, visualOptions);
 }
-
-DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, blur);
-DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, error);
-DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, focus);
-DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, load);
 
 RefPtr<Node> Element::cloneNodeInternal(Document& targetDocument, CloningOperation type)
 {
@@ -388,7 +389,7 @@ NamedNodeMap& Element::attributes() const
     if (NamedNodeMap* attributeMap = rareData.attributeMap())
         return *attributeMap;
 
-    rareData.setAttributeMap(NamedNodeMap::create(const_cast<Element&>(*this)));
+    rareData.setAttributeMap(std::make_unique<NamedNodeMap>(const_cast<Element&>(*this)));
     return *rareData.attributeMap();
 }
 
@@ -623,6 +624,20 @@ void Element::scrollIntoViewIfNeeded(bool centerIfNeeded)
         renderer()->scrollRectToVisible(bounds, ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
 }
 
+void Element::scrollIntoViewIfNotVisible(bool centerIfNotVisible)
+{
+    document().updateLayoutIgnorePendingStylesheets();
+    
+    if (!renderer())
+        return;
+    
+    LayoutRect bounds = renderer()->anchorRect();
+    if (centerIfNotVisible)
+        renderer()->scrollRectToVisible(bounds, ScrollAlignment::alignCenterIfNotVisible, ScrollAlignment::alignCenterIfNotVisible);
+    else
+        renderer()->scrollRectToVisible(bounds, ScrollAlignment::alignToEdgeIfNotVisible, ScrollAlignment::alignToEdgeIfNotVisible);
+}
+    
 void Element::scrollByUnits(int units, ScrollGranularity granularity)
 {
     document().updateLayoutIgnorePendingStylesheets();
@@ -721,7 +736,7 @@ double Element::offsetTop()
 
 double Element::offsetWidth()
 {
-    document().updateLayoutIgnorePendingStylesheets();
+    document().updateLayoutIfDimensionsOutOfDate(*this, WidthDimensionsCheck);
     if (RenderBoxModelObject* renderer = renderBoxModelObject()) {
         LayoutUnit offsetWidth = subpixelMetricsEnabled(renderer->document()) ? renderer->offsetWidth() : LayoutUnit(renderer->pixelSnappedOffsetWidth());
         return convertToNonSubpixelValueIfNeeded(adjustLayoutUnitForAbsoluteZoom(offsetWidth, *renderer).toDouble(), renderer->document());
@@ -731,7 +746,7 @@ double Element::offsetWidth()
 
 double Element::offsetHeight()
 {
-    document().updateLayoutIgnorePendingStylesheets();
+    document().updateLayoutIfDimensionsOutOfDate(*this, HeightDimensionsCheck);
     if (RenderBoxModelObject* renderer = renderBoxModelObject()) {
         LayoutUnit offsetHeight = subpixelMetricsEnabled(renderer->document()) ? renderer->offsetHeight() : LayoutUnit(renderer->pixelSnappedOffsetHeight());
         return convertToNonSubpixelValueIfNeeded(adjustLayoutUnitForAbsoluteZoom(offsetHeight, *renderer).toDouble(), renderer->document());
@@ -783,7 +798,7 @@ double Element::clientTop()
 
 double Element::clientWidth()
 {
-    document().updateLayoutIgnorePendingStylesheets();
+    document().updateLayoutIfDimensionsOutOfDate(*this, WidthDimensionsCheck);
 
     if (!document().hasLivingRenderTree())
         return 0;
@@ -804,8 +819,7 @@ double Element::clientWidth()
 
 double Element::clientHeight()
 {
-    document().updateLayoutIgnorePendingStylesheets();
-
+    document().updateLayoutIfDimensionsOutOfDate(*this, HeightDimensionsCheck);
     if (!document().hasLivingRenderTree())
         return 0;
     RenderView& renderView = *document().renderView();
@@ -865,7 +879,7 @@ void Element::setScrollTop(int newTop)
 
 int Element::scrollWidth()
 {
-    document().updateLayoutIgnorePendingStylesheets();
+    document().updateLayoutIfDimensionsOutOfDate(*this, WidthDimensionsCheck);
     if (RenderBox* rend = renderBox())
         return adjustForAbsoluteZoom(rend->scrollWidth(), *rend);
     return 0;
@@ -873,7 +887,7 @@ int Element::scrollWidth()
 
 int Element::scrollHeight()
 {
-    document().updateLayoutIgnorePendingStylesheets();
+    document().updateLayoutIfDimensionsOutOfDate(*this, HeightDimensionsCheck);
     if (RenderBox* rend = renderBox())
         return adjustForAbsoluteZoom(rend->scrollHeight(), *rend);
     return 0;
@@ -910,6 +924,126 @@ IntRect Element::boundsInRootViewSpace()
 
     result = view->contentsToRootView(result);
     return result;
+}
+
+static bool layoutOverflowRectContainsAllDescendants(const RenderElement& renderer)
+{
+    if (renderer.isRenderView())
+        return true;
+
+    if (!renderer.element())
+        return false;
+
+    // If there are any position:fixed inside of us, game over.
+    if (auto viewPositionedObjects = renderer.view().positionedObjects()) {
+        for (RenderBox* it : *viewPositionedObjects) {
+            if (it != &renderer && it->style().position() == FixedPosition && renderer.element()->contains(it->element()))
+                return false;
+        }
+    }
+
+    if (renderer.canContainAbsolutelyPositionedObjects()) {
+        // Our layout overflow will include all descendant positioned elements.
+        return true;
+    }
+
+    // This renderer may have positioned descendants whose containing block is some ancestor.
+    if (auto containingBlock = renderer.containingBlockForAbsolutePosition()) {
+        if (auto positionedObjects = containingBlock->positionedObjects()) {
+            for (RenderBox* it : *positionedObjects) {
+                if (it != &renderer && renderer.element()->contains(it->element()))
+                    return false;
+            }
+        }
+    }
+    
+    return false;
+}
+
+LayoutRect Element::absoluteEventBounds(bool& boundsIncludeAllDescendantElements, bool& includesFixedPositionElements)
+{
+    boundsIncludeAllDescendantElements = false;
+    includesFixedPositionElements = false;
+
+    if (!renderer())
+        return LayoutRect();
+
+    LayoutRect result;
+    if (isSVGElement()) {
+        // Get the bounding rectangle from the SVG model.
+        SVGElement& svgElement = downcast<SVGElement>(*this);
+        FloatRect localRect;
+        if (svgElement.getBoundingBox(localRect))
+            result = LayoutRect(renderer()->localToAbsoluteQuad(localRect, UseTransforms, &includesFixedPositionElements).boundingBox());
+    } else {
+        if (is<RenderBox>(renderer())) {
+            RenderBox& box = *downcast<RenderBox>(renderer());
+
+            bool computedBounds = false;
+            
+            if (RenderFlowThread* flowThread = box.flowThreadContainingBlock()) {
+                bool wasFixed = false;
+                Vector<FloatQuad> quads;
+                FloatRect localRect(0, 0, box.width(), box.height());
+                if (flowThread->absoluteQuadsForBox(quads, &wasFixed, &box, localRect.y(), localRect.maxY())) {
+                    FloatRect quadBounds = quads[0].boundingBox();
+                    for (size_t i = 1; i < quads.size(); ++i)
+                        quadBounds.unite(quads[i].boundingBox());
+                    
+                    result = LayoutRect(quadBounds);
+                    computedBounds = true;
+                } else {
+                    // Probably columns. Just return the bounds of the multicol block for now.
+                    // FIXME: this doesn't handle nested columns.
+                    RenderElement* multicolContainer = flowThread->parent();
+                    if (multicolContainer && is<RenderBox>(multicolContainer)) {
+                        LayoutRect overflowRect = downcast<RenderBox>(multicolContainer)->layoutOverflowRect();
+                        result = LayoutRect(multicolContainer->localToAbsoluteQuad(FloatRect(overflowRect), UseTransforms, &includesFixedPositionElements).boundingBox());
+                        computedBounds = true;
+                    }
+                }
+            }
+
+            if (!computedBounds) {
+                LayoutRect overflowRect = box.layoutOverflowRect();
+                result = LayoutRect(box.localToAbsoluteQuad(FloatRect(overflowRect), UseTransforms, &includesFixedPositionElements).boundingBox());
+                boundsIncludeAllDescendantElements = layoutOverflowRectContainsAllDescendants(box);
+            }
+        } else
+            result = LayoutRect(renderer()->absoluteBoundingBoxRect(true /* useTransforms */, &includesFixedPositionElements));
+    }
+
+    return result;
+}
+
+LayoutRect Element::absoluteEventBoundsOfElementAndDescendants(bool& includesFixedPositionElements)
+{
+    bool boundsIncludeDescendants;
+    LayoutRect result = absoluteEventBounds(boundsIncludeDescendants, includesFixedPositionElements);
+    if (boundsIncludeDescendants)
+        return result;
+
+    for (auto& child : childrenOfType<Element>(*this)) {
+        bool includesFixedPosition = false;
+        LayoutRect childBounds = child.absoluteEventBoundsOfElementAndDescendants(includesFixedPosition);
+        includesFixedPositionElements |= includesFixedPosition;
+        result.unite(childBounds);
+    }
+
+    return result;
+}
+
+LayoutRect Element::absoluteEventHandlerBounds(bool& includesFixedPositionElements)
+{
+    // This is not web-exposed, so don't call the FOUC-inducing updateLayoutIgnorePendingStylesheets().
+    FrameView* frameView = document().view();
+    if (!frameView)
+        return LayoutRect();
+
+    if (frameView->needsLayout())
+        frameView->layout();
+
+    return absoluteEventBoundsOfElementAndDescendants(includesFixedPositionElements);
 }
 
 Ref<ClientRectList> Element::getClientRects()
@@ -1331,24 +1465,6 @@ void Element::setPrefix(const AtomicString& prefix, ExceptionCode& ec)
     m_tagName.setPrefix(prefix.isEmpty() ? AtomicString() : prefix);
 }
 
-URL Element::baseURI() const
-{
-    const AtomicString& baseAttribute = getAttribute(baseAttr);
-    URL base(URL(), baseAttribute);
-    if (!base.protocol().isEmpty())
-        return base;
-
-    ContainerNode* parent = parentNode();
-    if (!parent)
-        return base;
-
-    const URL& parentBase = parent->baseURI();
-    if (parentBase.isNull())
-        return base;
-
-    return URL(parentBase, baseAttribute);
-}
-
 const AtomicString& Element::imageSourceURL() const
 {
     return fastGetAttribute(srcAttr);
@@ -1359,7 +1475,7 @@ bool Element::rendererIsNeeded(const RenderStyle& style)
     return style.display() != NONE;
 }
 
-RenderPtr<RenderElement> Element::createElementRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> Element::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
     return RenderElement::createFor(*this, WTF::move(style));
 }
@@ -1428,7 +1544,7 @@ void Element::removedFrom(ContainerNode& insertionPoint)
     if (insertionPoint.isInTreeScope()) {
         TreeScope* oldScope = &insertionPoint.treeScope();
         HTMLDocument* oldDocument = inDocument() && is<HTMLDocument>(oldScope->documentScope()) ? &downcast<HTMLDocument>(oldScope->documentScope()) : nullptr;
-        if (oldScope != &treeScope() || !isInTreeScope())
+        if (!isInTreeScope() || &treeScope() != &document())
             oldScope = nullptr;
 
         const AtomicString& idValue = getIdAttribute();
@@ -1497,7 +1613,7 @@ void Element::addShadowRoot(Ref<ShadowRoot>&& newShadowRoot)
     ChildNodeInsertionNotifier(*this).notify(shadowRoot, postInsertionNotificationTargets);
 
     for (auto& target : postInsertionNotificationTargets)
-        target->didNotifySubtreeInsertions();
+        target->finishedInsertingSubtree();
 
     resetNeedsNodeRenderingTraversalSlowPath();
 
@@ -1700,7 +1816,7 @@ void Element::finishParsingChildren()
         styleResolver->popParentElement(this);
 }
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 void Element::formatForDebugger(char* buffer, unsigned length) const
 {
     StringBuilder result;
@@ -2060,7 +2176,7 @@ void Element::updateFocusAppearance(bool /*restorePreviousSelection*/)
         VisibleSelection newSelection = VisibleSelection(firstPositionInOrBeforeNode(this), DOWNSTREAM);
         
         if (frame->selection().shouldChangeSelection(newSelection)) {
-            frame->selection().setSelection(newSelection);
+            frame->selection().setSelection(newSelection, FrameSelection::defaultSetSelectionOptions(), Element::defaultFocusTextStateChangeIntent());
             frame->selection().revealSelection();
         }
     } else if (renderer() && !renderer()->isWidget())
@@ -2107,6 +2223,32 @@ void Element::dispatchBlurEvent(RefPtr<Element>&& newFocusedElement)
 
     EventDispatcher::dispatchEvent(this, FocusEvent::create(eventNames().blurEvent, false, false, document().defaultView(), 0, WTF::move(newFocusedElement)));
 }
+
+#if ENABLE(MOUSE_FORCE_EVENTS)
+bool Element::dispatchMouseForceWillBegin()
+{
+    if (!document().hasListenerType(Document::FORCEWILLBEGIN_LISTENER))
+        return false;
+
+    Frame* frame = document().frame();
+    if (!frame)
+        return false;
+
+    PlatformMouseEvent platformMouseEvent(frame->eventHandler().lastKnownMousePosition(), frame->eventHandler().lastKnownMouseGlobalPosition(), NoButton, PlatformEvent::NoType, 1, false, false, false, false, WTF::currentTime(), ForceAtClick);
+    RefPtr<MouseEvent> mouseForceWillBeginEvent =  MouseEvent::create(eventNames().webkitmouseforcewillbeginEvent, document().defaultView(), platformMouseEvent, 0, nullptr);
+    mouseForceWillBeginEvent->setTarget(this);
+    dispatchEvent(mouseForceWillBeginEvent);
+
+    if (mouseForceWillBeginEvent->defaultHandled() || mouseForceWillBeginEvent->defaultPrevented())
+        return true;
+    return false;
+}
+#else
+bool Element::dispatchMouseForceWillBegin()
+{
+    return false;
+}
+#endif // #if ENABLE(MOUSE_FORCE_EVENTS)
 
 void Element::mergeWithNextTextNode(Text& node, ExceptionCode& ec)
 {
@@ -2448,38 +2590,6 @@ void Element::clearAfterPseudoElement()
         return;
     disconnectPseudoElement(elementRareData()->afterPseudoElement());
     elementRareData()->setAfterPseudoElement(nullptr);
-}
-
-// ElementTraversal API
-Element* Element::firstElementChild() const
-{
-    return ElementTraversal::firstChild(*this);
-}
-
-Element* Element::lastElementChild() const
-{
-    return ElementTraversal::lastChild(*this);
-}
-
-Element* Element::previousElementSibling() const
-{
-    return ElementTraversal::previousSibling(*this);
-}
-
-Element* Element::nextElementSibling() const
-{
-    return ElementTraversal::nextSibling(*this);
-}
-
-unsigned Element::childElementCount() const
-{
-    unsigned count = 0;
-    Node* n = firstChild();
-    while (n) {
-        count += n->isElementNode();
-        n = n->nextSibling();
-    }
-    return count;
 }
 
 bool Element::matchesReadWritePseudoClass() const
@@ -2919,27 +3029,6 @@ void Element::didRemoveAttribute(const QualifiedName& name, const AtomicString& 
     dispatchSubtreeModifiedEvent();
 }
 
-Ref<HTMLCollection> Element::ensureCachedHTMLCollection(CollectionType type)
-{
-    if (HTMLCollection* collection = cachedHTMLCollection(type))
-        return *collection;
-
-    if (type == TableRows) {
-        return ensureRareData().ensureNodeLists().addCachedCollection<HTMLTableRowsCollection>(downcast<HTMLTableElement>(*this), type);
-    } else if (type == SelectOptions) {
-        return ensureRareData().ensureNodeLists().addCachedCollection<HTMLOptionsCollection>(downcast<HTMLSelectElement>(*this), type);
-    } else if (type == FormControls) {
-        ASSERT(hasTagName(formTag) || hasTagName(fieldsetTag));
-        return ensureRareData().ensureNodeLists().addCachedCollection<HTMLFormControlsCollection>(*this, type);
-    }
-    return ensureRareData().ensureNodeLists().addCachedCollection<HTMLCollection>(*this, type);
-}
-
-HTMLCollection* Element::cachedHTMLCollection(CollectionType type)
-{
-    return hasRareData() && rareData()->nodeLists() ? rareData()->nodeLists()->cachedCollection<HTMLCollection>(type) : 0;
-}
-
 IntSize Element::savedLayerScrollOffset() const
 {
     return hasRareData() ? elementRareData()->savedLayerScrollOffset() : IntSize();
@@ -3095,7 +3184,7 @@ void Element::cloneAttributesFromElement(const Element& other)
 
     other.synchronizeAllAttributes();
     if (!other.m_elementData) {
-        m_elementData.clear();
+        m_elementData = nullptr;
         return;
     }
 

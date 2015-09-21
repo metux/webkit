@@ -45,6 +45,7 @@
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
+#include "FrameLoadRequest.h"
 #include "FrameLoader.h"
 #include "FrameSnapshotting.h"
 #include "FrameView.h"
@@ -155,8 +156,9 @@ bool InspectorPageAgent::cachedResourceContent(CachedResource* cachedResource, S
     if (cachedResource) {
         switch (cachedResource->type()) {
         case CachedResource::CSSStyleSheet:
+            // This can return a null String if the MIME type is invalid.
             *result = downcast<CachedCSSStyleSheet>(*cachedResource).sheetText();
-            return true;
+            return !result->isNull();
         case CachedResource::Script:
             *result = downcast<CachedScript>(*cachedResource).script();
             return true;
@@ -346,7 +348,7 @@ void InspectorPageAgent::didCreateFrontendAndBackend(Inspector::FrontendChannel*
 void InspectorPageAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReason)
 {
     m_frontendDispatcher = nullptr;
-    m_backendDispatcher.clear();
+    m_backendDispatcher = nullptr;
 
     ErrorString unused;
     disable(unused);
@@ -365,6 +367,10 @@ void InspectorPageAgent::enable(ErrorString&)
     m_enabled = true;
     m_instrumentingAgents->setInspectorPageAgent(this);
 
+    auto stopwatch = m_instrumentingAgents->inspectorEnvironment().executionStopwatch();
+    stopwatch->reset();
+    stopwatch->start();
+
     if (Frame* frame = mainFrame())
         m_originalScriptExecutionDisabled = !frame->settings().isScriptEnabled();
 }
@@ -372,7 +378,7 @@ void InspectorPageAgent::enable(ErrorString&)
 void InspectorPageAgent::disable(ErrorString&)
 {
     m_enabled = false;
-    m_scriptsToEvaluateOnLoad.clear();
+    m_scriptsToEvaluateOnLoad = nullptr;
     m_instrumentingAgents->setInspectorPageAgent(nullptr);
 
     ErrorString unused;
@@ -415,7 +421,10 @@ void InspectorPageAgent::navigate(ErrorString&, const String& url)
 {
     UserGestureIndicator indicator(DefinitelyProcessingUserGesture);
     Frame& frame = m_page->mainFrame();
-    frame.loader().changeLocation(frame.document()->securityOrigin(), frame.document()->completeURL(url), "", LockHistory::No, LockBackForwardList::No);
+
+    ResourceRequest resourceRequest(frame.document()->completeURL(url));
+    FrameLoadRequest frameRequest(frame.document()->securityOrigin(), resourceRequest, "_self", LockHistory::No, LockBackForwardList::No, MaybeSendReferrer, AllowNavigationToInvalidURL::No, NewFrameOpenerPolicy::Allow, ShouldReplaceDocumentIfJavaScriptURL::ReplaceDocumentIfJavaScriptURL, ShouldOpenExternalURLsPolicy::ShouldNotAllow);
+    frame.loader().changeLocation(frameRequest);
 }
 
 static Ref<Inspector::Protocol::Page::Cookie> buildObjectForCookie(const Cookie& cookie)
@@ -814,6 +823,12 @@ void InspectorPageAgent::loaderDetachedFromFrame(DocumentLoader& loader)
 
 void InspectorPageAgent::frameStartedLoading(Frame& frame)
 {
+    if (frame.isMainFrame()) {
+        auto stopwatch = m_instrumentingAgents->inspectorEnvironment().executionStopwatch();
+        stopwatch->reset();
+        stopwatch->start();
+    }
+
     m_frontendDispatcher->frameStartedLoading(frameId(&frame));
 }
 

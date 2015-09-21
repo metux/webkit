@@ -22,17 +22,20 @@
 #define StyleSheetContents_h
 
 #include "CSSParserMode.h"
+#include "CachePolicy.h"
 #include "URL.h"
 #include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicStringHash.h>
+#include <wtf/text/TextPosition.h>
 
 namespace WebCore {
 
 class CSSStyleSheet;
 class CachedCSSStyleSheet;
+class CachedResource;
 class Document;
 class Node;
 class SecurityOrigin;
@@ -62,11 +65,13 @@ public:
 
     void parseAuthorStyleSheet(const CachedCSSStyleSheet*, const SecurityOrigin*);
     WEBCORE_EXPORT bool parseString(const String&);
-    bool parseStringAtLine(const String&, int startLineNumber, bool);
+    bool parseStringAtPosition(const String&, const TextPosition&, bool createdByParser);
 
     bool isCacheable() const;
 
     bool isLoading() const;
+    bool subresourcesAllowReuse(CachePolicy) const;
+    WEBCORE_EXPORT bool isLoadingSubresources() const;
 
     void checkLoaded();
     void startLoadingDynamicSheet();
@@ -78,10 +83,10 @@ public:
     const String& charset() const { return m_parserContext.charset; }
 
     bool loadCompleted() const { return m_loadCompleted; }
-    bool hasFailedOrCanceledSubresources() const;
 
     URL completeURL(const String& url) const;
     void addSubresourceStyleURLs(ListHashSet<URL>&);
+    bool traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const;
 
     void setIsUserStyleSheet(bool b) { m_isUserStyleSheet = b; }
     bool isUserStyleSheet() const { return m_isUserStyleSheet; }
@@ -91,7 +96,8 @@ public:
     void parserAddNamespace(const AtomicString& prefix, const AtomicString& uri);
     void parserAppendRule(PassRefPtr<StyleRuleBase>);
     void parserSetEncodingFromCharsetRule(const String& encoding); 
-    void parserSetUsesRemUnits(bool b) { m_usesRemUnits = b; }
+    void parserSetUsesRemUnits() { m_usesRemUnits = true; }
+    void parserSetUsesStyleBasedEditability() { m_usesStyleBasedEditability = true; }
 
     void clearRules();
 
@@ -117,6 +123,7 @@ public:
     StyleRuleBase* ruleAt(unsigned index) const;
 
     bool usesRemUnits() const { return m_usesRemUnits; }
+    bool usesStyleBasedEditability() const { return m_usesStyleBasedEditability; }
 
     unsigned estimatedSizeInBytes() const;
     
@@ -159,6 +166,7 @@ private:
     bool m_hasSyntacticallyValidCSSHeader : 1;
     bool m_didLoadErrorOccur : 1;
     bool m_usesRemUnits : 1;
+    bool m_usesStyleBasedEditability : 1;
     bool m_isMutable : 1;
     bool m_isInMemoryCache : 1;
     

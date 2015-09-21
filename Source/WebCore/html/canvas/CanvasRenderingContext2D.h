@@ -38,7 +38,7 @@
 #include "ImageBuffer.h"
 #include "Path.h"
 #include "PlatformLayer.h"
-#include "TextDirection.h"
+#include "TextFlags.h"
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
@@ -132,18 +132,18 @@ public:
 
     void beginPath();
 
-    void fill(const String& winding = "nonzero");
+    void fill(const String& winding = ASCIILiteral("nonzero"));
     void stroke();
-    void clip(const String& winding = "nonzero");
+    void clip(const String& winding = ASCIILiteral("nonzero"));
 
-    void fill(DOMPath*, const String& winding = "nonzero");
+    void fill(DOMPath*, const String& winding = ASCIILiteral("nonzero"));
     void stroke(DOMPath*);
-    void clip(DOMPath*, const String& winding = "nonzero");
+    void clip(DOMPath*, const String& winding = ASCIILiteral("nonzero"));
 
-    bool isPointInPath(const float x, const float y, const String& winding = "nonzero");
+    bool isPointInPath(const float x, const float y, const String& winding = ASCIILiteral("nonzero"));
     bool isPointInStroke(const float x, const float y);
 
-    bool isPointInPath(DOMPath*, const float x, const float y, const String& winding = "nonzero");
+    bool isPointInPath(DOMPath*, const float x, const float y, const String& winding = ASCIILiteral("nonzero"));
     bool isPointInStroke(DOMPath*, const float x, const float y);
 
     void clearRect(float x, float y, float width, float height);
@@ -183,15 +183,15 @@ public:
 
     void setCompositeOperation(const String&);
 
-    PassRefPtr<CanvasGradient> createLinearGradient(float x0, float y0, float x1, float y1, ExceptionCode&);
-    PassRefPtr<CanvasGradient> createRadialGradient(float x0, float y0, float r0, float x1, float y1, float r1, ExceptionCode&);
-    PassRefPtr<CanvasPattern> createPattern(HTMLImageElement*, const String& repetitionType, ExceptionCode&);
-    PassRefPtr<CanvasPattern> createPattern(HTMLCanvasElement*, const String& repetitionType, ExceptionCode&);
+    RefPtr<CanvasGradient> createLinearGradient(float x0, float y0, float x1, float y1, ExceptionCode&);
+    RefPtr<CanvasGradient> createRadialGradient(float x0, float y0, float r0, float x1, float y1, float r1, ExceptionCode&);
+    RefPtr<CanvasPattern> createPattern(HTMLImageElement*, const String& repetitionType, ExceptionCode&);
+    RefPtr<CanvasPattern> createPattern(HTMLCanvasElement*, const String& repetitionType, ExceptionCode&);
 
-    PassRefPtr<ImageData> createImageData(PassRefPtr<ImageData>, ExceptionCode&) const;
-    PassRefPtr<ImageData> createImageData(float width, float height, ExceptionCode&) const;
-    PassRefPtr<ImageData> getImageData(float sx, float sy, float sw, float sh, ExceptionCode&) const;
-    PassRefPtr<ImageData> webkitGetImageDataHD(float sx, float sy, float sw, float sh, ExceptionCode&) const;
+    RefPtr<ImageData> createImageData(RefPtr<ImageData>&&, ExceptionCode&) const;
+    RefPtr<ImageData> createImageData(float width, float height, ExceptionCode&) const;
+    RefPtr<ImageData> getImageData(float sx, float sy, float sw, float sh, ExceptionCode&) const;
+    RefPtr<ImageData> webkitGetImageDataHD(float sx, float sy, float sw, float sh, ExceptionCode&) const;
     void putImageData(ImageData*, float dx, float dy, ExceptionCode&);
     void putImageData(ImageData*, float dx, float dy, float dirtyX, float dirtyY, float dirtyWidth, float dirtyHeight, ExceptionCode&);
     void webkitPutImageDataHD(ImageData*, float dx, float dy, ExceptionCode&);
@@ -220,13 +220,13 @@ public:
     void fillText(const String& text, float x, float y, float maxWidth);
     void strokeText(const String& text, float x, float y);
     void strokeText(const String& text, float x, float y, float maxWidth);
-    PassRefPtr<TextMetrics> measureText(const String& text);
+    Ref<TextMetrics> measureText(const String& text);
 
     LineCap getLineCap() const { return state().m_lineCap; }
     LineJoin getLineJoin() const { return state().m_lineJoin; }
 
-    bool webkitImageSmoothingEnabled() const;
-    void setWebkitImageSmoothingEnabled(bool);
+    bool imageSmoothingEnabled() const;
+    void setImageSmoothingEnabled(bool);
 
 private:
     enum class Direction {
@@ -235,14 +235,32 @@ private:
         LTR
     };
 
-    struct State final : FontSelectorClient {
+    class FontProxy : public FontSelectorClient {
+    public:
+        FontProxy() = default;
+        virtual ~FontProxy();
+        FontProxy(const FontProxy&);
+        FontProxy& operator=(const FontProxy&);
+
+        bool realized() const { return m_font.fontSelector(); }
+        void initialize(FontSelector&, RenderStyle&);
+        FontMetrics fontMetrics() const;
+        const FontDescription& fontDescription() const;
+        float width(const TextRun&) const;
+        void drawBidiText(GraphicsContext&, const TextRun&, const FloatPoint&, FontCascade::CustomFontNotReadyAction) const;
+
+    private:
+        void update(FontSelector&);
+        virtual void fontsNeedUpdate(FontSelector&) override;
+
+        FontCascade m_font;
+    };
+
+    struct State final {
         State();
-        virtual ~State();
 
         State(const State&);
         State& operator=(const State&);
-
-        virtual void fontsNeedUpdate(FontSelector*) override;
 
         String m_unparsedStrokeColor;
         String m_unparsedFillColor;
@@ -270,8 +288,7 @@ private:
         Direction m_direction;
 
         String m_unparsedFont;
-        FontCascade m_font;
-        bool m_realizedFont;
+        FontProxy m_font;
     };
 
     enum CanvasDidDrawOption {
@@ -308,7 +325,9 @@ private:
 
     void drawTextInternal(const String& text, float x, float y, bool fill, float maxWidth = 0, bool useMaxWidth = false);
 
-    const FontCascade& accessFont();
+    // The relationship between FontCascade and CanvasRenderingContext2D::FontProxy must hold certain invariants.
+    // Therefore, all font operations must pass through the State.
+    const FontProxy& fontProxy();
 
 #if ENABLE(DASHBOARD_SUPPORT)
     void clearPathForDashboardBackwardCompatibilityMode();
@@ -339,9 +358,9 @@ private:
 
     template<class T> void fullCanvasCompositedDrawImage(T*, ColorSpace, const FloatRect&, const FloatRect&, CompositeOperator);
 
-    void prepareGradientForDashboard(CanvasGradient* gradient) const;
+    void prepareGradientForDashboard(CanvasGradient& gradient) const;
 
-    PassRefPtr<ImageData> getImageData(ImageBuffer::CoordinateSystem, float sx, float sy, float sw, float sh, ExceptionCode&) const;
+    RefPtr<ImageData> getImageData(ImageBuffer::CoordinateSystem, float sx, float sy, float sw, float sh, ExceptionCode&) const;
     void putImageData(ImageData*, ImageBuffer::CoordinateSystem, float dx, float dy, float dirtyX, float dirtyY, float dirtyWidth, float dirtyHeight, ExceptionCode&);
 
     virtual bool is2d() const override { return true; }

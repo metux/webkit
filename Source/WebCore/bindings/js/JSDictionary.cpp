@@ -63,7 +63,7 @@ namespace WebCore {
 JSDictionary::GetPropertyResult JSDictionary::tryGetProperty(const char* propertyName, JSValue& finalResult) const
 {
     ASSERT(isValid());
-    Identifier identifier(m_exec, propertyName);
+    Identifier identifier = Identifier::fromString(m_exec, propertyName);
     PropertySlot slot(m_initializerObject.get());
 
     if (!m_initializerObject.get()->getPropertySlot(m_exec, identifier, slot))
@@ -264,6 +264,11 @@ void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Game
     result = JSGamepad::toWrapped(value);
 }
 #endif
+
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, JSC::JSFunction*& result)
+{
+    result = jsDynamicCast<JSC::JSFunction*>(value);
+}
 
 bool JSDictionary::getWithUndefinedOrNullCheck(const char* propertyName, String& result) const
 {

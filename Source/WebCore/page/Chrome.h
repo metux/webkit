@@ -74,7 +74,7 @@ public:
     virtual void invalidateContentsAndRootView(const IntRect&) override;
     virtual void invalidateContentsForSlowScroll(const IntRect&) override;
     virtual void scroll(const IntSize&, const IntRect&, const IntRect&) override;
-#if USE(TILED_BACKING_STORE)
+#if USE(COORDINATED_GRAPHICS)
     virtual void delegatedScrollRequested(const IntPoint& scrollPoint) override;
 #endif
     virtual IntPoint screenToRootView(const IntPoint&) const override;
@@ -145,9 +145,6 @@ public:
     bool runJavaScriptConfirm(Frame*, const String&);
     bool runJavaScriptPrompt(Frame*, const String& message, const String& defaultValue, String& result);
     WEBCORE_EXPORT void setStatusbarText(Frame*, const String&);
-    bool shouldInterruptJavaScript();
-
-    IntRect windowResizerRect() const;
 
     void mouseDidMoveOverElement(const HitTestResult&, unsigned modifierFlags);
 
@@ -160,10 +157,6 @@ public:
 
 #if ENABLE(INPUT_TYPE_COLOR)
     std::unique_ptr<ColorChooser> createColorChooser(ColorChooserClient*, const Color& initialColor);
-#endif
-
-#if ENABLE(DATE_AND_TIME_INPUT_TYPES) && !PLATFORM(IOS)
-    PassRefPtr<DateTimeChooser> openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&);
 #endif
 
     void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
@@ -180,8 +173,8 @@ public:
     bool selectItemWritingDirectionIsNatural();
     bool selectItemAlignmentFollowsMenuWritingDirection();
     bool hasOpenedPopup() const;
-    PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;
-    PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const;
+    RefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;
+    RefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const;
 
 #if PLATFORM(IOS)
     // FIXME: Can we come up with a better name for this setter?

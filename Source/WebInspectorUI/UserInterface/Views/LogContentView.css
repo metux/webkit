@@ -23,6 +23,40 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+.log-scope-bar > li.unread::before {
+    content: '';
+    display: inline-block;
+    vertical-align: baseline;
+
+    margin-left: -10px;
+    margin-right: 2px;
+    width: 8px;
+    height: 8px;
+
+    -webkit-clip-path: circle(50% at 50% 50%);
+    animation: unread-background-pulse 1.5s ease-in-out infinite alternate-reverse;
+}
+
+.log-scope-bar > li.unread:hover::before {
+    visibility: hidden;
+}
+
+.log-scope-bar > li.unread.errors::before {
+    background-color: hsl(0, 95%, 72%);
+}
+
+.log-scope-bar > li.unread.warnings::before {
+    background-color: hsl(48, 98%, 51%);
+}
+
+.log-scope-bar > li.unread.logs::before {
+    background-color: hsl(213, 92%, 77%);
+}
+
+@keyframes unread-background-pulse {
+    from { background-color: transparent; }
+}
+
 .content-view.log {
     overflow-y: overlay;
     overflow-x: hidden;
@@ -34,33 +68,37 @@
 
     word-wrap: break-word;
 
-    font-family: -webkit-system-font, sans-serif;
+    font-family: -apple-system, sans-serif;
     font-size: 12px;
 
     min-height: 100%;
-}
 
-.console-user-command,
-.console-user-command-result,
-.console-formatted-object {
-    font-family: Menlo, monospace;
-    font-size: 11px;
-}
-
-.expandable.source-code {
-    display: block;
+    outline: none;
 }
 
 .console-messages > :first-child {
     margin-top: auto;
 }
 
-.console-message {
-    border-top: 1px solid rgb(240, 240, 240);
+.console-item {
+    border-top: 1px solid hsl(0, 0%, 94%);
 }
 
-.console-group.new-session .console-group-messages .console-item:first-child {
-    border-top: none;
+.console-error-level:not(.filtered-out, .filtered-out-by-search),
+.console-error-level:not(.filtered-out, .filtered-out-by-search) + .console-item {
+    border-top-color: hsl(0, 100%, 92%);
+}
+
+.console-warning-level:not(.filtered-out, .filtered-out-by-search),
+.console-warning-level:not(.filtered-out, .filtered-out-by-search) + .console-item {
+    border-top-color: hsl(40, 100%, 90%);
+}
+
+.console-item::before {
+    position: absolute;
+    left: 4px;
+    height: 12px;
+    width: 12px;
 }
 
 .console-item.selected::after {
@@ -68,10 +106,11 @@
     display: block;
     content: "";
     left: 0;
-    top: 0;
-    bottom: 0;
+    top: -1px;
+    bottom: -1px;
     background: hsl(0, 0%, 60%);
     width: 2px;
+    z-index: 10;
 }
 
 .console-messages:focus .console-item.selected .data-grid tr.selected {
@@ -82,6 +121,15 @@
     background-color: hsl(210, 0%, 90%) !important;
 }
 
+.console-messages:focus .console-item.selected {
+    background-color: hsl(210, 98%, 96%);
+    border-color: hsl(210, 90%, 93%);
+}
+
+.console-messages:focus .console-item.selected + .console-item {
+    border-top-color: hsl(210, 90%, 93%);
+}
+
 .console-messages:focus .console-item.selected::after {
     background: hsl(210, 100%, 49%);
 }
@@ -90,67 +138,18 @@
     color: hsl(210, 100%, 33%);
 }
 
-.console-user-command-result.console-log-level::before {
-    content: url(../Images/UserInputResult.svg);
-    margin-top: 1px; /* align with 11px Menlo */
-}
-
-.console-message, .console-user-command {
-    position: relative;
-    padding: 2px 12px 2px 18px;
-    min-height: 16px;
-}
-
-.console-item::before {
-    content: " ";
-
-    position: absolute;
-    left: 4px;
-    width: 10px;
-}
-
-.console-message .bubble {
-    display: inline-block;
-    height: 15px;
-    background-color: rgb(128, 151, 189);
-    vertical-align: middle;
-    white-space: nowrap;
-    padding: 1px 4px;
-    margin-top: -2px;
-    margin-right: 4px;
-    margin-left: -18px;
-    text-align: left;
-    font-size: 11px;
-    line-height: normal;
-    font-weight: bold;
-    text-shadow: none;
-    color: white;
-    border-radius: 7px;
-
-    float: left;
-    margin-top: 0;
-    margin-left: 2px;
-}
-
-.console-message-text {
-    white-space: pre-wrap;
-}
-
-.console-message-text > span {
-    -webkit-user-select: text;
-}
-
 .console-group-title {
     font-weight: bold;
 }
 
 .console-group-title::before {
+    content: "";
     background-image: -webkit-canvas(disclosure-triangle-small-open-normal);
     background-size: 13px 13px;
-    top: 6px;
+    top: 4px;
+    left: 4px;
     width: 13px;
     height: 13px;
-    left: 3px;
 }
 
 .console-group.collapsed .console-group-title::before {
@@ -165,314 +164,21 @@
     position: relative;
 }
 
-.console-group.new-session {
-    border-top: 3px dashed rgb(240, 240, 240);
-}
-
-.console-error-level {
-    background-color: hsl(0, 100%, 96%);
-    border-color: hsl(0, 100%, 92%);
-}
-
-.console-error-level .console-message-text,
-.console-error-level .section .header .title {
-    color: hsl(0, 75%, 50%);
-}
-
-.console-debug-level .console-message-text {
-    color: blue;
-}
-
-.console-debug-level::before {
-    background-color: blue;
-}
-
-.console-error-level::before {
-    content: url(../Images/Error.svg);
-}
-
-.console-warning-level {
-    background-color: hsl(50, 100%, 94%);
-    border-color: hsl(50, 100%, 86%);
-}
-
-.console-warning-level .console-message-text {
-    color: hsl(30, 90%, 35%);
-}
-
-.console-warning-level::before {
-    content: url(../Images/Warning.svg);
-}
-
-.console-user-command .console-message {
-    margin-left: -24px;
-    padding-right: 0;
-}
-
-.console-user-command::before {
-    content: url(../Images/UserInputPromptPrevious.svg);
-    margin-top: 1px; /* align with 11px Menlo */
-}
-
-.console-user-command > .console-message-text {
-    color: rgb(0, 128, 255);
+.console-session + .console-session {
+    border-top: 3px dashed hsl(0, 0%, 94%);
 }
 
 .console-messages a {
-    color: rgb(33%, 33%, 33%);
+    color: hsl(0, 0%, 32%);
     cursor: pointer;
 }
 
 .console-messages a:hover {
-    color: rgb(15%, 15%, 15%);
+    color: hsl(0, 0%, 14%);
 }
 
-.console-message-url {
-    float: right;
-    margin-left: 4px;
-    font-weight: normal;
-}
-
-.console-group-messages .section {
-    margin: 0 0 0 12px;
-}
-
-.console-group-messages .section .header {
-    padding: 0 8px 0 0;
-    background-image: none;
-    border: none;
-    min-height: 0;
-}
-
-.console-group-messages .section .header::before {
-    top: 3px;
-    left: 1px;
-}
-
-.console-group-messages .section .header .title {
-    color: black;
-    font-weight: normal;
-    line-height: normal; /* @FIXME: may cause inconsistencies in line-heights of monospace and non-monospace text */
-}
-
-.console-group-messages .section .properties li .info {
-    padding-top: 0;
-    padding-bottom: 0;
-    color: rgb(60%, 60%, 60%);
-}
-
-.console-group-messages .outline-disclosure {
-    outline: none;
-    padding-left: 0;
-}
-
-.console-group-messages .outline-disclosure > ol {
-    padding: 0 0 0 12px !important;
-}
-
-.console-group-messages .outline-disclosure.single-node li {
-    padding-left: 2px;
-}
-
-.console-group-messages .outline-disclosure li .selection {
-    margin-left: -6px;
-    margin-right: -6px;
-}
-
-.console-group-messages .add-attribute {
-    display: none;
-}
-
-.console-object-preview {
-    font-style: italic;
-}
-
-.console-object-preview-lossless,
-.console-formatted-array .console-object-preview,
-.expanded .console-object-preview {
-    font-style: normal;
-}
-
-.console-object-preview .name {
- /* Match ObjectPropertiesSection name styles */
-    color: rgb(136, 19, 145);
-}
-
-.expanded .console-object-preview > .console-object-preview-body {
-    display: none;
-}
-
-.console-object-preview > .console-object-preview-name.console-object-preview-name-Object {
-    display: none;
-}
-
-.console-object-preview-body .console-object-preview-name.console-object-preview-name-Object { 
-    display: none;
-}
-
-.expanded .console-object-preview > .console-object-preview-name.console-object-preview-name-Object {
-    display: inline;
-}
-
-.console-formatted-object, .console-formatted-node, .console-formatted-error, .console-formatted-map, .console-formatted-set, .console-formatted-weakmap {
-    position: relative;
-    display: inline-block;
-    vertical-align: baseline;
-    color: black;
-}
-
-:matches(.console-formatted-object, .console-formatted-node, .console-formatted-error, .console-formatted-map, .console-formatted-set, .console-formatted-weakmap) .section {
-    position: static;
-}
-
-:matches(.console-formatted-object, .console-formatted-node, .console-formatted-error, .console-formatted-map, .console-formatted-set, .console-formatted-weakmap) .properties {
-    padding-left: 0 !important;
-}
-
-.console-formatted-number {
-    color: rgb(28, 0, 207);
-}
-
-.console-formatted-string, .console-formatted-regexp {
-    white-space: pre;
-}
-
-.console-formatted-string {
-    color: rgb(196, 26, 22);
-}
-
-.console-formatted-regexp {
-    color: rgb(255, 88, 0);
-}
-
-.console-formatted-symbol {
-    color: rgb(63, 169, 156);
-}
-
-.console-formatted-null, .console-formatted-undefined {
-    color: rgb(128, 128, 128);
-}
-
-.error-message {
-    color: red;
-}
-
-.auto-complete-text, .editing .auto-complete-text {
-    color: rgb(128, 128, 128) !important;
-    -webkit-user-modify: read-only;
-}
-
-.outline-disclosure li.hovered:not(.selected) .selection {
-    display: block;
-    left: 3px;
-    right: 3px;
-    background-color: rgba(56, 121, 217, 0.1);
-    border-radius: 5px;
-}
-
-.outline-disclosure li.highlighted .highlight {
-    background-color: rgb(255, 230, 179);
-    border-radius: 4px;
-    padding-bottom: 2px;
-    margin-bottom: -2px;
-}
-
-.outline-disclosure li.selected.highlighted .highlight {
-    background-color: transparent;
-    padding-bottom: 0;
-    margin-bottom: 0;
-}
-
-.outline-disclosure li .selection {
-    display: none;
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 15px;
-    z-index: -1;
-}
-
-.outline-disclosure li.selected .selection {
-    display: block;
-    background-color: rgb(212, 212, 212);
-}
-
-.outline-disclosure li.elements-drag-over .selection {
-    display: block;
-    margin-top: -2px;
-    border-top: 2px solid rgb(56, 121, 217);
-}
-
-.outline-disclosure ol:focus li.selected .selection {
-    background-color: rgb(56, 121, 217);
-}
-
-.outline-disclosure ol.search-match-not-found li.selected .selection {
-    border: 1px solid rgb(56, 121, 217);
-    background-color: white;
-}
-
-.outline-disclosure > ol {
-    position: relative;
-    padding: 2px 6px !important;
-    margin: 0;
-    color: black;
-    cursor: default;
-    min-width: 100%;
-}
-
-.outline-disclosure, .outline-disclosure ol {
-    list-style-type: none;
-    -webkit-padding-start: 12px;
-    margin: 0;
-}
-
-.outline-disclosure li {
-    padding: 0 0 0 14px;
-    margin-top: 0;
-    margin-bottom: 2px;
-    margin-left: -2px;
-    word-wrap: break-word;
-}
-
-.outline-disclosure li.parent {
-    margin-left: -12px
-}
-
-.outline-disclosure li .webkit-html-tag.close {
-    margin-left: -12px;
-}
-
-.outline-disclosure li.parent::before {
-    float: left;
-
-    content: "";
-
-    background-image: -webkit-canvas(disclosure-triangle-tiny-closed-normal);
-    background-size: 8px 8px;
-    background-repeat: no-repeat;
-
-    width: 8px;
-    height: 8px;
-
-    margin-top: 4px;
-    padding-right: 2px;
-}
-
-.outline-disclosure li.parent.expanded::before {
-    background-image: -webkit-canvas(disclosure-triangle-tiny-open-normal);
-}
-
-.outline-disclosure ol.children {
-    display: none;
-}
-
-.outline-disclosure ol.children.expanded {
-    display: block;
-}
-
-.webkit-html-fragment.shadow {
-    opacity: 0.6;
+.console-messages .data-grid {
+    clear: both;
 }
 
 .console-item.filtered-out {
@@ -481,12 +187,8 @@
 
 .search-bar.log-search-bar > input[type="search"] {
     width: 150px;
-    border: 1px solid rgba(0, 0, 0, 0.35);
+    border: 1px solid hsla(0, 0%, 0%, 0.35);
     padding-left: 4px;
-}
-
-body.mac-platform.legacy .search-bar.log-search-bar > input[type="search"] {
-    padding-left: 0;
 }
 
 .search-in-progress .console-item.filtered-out-by-search {
@@ -495,12 +197,12 @@ body.mac-platform.legacy .search-bar.log-search-bar > input[type="search"] {
 
 .search-in-progress .console-item:not(.filtered-out-by-search) .highlighted {
     color: black;
-    background-color: rgba(235, 215, 38, 0.2);
-    border-bottom: 1px solid rgb(237, 202, 71);
+    background-color: hsla(53, 83%, 53%, 0.2);
+    border-bottom: 1px solid hsl(47, 82%, 60%);
 }
 
 .search-in-progress .console-item:not(.filtered-out-by-search) .highlighted.selected {
-    background-color: rgba(235, 215, 38, 0.75);
+    background-color: hsla(53, 83%, 53%, 0.75);
 }
 
 /* @media reader currently blocked by: http://webkit.org/b/118096 */

@@ -28,122 +28,183 @@
 
 #if ENABLE(CONTENT_EXTENSIONS)
 
+#include "CompiledContentExtension.h"
+#include "ContentExtension.h"
 #include "ContentExtensionsDebugging.h"
-#include "NFA.h"
-#include "NFAToDFA.h"
+#include "DFABytecodeInterpreter.h"
+#include "Document.h"
+#include "DocumentLoader.h"
+#include "Frame.h"
+#include "MainFrame.h"
+#include "ResourceLoadInfo.h"
 #include "URL.h"
-#include "URLFilterParser.h"
-#include <wtf/CurrentTime.h>
-#include <wtf/DataLog.h>
+#include "UserContentController.h"
 #include <wtf/NeverDestroyed.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
 
 namespace ContentExtensions {
-
-void ContentExtensionsBackend::setRuleList(const String& identifier, const Vector<ContentExtensionRule>& ruleList)
+    
+void ContentExtensionsBackend::addContentExtension(const String& identifier, RefPtr<CompiledContentExtension> compiledContentExtension)
 {
     ASSERT(!identifier.isEmpty());
     if (identifier.isEmpty())
         return;
 
-    if (ruleList.isEmpty()) {
-        removeRuleList(identifier);
+    if (!compiledContentExtension) {
+        removeContentExtension(identifier);
         return;
     }
 
-#if CONTENT_EXTENSIONS_PERFORMANCE_REPORTING
-    double nfaBuildTimeStart = monotonicallyIncreasingTime();
-#endif
-
-    NFA nfa;
-    URLFilterParser urlFilterParser(nfa);
-    for (unsigned ruleIndex = 0; ruleIndex < ruleList.size(); ++ruleIndex) {
-        const ContentExtensionRule& contentExtensionRule = ruleList[ruleIndex];
-        const ContentExtensionRule::Trigger& trigger = contentExtensionRule.trigger();
-        ASSERT(trigger.urlFilter.length());
-
-        String error = urlFilterParser.addPattern(trigger.urlFilter, trigger.urlFilterIsCaseSensitive, ruleIndex);
-
-        if (!error.isNull()) {
-            dataLogF("Error while parsing %s: %s\n", trigger.urlFilter.utf8().data(), error.utf8().data());
-            continue;
-        }
-    }
-
-#if CONTENT_EXTENSIONS_PERFORMANCE_REPORTING
-    double nfaBuildTimeEnd = monotonicallyIncreasingTime();
-    dataLogF("    Time spent building the NFA: %f\n", (nfaBuildTimeEnd - nfaBuildTimeStart));
-#endif
-
-#if CONTENT_EXTENSIONS_STATE_MACHINE_DEBUGGING
-    nfa.debugPrintDot();
-#endif
-
-#if CONTENT_EXTENSIONS_PERFORMANCE_REPORTING
-    double dfaBuildTimeStart = monotonicallyIncreasingTime();
-#endif
-
-    CompiledContentExtension compiledContentExtension = { NFAToDFA::convert(nfa), ruleList };
-
-#if CONTENT_EXTENSIONS_PERFORMANCE_REPORTING
-    double dfaBuildTimeEnd = monotonicallyIncreasingTime();
-    dataLogF("    Time spent building the DFA: %f\n", (dfaBuildTimeEnd - dfaBuildTimeStart));
-#endif
-
-    // FIXME: never add a DFA that only matches the empty set.
-
-#if CONTENT_EXTENSIONS_STATE_MACHINE_DEBUGGING
-    compiledContentExtension.dfa.debugPrintDot();
-#endif
-
-    m_ruleLists.set(identifier, compiledContentExtension);
+    RefPtr<ContentExtension> extension = ContentExtension::create(identifier, adoptRef(*compiledContentExtension.leakRef()));
+    m_contentExtensions.set(identifier, WTF::move(extension));
 }
 
-void ContentExtensionsBackend::removeRuleList(const String& identifier)
+void ContentExtensionsBackend::removeContentExtension(const String& identifier)
 {
-    m_ruleLists.remove(identifier);
+    m_contentExtensions.remove(identifier);
 }
 
-void ContentExtensionsBackend::removeAllRuleLists()
+void ContentExtensionsBackend::removeAllContentExtensions()
 {
-    m_ruleLists.clear();
+    m_contentExtensions.clear();
 }
 
-bool ContentExtensionsBackend::shouldBlockURL(const URL& url)
+Vector<Action> ContentExtensionsBackend::actionsForResourceLoad(const ResourceLoadInfo& resourceLoadInfo) const
 {
-    const String& urlString = url.string();
+#if CONTENT_EXTENSIONS_PERFORMANCE_REPORTING
+    double addedTimeStart = monotonicallyIncreasingTime();
+#endif
+    if (resourceLoadInfo.resourceURL.protocolIsData())
+        return Vector<Action>();
+
+    const String& urlString = resourceLoadInfo.resourceURL.string();
     ASSERT_WITH_MESSAGE(urlString.containsOnlyASCII(), "A decoded URL should only contain ASCII characters. The matching algorithm assumes the input is ASCII.");
+    const CString& urlCString = urlString.utf8();
 
-    for (auto& ruleListSlot : m_ruleLists) {
-        CompiledContentExtension& compiledContentExtension = ruleListSlot.value;
-        unsigned state = compiledContentExtension.dfa.root();
+    Vector<Action> finalActions;
+    ResourceFlags flags = resourceLoadInfo.getResourceFlags();
+    for (auto& contentExtension : m_contentExtensions.values()) {
+        RELEASE_ASSERT(contentExtension);
+        const CompiledContentExtension& compiledExtension = contentExtension->compiledExtension();
+        
+        DFABytecodeInterpreter withoutDomainsInterpreter(compiledExtension.filtersWithoutDomainsBytecode(), compiledExtension.filtersWithoutDomainsBytecodeLength());
+        DFABytecodeInterpreter::Actions withoutDomainsActions = withoutDomainsInterpreter.interpret(urlCString, flags);
+        
+        String domain = resourceLoadInfo.mainDocumentURL.host();
+        DFABytecodeInterpreter withDomainsInterpreter(compiledExtension.filtersWithDomainsBytecode(), compiledExtension.filtersWithDomainsBytecodeLength());
+        DFABytecodeInterpreter::Actions withDomainsActions = withDomainsInterpreter.interpretWithDomains(urlCString, flags, contentExtension->cachedDomainActions(domain));
+        
+        const SerializedActionByte* actions = compiledExtension.actions();
+        const unsigned actionsLength = compiledExtension.actionsLength();
+        
+        bool sawIgnorePreviousRules = false;
+        const Vector<uint32_t>& universalWithDomains = contentExtension->universalActionsWithDomains(domain);
+        const Vector<uint32_t>& universalWithoutDomains = contentExtension->universalActionsWithoutDomains();
+        if (!withoutDomainsActions.isEmpty() || !withDomainsActions.isEmpty() || !universalWithDomains.isEmpty() || !universalWithoutDomains.isEmpty()) {
+            Vector<uint32_t> actionLocations;
+            actionLocations.reserveInitialCapacity(withoutDomainsActions.size() + withDomainsActions.size() + universalWithoutDomains.size() + universalWithDomains.size());
+            for (uint64_t actionLocation : withoutDomainsActions)
+                actionLocations.uncheckedAppend(static_cast<uint32_t>(actionLocation));
+            for (uint64_t actionLocation : withDomainsActions)
+                actionLocations.uncheckedAppend(static_cast<uint32_t>(actionLocation));
+            for (uint32_t actionLocation : universalWithoutDomains)
+                actionLocations.uncheckedAppend(actionLocation);
+            for (uint32_t actionLocation : universalWithDomains)
+                actionLocations.uncheckedAppend(actionLocation);
+            std::sort(actionLocations.begin(), actionLocations.end());
 
-        HashSet<uint64_t, DefaultHash<uint64_t>::Hash, WTF::UnsignedWithZeroKeyHashTraits<uint64_t>> triggeredActions;
-
-        for (unsigned i = 0; i < urlString.length(); ++i) {
-            char character = static_cast<char>(urlString[i]);
-            bool ok;
-            state = compiledContentExtension.dfa.nextState(state, character, ok);
-            if (!ok)
-                break;
-
-            const Vector<uint64_t>& actions = compiledContentExtension.dfa.actions(state);
-            if (!actions.isEmpty())
-                triggeredActions.add(actions.begin(), actions.end());
+            // Add actions in reverse order to properly deal with IgnorePreviousRules.
+            for (unsigned i = actionLocations.size(); i; i--) {
+                Action action = Action::deserialize(actions, actionsLength, actionLocations[i - 1]);
+                action.setExtensionIdentifier(contentExtension->identifier());
+                if (action.type() == ActionType::IgnorePreviousRules) {
+                    sawIgnorePreviousRules = true;
+                    break;
+                }
+                finalActions.append(action);
+            }
         }
-        if (!triggeredActions.isEmpty()) {
-            Vector<uint64_t> sortedActions;
-            copyToVector(triggeredActions, sortedActions);
-            std::sort(sortedActions.begin(), sortedActions.end());
-            size_t lastAction = static_cast<size_t>(sortedActions.last());
-            if (compiledContentExtension.ruleList[lastAction].action().type == ExtensionActionType::BlockLoad)
-                return true;
+        if (!sawIgnorePreviousRules) {
+            finalActions.append(Action(ActionType::CSSDisplayNoneStyleSheet, contentExtension->identifier()));
+            finalActions.last().setExtensionIdentifier(contentExtension->identifier());
+        }
+    }
+#if CONTENT_EXTENSIONS_PERFORMANCE_REPORTING
+    double addedTimeEnd = monotonicallyIncreasingTime();
+    dataLogF("Time added: %f microseconds %s \n", (addedTimeEnd - addedTimeStart) * 1.0e6, resourceLoadInfo.resourceURL.string().utf8().data());
+#endif
+    return finalActions;
+}
+
+StyleSheetContents* ContentExtensionsBackend::globalDisplayNoneStyleSheet(const String& identifier) const
+{
+    const auto& contentExtension = m_contentExtensions.get(identifier);
+    return contentExtension ? contentExtension->globalDisplayNoneStyleSheet() : nullptr;
+}
+
+void ContentExtensionsBackend::processContentExtensionRulesForLoad(ResourceRequest& request, ResourceType resourceType, DocumentLoader& initiatingDocumentLoader)
+{
+    Document* currentDocument = nullptr;
+    URL mainDocumentURL;
+
+    if (Frame* frame = initiatingDocumentLoader.frame()) {
+        currentDocument = frame->document();
+
+        if (initiatingDocumentLoader.isLoadingMainResource()
+            && frame->isMainFrame()
+            && resourceType == ResourceType::Document)
+            mainDocumentURL = request.url();
+        else if (Document* mainDocument = frame->mainFrame().document())
+            mainDocumentURL = mainDocument->url();
+    }
+
+    ResourceLoadInfo resourceLoadInfo = { request.url(), mainDocumentURL, resourceType };
+    Vector<ContentExtensions::Action> actions = actionsForResourceLoad(resourceLoadInfo);
+
+    bool willBlockLoad = false;
+    for (const auto& action : actions) {
+        switch (action.type()) {
+        case ContentExtensions::ActionType::BlockLoad:
+            willBlockLoad = true;
+            break;
+        case ContentExtensions::ActionType::BlockCookies:
+            request.setAllowCookies(false);
+            break;
+        case ContentExtensions::ActionType::CSSDisplayNoneSelector:
+            if (resourceType == ResourceType::Document)
+                initiatingDocumentLoader.addPendingContentExtensionDisplayNoneSelector(action.extensionIdentifier(), action.stringArgument(), action.actionID());
+            else if (currentDocument)
+                currentDocument->styleSheetCollection().addDisplayNoneSelector(action.extensionIdentifier(), action.stringArgument(), action.actionID());
+            break;
+        case ContentExtensions::ActionType::CSSDisplayNoneStyleSheet: {
+            StyleSheetContents* styleSheetContents = globalDisplayNoneStyleSheet(action.stringArgument());
+            if (styleSheetContents) {
+                if (resourceType == ResourceType::Document)
+                    initiatingDocumentLoader.addPendingContentExtensionSheet(action.stringArgument(), *styleSheetContents);
+                else if (currentDocument)
+                    currentDocument->styleSheetCollection().maybeAddContentExtensionSheet(action.stringArgument(), *styleSheetContents);
+            }
+            break;
+        }
+        case ContentExtensions::ActionType::IgnorePreviousRules:
+        case ContentExtensions::ActionType::InvalidAction:
+            RELEASE_ASSERT_NOT_REACHED();
         }
     }
 
-    return false;
+    if (willBlockLoad) {
+        if (currentDocument)
+            currentDocument->addConsoleMessage(MessageSource::ContentBlocker, MessageLevel::Info, makeString("Content blocker prevented frame displaying ", mainDocumentURL.string(), " from loading a resource from ", request.url().string()));
+        request = ResourceRequest();
+    }
+}
+
+const String& ContentExtensionsBackend::displayNoneCSSRule()
+{
+    static NeverDestroyed<const String> rule(ASCIILiteral("display:none !important;"));
+    return rule;
 }
 
 } // namespace ContentExtensions

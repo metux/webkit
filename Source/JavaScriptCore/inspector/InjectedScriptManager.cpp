@@ -139,9 +139,9 @@ Deprecated::ScriptObject InjectedScriptManager::createInjectedScript(const Strin
     JSGlobalObject* globalObject = scriptState->lexicalGlobalObject();
     JSValue globalThisValue = scriptState->globalThisValue();
 
-    JSValue evaluationException;
+    NakedPtr<Exception> evaluationException;
     InspectorEvaluateHandler evaluateHandler = m_environment.evaluateHandler();
-    JSValue functionValue = evaluateHandler(scriptState, sourceCode, globalThisValue, &evaluationException);
+    JSValue functionValue = evaluateHandler(scriptState, sourceCode, globalThisValue, evaluationException);
     if (evaluationException)
         return Deprecated::ScriptObject();
 
@@ -156,6 +156,7 @@ Deprecated::ScriptObject InjectedScriptManager::createInjectedScript(const Strin
     args.append(jsNumber(id));
 
     JSValue result = JSC::call(scriptState, functionValue, callType, callData, globalThisValue, args);
+    scriptState->clearException();
     if (result.isObject())
         return Deprecated::ScriptObject(scriptState, result.getObject());
 

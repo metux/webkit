@@ -62,17 +62,23 @@ my %extensionAttrs = ();
 
 require Config;
 
-my $gccLocation = "";
+my $ccLocation = "";
 if ($ENV{CC}) {
-    $gccLocation = $ENV{CC};
+    $ccLocation = $ENV{CC};
 } elsif (($Config::Config{"osname"}) =~ /solaris/i) {
-    $gccLocation = "/usr/sfw/bin/gcc";
+    $ccLocation = "/usr/sfw/bin/gcc";
 } elsif ($Config::Config{"osname"} eq "darwin" && $ENV{SDKROOT}) {
-    chomp($gccLocation = `xcrun -find cc -sdk '$ENV{SDKROOT}'`);
+    chomp($ccLocation = `xcrun -find cc -sdk '$ENV{SDKROOT}'`);
 } else {
-    $gccLocation = "/usr/bin/cc";
+    $ccLocation = "/usr/bin/cc";
 }
-my $preprocessor = $gccLocation . " -E -x c++";
+
+my $preprocessor = "";
+if ($Config::Config{"osname"} eq "MSWin32") {
+    $preprocessor = "\"$ccLocation\" /EP";
+} else {
+    $preprocessor = $ccLocation . " -E -x c++";
+}
 
 GetOptions(
     'tags=s' => \$tagsFile, 
@@ -120,7 +126,7 @@ if (length($fontNamesIn)) {
     print F StaticString::GenerateStrings(\%parameters);
 
     for my $name (sort keys %parameters) {
-        print F "WEBCORE_EXPORT DEFINE_GLOBAL(AtomicString, $name)\n";
+        print F "DEFINE_GLOBAL(AtomicString, $name)\n";
     }
 
     printInit($F, 0);
@@ -716,16 +722,16 @@ sub printNamesHeaderFile
     my $lowercaseNamespacePrefix = lc($parameters{namespacePrefix});
 
     print F "// Namespace\n";
-    print F "extern const WTF::AtomicString ${lowercaseNamespacePrefix}NamespaceURI;\n\n";
+    print F "WEBCORE_EXPORT extern const WTF::AtomicString ${lowercaseNamespacePrefix}NamespaceURI;\n\n";
 
     if (keys %allTags) {
         print F "// Tags\n";
-        printMacros($F, "extern const WebCore::$parameters{namespace}QualifiedName", "Tag", \%allTags);
+        printMacros($F, "WEBCORE_EXPORT extern const WebCore::$parameters{namespace}QualifiedName", "Tag", \%allTags);
     }
 
     if (keys %allAttrs) {
         print F "// Attributes\n";
-        printMacros($F, "extern const WebCore::QualifiedName", "Attr", \%allAttrs);
+        printMacros($F, "WEBCORE_EXPORT extern const WebCore::QualifiedName", "Attr", \%allAttrs);
     }
     print F "#endif\n\n";
 

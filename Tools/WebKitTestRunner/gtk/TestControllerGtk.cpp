@@ -27,10 +27,11 @@
 #include "config.h"
 #include "TestController.h"
 
+#include "PlatformWebView.h"
 #include <gtk/gtk.h>
 #include <wtf/Platform.h>
-#include <wtf/gobject/GMainLoopSource.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GMainLoopSource.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WTR {
@@ -94,9 +95,14 @@ void TestController::platformInitializeContext()
 {
 }
 
-void TestController::setHidden(bool)
+void TestController::setHidden(bool hidden)
 {
-    // FIXME: Need to implement this to test visibilityState.
+    if (!m_mainWebView)
+        return;
+    if (hidden)
+        gtk_widget_unmap(GTK_WIDGET(m_mainWebView->platformView()));
+    else
+        gtk_widget_map(GTK_WIDGET(m_mainWebView->platformView()));
 }
 
 void TestController::runModal(PlatformWebView*)
@@ -107,6 +113,17 @@ void TestController::runModal(PlatformWebView*)
 const char* TestController::platformLibraryPathForTesting()
 {
     return 0;
+}
+
+void TestController::platformConfigureViewForTest(const TestInvocation&)
+{
+}
+
+void TestController::platformResetPreferencesToConsistentValues()
+{
+    if (!m_mainWebView)
+        return;
+    m_mainWebView->dismissAllPopupMenus();
 }
 
 } // namespace WTR

@@ -28,12 +28,13 @@
 
 #include "CallFrame.h"
 #include "Identifier.h"
+#include "IdentifierInlines.h"
 #include "JSGlobalObject.h"
 #include <wtf/text/StringView.h>
 
 using namespace JSC;
 
-PassRefPtr<OpaqueJSString> OpaqueJSString::create(const String& string)
+RefPtr<OpaqueJSString> OpaqueJSString::create(const String& string)
 {
     if (string.isNull())
         return nullptr;
@@ -69,9 +70,9 @@ Identifier OpaqueJSString::identifier(VM* vm) const
         return Identifier(Identifier::EmptyIdentifier);
 
     if (m_string.is8Bit())
-        return Identifier(vm, m_string.characters8(), m_string.length());
+        return Identifier::fromString(vm, m_string.characters8(), m_string.length());
 
-    return Identifier(vm, m_string.characters16(), m_string.length());
+    return Identifier::fromString(vm, m_string.characters16(), m_string.length());
 }
 
 const UChar* OpaqueJSString::characters()

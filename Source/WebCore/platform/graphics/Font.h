@@ -195,6 +195,7 @@ public:
 #endif
 #if PLATFORM(COCOA)
     CFDictionaryRef getCFStringAttributes(TypesettingFeatures, FontOrientation) const;
+    bool hasCustomTracking() const { return isSystemFont(); }
 #endif
 
 #if PLATFORM(COCOA) || USE(HARFBUZZ)
@@ -203,8 +204,11 @@ public:
 
     bool applyTransforms(GlyphBufferGlyph*, GlyphBufferAdvance*, size_t glyphCount, TypesettingFeatures) const;
 
-#if PLATFORM(WIN)
+#if PLATFORM(COCOA) || PLATFORM(WIN)
     bool isSystemFont() const { return m_isSystemFont; }
+#endif
+
+#if PLATFORM(WIN)
     SCRIPT_FONTPROPERTIES* scriptFontProperties() const;
     SCRIPT_CACHE* scriptCache() const { return &m_scriptCache; }
     static void setShouldApplyMacAscentHack(bool);
@@ -216,6 +220,8 @@ private:
     Font(const FontPlatformData&, bool isCustomFont = false, bool isLoading = false, bool isTextOrientationFallback = false);
 
     Font(std::unique_ptr<SVGData>, float fontSize, bool syntheticBold, bool syntheticItalic);
+
+    Font(const FontPlatformData&, std::unique_ptr<SVGData>&&, bool isCustomFont = false, bool isLoading = false, bool isTextOrientationFallback = false);
 
     void platformInit();
     void platformGlyphInit();
@@ -248,20 +254,10 @@ private:
     mutable std::unique_ptr<GlyphMetricsMap<FloatRect>> m_glyphToBoundsMap;
     mutable GlyphMetricsMap<float> m_glyphToWidthMap;
 
-    bool m_treatAsFixedPitch;
-    bool m_isCustomFont; // Whether or not we are custom font loaded via @font-face
-    bool m_isLoading; // Whether or not this custom font is still in the act of loading.
-
-    bool m_isTextOrientationFallback;
-    bool m_isBrokenIdeographFallback;
-
-    bool m_isUsedInSystemFallbackCache { false };
-
     mutable RefPtr<OpenTypeMathData> m_mathData;
 #if ENABLE(OPENTYPE_VERTICAL)
     RefPtr<OpenTypeVerticalData> m_verticalData;
 #endif
-    bool m_hasVerticalGlyphs;
 
     Glyph m_spaceGlyph;
     float m_spaceWidth;
@@ -271,6 +267,10 @@ private:
     Glyph m_zeroWidthSpaceGlyph;
 
     struct DerivedFontData {
+#if !COMPILER(MSVC)
+        WTF_MAKE_FAST_ALLOCATED;
+#endif
+    public:
         explicit DerivedFontData(bool custom)
             : forCustomFont(custom)
         {
@@ -304,14 +304,31 @@ private:
 #endif
 
 #if PLATFORM(WIN)
-    bool m_isSystemFont;
     mutable SCRIPT_CACHE m_scriptCache;
     mutable SCRIPT_FONTPROPERTIES* m_scriptFontProperties;
 #endif
+
+    unsigned m_treatAsFixedPitch : 1;
+    unsigned m_isCustomFont : 1; // Whether or not we are custom font loaded via @font-face
+    unsigned m_isLoading : 1; // Whether or not this custom font is still in the act of loading.
+
+    unsigned m_isTextOrientationFallback : 1;
+    unsigned m_isBrokenIdeographFallback : 1;
+    unsigned m_hasVerticalGlyphs : 1;
+
+    unsigned m_isUsedInSystemFallbackCache : 1;
+
+#if PLATFORM(COCOA) || PLATFORM(WIN)
+    unsigned m_isSystemFont : 1;
+#endif
 #if PLATFORM(IOS)
-    bool m_shouldNotBeUsedForArabic;
+    unsigned m_shouldNotBeUsedForArabic : 1;
 #endif
 };
+
+#if PLATFORM(IOS)
+bool fontFamilyShouldNotBeUsedForArabic(CFStringRef);
+#endif
 
 ALWAYS_INLINE FloatRect Font::boundsForGlyph(Glyph glyph) const
 {

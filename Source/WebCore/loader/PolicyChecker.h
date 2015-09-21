@@ -36,6 +36,10 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/WTFString.h>
 
+#if ENABLE(CONTENT_FILTERING)
+#include "ContentFilterUnblockHandler.h"
+#endif
+
 namespace WebCore {
 
 class DocumentLoader;
@@ -47,6 +51,7 @@ class ResourceResponse;
 
 class PolicyChecker {
     WTF_MAKE_NONCOPYABLE(PolicyChecker);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit PolicyChecker(Frame&);
 
@@ -74,6 +79,10 @@ public:
     // the heart to hack on all the platforms to make that happen right now.
     void continueLoadAfterWillSubmitForm(PolicyAction);
 
+#if ENABLE(CONTENT_FILTERING)
+    void setContentFilterUnblockHandler(ContentFilterUnblockHandler unblockHandler) { m_contentFilterUnblockHandler = WTF::move(unblockHandler); }
+#endif
+
 private:
     void continueAfterNavigationPolicy(PolicyAction);
     void continueAfterNewWindowPolicy(PolicyAction);
@@ -91,6 +100,10 @@ private:
     // on navigation action delegate callbacks.
     FrameLoadType m_loadType;
     PolicyCallback m_callback;
+
+#if ENABLE(CONTENT_FILTERING)
+    ContentFilterUnblockHandler m_contentFilterUnblockHandler;
+#endif
 };
 
 } // namespace WebCore

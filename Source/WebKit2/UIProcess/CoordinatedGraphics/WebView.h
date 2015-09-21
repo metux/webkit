@@ -51,7 +51,7 @@ class WebView : public API::ObjectImpl<API::Object::Type::View>, public PageClie
 public:
     virtual ~WebView();
 
-    static PassRefPtr<WebView> create(WebProcessPool*, WebPageGroup*);
+    static Ref<WebView> create(WebProcessPool*, WebPageGroup*);
 
     void initialize();
 
@@ -94,7 +94,9 @@ public:
     bool requestExitFullScreen();
 #endif
 
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
     void findZoomableAreaForPoint(const WebCore::IntPoint&, const WebCore::IntSize&);
+#endif
 
     // View client.
     void initializeClient(const WKViewClientBase*);
@@ -128,7 +130,7 @@ protected:
 
     virtual bool canScrollView() override { return false; }
     virtual void scrollView(const WebCore::IntRect&, const WebCore::IntSize&) override;
-    virtual void requestScroll(const WebCore::FloatPoint&, bool) override;
+    virtual void requestScroll(const WebCore::FloatPoint&, const WebCore::IntPoint&, bool) override;
 
     virtual WebCore::IntSize viewSize() override;
 
@@ -147,9 +149,11 @@ protected:
 
     virtual void didCommitLoadForMainFrame(const String& mimeType, bool useCustomContentProvider) override;
 
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
     virtual void pageDidRequestScroll(const WebCore::IntPoint&) override;
     virtual void didRenderFrame(const WebCore::IntSize& contentsSize, const WebCore::IntRect& coveredRect) override;
     virtual void pageTransitionViewportReady() override;
+#endif
 
     virtual void setCursor(const WebCore::Cursor&) override;
     virtual void setCursorHiddenUntilMouseMoves(bool) override;
@@ -175,13 +179,14 @@ protected:
     virtual void doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled) override;
 #endif
 
-    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) override;
-    virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) override;
+    virtual RefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) override;
+    virtual RefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) override;
 #if ENABLE(INPUT_TYPE_COLOR)
-    virtual PassRefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) override;
+    virtual RefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) override;
 #endif
 
-    virtual void setTextIndicator(PassRefPtr<WebCore::TextIndicator>, bool) override;
+    virtual void setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorLifetime = WebCore::TextIndicatorLifetime::Permanent) override;
+    virtual void clearTextIndicator(WebCore::TextIndicatorDismissalAnimation = WebCore::TextIndicatorDismissalAnimation::FadeOut) override;
     virtual void setTextIndicatorAnimationProgress(float) override;
 
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&) override;
@@ -202,7 +207,11 @@ protected:
     virtual void navigationGestureDidBegin() override { };
     virtual void navigationGestureWillEnd(bool, WebBackForwardListItem&) override { };
     virtual void navigationGestureDidEnd(bool, WebBackForwardListItem&) override { };
+    virtual void navigationGestureDidEnd() override { };
     virtual void willRecordNavigationSnapshot(WebBackForwardListItem&) override { };
+
+    virtual void didChangeBackgroundColor() override { }
+    virtual void didFailLoadForMainFrame() override { }
 
     WebViewClient m_client;
     RefPtr<WebPageProxy> m_page;

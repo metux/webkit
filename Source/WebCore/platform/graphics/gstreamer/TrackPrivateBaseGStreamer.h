@@ -29,8 +29,9 @@
 #if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(VIDEO_TRACK)
 
 #include "GRefPtrGStreamer.h"
+#include <wtf/Lock.h>
 #include <wtf/ThreadingPrimitives.h>
-#include <wtf/gobject/GThreadSafeMainLoopSource.h>
+#include <wtf/glib/GThreadSafeMainLoopSource.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -73,7 +74,7 @@ private:
     GThreadSafeMainLoopSource m_activeTimerHandler;
     GThreadSafeMainLoopSource m_tagTimerHandler;
 
-    Mutex m_tagMutex;
+    Lock m_tagMutex;
     GRefPtr<GstTagList> m_tags;
 };
 

@@ -29,7 +29,7 @@
 #include "ContainerNode.h"
 #include "EditingBoundary.h"
 #include "TextAffinity.h"
-#include "TextDirection.h"
+#include "TextFlags.h"
 #include <wtf/Assertions.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
@@ -92,7 +92,7 @@ public:
 
     AnchorType anchorType() const { return static_cast<AnchorType>(m_anchorType); }
 
-    void clear() { m_anchorNode.clear(); m_offset = 0; m_anchorType = PositionIsOffsetInAnchor; m_isLegacyEditingPosition = false; }
+    void clear() { m_anchorNode = nullptr; m_offset = 0; m_anchorType = PositionIsOffsetInAnchor; m_isLegacyEditingPosition = false; }
 
     // These are always DOM compliant values.  Editing positions like [img, 0] (aka [img, before])
     // will return img->parentNode() and img->computeNodeIndex() from these functions.
@@ -198,11 +198,11 @@ public:
     static bool nodeIsUserSelectAll(const Node*) { return false; }
     static Node* rootUserSelectAllForNode(Node*) { return 0; }
 #endif
-    static ContainerNode* findParent(const Node*);
+    static ContainerNode* findParent(const Node&);
     
     void debugPosition(const char* msg = "") const;
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
     void formatForDebugger(char* buffer, unsigned length) const;
     void showAnchorTypeAndOffset() const;
     void showTreeForThis() const;
@@ -342,7 +342,7 @@ inline bool offsetIsBeforeLastNodeOffset(int offset, Node* anchorNode)
 
 } // namespace WebCore
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 // Outside the WebCore namespace for ease of invocation from gdb.
 void showTree(const WebCore::Position&);
 void showTree(const WebCore::Position*);

@@ -69,6 +69,7 @@ MemoryCache::MemoryCache()
     , m_deadDecodedDataDeletionInterval(defaultDecodedDataDeletionInterval)
     , m_liveSize(0)
     , m_deadSize(0)
+    , m_pruneTimer(*this, &MemoryCache::prune)
 {
 }
 
@@ -128,7 +129,6 @@ void MemoryCache::revalidationSucceeded(CachedResource& revalidatingResource, co
     CachedResource& resource = *revalidatingResource.resourceToRevalidate();
     ASSERT(!resource.inCache());
     ASSERT(resource.isLoaded());
-    ASSERT(revalidatingResource.inCache());
 
     // Calling remove() can potentially delete revalidatingResource, which we use
     // below. This mustn't be the case since revalidation means it is loaded
@@ -166,11 +166,6 @@ void MemoryCache::revalidationFailed(CachedResource& revalidatingResource)
     LOG(ResourceLoading, "Revalidation failed for %p", &revalidatingResource);
     ASSERT(revalidatingResource.resourceToRevalidate());
     revalidatingResource.clearResourceToRevalidate();
-}
-
-CachedResource* MemoryCache::resourceForURL(const URL& resourceURL, SessionID sessionID)
-{
-    return resourceForRequest(ResourceRequest(resourceURL), sessionID);
 }
 
 CachedResource* MemoryCache::resourceForRequest(const ResourceRequest& request, SessionID sessionID)
@@ -543,6 +538,39 @@ void MemoryCache::removeResourcesWithOrigin(SecurityOrigin& origin)
         remove(*resource);
 }
 
+void MemoryCache::removeResourcesWithOrigins(SessionID sessionID, const HashSet<RefPtr<SecurityOrigin>>& origins)
+{
+    auto* resourceMap = sessionResourceMap(sessionID);
+    if (!resourceMap)
+        return;
+
+#if ENABLE(CACHE_PARTITIONING)
+    HashSet<String> originPartitions;
+
+    for (auto& origin : origins)
+        originPartitions.add(ResourceRequest::partitionName(origin->host()));
+#endif
+
+    Vector<CachedResource*> resourcesToRemove;
+    for (auto& keyValuePair : *resourceMap) {
+        auto& resource = *keyValuePair.value;
+
+#if ENABLE(CACHE_PARTITIONING)
+        auto& partitionName = keyValuePair.key.second;
+        if (originPartitions.contains(partitionName)) {
+            resourcesToRemove.append(&resource);
+            continue;
+        }
+#endif
+
+        if (origins.contains(SecurityOrigin::create(resource.url()).ptr()))
+            resourcesToRemove.append(&resource);
+    }
+
+    for (auto& resource : resourcesToRemove)
+        remove(*resource);
+}
+
 void MemoryCache::getOriginsWithCache(SecurityOriginSet& origins)
 {
 #if ENABLE(CACHE_PARTITIONING)
@@ -560,6 +588,27 @@ void MemoryCache::getOriginsWithCache(SecurityOriginSet& origins)
             origins.add(SecurityOrigin::create(resource.url()));
         }
     }
+}
+
+HashSet<RefPtr<SecurityOrigin>> MemoryCache::originsWithCache(SessionID sessionID) const
+{
+    HashSet<RefPtr<SecurityOrigin>> origins;
+
+    auto it = m_sessionResources.find(sessionID);
+    if (it != m_sessionResources.end()) {
+        for (auto& keyValue : *it->value) {
+            auto& resource = *keyValue.value;
+#if ENABLE(CACHE_PARTITIONING)
+            auto& partitionName = keyValue.key.second;
+            if (!partitionName.isEmpty())
+                origins.add(SecurityOrigin::create("http", partitionName, 0));
+            else
+#endif
+            origins.add(SecurityOrigin::create(resource.url()));
+        }
+    }
+
+    return origins;
 }
 
 void MemoryCache::removeFromLiveDecodedResourcesList(CachedResource& resource)
@@ -680,13 +729,43 @@ void MemoryCache::evictResources()
     setDisabled(false);
 }
 
+void MemoryCache::evictResources(SessionID sessionID)
+{
+    if (disabled())
+        return;
+
+    auto it = m_sessionResources.find(sessionID);
+    if (it == m_sessionResources.end())
+        return;
+    auto& resources = *it->value;
+
+    for (int i = 0, size = resources.size(); i < size; ++i)
+        remove(*resources.begin()->value);
+
+    ASSERT(!m_sessionResources.contains(sessionID));
+}
+
+bool MemoryCache::needsPruning() const
+{
+    return m_liveSize + m_deadSize > m_capacity || m_deadSize > m_maxDeadCapacity;
+}
+
 void MemoryCache::prune()
 {
-    if (m_liveSize + m_deadSize <= m_capacity && m_deadSize <= m_maxDeadCapacity) // Fast path.
+    if (!needsPruning())
         return;
         
     pruneDeadResources(); // Prune dead first, in case it was "borrowing" capacity from live.
     pruneLiveResources();
+}
+
+void MemoryCache::pruneSoon()
+{
+     if (m_pruneTimer.isActive())
+        return;
+     if (!needsPruning())
+         return;
+     m_pruneTimer.startOneShot(0);
 }
 
 #ifndef NDEBUG

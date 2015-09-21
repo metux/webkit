@@ -31,7 +31,6 @@
 
 #include "JSGlobalObject.h"
 #include "JSLexicalEnvironment.h"
-#include "JSNameScope.h"
 #include "JSCInlines.h"
 #include "PropertyNameArray.h"
 
@@ -61,10 +60,11 @@ void JSSymbolTableObject::getOwnNonIndexPropertyNames(JSObject* object, ExecStat
         ConcurrentJITLocker locker(thisObject->symbolTable()->m_lock);
         SymbolTable::Map::iterator end = thisObject->symbolTable()->end(locker);
         for (SymbolTable::Map::iterator it = thisObject->symbolTable()->begin(locker); it != end; ++it) {
-            if (it->key->isUnique())
-                continue;
-            if (!(it->value.getAttributes() & DontEnum) || shouldIncludeDontEnumProperties(mode))
-                propertyNames.add(Identifier(exec, it->key.get()));
+            if (!(it->value.getAttributes() & DontEnum) || mode.includeDontEnumProperties()) {
+                if (it->key->isSymbol() && !propertyNames.includeSymbolProperties())
+                    continue;
+                propertyNames.add(Identifier::fromUid(exec, it->key.get()));
+            }
         }
     }
     

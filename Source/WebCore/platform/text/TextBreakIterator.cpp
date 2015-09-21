@@ -27,6 +27,7 @@
 #include "UTextProviderUTF16.h"
 #include <mutex>
 #include <wtf/Atomics.h>
+#include <wtf/Lock.h>
 #include <wtf/text/StringView.h>
 
 namespace WebCore {
@@ -210,7 +211,7 @@ TextBreakIterator* cursorMovementIterator(StringView string)
         "$ZWJ     = \\u200D;"               // Zero width joiner
         "$EmojiVar = [\\uFE0F];"            // Emoji-style variation selector
         "$EmojiForSeqs = [\\u2764 \\U0001F466-\\U0001F469 \\U0001F48B];" // Emoji that participate in ZWJ sequences
-        "$EmojiForMods = [\\u261D \\u270A-\\u270C \\U0001F385 \\U0001F3C3-\\U0001F3C4 \\U0001F3C7 \\U0001F3CA \\U0001F442-\\U0001F443 \\U0001F446-\\U0001F450 \\U0001F466-\\U0001F469 \\U0001F46E-\\U0001F478 \\U0001F47C \\U0001F481-\\U0001F483 \\U0001F485-\\U0001F487 \\U0001F4AA \\U0001F645-\\U0001F647 \\U0001F64B-\\U0001F64F \\U0001F6B4-\\U0001F6B6 \\U0001F6C0];" // Emoji that take Fitzpatrick modifiers
+        "$EmojiForMods = [\\u261D \\u270A-\\u270C \\U0001F385 \\U0001F3C3-\\U0001F3C4 \\U0001F3C7 \\U0001F3CA \\U0001F442-\\U0001F443 \\U0001F446-\\U0001F450 \\U0001F466-\\U0001F469 \\U0001F46E-\\U0001F478 \\U0001F47C \\U0001F481-\\U0001F483 \\U0001F485-\\U0001F487 \\U0001F4AA \\U0001F596 \\U0001F645-\\U0001F647 \\U0001F64B-\\U0001F64F \\U0001F6A3 \\U0001F6B4-\\U0001F6B6 \\U0001F6C0] ;" // Emoji that take Fitzpatrick modifiers
         "$EmojiMods = [\\U0001F3FB-\\U0001F3FF];" // Fitzpatrick modifiers
         "!!chain;"
         "!!forward;"
@@ -411,7 +412,7 @@ static const char* uax14AssignmentsAfter =
     "$ZWJ = \\u200D;"
     "$EmojiVar = \\uFE0F;"
     "$EmojiForSeqs = [\\u2764 \\U0001F466-\\U0001F469 \\U0001F48B];"
-    "$EmojiForMods = [\\u261D \\u270A-\\u270C \\U0001F385 \\U0001F3C3-\\U0001F3C4 \\U0001F3C7 \\U0001F3CA \\U0001F442-\\U0001F443 \\U0001F446-\\U0001F450 \\U0001F466-\\U0001F469 \\U0001F46E-\\U0001F478 \\U0001F47C \\U0001F481-\\U0001F483 \\U0001F485-\\U0001F487 \\U0001F4AA \\U0001F645-\\U0001F647 \\U0001F64B-\\U0001F64F \\U0001F6B4-\\U0001F6B6 \\U0001F6C0];"
+    "$EmojiForMods = [\\u261D \\u270A-\\u270C \\U0001F385 \\U0001F3C3-\\U0001F3C4 \\U0001F3C7 \\U0001F3CA \\U0001F442-\\U0001F443 \\U0001F446-\\U0001F450 \\U0001F466-\\U0001F469 \\U0001F46E-\\U0001F478 \\U0001F47C \\U0001F481-\\U0001F483 \\U0001F485-\\U0001F487 \\U0001F4AA \\U0001F596 \\U0001F645-\\U0001F647 \\U0001F64B-\\U0001F64F \\U0001F6A3 \\U0001F6B4-\\U0001F6B6 \\U0001F6C0] ;" // Emoji that take Fitzpatrick modifiers
     "$EmojiMods = [\\U0001F3FB-\\U0001F3FF];"
     "$dictionary = [:LineBreak = Complex_Context:];"
     "$ALPlus = [$AL $AI $SA $SG $XX];"
@@ -765,8 +766,8 @@ static inline bool compareAndSwapNonSharedCharacterBreakIterator(TextBreakIterat
 #if ENABLE(COMPARE_AND_SWAP)
     return WTF::weakCompareAndSwap(reinterpret_cast<void**>(&nonSharedCharacterBreakIterator), expected, newValue);
 #else
-    DEPRECATED_DEFINE_STATIC_LOCAL(std::mutex, nonSharedCharacterBreakIteratorMutex, ());
-    std::lock_guard<std::mutex> locker(nonSharedCharacterBreakIteratorMutex);
+    static StaticLock nonSharedCharacterBreakIteratorMutex;
+    std::lock_guard<StaticLock> locker(nonSharedCharacterBreakIteratorMutex);
     if (nonSharedCharacterBreakIterator != expected)
         return false;
     nonSharedCharacterBreakIterator = newValue;

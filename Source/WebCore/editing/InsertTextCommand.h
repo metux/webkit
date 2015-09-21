@@ -49,24 +49,25 @@ public:
     };
 
     static Ref<InsertTextCommand> create(Document& document, const String& text, bool selectInsertedText = false,
-        RebalanceType rebalanceType = RebalanceLeadingAndTrailingWhitespaces)
+        RebalanceType rebalanceType = RebalanceLeadingAndTrailingWhitespaces, EditAction editingAction = EditActionInsert)
     {
-        return adoptRef(*new InsertTextCommand(document, text, selectInsertedText, rebalanceType));
+        return adoptRef(*new InsertTextCommand(document, text, selectInsertedText, rebalanceType, editingAction));
     }
 
-    static Ref<InsertTextCommand> createWithMarkerSupplier(Document& document, const String& text, PassRefPtr<TextInsertionMarkerSupplier> markerSupplier)
+    static Ref<InsertTextCommand> createWithMarkerSupplier(Document& document, const String& text, PassRefPtr<TextInsertionMarkerSupplier> markerSupplier, EditAction editingAction = EditActionInsert)
     {
-        return adoptRef(*new InsertTextCommand(document, text, markerSupplier));
+        return adoptRef(*new InsertTextCommand(document, text, markerSupplier, editingAction));
     }
+
+protected:
+    InsertTextCommand(Document&, const String& text, PassRefPtr<TextInsertionMarkerSupplier>, EditAction);
+    InsertTextCommand(Document&, const String& text, bool selectInsertedText, RebalanceType, EditAction);
 
 private:
 
-    InsertTextCommand(Document&, const String& text, bool selectInsertedText, RebalanceType);
-    InsertTextCommand(Document&, const String& text, PassRefPtr<TextInsertionMarkerSupplier>);
-
     void deleteCharacter();
 
-    virtual void doApply();
+    virtual void doApply() override;
 
     virtual bool isInsertTextCommand() const override { return true; }
 

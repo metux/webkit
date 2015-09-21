@@ -64,8 +64,10 @@ bool AccessibilityTableCell::computeAccessibilityIsIgnored() const
     if (decision == IgnoreObject)
         return true;
     
-    // Ignore anonymous table cells.
-    if (!node())
+    // Ignore anonymous table cells as long as they're not in a table (ie. when display:table is used).
+    RenderObject* renderTable = is<RenderTableCell>(m_renderer) ? downcast<RenderTableCell>(*m_renderer).table() : nullptr;
+    bool inTable = renderTable && renderTable->node() && (renderTable->node()->hasTagName(tableTag) || nodeHasRole(renderTable->node(), "grid"));
+    if (!node() && !inTable)
         return true;
         
     if (!isTableCell())
@@ -91,6 +93,24 @@ AccessibilityTable* AccessibilityTableCell::parentTable() const
     AccessibilityObject* parentTable = axObjectCache()->get(downcast<RenderTableCell>(*m_renderer).table());
     if (!is<AccessibilityTable>(parentTable))
         return nullptr;
+    
+    // The RenderTableCell's table() object might be anonymous sometimes. We should handle it gracefully
+    // by finding the right table.
+    if (!parentTable->node()) {
+        for (AccessibilityObject* parent = parentObject(); parent; parent = parent->parentObject()) {
+            // If this is a non-anonymous table object, but not an accessibility table, we should stop because
+            // we don't want to choose another ancestor table as this cell's table.
+            if (is<AccessibilityTable>(*parent)) {
+                auto& parentTable = downcast<AccessibilityTable>(*parent);
+                if (parentTable.isExposableThroughAccessibility())
+                    return &parentTable;
+                if (parentTable.node())
+                    break;
+            }
+        }
+        return nullptr;
+    }
+    
     return downcast<AccessibilityTable>(parentTable);
 }
     
@@ -105,34 +125,21 @@ bool AccessibilityTableCell::isTableCell() const
     
 AccessibilityRole AccessibilityTableCell::determineAccessibilityRole()
 {
-    // Always call determineAccessibleRole so that the ARIA role is set.
-    // Even though this object reports a Cell role, the ARIA role will be used
-    // to determine if it's a column header.
+    // AccessibilityRenderObject::determineAccessibleRole provides any ARIA-supplied
+    // role, falling back on the role to be used if we determine here that the element
+    // should not be exposed as a cell. Thus if we already know it's a cell, return that.
     AccessibilityRole defaultRole = AccessibilityRenderObject::determineAccessibilityRole();
-#if !PLATFORM(EFL) && !PLATFORM(GTK)
+    if (defaultRole == ColumnHeaderRole || defaultRole == RowHeaderRole || defaultRole == CellRole || defaultRole == GridCellRole)
+        return defaultRole;
+
     if (!isTableCell())
         return defaultRole;
+    if (isColumnHeaderCell())
+        return ColumnHeaderRole;
+    if (isRowHeaderCell())
+        return RowHeaderRole;
+
     return CellRole;
-#endif
-
-    // If AccessibilityRenderObject::determineAccessibilityRole returns the type of CellRole,
-    // which is derived from the role attribute, it does not change anything.
-    if (defaultRole != UnknownRole) {
-        AccessibilityRole ariaRole = ariaRoleAttribute();
-        if (ariaRole == CellRole || ariaRole == RowHeaderRole || ariaRole == ColumnHeaderRole)
-            return ariaRole;
-    }
-
-    // Here there is a more precide definition of the type of CellRole than was possible
-    // at the level of AccessibilityRenderObject.
-    if (defaultRole == ColumnHeaderRole || defaultRole == CellRole || defaultRole == RowHeaderRole) {
-        if (isColumnHeaderCell())
-            return ColumnHeaderRole;
-        if (isRowHeaderCell())
-            return RowHeaderRole;
-        return CellRole;
-    }
-    return defaultRole;
 }
     
 bool AccessibilityTableCell::isTableHeaderCell() const
@@ -295,34 +302,25 @@ void AccessibilityTableCell::rowHeaders(AccessibilityChildrenVector& headers)
             headers.append(tableCell);
     }
 }
-    
+
+AccessibilityTableRow* AccessibilityTableCell::parentRow() const
+{
+    AccessibilityObject* parent = parentObjectUnignored();
+    if (!is<AccessibilityTableRow>(*parent))
+        return nullptr;
+    return downcast<AccessibilityTableRow>(parent);
+}
+
 void AccessibilityTableCell::rowIndexRange(std::pair<unsigned, unsigned>& rowRange) const
 {
     if (!is<RenderTableCell>(m_renderer))
         return;
     
     RenderTableCell& renderCell = downcast<RenderTableCell>(*m_renderer);
-    rowRange.first = renderCell.rowIndex();
     rowRange.second = renderCell.rowSpan();
     
-    // since our table might have multiple sections, we have to offset our row appropriately
-    RenderTableSection* section = renderCell.section();
-    RenderTable* table = renderCell.table();
-    if (!table || !section)
-        return;
-
-    RenderTableSection* footerSection = table->footer();
-    unsigned rowOffset = 0;
-    for (RenderTableSection* tableSection = table->topSection(); tableSection; tableSection = table->sectionBelow(tableSection, SkipEmptySections)) {
-        // Don't add row offsets for bottom sections that are placed in before the body section.
-        if (tableSection == footerSection)
-            continue;
-        if (tableSection == section)
-            break;
-        rowOffset += tableSection->numRows();
-    }
-
-    rowRange.first += rowOffset;
+    if (AccessibilityTableRow* parentRow = this->parentRow())
+        rowRange.first = parentRow->rowIndex();
 }
     
 void AccessibilityTableCell::columnIndexRange(std::pair<unsigned, unsigned>& columnRange) const

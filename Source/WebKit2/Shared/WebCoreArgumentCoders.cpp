@@ -49,6 +49,7 @@
 #include <WebCore/IDBKeyRangeData.h>
 #include <WebCore/Image.h>
 #include <WebCore/Length.h>
+#include <WebCore/Path.h>
 #include <WebCore/PluginData.h>
 #include <WebCore/ProtectionSpace.h>
 #include <WebCore/Region.h>
@@ -81,6 +82,14 @@
 #include <WebCore/SelectionRect.h>
 #include <WebCore/SharedBuffer.h>
 #endif // PLATFORM(IOS)
+
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+#include <WebCore/MediaPlaybackTargetContext.h>
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+#include <WebCore/MediaSessionMetadata.h>
+#endif
 
 using namespace WebCore;
 using namespace WebKit;
@@ -364,6 +373,111 @@ bool ArgumentCoder<IntSize>::decode(ArgumentDecoder& decoder, IntSize& intSize)
     return SimpleArgumentCoder<IntSize>::decode(decoder, intSize);
 }
 
+static void pathEncodeApplierFunction(ArgumentEncoder& encoder, const PathElement& element)
+{
+    encoder.encodeEnum(element.type);
+
+    switch (element.type) {
+    case PathElementMoveToPoint: // The points member will contain 1 value.
+        encoder << element.points[0];
+        break;
+    case PathElementAddLineToPoint: // The points member will contain 1 value.
+        encoder << element.points[0];
+        break;
+    case PathElementAddQuadCurveToPoint: // The points member will contain 2 values.
+        encoder << element.points[0];
+        encoder << element.points[1];
+        break;
+    case PathElementAddCurveToPoint: // The points member will contain 3 values.
+        encoder << element.points[0];
+        encoder << element.points[1];
+        encoder << element.points[2];
+        break;
+    case PathElementCloseSubpath: // The points member will contain no values.
+        break;
+    }
+}
+
+void ArgumentCoder<Path>::encode(ArgumentEncoder& encoder, const Path& path)
+{
+    uint64_t numPoints = 0;
+    path.apply([&numPoints](const PathElement&) {
+        ++numPoints;
+    });
+
+    encoder << numPoints;
+
+    path.apply([&encoder](const PathElement& pathElement) {
+        pathEncodeApplierFunction(encoder, pathElement);
+    });
+}
+
+bool ArgumentCoder<Path>::decode(ArgumentDecoder& decoder, Path& path)
+{
+    uint64_t numPoints;
+    if (!decoder.decode(numPoints))
+        return false;
+    
+    path.clear();
+
+    for (uint64_t i = 0; i < numPoints; ++i) {
+    
+        PathElementType elementType;
+        if (!decoder.decodeEnum(elementType))
+            return false;
+        
+        switch (elementType) {
+        case PathElementMoveToPoint: { // The points member will contain 1 value.
+            FloatPoint point;
+            if (!decoder.decode(point))
+                return false;
+            path.moveTo(point);
+            break;
+        }
+        case PathElementAddLineToPoint: { // The points member will contain 1 value.
+            FloatPoint point;
+            if (!decoder.decode(point))
+                return false;
+            path.addLineTo(point);
+            break;
+        }
+        case PathElementAddQuadCurveToPoint: { // The points member will contain 2 values.
+            FloatPoint controlPoint;
+            if (!decoder.decode(controlPoint))
+                return false;
+
+            FloatPoint endPoint;
+            if (!decoder.decode(endPoint))
+                return false;
+
+            path.addQuadCurveTo(controlPoint, endPoint);
+            break;
+        }
+        case PathElementAddCurveToPoint: { // The points member will contain 3 values.
+            FloatPoint controlPoint1;
+            if (!decoder.decode(controlPoint1))
+                return false;
+
+            FloatPoint controlPoint2;
+            if (!decoder.decode(controlPoint2))
+                return false;
+
+            FloatPoint endPoint;
+            if (!decoder.decode(endPoint))
+                return false;
+
+            path.addBezierCurveTo(controlPoint1, controlPoint2, endPoint);
+            break;
+        }
+        case PathElementCloseSubpath: // The points member will contain no values.
+            path.closeSubpath();
+            break;
+        }
+    }
+
+    return true;
+}
+
 template<> struct ArgumentCoder<Region::Span> {
     static void encode(ArgumentEncoder&, const Region::Span&);
     static bool decode(ArgumentDecoder&, Region::Span&);
@@ -456,9 +570,18 @@ bool ArgumentCoder<MimeClassInfo>::decode(ArgumentDecoder& decoder, MimeClassInf
 
 void ArgumentCoder<PluginInfo>::encode(ArgumentEncoder& encoder, const PluginInfo& pluginInfo)
 {
-    encoder << pluginInfo.name << pluginInfo.file << pluginInfo.desc << pluginInfo.mimes << pluginInfo.isApplicationPlugin;
+    encoder << pluginInfo.name;
+    encoder << pluginInfo.file;
+    encoder << pluginInfo.desc;
+    encoder << pluginInfo.mimes;
+    encoder << pluginInfo.isApplicationPlugin;
+    encoder.encodeEnum(pluginInfo.clientLoadPolicy);
+#if PLATFORM(MAC)
+    encoder << pluginInfo.bundleIdentifier;
+    encoder << pluginInfo.versionString;
+#endif
 }
-    
+
 bool ArgumentCoder<PluginInfo>::decode(ArgumentDecoder& decoder, PluginInfo& pluginInfo)
 {
     if (!decoder.decode(pluginInfo.name))
@@ -471,6 +594,14 @@ bool ArgumentCoder<PluginInfo>::decode(ArgumentDecoder& decoder, PluginInfo& plu
         return false;
     if (!decoder.decode(pluginInfo.isApplicationPlugin))
         return false;
+    if (!decoder.decodeEnum(pluginInfo.clientLoadPolicy))
+        return false;
+#if PLATFORM(MAC)
+    if (!decoder.decode(pluginInfo.bundleIdentifier))
+        return false;
+    if (!decoder.decode(pluginInfo.versionString))
+        return false;
+#endif
 
     return true;
 }
@@ -634,6 +765,9 @@ void ArgumentCoder<Cursor>::encode(ArgumentEncoder& encoder, const Cursor& curso
     encoder << true;
     encodeImage(encoder, cursor.image());
     encoder << cursor.hotSpot();
+#if ENABLE(MOUSE_CURSOR_SCALE)
+    encoder << cursor.imageScaleFactor();
+#endif
 }
 
 bool ArgumentCoder<Cursor>::decode(ArgumentDecoder& decoder, Cursor& cursor)
@@ -675,7 +809,15 @@ bool ArgumentCoder<Cursor>::decode(ArgumentDecoder& decoder, Cursor& cursor)
     if (!image->rect().contains(hotSpot))
         return false;
 
+#if ENABLE(MOUSE_CURSOR_SCALE)
+    float scale;
+    if (!decoder.decode(scale))
+        return false;
+
+    cursor = Cursor(image.get(), hotSpot, scale);
+#else
     cursor = Cursor(image.get(), hotSpot);
+#endif
     return true;
 }
 #endif
@@ -813,10 +955,6 @@ void ArgumentCoder<WindowFeatures>::encode(ArgumentEncoder& encoder, const Windo
     encoder << windowFeatures.y;
     encoder << windowFeatures.width;
     encoder << windowFeatures.height;
-    encoder << windowFeatures.xSet;
-    encoder << windowFeatures.ySet;
-    encoder << windowFeatures.widthSet;
-    encoder << windowFeatures.heightSet;
     encoder << windowFeatures.menuBarVisible;
     encoder << windowFeatures.statusBarVisible;
     encoder << windowFeatures.toolBarVisible;
@@ -836,14 +974,6 @@ bool ArgumentCoder<WindowFeatures>::decode(ArgumentDecoder& decoder, WindowFeatu
     if (!decoder.decode(windowFeatures.width))
         return false;
     if (!decoder.decode(windowFeatures.height))
-        return false;
-    if (!decoder.decode(windowFeatures.xSet))
-        return false;
-    if (!decoder.decode(windowFeatures.ySet))
-        return false;
-    if (!decoder.decode(windowFeatures.widthSet))
-        return false;
-    if (!decoder.decode(windowFeatures.heightSet))
         return false;
     if (!decoder.decode(windowFeatures.menuBarVisible))
         return false;
@@ -1036,9 +1166,9 @@ static void encodeSharedBuffer(ArgumentEncoder& encoder, SharedBuffer* buffer)
     SharedMemory::Handle handle;
     encoder << (buffer ? static_cast<uint64_t>(buffer->size()): 0);
     if (buffer) {
-        RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::create(buffer->size());
+        RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::allocate(buffer->size());
         memcpy(sharedMemoryBuffer->data(), buffer->data(), buffer->size());
-        sharedMemoryBuffer->createHandle(handle, SharedMemory::ReadOnly);
+        sharedMemoryBuffer->createHandle(handle, SharedMemory::Protection::ReadOnly);
         encoder << handle;
     }
 }
@@ -1054,7 +1184,7 @@ static bool decodeSharedBuffer(ArgumentDecoder& decoder, RefPtr<SharedBuffer>& b
         if (!decoder.decode(handle))
             return false;
 
-        RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::create(handle, SharedMemory::ReadOnly);
+        RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::map(handle, SharedMemory::Protection::ReadOnly);
         buffer = SharedBuffer::create(static_cast<unsigned char*>(sharedMemoryBuffer->data()), bufferSize);
     }
 
@@ -1302,6 +1432,32 @@ bool ArgumentCoder<UserStyleSheet>::decode(ArgumentDecoder& decoder, UserStyleSh
     userStyleSheet = UserStyleSheet(source, url, WTF::move(whitelist), WTF::move(blacklist), injectedFrames, level);
     return true;
 }
+
+#if ENABLE(MEDIA_SESSION)
+void ArgumentCoder<MediaSessionMetadata>::encode(ArgumentEncoder& encoder, const MediaSessionMetadata& result)
+{
+    encoder << result.artist();
+    encoder << result.album();
+    encoder << result.title();
+    encoder << result.artworkURL();
+}
+
+bool ArgumentCoder<MediaSessionMetadata>::decode(ArgumentDecoder& decoder, MediaSessionMetadata& result)
+{
+    String artist, album, title;
+    URL artworkURL;
+    if (!decoder.decode(artist))
+        return false;
+    if (!decoder.decode(album))
+        return false;
+    if (!decoder.decode(title))
+        return false;
+    if (!decoder.decode(artworkURL))
+        return false;
+    result = MediaSessionMetadata(title, artist, album, artworkURL);
+    return true;
+}
+#endif
 
 void ArgumentCoder<UserScript>::encode(ArgumentEncoder& encoder, const UserScript& userScript)
 {
@@ -1959,6 +2115,7 @@ void ArgumentCoder<TextIndicatorData>::encode(ArgumentEncoder& encoder, const Te
     encoder << textIndicatorData.textBoundingRectInRootViewCoordinates;
     encoder << textIndicatorData.textRectsInBoundingRectCoordinates;
     encoder << textIndicatorData.contentImageScaleFactor;
+    encoder << textIndicatorData.wantsMargin;
     encoder.encodeEnum(textIndicatorData.presentationTransition);
 
     bool hasImage = textIndicatorData.contentImage;
@@ -1986,22 +2143,55 @@ bool ArgumentCoder<TextIndicatorData>::decode(ArgumentDecoder& decoder, TextIndi
     if (!decoder.decode(textIndicatorData.contentImageScaleFactor))
         return false;
 
+    if (!decoder.decode(textIndicatorData.wantsMargin))
+        return false;
+
     if (!decoder.decodeEnum(textIndicatorData.presentationTransition))
         return false;
 
     bool hasImage;
     if (!decoder.decode(hasImage))
         return false;
+    if (!hasImage)
+        textIndicatorData.contentImage = nullptr;
     if (hasImage && !decodeImage(decoder, textIndicatorData.contentImage))
         return false;
 
     bool hasImageWithHighlight;
     if (!decoder.decode(hasImageWithHighlight))
         return false;
+    if (!hasImageWithHighlight)
+        textIndicatorData.contentImageWithHighlight = nullptr;
     if (hasImageWithHighlight && !decodeImage(decoder, textIndicatorData.contentImageWithHighlight))
         return false;
 
     return true;
 }
+
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+void ArgumentCoder<MediaPlaybackTargetContext>::encode(ArgumentEncoder& encoder, const MediaPlaybackTargetContext& target)
+{
+    int32_t targetType = target.type;
+    encoder << targetType;
+
+    if (!target.encodingRequiresPlatformData())
+        return;
+
+    encodePlatformData(encoder, target);
+}
+
+bool ArgumentCoder<MediaPlaybackTargetContext>::decode(ArgumentDecoder& decoder, MediaPlaybackTargetContext& target)
+{
+    int32_t targetType;
+    if (!decoder.decode(targetType))
+        return false;
+
+    target.type = static_cast<MediaPlaybackTargetContext::ContextType>(targetType);
+    if (!target.encodingRequiresPlatformData())
+        return false;
+
+    return decodePlatformData(decoder, target);
+}
+#endif
 
 } // namespace IPC

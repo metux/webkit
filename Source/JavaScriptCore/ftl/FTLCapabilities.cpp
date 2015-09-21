@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,15 +44,14 @@ inline CapabilityLevel canCompile(Node* node)
     
     switch (node->op()) {
     case JSConstant:
-    case GetMyArgumentsLength:
     case GetLocal:
     case SetLocal:
-    case PutLocal:
-    case KillLocal:
+    case PutStack:
+    case KillStack:
+    case GetStack:
     case MovHint:
     case ZombieHint:
     case Phantom:
-    case HardPhantom:
     case Flush:
     case PhantomLocal:
     case SetArgument:
@@ -64,6 +63,7 @@ inline CapabilityLevel canCompile(Node* node)
     case BitLShift:
     case BitURShift:
     case CheckStructure:
+    case DoubleAsInt32:
     case ArrayifyToStructure:
     case PutStructure:
     case GetButterfly:
@@ -79,6 +79,7 @@ inline CapabilityLevel canCompile(Node* node)
     case PutGlobalVar:
     case ValueAdd:
     case ArithAdd:
+    case ArithClz32:
     case ArithSub:
     case ArithMul:
     case ArithDiv:
@@ -89,7 +90,9 @@ inline CapabilityLevel canCompile(Node* node)
     case ArithSin:
     case ArithCos:
     case ArithPow:
+    case ArithRound:
     case ArithSqrt:
+    case ArithLog:
     case ArithFRound:
     case ArithNegate:
     case UInt32ToNumber:
@@ -101,27 +104,34 @@ inline CapabilityLevel canCompile(Node* node)
     case ExtractOSREntryLocal:
     case LoopHint:
     case SkipScope:
-    case GetClosureRegisters:
+    case CreateActivation:
+    case NewFunction:
     case GetClosureVar:
     case PutClosureVar:
+    case CreateDirectArguments:
+    case CreateScopedArguments:
+    case CreateClonedArguments:
+    case GetFromArguments:
+    case PutToArguments:
     case InvalidationPoint:
     case StringCharAt:
     case CheckCell:
     case CheckBadCell:
+    case CheckNotEmpty:
+    case CheckIdent:
     case StringCharCodeAt:
     case AllocatePropertyStorage:
     case ReallocatePropertyStorage:
-    case FunctionReentryWatchpoint:
-    case TypedArrayWatchpoint:
     case GetTypedArrayByteOffset:
-    case VariableWatchpoint:
     case NotifyWrite:
     case StoreBarrier:
-    case StoreBarrierWithNullCheck:
     case Call:
     case Construct:
-    case NativeCall:
-    case NativeConstruct:
+    case CallVarargs:
+    case CallForwardVarargs:
+    case ConstructVarargs:
+    case ConstructForwardVarargs:
+    case LoadVarargs:
     case ValueToInt32:
     case Branch:
     case LogicalNot:
@@ -131,10 +141,10 @@ inline CapabilityLevel canCompile(Node* node)
     case CountExecution:
     case GetExecutable:
     case GetScope:
-    case AllocationProfileWatchpoint:
-    case CheckArgumentsNotCreated:
     case GetCallee:
+    case GetArgumentCount:
     case ToString:
+    case CallStringConstructor:
     case MakeRope:
     case NewArrayWithSize:
     case GetById:
@@ -142,16 +152,15 @@ inline CapabilityLevel canCompile(Node* node)
     case MultiGetByOffset:
     case MultiPutByOffset:
     case ToPrimitive:
-    case PhantomArguments:
     case Throw:
     case ThrowReferenceError:
     case Unreachable:
-    case GetMyArgumentByVal:
     case IsUndefined:
     case IsBoolean:
     case IsNumber:
     case IsString:
     case IsObject:
+    case IsObjectOrNull:
     case IsFunction:
     case CheckHasInstance:
     case InstanceOf:
@@ -165,16 +174,24 @@ inline CapabilityLevel canCompile(Node* node)
     case HasStructureProperty:
     case GetDirectPname:
     case GetEnumerableLength:
-    case GetStructurePropertyEnumerator:
-    case GetGenericPropertyEnumerator:
-    case GetEnumeratorPname:
+    case GetPropertyEnumerator:
+    case GetEnumeratorStructurePname:
+    case GetEnumeratorGenericPname:
     case ToIndexString:
     case BottomValue:
     case PhantomNewObject:
-    case PutByOffsetHint:
+    case PhantomNewFunction:
+    case PhantomCreateActivation:
+    case PutHint:
     case CheckStructureImmediate:
-    case PutStructureHint:
     case MaterializeNewObject:
+    case MaterializeCreateActivation:
+    case PhantomDirectArguments:
+    case PhantomClonedArguments:
+    case GetMyArgumentByVal:
+    case ForwardVarargs:
+    case Switch:
+    case TypeOf:
         // These are OK.
         break;
     case Identity:
@@ -203,6 +220,8 @@ inline CapabilityLevel canCompile(Node* node)
         case Array::Int32:
         case Array::Double:
         case Array::Contiguous:
+        case Array::DirectArguments:
+        case Array::ScopedArguments:
             break;
         default:
             if (isTypedView(node->arrayMode().typedArrayType()))
@@ -216,6 +235,8 @@ inline CapabilityLevel canCompile(Node* node)
         case Array::Double:
         case Array::Contiguous:
         case Array::String:
+        case Array::DirectArguments:
+        case Array::ScopedArguments:
             break;
         default:
             if (isTypedView(node->arrayMode().typedArrayType()))
@@ -242,6 +263,9 @@ inline CapabilityLevel canCompile(Node* node)
         case Array::Int32:
         case Array::Double:
         case Array::Contiguous:
+        case Array::Undecided:
+        case Array::DirectArguments:
+        case Array::ScopedArguments:
             break;
         default:
             if (isTypedView(node->arrayMode().typedArrayType()))
@@ -305,6 +329,10 @@ inline CapabilityLevel canCompile(Node* node)
             break;
         if (node->isBinaryUseKind(StringIdentUse))
             break;
+        if (node->isBinaryUseKind(ObjectUse, UntypedUse))
+            break;
+        if (node->isBinaryUseKind(UntypedUse, ObjectUse))
+            break;
         if (node->isBinaryUseKind(ObjectUse))
             break;
         if (node->isBinaryUseKind(BooleanUse))
@@ -331,16 +359,6 @@ inline CapabilityLevel canCompile(Node* node)
         if (node->isBinaryUseKind(UntypedUse))
             break;
         return CannotCompile;
-    case Switch:
-        switch (node->switchData()->kind) {
-        case SwitchImm:
-        case SwitchChar:
-        case SwitchCell:
-            break;
-        default:
-            return CannotCompile;
-        }
-        break;
     default:
         // Don't know how to handle anything else.
         return CannotCompile;
@@ -359,17 +377,6 @@ CapabilityLevel canCompile(Graph& graph)
     if (graph.m_codeBlock->codeType() != FunctionCode) {
         if (verboseCapabilities())
             dataLog("FTL rejecting ", *graph.m_codeBlock, " because it doesn't belong to a function.\n");
-        return CannotCompile;
-    }
-    
-    if (graph.m_codeBlock->needsActivation()) {
-        // Need this because although we also don't support
-        // CreateActivation, we might not see those nodes in case of
-        // OSR entry.
-        // FIXME: Support activations.
-        // https://bugs.webkit.org/show_bug.cgi?id=129576
-        if (verboseCapabilities())
-            dataLog("FTL rejecting ", *graph.m_codeBlock, " because it uses activations.\n");
         return CannotCompile;
     }
     
@@ -397,9 +404,11 @@ CapabilityLevel canCompile(Graph& graph)
                 case KnownInt32Use:
                 case Int52RepUse:
                 case NumberUse:
+                case RealNumberUse:
                 case DoubleRepUse:
                 case DoubleRepRealUse:
                 case BooleanUse:
+                case KnownBooleanUse:
                 case CellUse:
                 case KnownCellUse:
                 case ObjectUse:
@@ -409,6 +418,7 @@ CapabilityLevel canCompile(Graph& graph)
                 case KnownStringUse:
                 case StringObjectUse:
                 case StringOrStringObjectUse:
+                case SymbolUse:
                 case FinalObjectUse:
                 case NotCellUse:
                 case OtherUse:

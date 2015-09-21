@@ -607,13 +607,6 @@ _llint_op_enter:
     dispatch(1)
 
 
-_llint_op_create_lexical_environment:
-    traceExecution()
-    loadisFromInstruction(1, t0)
-    callSlowPath(_llint_slow_path_create_lexical_environment)
-    dispatch(3)
-
-
 _llint_op_get_scope:
     traceExecution()
     loadp Callee[cfr], t0
@@ -623,51 +616,28 @@ _llint_op_get_scope:
     dispatch(2)
 
 
-_llint_op_init_lazy_reg:
-    traceExecution()
-    loadisFromInstruction(1, t0)
-    storeq ValueEmpty, [cfr, t0, 8]
-    dispatch(2)
-
-
-_llint_op_create_arguments:
-    traceExecution()
-    loadisFromInstruction(1, t0)
-    bqneq [cfr, t0, 8], ValueEmpty, .opCreateArgumentsDone
-    callSlowPath(_slow_path_create_arguments)
-.opCreateArgumentsDone:
-    dispatch(3)
-
-
 _llint_op_create_this:
     traceExecution()
     loadisFromInstruction(2, t0)
     loadp [cfr, t0, 8], t0
-    loadp JSFunction::m_allocationProfile + ObjectAllocationProfile::m_allocator[t0], t1
-    loadp JSFunction::m_allocationProfile + ObjectAllocationProfile::m_structure[t0], t2
+    loadp JSFunction::m_rareData[t0], t4
+    btpz t4, .opCreateThisSlow
+    loadp FunctionRareData::m_allocationProfile + ObjectAllocationProfile::m_allocator[t4], t1
+    loadp FunctionRareData::m_allocationProfile + ObjectAllocationProfile::m_structure[t4], t2
     btpz t1, .opCreateThisSlow
+    loadpFromInstruction(4, t4)
+    bpeq t4, 1, .hasSeenMultipleCallee
+    bpneq t4, t0, .opCreateThisSlow
+.hasSeenMultipleCallee:
     allocateJSObject(t1, t2, t0, t3, .opCreateThisSlow)
     loadisFromInstruction(1, t1)
     storeq t0, [cfr, t1, 8]
-    dispatch(4)
+    dispatch(5)
 
 .opCreateThisSlow:
     callSlowPath(_slow_path_create_this)
-    dispatch(4)
+    dispatch(5)
 
-
-_llint_op_get_callee:
-    traceExecution()
-    loadisFromInstruction(1, t0)
-    loadp Callee[cfr], t1
-    loadpFromInstruction(2, t2)
-    bpneq t1, t2, .opGetCalleeSlow
-    storep t1, [cfr, t0, 8]
-    dispatch(3)
-
-.opGetCalleeSlow:
-    callSlowPath(_slow_path_get_callee)
-    dispatch(3)
 
 _llint_op_to_this:
     traceExecution()
@@ -700,6 +670,17 @@ _llint_op_new_object:
     dispatch(4)
 
 
+_llint_op_check_tdz:
+    traceExecution()
+    loadisFromInstruction(1, t0)
+    loadConstantOrVariable(t0, t1)
+    bqneq t1, ValueEmpty, .opNotTDZ
+    callSlowPath(_slow_path_throw_tdz_error)
+
+.opNotTDZ:
+    dispatch(2)
+
+
 _llint_op_mov:
     traceExecution()
     loadisFromInstruction(2, t1)
@@ -708,13 +689,6 @@ _llint_op_mov:
     storeq t2, [cfr, t0, 8]
     dispatch(3)
 
-
-macro notifyWrite(set, value, scratch, slow)
-    loadb VariableWatchpointSet::m_state[set], scratch
-    bieq scratch, IsInvalidated, .done
-    bqneq value, VariableWatchpointSet::m_inferredValue[set], slow
-.done:
-end
 
 _llint_op_not:
     traceExecution()
@@ -876,6 +850,22 @@ _llint_op_to_number:
 
 .opToNumberSlow:
     callSlowPath(_slow_path_to_number)
+    dispatch(3)
+
+
+_llint_op_to_string:
+    traceExecution()
+    loadisFromInstruction(2, t1)
+    loadisFromInstruction(1, t2)
+    loadConstantOrVariable(t1, t0)
+    btqnz t0, tagMask, .opToStringSlow
+    bbneq JSCell::m_type[t0], StringType, .opToStringSlow
+.opToStringIsString:
+    storeq t0, [cfr, t2, 8]
+    dispatch(3)
+
+.opToStringSlow:
+    callSlowPath(_slow_path_to_string)
     dispatch(3)
 
 
@@ -1206,6 +1196,21 @@ _llint_op_is_string:
     dispatch(3)
 
 
+_llint_op_is_object:
+    traceExecution()
+    loadisFromInstruction(2, t1)
+    loadisFromInstruction(1, t2)
+    loadConstantOrVariable(t1, t0)
+    btqnz t0, tagMask, .opIsObjectNotCell
+    cbaeq JSCell::m_type[t0], ObjectType, t1
+    orq ValueFalse, t1
+    storeq t1, [cfr, t2, 8]
+    dispatch(3)
+.opIsObjectNotCell:
+    storeq ValueFalse, [cfr, t2, 8]
+    dispatch(3)
+
+
 macro loadPropertyAtVariableOffset(propertyOffsetAsInt, objectAndStorage, value)
     bilt propertyOffsetAsInt, firstOutOfLineOffset, .isInline
     loadp JSObject::m_butterfly[objectAndStorage], objectAndStorage
@@ -1230,16 +1235,6 @@ macro storePropertyAtVariableOffset(propertyOffsetAsInt, objectAndStorage, value
 .ready:
     storeq value, (firstOutOfLineOffset - 2) * 8[objectAndStorage, propertyOffsetAsInt, 8]
 end
-
-_llint_op_init_global_const:
-    traceExecution()
-    writeBarrierOnGlobalObject(2)
-    loadisFromInstruction(2, t1)
-    loadpFromInstruction(1, t0)
-    loadConstantOrVariable(t1, t2)
-    storeq t2, [t0]
-    dispatch(5)
-
 
 macro getById(getPropertyStorage)
     traceExecution()
@@ -1299,22 +1294,6 @@ _llint_op_get_array_length:
 .opGetArrayLengthSlow:
     callSlowPath(_llint_slow_path_get_by_id)
     dispatch(9)
-
-
-_llint_op_get_arguments_length:
-    traceExecution()
-    loadisFromInstruction(2, t0)
-    loadisFromInstruction(1, t1)
-    btqnz [cfr, t0, 8], .opGetArgumentsLengthSlow
-    loadi ArgumentCount + PayloadOffset[cfr], t2
-    subi 1, t2
-    orq tagTypeNumber, t2
-    storeq t2, [cfr, t1, 8]
-    dispatch(4)
-
-.opGetArgumentsLengthSlow:
-    callSlowPath(_llint_slow_path_get_arguments_length)
-    dispatch(4)
 
 
 macro putById(getPropertyStorage)
@@ -1461,30 +1440,6 @@ _llint_op_get_by_val:
 .opGetByValSlow:
     callSlowPath(_llint_slow_path_get_by_val)
     dispatch(6)
-
-
-_llint_op_get_argument_by_val:
-    # FIXME: At some point we should array profile this. Right now it isn't necessary
-    # since the DFG will never turn a get_argument_by_val into a GetByVal.
-    traceExecution()
-    loadisFromInstruction(2, t0)
-    loadisFromInstruction(3, t1)
-    btqnz [cfr, t0, 8], .opGetArgumentByValSlow
-    loadConstantOrVariableInt32(t1, t2, .opGetArgumentByValSlow)
-    loadi ArgumentCount + PayloadOffset[cfr], t1
-    sxi2q t2, t2
-    subi 1, t1
-    biaeq t2, t1, .opGetArgumentByValSlow
-    loadisFromInstruction(1, t3)
-    loadpFromInstruction(6, t1)
-    loadq FirstArgumentOffset[cfr, t2, 8], t0
-    storeq t0, [cfr, t3, 8]
-    valueProfile(t0, 6, t1)
-    dispatch(7)
-
-.opGetArgumentByValSlow:
-    callSlowPath(_llint_slow_path_get_argument_by_val)
-    dispatch(7)
 
 
 macro contiguousPutByVal(storeCallback)
@@ -1768,17 +1723,6 @@ _llint_op_switch_char:
     dispatch(0)
 
 
-_llint_op_new_func:
-    traceExecution()
-    loadisFromInstruction(4, t2)
-    btiz t2, .opNewFuncUnchecked
-    loadisFromInstruction(1, t1)
-    btqnz [cfr, t1, 8], .opNewFuncDone
-.opNewFuncUnchecked:
-    callSlowPath(_llint_slow_path_new_func)
-.opNewFuncDone:
-    dispatch(5)
-
 macro arrayProfileForCall()
     loadisFromInstruction(4, t3)
     negp t3
@@ -1811,14 +1755,6 @@ macro doCall(slowPath)
     slowPathForCall(slowPath)
 end
 
-_llint_op_tear_off_arguments:
-    traceExecution()
-    loadisFromInstruction(1, t0)
-    btqz [cfr, t0, 8], .opTearOffArgumentsNotCreated
-    callSlowPath(_llint_slow_path_tear_off_arguments)
-.opTearOffArgumentsNotCreated:
-    dispatch(3)
-
 
 _llint_op_ret:
     traceExecution()
@@ -1834,7 +1770,7 @@ _llint_op_to_primitive:
     loadisFromInstruction(1, t3)
     loadConstantOrVariable(t2, t0)
     btqnz t0, tagMask, .opToPrimitiveIsImm
-    bbneq JSCell::m_type[t0], StringType, .opToPrimitiveSlowCase
+    bbaeq JSCell::m_type[t0], ObjectType, .opToPrimitiveSlowCase
 .opToPrimitiveIsImm:
     storeq t0, [cfr, t3, 8]
     dispatch(3)
@@ -1868,12 +1804,18 @@ _llint_op_catch:
     loadp VM::targetInterpreterPCForThrow[t3], PC
     subp PB, PC
     rshiftp 3, PC
+
     loadq VM::m_exception[t3], t0
     storeq 0, VM::m_exception[t3]
     loadisFromInstruction(1, t2)
     storeq t0, [cfr, t2, 8]
+
+    loadq Exception::m_value[t0], t3
+    loadisFromInstruction(2, t2)
+    storeq t3, [cfr, t2, 8]
+
     traceExecution()
-    dispatch(2)
+    dispatch(3)
 
 
 _llint_op_end:
@@ -2067,9 +2009,8 @@ macro getGlobalVar()
 end
 
 macro getClosureVar()
-    loadp JSEnvironmentRecord::m_registers[t0], t0
     loadisFromInstruction(6, t1)
-    loadq [t0, t1, 8], t0
+    loadq JSEnvironmentRecord_variables[t0, t1, 8], t0
     valueProfile(t0, 7, t1)
     loadisFromInstruction(1, t1)
     storeq t0, [cfr, t1, 8]
@@ -2106,7 +2047,6 @@ _llint_op_get_from_scope:
 .gGlobalVarWithVarInjectionChecks:
     bineq t0, GlobalVarWithVarInjectionChecks, .gClosureVarWithVarInjectionChecks
     varInjectionCheck(.gDynamic)
-    loadVariable(2, t0)
     getGlobalVar()
     dispatch(8)
 
@@ -2133,17 +2073,16 @@ macro putGlobalVar()
     loadisFromInstruction(3, t0)
     loadConstantOrVariable(t0, t1)
     loadpFromInstruction(5, t2)
-    notifyWrite(t2, t1, t0, .pDynamic)
     loadpFromInstruction(6, t0)
+    notifyWrite(t2, .pDynamic)
     storeq t1, [t0]
 end
 
 macro putClosureVar()
     loadisFromInstruction(3, t1)
     loadConstantOrVariable(t1, t2)
-    loadp JSEnvironmentRecord::m_registers[t0], t0
     loadisFromInstruction(6, t1)
-    storeq t2, [t0, t1, 8]
+    storeq t2, JSEnvironmentRecord_variables[t0, t1, 8]
 end
 
 macro putLocalClosureVar()
@@ -2151,11 +2090,10 @@ macro putLocalClosureVar()
     loadConstantOrVariable(t1, t2)
     loadpFromInstruction(5, t3)
     btpz t3, .noVariableWatchpointSet
-    notifyWrite(t3, t2, t1, .pDynamic)
+    notifyWrite(t3, .pDynamic)
 .noVariableWatchpointSet:
-    loadp JSEnvironmentRecord::m_registers[t0], t0
     loadisFromInstruction(6, t1)
-    storeq t2, [t0, t1, 8]
+    storeq t2, JSEnvironmentRecord_variables[t0, t1, 8]
 end
 
 
@@ -2217,6 +2155,38 @@ _llint_op_put_to_scope:
     callSlowPath(_llint_slow_path_put_to_scope)
     dispatch(7)
 
+
+_llint_op_get_from_arguments:
+    traceExecution()
+    loadVariable(2, t0)
+    loadi 24[PB, PC, 8], t1
+    loadq DirectArguments_storage[t0, t1, 8], t0
+    valueProfile(t0, 4, t1)
+    loadisFromInstruction(1, t1)
+    storeq t0, [cfr, t1, 8]
+    dispatch(5)
+
+
+_llint_op_put_to_arguments:
+    traceExecution()
+    writeBarrierOnOperands(1, 3)
+    loadVariable(1, t0)
+    loadi 16[PB, PC, 8], t1
+    loadisFromInstruction(3, t3)
+    loadConstantOrVariable(t3, t2)
+    storeq t2, DirectArguments_storage[t0, t1, 8]
+    dispatch(4)
+
+
+_llint_op_get_parent_scope:
+    traceExecution()
+    loadVariable(2, t0)
+    loadp JSScope::m_next[t0], t0
+    loadisFromInstruction(1, t1)
+    storeq t0, [cfr, t1, 8]
+    dispatch(3)
+
+
 _llint_op_profile_type:
     traceExecution()
     loadp CodeBlock[cfr], t1
@@ -2230,6 +2200,7 @@ _llint_op_profile_type:
     loadisFromInstruction(1, t3)
     loadConstantOrVariable(t3, t0)
 
+    bqeq t0, ValueEmpty, .opProfileTypeDone
     # Store the JSValue onto the log entry.
     storeq t0, TypeProfilerLog::LogEntry::value[t2]
     

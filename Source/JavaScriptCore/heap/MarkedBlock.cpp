@@ -33,27 +33,31 @@
 
 namespace JSC {
 
-MarkedBlock* MarkedBlock::create(DeadBlock* block, MarkedAllocator* allocator, size_t cellSize, DestructorType destructorType)
+MarkedBlock* MarkedBlock::create(MarkedAllocator* allocator, size_t capacity, size_t cellSize, bool needsDestruction)
 {
-    ASSERT(reinterpret_cast<size_t>(block) == (reinterpret_cast<size_t>(block) & blockMask));
-    Region* region = block->region();
-    return new (NotNull, block) MarkedBlock(region, allocator, cellSize, destructorType);
+    return new (NotNull, fastAlignedMalloc(blockSize, capacity)) MarkedBlock(allocator, capacity, cellSize, needsDestruction);
 }
 
-MarkedBlock::MarkedBlock(Region* region, MarkedAllocator* allocator, size_t cellSize, DestructorType destructorType)
-    : HeapBlock<MarkedBlock>(region)
+void MarkedBlock::destroy(MarkedBlock* block)
+{
+    block->~MarkedBlock();
+    fastAlignedFree(block);
+}
+
+MarkedBlock::MarkedBlock(MarkedAllocator* allocator, size_t capacity, size_t cellSize, bool needsDestruction)
+    : DoublyLinkedListNode<MarkedBlock>()
     , m_atomsPerCell((cellSize + atomSize - 1) / atomSize)
-    , m_endAtom((allocator->cellSize() ? atomsPerBlock : region->blockSize() / atomSize) - m_atomsPerCell + 1)
-    , m_destructorType(destructorType)
+    , m_endAtom((allocator->cellSize() ? atomsPerBlock - m_atomsPerCell : firstAtom()) + 1)
+    , m_capacity(capacity)
+    , m_needsDestruction(needsDestruction)
     , m_allocator(allocator)
     , m_state(New) // All cells start out unmarked.
-    , m_weakSet(allocator->heap()->vm())
+    , m_weakSet(allocator->heap()->vm(), *this)
 {
     ASSERT(allocator);
     HEAP_LOG_BLOCK_STATE_TRANSITION(this);
 }
 
-template<MarkedBlock::DestructorType dtorType>
 inline void MarkedBlock::callDestructor(JSCell* cell)
 {
     // A previous eager sweep may already have run cell's destructor.
@@ -61,20 +65,20 @@ inline void MarkedBlock::callDestructor(JSCell* cell)
         return;
 
     ASSERT(cell->structureID());
-    if (dtorType == MarkedBlock::Normal)
-        jsCast<JSDestructibleObject*>(cell)->classInfo()->methodTable.destroy(cell);
-    else
+    if (cell->inlineTypeFlags() & StructureIsImmortal)
         cell->structure(*vm())->classInfo()->methodTable.destroy(cell);
+    else
+        jsCast<JSDestructibleObject*>(cell)->classInfo()->methodTable.destroy(cell);
     cell->zap();
 }
 
-template<MarkedBlock::BlockState blockState, MarkedBlock::SweepMode sweepMode, MarkedBlock::DestructorType dtorType>
+template<MarkedBlock::BlockState blockState, MarkedBlock::SweepMode sweepMode, bool callDestructors>
 MarkedBlock::FreeList MarkedBlock::specializedSweep()
 {
     ASSERT(blockState != Allocated && blockState != FreeListed);
-    ASSERT(!(dtorType == MarkedBlock::None && sweepMode == SweepOnly));
+    ASSERT(!(!callDestructors && sweepMode == SweepOnly));
 
-    SamplingRegion samplingRegion((dtorType != MarkedBlock::None && blockState != New) ? "Calling destructors" : "sweeping");
+    SamplingRegion samplingRegion((!callDestructors && blockState != New) ? "Calling destructors" : "sweeping");
     
     // This produces a free list that is ordered in reverse through the block.
     // This is fine, since the allocation code makes no assumptions about the
@@ -87,8 +91,8 @@ MarkedBlock::FreeList MarkedBlock::specializedSweep()
 
         JSCell* cell = reinterpret_cast_ptr<JSCell*>(&atoms()[i]);
 
-        if (dtorType != MarkedBlock::None && blockState != New)
-            callDestructor<dtorType>(cell);
+        if (callDestructors && blockState != New)
+            callDestructor(cell);
 
         if (sweepMode == SweepToFreeList) {
             FreeCell* freeCell = reinterpret_cast<FreeCell*>(cell);
@@ -113,23 +117,21 @@ MarkedBlock::FreeList MarkedBlock::sweep(SweepMode sweepMode)
 
     m_weakSet.sweep();
 
-    if (sweepMode == SweepOnly && m_destructorType == MarkedBlock::None)
+    if (sweepMode == SweepOnly && !m_needsDestruction)
         return FreeList();
 
-    if (m_destructorType == MarkedBlock::ImmortalStructure)
-        return sweepHelper<MarkedBlock::ImmortalStructure>(sweepMode);
-    if (m_destructorType == MarkedBlock::Normal)
-        return sweepHelper<MarkedBlock::Normal>(sweepMode);
-    return sweepHelper<MarkedBlock::None>(sweepMode);
+    if (m_needsDestruction)
+        return sweepHelper<true>(sweepMode);
+    return sweepHelper<false>(sweepMode);
 }
 
-template<MarkedBlock::DestructorType dtorType>
+template<bool callDestructors>
 MarkedBlock::FreeList MarkedBlock::sweepHelper(SweepMode sweepMode)
 {
     switch (m_state) {
     case New:
         ASSERT(sweepMode == SweepToFreeList);
-        return specializedSweep<New, SweepToFreeList, dtorType>();
+        return specializedSweep<New, SweepToFreeList, callDestructors>();
     case FreeListed:
         // Happens when a block transitions to fully allocated.
         ASSERT(sweepMode == SweepToFreeList);
@@ -140,8 +142,8 @@ MarkedBlock::FreeList MarkedBlock::sweepHelper(SweepMode sweepMode)
         return FreeList();
     case Marked:
         return sweepMode == SweepToFreeList
-            ? specializedSweep<Marked, SweepToFreeList, dtorType>()
-            : specializedSweep<Marked, SweepOnly, dtorType>();
+            ? specializedSweep<Marked, SweepToFreeList, callDestructors>()
+            : specializedSweep<Marked, SweepOnly, callDestructors>();
     }
 
     RELEASE_ASSERT_NOT_REACHED();
@@ -155,10 +157,11 @@ public:
     {
     }
 
-    void operator()(JSCell* cell)
+    IterationStatus operator()(JSCell* cell)
     {
         ASSERT(MarkedBlock::blockFor(cell) == m_block);
         m_block->setNewlyAllocated(cell);
+        return IterationStatus::Continue;
     }
 
 private:
@@ -215,11 +218,6 @@ void MarkedBlock::clearMarks()
 #endif
 }
 
-void MarkedBlock::clearRememberedSet()
-{
-    m_rememberedSet.clearAll();
-}
-
 template <HeapOperation collectionType>
 void MarkedBlock::clearMarksWithCollectionType()
 {
@@ -229,9 +227,6 @@ void MarkedBlock::clearMarksWithCollectionType()
     ASSERT(m_state != New && m_state != FreeListed);
     if (collectionType == FullCollection) {
         m_marks.clearAll();
-#if ENABLE(GGC)
-        m_rememberedSet.clearAll();
-#endif
         // This will become true at the end of the mark phase. We set it now to
         // avoid an extra pass to do so later.
         m_state = Marked;

@@ -262,7 +262,6 @@ void CSSParserSelector::adoptSelectorVector(Vector<std::unique_ptr<CSSParserSele
     m_selector->setSelectorList(WTF::move(selectorList));
 }
 
-#if ENABLE(CSS_SELECTORS_LEVEL4)
 void CSSParserSelector::setLangArgumentList(const Vector<CSSParserString>& stringVector)
 {
     ASSERT_WITH_MESSAGE(!stringVector.isEmpty(), "No CSS Selector takes an empty argument list.");
@@ -272,7 +271,6 @@ void CSSParserSelector::setLangArgumentList(const Vector<CSSParserString>& strin
         argumentList->append(languageArgument);
     m_selector->setLangArgumentList(WTF::move(argumentList));
 }
-#endif
 
 void CSSParserSelector::setPseudoClassValue(const CSSParserString& pseudoClassString)
 {
@@ -338,9 +336,11 @@ void CSSParserSelector::appendTagHistory(CSSParserSelectorCombinator relation, s
     case CSSParserSelectorCombinator::DescendantSpace:
         selectorRelation = CSSSelector::Descendant;
         break;
+#if ENABLE(CSS_SELECTORS_LEVEL4)
     case CSSParserSelectorCombinator::DescendantDoubleChild:
         selectorRelation = CSSSelector::Descendant;
         break;
+#endif
     case CSSParserSelectorCombinator::DirectAdjacent:
         selectorRelation = CSSSelector::DirectAdjacent;
         break;
@@ -350,8 +350,10 @@ void CSSParserSelector::appendTagHistory(CSSParserSelectorCombinator relation, s
     }
     end->setRelation(selectorRelation);
 
+#if ENABLE(CSS_SELECTORS_LEVEL4)
     if (relation == CSSParserSelectorCombinator::DescendantDoubleChild)
         end->setDescendantUseDoubleChildSyntax();
+#endif
 
     end->setTagHistory(WTF::move(selector));
 }

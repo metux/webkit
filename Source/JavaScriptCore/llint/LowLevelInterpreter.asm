@@ -44,6 +44,9 @@ else
 end
 const SlotSize = 8
 
+const JSEnvironmentRecord_variables = (sizeof JSEnvironmentRecord + SlotSize - 1) & ~(SlotSize - 1)
+const DirectArguments_storage = (sizeof DirectArguments + SlotSize - 1) & ~(SlotSize - 1)
+
 const StackAlignment = 16
 const StackAlignmentMask = StackAlignment - 1
 
@@ -178,7 +181,7 @@ const FunctionCode = 2
 const LLIntReturnPC = ArgumentCount + TagOffset
 
 # String flags.
-const HashFlags8BitBuffer = 32
+const HashFlags8BitBuffer = 8
 
 # Copied from PropertyOffset.h
 const firstOutOfLineOffset = 100
@@ -195,7 +198,7 @@ const Dynamic = 7
 
 const ResolveModeMask = 0xffff
 
-const MarkedBlockSize = 64 * 1024
+const MarkedBlockSize = 16 * 1024
 const MarkedBlockMask = ~(MarkedBlockSize - 1)
 # Constants for checking mark bits.
 const AtomNumberShift = 3
@@ -516,6 +519,10 @@ end
 macro skipIfIsRememberedOrInEden(cell, scratch1, scratch2, continuation)
     loadb JSCell::m_gcData[cell], scratch1
     continuation(scratch1)
+end
+
+macro notifyWrite(set, slow)
+    bbneq WatchpointSet::m_state[set], IsInvalidated, slow
 end
 
 macro checkSwitchToJIT(increment, action)
@@ -919,10 +926,28 @@ end
 
 
 # Value-representation-agnostic code.
-_llint_op_touch_entry:
+_llint_op_create_direct_arguments:
     traceExecution()
-    callSlowPath(_slow_path_touch_entry)
-    dispatch(1)
+    callSlowPath(_slow_path_create_direct_arguments)
+    dispatch(2)
+
+
+_llint_op_create_scoped_arguments:
+    traceExecution()
+    callSlowPath(_slow_path_create_scoped_arguments)
+    dispatch(3)
+
+
+_llint_op_create_out_of_band_arguments:
+    traceExecution()
+    callSlowPath(_slow_path_create_out_of_band_arguments)
+    dispatch(2)
+
+
+_llint_op_new_func:
+    traceExecution()
+    callSlowPath(_llint_slow_path_new_func)
+    dispatch(4)
 
 
 _llint_op_new_array:
@@ -985,11 +1010,10 @@ _llint_op_typeof:
     dispatch(3)
 
 
-_llint_op_is_object:
+_llint_op_is_object_or_null:
     traceExecution()
-    callSlowPath(_slow_path_is_object)
+    callSlowPath(_slow_path_is_object_or_null)
     dispatch(3)
-
 
 _llint_op_is_function:
     traceExecution()
@@ -1032,6 +1056,18 @@ _llint_op_del_by_val:
 _llint_op_put_by_index:
     traceExecution()
     callSlowPath(_llint_slow_path_put_by_index)
+    dispatch(4)
+
+
+_llint_op_put_getter_by_id:
+    traceExecution()
+    callSlowPath(_llint_slow_path_put_getter_by_id)
+    dispatch(4)
+
+
+_llint_op_put_setter_by_id:
+    traceExecution()
+    callSlowPath(_llint_slow_path_put_setter_by_id)
     dispatch(4)
 
 
@@ -1247,20 +1283,14 @@ _llint_op_strcat:
 
 _llint_op_push_with_scope:
     traceExecution()
-    callSlowPath(_llint_slow_path_push_with_scope)
-    dispatch(3)
+    callSlowPath(_slow_path_push_with_scope)
+    dispatch(4)
 
 
-_llint_op_pop_scope:
+_llint_op_create_lexical_environment:
     traceExecution()
-    callSlowPath(_llint_slow_path_pop_scope)
-    dispatch(2)
-
-
-_llint_op_push_name_scope:
-    traceExecution()
-    callSlowPath(_llint_slow_path_push_name_scope)
-    dispatch(6)
+    callSlowPath(_slow_path_create_lexical_environment)
+    dispatch(5)
 
 
 _llint_op_throw:
@@ -1339,19 +1369,19 @@ _llint_op_get_direct_pname:
     callSlowPath(_slow_path_get_direct_pname)
     dispatch(7)
 
-_llint_op_get_structure_property_enumerator:
+_llint_op_get_property_enumerator:
     traceExecution()
-    callSlowPath(_slow_path_get_structure_property_enumerator)
+    callSlowPath(_slow_path_get_property_enumerator)
+    dispatch(3)
+
+_llint_op_enumerator_structure_pname:
+    traceExecution()
+    callSlowPath(_slow_path_next_structure_enumerator_pname)
     dispatch(4)
 
-_llint_op_get_generic_property_enumerator:
+_llint_op_enumerator_generic_pname:
     traceExecution()
-    callSlowPath(_slow_path_get_generic_property_enumerator)
-    dispatch(5)
-
-_llint_op_next_enumerator_pname:
-    traceExecution()
-    callSlowPath(_slow_path_next_enumerator_pname)
+    callSlowPath(_slow_path_next_generic_enumerator_pname)
     dispatch(4)
 
 _llint_op_to_index_string:
@@ -1382,6 +1412,3 @@ macro notSupported()
         break
     end
 end
-
-_llint_op_init_global_const_nop:
-    dispatch(5)

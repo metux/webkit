@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2014-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,7 +44,9 @@
 #include <WebKit/WKNotificationPermissionRequest.h>
 #include <WebKit/WKNumber.h>
 #include <WebKit/WKPageGroup.h>
+#include <WebKit/WKPageInjectedBundleClient.h>
 #include <WebKit/WKPagePrivate.h>
+#include <WebKit/WKPluginInformation.h>
 #include <WebKit/WKPreferencesRefPrivate.h>
 #include <WebKit/WKProtectionSpace.h>
 #include <WebKit/WKRetainPtr.h>
@@ -123,6 +125,7 @@ TestController::TestController(int argc, const char* argv[])
     , m_shouldUseAcceleratedDrawing(false)
     , m_shouldUseRemoteLayerTree(false)
     , m_shouldLogHistoryClientCallbacks(false)
+    , m_shouldShowWebView(false)
 {
     initialize(argc, argv);
     controller = this;
@@ -210,9 +213,9 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WK
         0, // takeFocus
         focus,
         unfocus,
-        0, // runJavaScriptAlert
-        0, // runJavaScriptConfirm
-        0, // runJavaScriptPrompt
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
         0, // setStatusText
         0, // mouseDidMoveOverElement_deprecatedForUseWithV0
         0, // missingPluginButtonClicked
@@ -256,6 +259,11 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WK
         0, // didCancelTrackingPotentialLongMousePress
         0, // isPlayingAudioDidChange
         decidePolicyForUserMediaPermissionRequest,
+        0, // didClickAutofillButton
+        0, // runJavaScriptAlert
+        0, // runJavaScriptConfirm
+        0, // runJavaScriptPrompt
+        0, // mediaSessionMetadataDidChange
     };
     WKPageSetPageUIClient(newPage, &otherPageUIClient.base);
     
@@ -324,6 +332,8 @@ void TestController::initialize(int argc, const char* argv[])
     m_shouldUseAcceleratedDrawing = options.shouldUseAcceleratedDrawing;
     m_shouldUseRemoteLayerTree = options.shouldUseRemoteLayerTree;
     m_paths = options.paths;
+    m_allowedHosts = options.allowedHosts;
+    m_shouldShowWebView = options.shouldShowWebView;
 
     if (options.printSupportedFeatures) {
         // FIXME: On Windows, DumpRenderTree uses this to expose whether it supports 3d
@@ -352,9 +362,12 @@ void TestController::initialize(int argc, const char* argv[])
 
         const char separator = '/';
 
+        WKContextConfigurationSetApplicationCacheDirectory(configuration.get(), toWK(temporaryFolder + separator + "ApplicationCache").get());
+        WKContextConfigurationSetDiskCacheDirectory(configuration.get(), toWK(temporaryFolder + separator + "Cache").get());
         WKContextConfigurationSetIndexedDBDatabaseDirectory(configuration.get(), toWK(temporaryFolder + separator + "Databases" + separator + "IndexedDB").get());
         WKContextConfigurationSetLocalStorageDirectory(configuration.get(), toWK(temporaryFolder + separator + "LocalStorage").get());
         WKContextConfigurationSetWebSQLDatabaseDirectory(configuration.get(), toWK(temporaryFolder + separator + "Databases" + separator + "WebSQL").get());
+        WKContextConfigurationSetMediaKeysStorageDirectory(configuration.get(), toWK(temporaryFolder + separator + "MediaKeys").get());
     }
 
     m_context = adoptWK(WKContextCreateWithConfiguration(configuration.get()));
@@ -368,12 +381,7 @@ void TestController::initialize(int argc, const char* argv[])
     if (const char* dumpRenderTreeTemp = libraryPathForTesting()) {
         String temporaryFolder = String::fromUTF8(dumpRenderTreeTemp);
 
-        const char separator = '/';
-
-        // FIXME: These should be migrated to WKContextConfigurationRef.
-        WKContextSetApplicationCacheDirectory(m_context.get(), toWK(temporaryFolder + separator + "ApplicationCache").get());
-        WKContextSetDiskCacheDirectory(m_context.get(), toWK(temporaryFolder + separator + "Cache").get());
-        WKContextSetCookieStorageDirectory(m_context.get(), toWK(temporaryFolder + separator + "Cookies").get());
+        // FIXME: This should be migrated to WKContextConfigurationRef.
         // Disable icon database to avoid fetching <http://127.0.0.1:8000/favicon.ico> and making tests flaky.
         // Invividual tests can enable it using testRunner.setIconDatabaseEnabled, although it's not currently supported in WebKitTestRunner.
         WKContextSetIconDatabasePath(m_context.get(), toWK(emptyString()).get());
@@ -424,18 +432,14 @@ void TestController::initialize(int argc, const char* argv[])
     // Some preferences (notably mock scroll bars setting) currently cannot be re-applied to an existing view, so we need to set them now.
     resetPreferencesToConsistentValues();
 
-    WKRetainPtr<WKMutableDictionaryRef> viewOptions;
-    if (m_shouldUseRemoteLayerTree) {
-        viewOptions = adoptWK(WKMutableDictionaryCreate());
-        WKRetainPtr<WKStringRef> useRemoteLayerTreeKey = adoptWK(WKStringCreateWithUTF8CString("RemoteLayerTree"));
-        WKRetainPtr<WKBooleanRef> useRemoteLayerTreeValue = adoptWK(WKBooleanCreate(m_shouldUseRemoteLayerTree));
-        WKDictionarySetItem(viewOptions.get(), useRemoteLayerTreeKey.get(), useRemoteLayerTreeValue.get());
-    }
+    ViewOptions viewOptions;
+    viewOptions.useRemoteLayerTree = m_shouldUseRemoteLayerTree;
+    viewOptions.shouldShowWebView = m_shouldShowWebView;
 
-    createWebViewWithOptions(viewOptions.get());
+    createWebViewWithOptions(viewOptions);
 }
 
-void TestController::createWebViewWithOptions(WKDictionaryRef options)
+void TestController::createWebViewWithOptions(const ViewOptions& options)
 {
     m_mainWebView = std::make_unique<PlatformWebView>(m_context.get(), m_pageGroup.get(), nullptr, options);
     WKPageUIClientV5 pageUIClient = {
@@ -446,9 +450,9 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
         0, // takeFocus
         focus,
         unfocus,
-        0, // runJavaScriptAlert
-        0, // runJavaScriptConfirm
-        0, // runJavaScriptPrompt
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
+        0, // runJavaScriptAlert_deprecatedForUseWithV0
         0, // setStatusText
         0, // mouseDidMoveOverElement_deprecatedForUseWithV0
         0, // missingPluginButtonClicked
@@ -492,6 +496,11 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
         0, // didCancelTrackingPotentialLongMousePress
         0, // isPlayingAudioDidChange
         decidePolicyForUserMediaPermissionRequest,
+        0, // didClickAutofillButton
+        0, // runJavaScriptAlert
+        0, // runJavaScriptConfirm
+        0, // runJavaScriptPrompt
+        0, // mediaSessionMetadataDidChange
     };
     WKPageSetPageUIClient(m_mainWebView->page(), &pageUIClient.base);
 
@@ -517,6 +526,15 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
     };
     WKPageSetPageNavigationClient(m_mainWebView->page(), &pageNavigationClient.base);
 
+
+    // this should just be done on the page?
+    WKPageInjectedBundleClientV0 injectedBundleClient = {
+        { 0, this },
+        didReceivePageMessageFromInjectedBundle,
+        didReceiveSynchronousPageMessageFromInjectedBundle
+    };
+    WKPageSetPageInjectedBundleClient(m_mainWebView->page(), &injectedBundleClient.base);
+
     m_mainWebView->didInitializeClients();
 
     // Generally, the tests should default to running at 1x. updateWindowScaleForTest() will adjust the scale to
@@ -524,7 +542,7 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
     m_mainWebView->changeWindowScaleIfNeeded(1);
 }
 
-void TestController::ensureViewSupportsOptions(WKDictionaryRef options)
+void TestController::ensureViewSupportsOptions(const ViewOptions& options)
 {
     if (m_mainWebView && !m_mainWebView->viewSupportsOptions(options)) {
         WKPageSetPageUIClient(m_mainWebView->page(), 0);
@@ -543,8 +561,10 @@ void TestController::resetPreferencesToConsistentValues()
     // Reset preferences
     WKPreferencesRef preferences = WKPageGroupGetPreferences(m_pageGroup.get());
     WKPreferencesResetTestRunnerOverrides(preferences);
+    WKPreferencesSetPageVisibilityBasedProcessSuppressionEnabled(preferences, false);
     WKPreferencesSetOfflineWebApplicationCacheEnabled(preferences, true);
     WKPreferencesSetFontSmoothingLevel(preferences, kWKFontSmoothingLevelNoSubpixelAntiAliasing);
+    WKPreferencesSetAntialiasedFontDilationEnabled(preferences, false);
     WKPreferencesSetXSSAuditorEnabled(preferences, false);
     WKPreferencesSetWebAudioEnabled(preferences, true);
     WKPreferencesSetMediaStreamEnabled(preferences, true);
@@ -589,6 +609,9 @@ void TestController::resetPreferencesToConsistentValues()
     WKPreferencesSetMediaSourceEnabled(preferences, true);
 #endif
 
+    WKPreferencesSetHiddenPageDOMTimerThrottlingEnabled(preferences, false);
+    WKPreferencesSetHiddenPageCSSAnimationSuspensionEnabled(preferences, false);
+
     WKPreferencesSetAcceleratedDrawingEnabled(preferences, m_shouldUseAcceleratedDrawing);
 
     WKCookieManagerDeleteAllCookies(WKContextGetCookieManager(m_context.get()));
@@ -609,7 +632,15 @@ bool TestController::resetStateToConsistentValues()
     WKRetainPtr<WKBooleanRef> shouldGCValue = adoptWK(WKBooleanCreate(m_gcBetweenTests));
     WKDictionarySetItem(resetMessageBody.get(), shouldGCKey.get(), shouldGCValue.get());
 
-    WKContextPostMessageToInjectedBundle(TestController::singleton().context(), messageName.get(), resetMessageBody.get());
+    WKRetainPtr<WKStringRef> allowedHostsKey = adoptWK(WKStringCreateWithUTF8CString("AllowedHosts"));
+    WKRetainPtr<WKMutableArrayRef> allowedHostsValue = adoptWK(WKMutableArrayCreate());
+    for (auto& host : m_allowedHosts) {
+        WKRetainPtr<WKStringRef> wkHost = adoptWK(WKStringCreateWithUTF8CString(host.c_str()));
+        WKArrayAppendItem(allowedHostsValue.get(), wkHost.get());
+    }
+    WKDictionarySetItem(resetMessageBody.get(), allowedHostsKey.get(), allowedHostsValue.get());
+
+    WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), resetMessageBody.get());
 
     WKContextSetShouldUseFontSmoothing(TestController::singleton().context(), false);
 
@@ -634,6 +665,8 @@ bool TestController::resetStateToConsistentValues()
 
     // Re-set to the default backing scale factor by setting the custom scale factor to 0.
     WKPageSetCustomBackingScaleFactor(m_mainWebView->page(), 0);
+
+    WKPageClearWheelEventTestTrigger(m_mainWebView->page());
 
 #if PLATFORM(EFL)
     // EFL use a real window while other ports such as Qt don't.
@@ -668,6 +701,10 @@ bool TestController::resetStateToConsistentValues()
 
     m_shouldLogHistoryClientCallbacks = false;
 
+    WKPageGroupRemoveAllUserContentFilters(WKPageGetPageGroup(m_mainWebView->page()));
+
+    setHidden(false);
+
     // Reset main page back to about:blank
     m_doneResetting = false;
 
@@ -692,9 +729,7 @@ void TestController::reattachPageToWebProcess()
 const char* TestController::webProcessName()
 {
     // FIXME: Find a way to not hardcode the process name.
-#if PLATFORM(IOS)
-    return "com.apple.WebKit.WebContent";
-#elif PLATFORM(MAC)
+#if PLATFORM(COCOA)
     return "com.apple.WebKit.WebContent.Development";
 #else
     return "WebProcess";
@@ -704,9 +739,7 @@ const char* TestController::webProcessName()
 const char* TestController::networkProcessName()
 {
     // FIXME: Find a way to not hardcode the process name.
-#if PLATFORM(IOS)
-    return "com.apple.WebKit.Networking";
-#elif PLATFORM(MAC)
+#if PLATFORM(COCOA)
     return "com.apple.WebKit.Networking.Development";
 #else
     return "NetworkProcess";
@@ -715,7 +748,7 @@ const char* TestController::networkProcessName()
 
 void TestController::updateWebViewSizeForTest(const TestInvocation& test)
 {
-    bool isSVGW3CTest = strstr(test.pathOrURL(), "svg/W3C-SVG-1.1") || strstr(test.pathOrURL(), "svg\\W3C-SVG-1.1");
+    bool isSVGW3CTest = test.urlContains("svg/W3C-SVG-1.1") || test.urlContains("svg\\W3C-SVG-1.1");
 
     unsigned width = viewWidth;
     unsigned height = viewHeight;
@@ -729,39 +762,37 @@ void TestController::updateWebViewSizeForTest(const TestInvocation& test)
 
 void TestController::updateWindowScaleForTest(PlatformWebView* view, const TestInvocation& test)
 {
-    WTF::String localPathOrUrl = String(test.pathOrURL());
-    bool needsHighDPIWindow = localPathOrUrl.findIgnoringCase("/hidpi-") != notFound;
+    bool needsHighDPIWindow = test.urlContains("/hidpi-");
     view->changeWindowScaleIfNeeded(needsHighDPIWindow ? 2 : 1);
 }
 
 // FIXME: move into relevant platformConfigureViewForTest()?
-static bool shouldUseFixedLayout(const char* pathOrURL)
+static bool shouldUseFixedLayout(const TestInvocation& test)
 {
 #if ENABLE(CSS_DEVICE_ADAPTATION)
-    if (strstr(pathOrURL, "device-adapt/") || strstr(pathOrURL, "device-adapt\\"))
+    if (test.urlContains("device-adapt/") || test.urlContains("device-adapt\\"))
         return true;
 #endif
 
-#if USE(TILED_BACKING_STORE) && PLATFORM(EFL)
-    if (strstr(pathOrURL, "sticky/") || strstr(pathOrURL, "sticky\\"))
+#if USE(COORDINATED_GRAPHICS) && PLATFORM(EFL)
+    if (test.urlContains("sticky/") || test.urlContains("sticky\\"))
         return true;
 #endif
     return false;
 
-    UNUSED_PARAM(pathOrURL);
+    UNUSED_PARAM(test);
 }
 
 void TestController::updateLayoutTypeForTest(const TestInvocation& test)
 {
-    auto viewOptions = adoptWK(WKMutableDictionaryCreate());
-    auto useFixedLayoutKey = adoptWK(WKStringCreateWithUTF8CString("UseFixedLayout"));
-    auto useFixedLayoutValue = adoptWK(WKBooleanCreate(shouldUseFixedLayout(test.pathOrURL())));
-    WKDictionarySetItem(viewOptions.get(), useFixedLayoutKey.get(), useFixedLayoutValue.get());
+    ViewOptions viewOptions;
 
-    ensureViewSupportsOptions(viewOptions.get());
+    viewOptions.useFixedLayout = shouldUseFixedLayout(test);
+
+    ensureViewSupportsOptions(viewOptions);
 }
 
-#if !PLATFORM(COCOA)
+#if !PLATFORM(COCOA) && !PLATFORM(GTK)
 void TestController::platformConfigureViewForTest(const TestInvocation&)
 {
 }
@@ -938,6 +969,18 @@ void TestController::didReceiveSynchronousMessageFromInjectedBundle(WKContextRef
     *returnData = static_cast<TestController*>(const_cast<void*>(clientInfo))->didReceiveSynchronousMessageFromInjectedBundle(messageName, messageBody).leakRef();
 }
 
+// WKPageInjectedBundleClient
+
+void TestController::didReceivePageMessageFromInjectedBundle(WKPageRef page, WKStringRef messageName, WKTypeRef messageBody, const void* clientInfo)
+{
+    static_cast<TestController*>(const_cast<void*>(clientInfo))->didReceiveMessageFromInjectedBundle(messageName, messageBody);
+}
+
+void TestController::didReceiveSynchronousPageMessageFromInjectedBundle(WKPageRef page, WKStringRef messageName, WKTypeRef messageBody, WKTypeRef* returnData, const void* clientInfo)
+{
+    *returnData = static_cast<TestController*>(const_cast<void*>(clientInfo))->didReceiveSynchronousMessageFromInjectedBundle(messageName, messageBody).leakRef();
+}
+
 void TestController::networkProcessDidCrash(WKContextRef context, const void *clientInfo)
 {
     static_cast<TestController*>(const_cast<void*>(clientInfo))->networkProcessDidCrash();
@@ -1068,6 +1111,32 @@ WKRetainPtr<WKTypeRef> TestController::didReceiveSynchronousMessageFromInjectedB
             WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), false);
             return 0;
         }
+
+#if PLATFORM(MAC)
+        if (WKStringIsEqualToUTF8CString(subMessageName, "MouseForceDown")) {
+            WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), true);
+            m_eventSenderProxy->mouseForceDown();
+            WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), false);
+            return 0;
+        }
+
+        if (WKStringIsEqualToUTF8CString(subMessageName, "MouseForceUp")) {
+            WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), true);
+            m_eventSenderProxy->mouseForceUp();
+            WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), false);
+            return 0;
+        }
+
+        if (WKStringIsEqualToUTF8CString(subMessageName, "MouseForceChanged")) {
+            WKRetainPtr<WKStringRef> forceKey = adoptWK(WKStringCreateWithUTF8CString("Force"));
+            double force = WKDoubleGetValue(static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, forceKey.get())));
+
+            WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), true);
+            m_eventSenderProxy->mouseForceChanged(force);
+            WKPageSetShouldSendEventsSynchronously(mainWebView()->page(), false);
+            return 0;
+        }
+#endif // PLATFORM(MAC)
 
         if (WKStringIsEqualToUTF8CString(subMessageName, "MouseScrollBy")) {
             WKRetainPtr<WKStringRef> xKey = adoptWK(WKStringCreateWithUTF8CString("X"));
@@ -1283,7 +1352,22 @@ WKPluginLoadPolicy TestController::decidePolicyForPluginLoad(WKPageRef, WKPlugin
 {
     if (m_shouldBlockAllPlugins)
         return kWKPluginLoadPolicyBlocked;
+
+#if PLATFORM(MAC)
+    WKStringRef bundleIdentifier = (WKStringRef)WKDictionaryGetItemForKey(pluginInformation, WKPluginInformationBundleIdentifierKey());
+    if (!bundleIdentifier)
+        return currentPluginLoadPolicy;
+
+    if (WKStringIsEqualToUTF8CString(bundleIdentifier, "com.apple.QuickTime Plugin.plugin"))
+        return currentPluginLoadPolicy;
+
+    if (WKStringIsEqualToUTF8CString(bundleIdentifier, "com.apple.testnetscapeplugin"))
+        return currentPluginLoadPolicy;
+
+    RELEASE_ASSERT_NOT_REACHED(); // Please don't use any other plug-ins in tests, as they will not be installed on all machines.
+#else
     return currentPluginLoadPolicy;
+#endif
 }
 
 void TestController::didCommitNavigation(WKPageRef page, WKNavigationRef navigation)
@@ -1382,6 +1466,11 @@ void TestController::handleGeolocationPermissionRequest(WKGeolocationPermissionR
 {
     m_geolocationPermissionRequests.append(geolocationPermissionRequest);
     decidePolicyForGeolocationPermissionRequestIfPossible();
+}
+
+bool TestController::isGeolocationProviderActive() const
+{
+    return m_geolocationProvider->isActive();
 }
 
 void TestController::setUserMediaPermission(bool enabled)

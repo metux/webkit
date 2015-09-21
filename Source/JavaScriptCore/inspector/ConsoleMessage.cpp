@@ -141,6 +141,7 @@ static Inspector::Protocol::Console::ConsoleMessage::Source messageSourceValue(M
     case MessageSource::Rendering: return Inspector::Protocol::Console::ConsoleMessage::Source::Rendering;
     case MessageSource::CSS: return Inspector::Protocol::Console::ConsoleMessage::Source::CSS;
     case MessageSource::Security: return Inspector::Protocol::Console::ConsoleMessage::Source::Security;
+    case MessageSource::ContentBlocker: return Inspector::Protocol::Console::ConsoleMessage::Source::ContentBlocker;
     case MessageSource::Other: return Inspector::Protocol::Console::ConsoleMessage::Source::Other;
     }
     return Inspector::Protocol::Console::ConsoleMessage::Source::Other;
@@ -170,6 +171,7 @@ static Inspector::Protocol::Console::ConsoleMessage::Level messageLevelValue(Mes
 {
     switch (level) {
     case MessageLevel::Log: return Inspector::Protocol::Console::ConsoleMessage::Level::Log;
+    case MessageLevel::Info: return Inspector::Protocol::Console::ConsoleMessage::Level::Info;
     case MessageLevel::Warning: return Inspector::Protocol::Console::ConsoleMessage::Level::Warning;
     case MessageLevel::Error: return Inspector::Protocol::Console::ConsoleMessage::Level::Error;
     case MessageLevel::Debug: return Inspector::Protocol::Console::ConsoleMessage::Level::Debug;
@@ -271,7 +273,7 @@ void ConsoleMessage::clear()
         m_message = ASCIILiteral("<message collected>");
 
     if (m_arguments)
-        m_arguments.clear();
+        m_arguments = nullptr;
 }
 
 JSC::ExecState* ConsoleMessage::scriptState() const

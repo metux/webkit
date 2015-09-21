@@ -52,19 +52,21 @@ TypeProfilerLog::~TypeProfilerLog()
     delete[] m_logStartPtr;
 }
 
-void TypeProfilerLog::processLogEntries(String reason)
+void TypeProfilerLog::processLogEntries(const String& reason)
 {
-    if (verbose)
+    double before = 0;
+    if (verbose) {
         dataLog("Process caller:'", reason, "'");
+        before = currentTimeMS();
+    }
 
-    double before = currentTimeMS();
     LogEntry* entry = m_logStartPtr;
     HashMap<Structure*, RefPtr<StructureShape>> seenShapes;
     while (entry != m_currentLogEntryPtr) {
         StructureID id = entry->structureID;
         RefPtr<StructureShape> shape; 
         JSValue value = entry->value;
-        Structure* structure = 0;
+        Structure* structure = nullptr;
         if (id) {
             structure = Heap::heap(value.asCell())->structureIDTable().get(id); 
             auto iter = seenShapes.find(structure);
@@ -75,7 +77,7 @@ void TypeProfilerLog::processLogEntries(String reason)
                 shape = iter->value;
         }
 
-        RuntimeType type = TypeSet::getRuntimeTypeForValue(value);
+        RuntimeType type = runtimeTypeForValue(value);
         TypeLocation* location = entry->location;
         location->m_lastSeenType = type;
         if (location->m_globalTypeSet)

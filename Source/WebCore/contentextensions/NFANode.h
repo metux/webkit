@@ -38,15 +38,17 @@ namespace WebCore {
 namespace ContentExtensions {
 
 // A NFANode abstract the transition table out of a NFA state.
+
+typedef Vector<uint64_t, 0, WTF::CrashOnOverflow, 1> ActionList;
+typedef HashSet<unsigned, DefaultHash<unsigned>::Hash, WTF::UnsignedWithZeroKeyHashTraits<unsigned>> NFANodeIndexSet;
+typedef HashMap<uint16_t, NFANodeIndexSet, DefaultHash<uint16_t>::Hash, WTF::UnsignedWithZeroKeyHashTraits<uint16_t>> NFANodeTransitions;
+
 class NFANode {
 public:
-    HashMap<uint16_t, HashSet<unsigned, DefaultHash<unsigned>::Hash, WTF::UnsignedWithZeroKeyHashTraits<unsigned>>> transitions;
-    HashSet<unsigned, DefaultHash<unsigned>::Hash, WTF::UnsignedWithZeroKeyHashTraits<unsigned>> transitionsOnAnyCharacter;
+    NFANodeTransitions transitions;
+    NFANodeIndexSet transitionsOnAnyCharacter;
 
-    Vector<uint64_t> finalRuleIds;
-#if CONTENT_EXTENSIONS_STATE_MACHINE_DEBUGGING
-    Vector<uint64_t> ruleIds;
-#endif
+    ActionList finalRuleIds;
 };
 
 }

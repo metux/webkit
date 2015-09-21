@@ -30,7 +30,6 @@
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/text/StringHash.h>
 
 #include <wtf/ThreadSpecific.h>
@@ -39,10 +38,10 @@ using WTF::ThreadSpecific;
 
 namespace WebCore {
 
-    class EventNames;
     class ThreadTimers;
 
     struct CachedResourceRequestInitiators;
+    struct EventNames;
     struct ICUConverterWrapper;
     struct TECConverterWrapper;
 
@@ -68,25 +67,25 @@ namespace WebCore {
 #endif
 
     private:
-        OwnPtr<CachedResourceRequestInitiators> m_cachedResourceRequestInitiators;
-        OwnPtr<EventNames> m_eventNames;
-        OwnPtr<ThreadTimers> m_threadTimers;
+        std::unique_ptr<CachedResourceRequestInitiators> m_cachedResourceRequestInitiators;
+        std::unique_ptr<EventNames> m_eventNames;
+        std::unique_ptr<ThreadTimers> m_threadTimers;
 
 #ifndef NDEBUG
         bool m_isMainThread;
 #endif
 
-        OwnPtr<ICUConverterWrapper> m_cachedConverterICU;
+        std::unique_ptr<ICUConverterWrapper> m_cachedConverterICU;
 
 #if PLATFORM(MAC)
-        OwnPtr<TECConverterWrapper> m_cachedConverterTEC;
+        std::unique_ptr<TECConverterWrapper> m_cachedConverterTEC;
 #endif
 
         WEBCORE_EXPORT static ThreadSpecific<ThreadGlobalData>* staticData;
 #if USE(WEB_THREAD)
         WEBCORE_EXPORT static ThreadGlobalData* sharedMainThreadStaticData;
 #endif
-        friend ThreadGlobalData& threadGlobalData();
+        WEBCORE_EXPORT friend ThreadGlobalData& threadGlobalData();
     };
 
 #if USE(WEB_THREAD)

@@ -66,8 +66,6 @@ public:
     static Ref<HTMLInputElement> create(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
     virtual ~HTMLInputElement();
 
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitspeechchange);
-
     virtual HTMLInputElement* toInputElement() override final { return this; }
 
     WEBCORE_EXPORT virtual bool shouldAutocomplete() const override final;
@@ -147,11 +145,13 @@ public:
     virtual TextControlInnerTextElement* innerTextElement() const override final;
     HTMLElement* innerBlockElement() const;
     HTMLElement* innerSpinButtonElement() const;
+    HTMLElement* capsLockIndicatorElement() const;
     HTMLElement* resultsButtonElement() const;
     HTMLElement* cancelButtonElement() const;
     HTMLElement* sliderThumbElement() const;
     HTMLElement* sliderTrackElement() const;
     virtual HTMLElement* placeholderElement() const override final;
+    WEBCORE_EXPORT HTMLElement* autoFillButtonElement() const;
 
     bool checked() const { return m_isChecked; }
     void setChecked(bool, TextFieldEventBehavior = DispatchNoEvent);
@@ -200,7 +200,7 @@ public:
     bool canHaveSelection() const;
 
     virtual bool rendererIsNeeded(const RenderStyle&) override final;
-    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override final;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override final;
     virtual void willAttachRenderers() override final;
     virtual void didAttachRenderers() override final;
     virtual void didDetachRenderers() override final;
@@ -236,8 +236,11 @@ public:
 
     bool multiple() const;
 
-    bool isAutofilled() const { return m_isAutofilled; }
-    WEBCORE_EXPORT void setAutofilled(bool = true);
+    bool isAutoFilled() const { return m_isAutoFilled; }
+    WEBCORE_EXPORT void setAutoFilled(bool = true);
+
+    bool showAutoFillButton() const { return m_showAutoFillButton; }
+    WEBCORE_EXPORT void setShowAutoFillButton(bool);
 
     FileList* files();
     void setFiles(PassRefPtr<FileList>);
@@ -317,6 +320,8 @@ public:
     bool setupDateTimeChooserParameters(DateTimeChooserParameters&);
 #endif
 
+    void capsLockStateMayHaveChanged();
+
 protected:
     HTMLInputElement(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
 
@@ -330,6 +335,7 @@ private:
     virtual void willChangeForm() override final;
     virtual void didChangeForm() override final;
     virtual InsertionNotificationRequest insertedInto(ContainerNode&) override final;
+    void finishedInsertingSubtree() override final;
     virtual void removedFrom(ContainerNode&) override final;
     virtual void didMoveToNewDocument(Document* oldDocument) override final;
 
@@ -427,7 +433,8 @@ private:
     bool m_hasType : 1;
     bool m_isActivatedSubmit : 1;
     unsigned m_autocomplete : 2; // AutoCompleteSetting
-    bool m_isAutofilled : 1;
+    bool m_isAutoFilled : 1;
+    bool m_showAutoFillButton : 1;
 #if ENABLE(DATALIST_ELEMENT)
     bool m_hasNonEmptyList : 1;
 #endif

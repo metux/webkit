@@ -27,7 +27,7 @@
 #define APIString_h
 
 #include "APIObject.h"
-#include <wtf/PassRefPtr.h>
+#include <wtf/Ref.h>
 #include <wtf/text/StringView.h>
 #include <wtf/text/WTFString.h>
 #include <wtf/unicode/UTF8.h>
@@ -36,17 +36,17 @@ namespace API {
 
 class String final : public ObjectImpl<Object::Type::String> {
 public:
-    static RefPtr<String> createNull()
+    static Ref<String> createNull()
     {
-        return adoptRef(new String);
+        return adoptRef(*new String);
     }
 
-    static RefPtr<String> create(WTF::String&& string)
+    static Ref<String> create(WTF::String&& string)
     {
-        return adoptRef(new String(string.isNull() ? WTF::String(StringImpl::empty()) : string.isolatedCopy()));
+        return adoptRef(*new String(string.isNull() ? WTF::String(StringImpl::empty()) : string.isolatedCopy()));
     }
 
-    static RefPtr<String> create(const WTF::String& string)
+    static Ref<String> create(const WTF::String& string)
     {
         return create(string.isolatedCopy());
     }
@@ -55,43 +55,8 @@ public:
     {
     }
 
-    bool isNull() const { return m_string.isNull(); }
-    bool isEmpty() const { return m_string.isEmpty(); }
-    
-    size_t length() const { return m_string.length(); }
-    size_t getCharacters(UChar* buffer, size_t bufferLength) const
-    {
-        unsigned unsignedBufferLength = std::min<size_t>(bufferLength, std::numeric_limits<unsigned>::max());
-        StringView substring = StringView(m_string).substring(0, unsignedBufferLength);
-        substring.getCharactersWithUpconvert(buffer);
-        return substring.length();
-    }
-
-    size_t maximumUTF8CStringSize() const { return m_string.length() * 3 + 1; }
-    size_t getUTF8CString(char* buffer, size_t bufferSize)
-    {
-        if (!bufferSize)
-            return 0;
-        char* p = buffer;
-        WTF::Unicode::ConversionResult result;
-        if (m_string.is8Bit()) {
-            const LChar* characters = m_string.characters8();
-            result = WTF::Unicode::convertLatin1ToUTF8(&characters, characters + m_string.length(), &p, p + bufferSize - 1);
-        } else {
-            const UChar* characters = m_string.characters16();
-            result = WTF::Unicode::convertUTF16ToUTF8(&characters, characters + m_string.length(), &p, p + bufferSize - 1, /* strict */ true);
-        }
-        if (result != WTF::Unicode::conversionOK && result != WTF::Unicode::targetExhausted)
-            return 0;
-        *p++ = '\0';
-        return p - buffer;
-    }
-
-    bool equal(String* other) { return m_string == other->m_string; }
-    bool equalToUTF8String(const char* other) { return m_string == WTF::String::fromUTF8(other); }
-    bool equalToUTF8StringIgnoringCase(const char* other) { return equalIgnoringCase(m_string, other); }
-
-    const WTF::String& string() const { return m_string; }
+    WTF::StringView stringView() const { return m_string; }
+    WTF::String string() const { return m_string.isolatedCopy(); }
 
 private:
     String()

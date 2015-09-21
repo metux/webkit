@@ -42,19 +42,17 @@ public:
 
     virtual ~SVGFEImageElement();
 
-protected:
-    virtual void didNotifySubtreeInsertions() override;
-
 private:
     SVGFEImageElement(const QualifiedName&, Document&);
 
-    bool isSupportedAttribute(const QualifiedName&);
+    virtual void finishedInsertingSubtree() override;
+
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
     virtual void notifyFinished(CachedResource*) override;
 
     virtual void addSubresourceAttributeURLs(ListHashSet<URL>&) const override;
-    virtual PassRefPtr<FilterEffect> build(SVGFilterBuilder*, Filter*) override;
+    virtual RefPtr<FilterEffect> build(SVGFilterBuilder*, Filter&) override;
 
     void clearResourceReferences();
     void requestImageResource();
@@ -65,8 +63,8 @@ private:
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGFEImageElement)
         DECLARE_ANIMATED_PRESERVEASPECTRATIO(PreserveAspectRatio, preserveAspectRatio)
-        DECLARE_ANIMATED_STRING(Href, href)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_STRING_OVERRIDE(Href, href)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 
     CachedResourceHandle<CachedImage> m_cachedImage;

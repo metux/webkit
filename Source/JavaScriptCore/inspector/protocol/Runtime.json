@@ -13,11 +13,13 @@
             "description": "Mirror object referencing original JavaScript object.",
             "properties": [
                 { "name": "type", "type": "string", "enum": ["object", "function", "undefined", "string", "number", "boolean", "symbol"], "description": "Object type." },
-                { "name": "subtype", "type": "string", "optional": true, "enum": ["array", "null", "node", "regexp", "date", "error", "map", "set", "weakmap"], "description": "Object subtype hint. Specified for <code>object</code> type values only." },
+                { "name": "subtype", "type": "string", "optional": true, "enum": ["array", "null", "node", "regexp", "date", "error", "map", "set", "weakmap", "weakset", "iterator", "class"], "description": "Object subtype hint. Specified for <code>object</code> <code>function</code> (for class) type values only." },
                 { "name": "className", "type": "string", "optional": true, "description": "Object class (constructor) name. Specified for <code>object</code> type values only." },
                 { "name": "value", "type": "any", "optional": true, "description": "Remote object value (in case of primitive values or JSON values if it was requested)." },
                 { "name": "description", "type": "string", "optional": true, "description": "String representation of the object." },
                 { "name": "objectId", "$ref": "RemoteObjectId", "optional": true, "description": "Unique object identifier (for non-primitive values)." },
+                { "name": "size", "type": "integer", "optional": true, "description": "Size of the array/collection. Specified for array/map/set/weakmap/weakset object type values only." },
+                { "name": "classPrototype", "$ref": "RemoteObject", "optional": true, "description": "Remote object for the class prototype. Specified for class object type values only." },
                 { "name": "preview", "$ref": "ObjectPreview", "optional": true, "description": "Preview containing abbreviated property values. Specified for <code>object</code> type values only." }
             ]
         },
@@ -27,12 +29,13 @@
             "description": "Object containing abbreviated remote object value.",
             "properties": [
                 { "name": "type", "type": "string", "enum": ["object", "function", "undefined", "string", "number", "boolean", "symbol"], "description": "Object type." },
-                { "name": "subtype", "type": "string", "optional": true, "enum": ["array", "null", "node", "regexp", "date", "error", "map", "set", "weakmap"], "description": "Object subtype hint. Specified for <code>object</code> type values only." },
+                { "name": "subtype", "type": "string", "optional": true, "enum": ["array", "null", "node", "regexp", "date", "error", "map", "set", "weakmap", "weakset", "iterator", "class"], "description": "Object subtype hint. Specified for <code>object</code> type values only." },
                 { "name": "description", "type": "string", "optional": true, "description": "String representation of the object." },
                 { "name": "lossless", "type": "boolean", "description": "Determines whether preview is lossless (contains all information of the original object)." },
                 { "name": "overflow", "type": "boolean", "optional": true, "description": "True iff some of the properties of the original did not fit." },
                 { "name": "properties", "type": "array", "items": { "$ref": "PropertyPreview" }, "optional": true, "description": "List of the properties." },
-                { "name": "entries", "type": "array", "items": { "$ref": "EntryPreview" }, "optional": true, "description": "List of the entries. Specified for <code>map</code> and <code>set</code> subtype values only." }
+                { "name": "entries", "type": "array", "items": { "$ref": "EntryPreview" }, "optional": true, "description": "List of the entries. Specified for <code>map</code> and <code>set</code> subtype values only." },
+                { "name": "size", "type": "integer", "optional": true, "description": "Size of the array/collection. Specified for array/map/set/weakmap/weakset object type values only." }
             ]
         },
         {
@@ -41,9 +44,10 @@
             "properties": [
                 { "name": "name", "type": "string", "description": "Property name." },
                 { "name": "type", "type": "string", "enum": ["object", "function", "undefined", "string", "number", "boolean", "symbol", "accessor"], "description": "Object type." },
-                { "name": "subtype", "type": "string", "optional": true, "enum": ["array", "null", "node", "regexp", "date", "error", "map", "set", "weakmap"], "description": "Object subtype hint. Specified for <code>object</code> type values only." },
+                { "name": "subtype", "type": "string", "optional": true, "enum": ["array", "null", "node", "regexp", "date", "error", "map", "set", "weakmap", "weakset", "iterator", "class"], "description": "Object subtype hint. Specified for <code>object</code> type values only." },
                 { "name": "value", "type": "string", "optional": true, "description": "User-friendly property value string." },
-                { "name": "valuePreview", "$ref": "ObjectPreview", "optional": true, "description": "Nested value preview." }
+                { "name": "valuePreview", "$ref": "ObjectPreview", "optional": true, "description": "Nested value preview." },
+                { "name": "internal", "type": "boolean", "optional": true, "description": "True if this is an internal property." }
             ]
         },
         {
@@ -67,7 +71,7 @@
             "type": "object",
             "description": "Object property descriptor.",
             "properties": [
-                { "name": "name", "type": "string", "description": "Property name." },
+                { "name": "name", "type": "string", "description": "Property name or symbol description." },
                 { "name": "value", "$ref": "RemoteObject", "optional": true, "description": "The value associated with the property." },
                 { "name": "writable", "type": "boolean", "optional": true, "description": "True if the value associated with the property may be changed (data descriptors only)." },
                 { "name": "get", "$ref": "RemoteObject", "optional": true, "description": "A function which serves as a getter for the property, or <code>undefined</code> if there is no getter (accessor descriptors only)." },
@@ -75,7 +79,9 @@
                 { "name": "configurable", "type": "boolean", "description": "True if the type of this property descriptor may be changed and if the property may be deleted from the corresponding object." },
                 { "name": "enumerable", "type": "boolean", "description": "True if this property shows up during enumeration of the properties on the corresponding object." },
                 { "name": "wasThrown", "type": "boolean", "optional": true, "description": "True if the result was thrown during the evaluation." },
-                { "name": "isOwn", "optional": true, "type": "boolean", "description": "True if the property is owned for the object." }
+                { "name": "isOwn", "optional": true, "type": "boolean", "description": "True if the property is owned for the object." },
+                { "name": "symbol", "optional": true, "$ref": "Runtime.RemoteObject", "description": "Property symbol object, if the property is a symbol." },
+                { "name": "nativeGetter", "optional": true, "type": "boolean", "description": "True if the property value came from a native getter." }
             ]
         },
         {
@@ -149,7 +155,8 @@
                 { "name": "isInteger", "type": "boolean", "description": "Indicates if this type description has been type Integer." },
                 { "name": "isNumber", "type": "boolean", "description": "Indicates if this type description has been type Number." },
                 { "name": "isString", "type": "boolean", "description": "Indicates if this type description has been type String." },
-                { "name": "isObject", "type": "boolean", "description": "Indicates if this type description has been type Object." }
+                { "name": "isObject", "type": "boolean", "description": "Indicates if this type description has been type Object." },
+                { "name": "isSymbol", "type": "boolean", "description": "Indicates if this type description has been type Symbol." }
             ]
         },
         {
@@ -207,11 +214,13 @@
                 { "name": "doNotPauseOnExceptionsAndMuteConsole", "type": "boolean", "optional": true, "description": "Specifies whether evaluation should stop on exceptions and mute console. Overrides setPauseOnException state." },
                 { "name": "contextId", "$ref": "Runtime.ExecutionContextId", "optional": true, "description": "Specifies in which isolated context to perform evaluation. Each content script lives in an isolated context and this parameter may be used to specify one of those contexts. If the parameter is omitted or 0 the evaluation will be performed in the context of the inspected page." },
                 { "name": "returnByValue", "type": "boolean", "optional": true, "description": "Whether the result is expected to be a JSON object that should be sent by value." },
-                { "name": "generatePreview", "type": "boolean", "optional": true, "description": "Whether preview should be generated for the result." }
+                { "name": "generatePreview", "type": "boolean", "optional": true, "description": "Whether preview should be generated for the result." },
+                { "name": "saveResult", "type": "boolean", "optional": true, "description": "Whether the resulting value should be considered for saving in the $n history." }
             ],
             "returns": [
                 { "name": "result", "$ref": "RemoteObject", "description": "Evaluation result." },
-                { "name": "wasThrown", "type": "boolean", "optional": true, "description": "True if the result was thrown during the evaluation." }
+                { "name": "wasThrown", "type": "boolean", "optional": true, "description": "True if the result was thrown during the evaluation." },
+                { "name": "savedResultIndex", "type": "integer", "optional": true, "description": "If the result was saved, this is the $n index that can be used to access the value." }
             ],
             "description": "Evaluates expression on global object."
         },
@@ -236,13 +245,25 @@
             "parameters": [
                 { "name": "objectId", "$ref": "RemoteObjectId", "description": "Identifier of the object to return properties for." },
                 { "name": "ownProperties", "optional": true, "type": "boolean", "description": "If true, returns properties belonging only to the object itself, not to its prototype chain." },
-                { "name": "ownAndGetterProperties", "optional": true, "type": "boolean", "description": "If true, returns properties belonging to the object itself, and getters in its prototype chain." }
+                { "name": "generatePreview", "type": "boolean", "optional": true, "description": "Whether preview should be generated for property values." }
             ],
             "returns": [
                 { "name": "result", "type": "array", "items": { "$ref": "PropertyDescriptor"}, "description": "Object properties." },
                 { "name": "internalProperties", "optional": true, "type": "array", "items": { "$ref": "InternalPropertyDescriptor"}, "description": "Internal object properties." }
             ],
             "description": "Returns properties of a given object. Object group of the result is inherited from the target object."
+        },
+        {
+            "name": "getDisplayableProperties",
+            "parameters": [
+                { "name": "objectId", "$ref": "RemoteObjectId", "description": "Identifier of the object to return properties for." },
+                { "name": "generatePreview", "type": "boolean", "optional": true, "description": "Whether preview should be generated for property values." }
+            ],
+            "returns": [
+                { "name": "properties", "type": "array", "items": { "$ref": "PropertyDescriptor"}, "description": "Object properties." },
+                { "name": "internalProperties", "optional": true, "type": "array", "items": { "$ref": "InternalPropertyDescriptor"}, "description": "Internal object properties." }
+            ],
+            "description": "Returns displayable properties of a given object. Object group of the result is inherited from the target object. Displayable properties are own properties, internal properties, and native getters in the prototype chain (assumed to be bindings and treated like own properties for the frontend)."
         },
         {
             "name": "getCollectionEntries",
@@ -256,6 +277,17 @@
             "returns": [
                 { "name": "entries", "type": "array", "items": { "$ref": "CollectionEntry" }, "description": "Array of collection entries." }
             ]
+        },
+        {
+            "name": "saveResult",
+            "parameters": [
+                { "name": "value", "$ref": "CallArgument", "description": "Id or value of the object to save." },
+                { "name": "contextId", "optional": true, "$ref": "ExecutionContextId", "description": "Unique id of the execution context. To specify in which execution context script evaluation should be performed. If not provided, determine from the CallArgument's objectId." }
+            ],
+            "returns": [
+                { "name": "savedResultIndex", "type": "integer", "optional": true, "description": "If the value was saved, this is the $n index that can be used to access the value." }
+            ],
+            "description": "Assign a saved result index to this value."
         },
         {
             "name": "releaseObject",

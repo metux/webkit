@@ -27,13 +27,7 @@
 
 #include "CSSValueKeywords.h"
 #include "FontFeatureSettings.h"
-#include "FontOrientation.h"
-#include "FontRenderingMode.h"
-#include "FontSmoothingMode.h"
-#include "FontTraitsMask.h"
-#include "FontWidthVariant.h"
-#include "NonCJKGlyphOrientation.h"
-#include "TextRenderingMode.h"
+#include "TextFlags.h"
 #include "WebKitFontFamilyNames.h"
 #include <unicode/uscript.h>
 #include <wtf/MathExtras.h>
@@ -44,59 +38,13 @@ namespace WebCore {
 
 using namespace WebKitFontFamilyNames;
 
-enum FontWeight {
-    FontWeight100,
-    FontWeight200,
-    FontWeight300,
-    FontWeight400,
-    FontWeight500,
-    FontWeight600,
-    FontWeight700,
-    FontWeight800,
-    FontWeight900,
-    FontWeightNormal = FontWeight400,
-    FontWeightBold = FontWeight700
-};
-
-enum FontItalic {
-    FontItalicOff = 0,
-    FontItalicOn = 1
-};
-
-enum FontSmallCaps {
-    FontSmallCapsOff = 0,
-    FontSmallCapsOn = 1
-};
-
 class FontDescription {
 public:
     enum Kerning { AutoKerning, NormalKerning, NoneKerning };
 
     enum LigaturesState { NormalLigaturesState, DisabledLigaturesState, EnabledLigaturesState };
 
-    FontDescription()
-        : m_families(1)
-        , m_specifiedSize(0)
-        , m_computedSize(0)
-        , m_orientation(Horizontal)
-        , m_nonCJKGlyphOrientation(NonCJKGlyphOrientationVerticalRight)
-        , m_widthVariant(RegularWidth)
-        , m_italic(FontItalicOff)
-        , m_smallCaps(FontSmallCapsOff)
-        , m_isAbsoluteSize(false)
-        , m_weight(FontWeightNormal)
-        , m_renderingMode(NormalRenderingMode)
-        , m_kerning(AutoKerning)
-        , m_commonLigaturesState(NormalLigaturesState)
-        , m_discretionaryLigaturesState(NormalLigaturesState)
-        , m_historicalLigaturesState(NormalLigaturesState)
-        , m_keywordSize(0)
-        , m_fontSmoothing(AutoSmoothing)
-        , m_textRendering(AutoTextRendering)
-        , m_isSpecifiedFont(false)
-        , m_script(USCRIPT_COMMON)
-    {
-    }
+    WEBCORE_EXPORT FontDescription();
 
     bool operator==(const FontDescription&) const;
     bool operator!=(const FontDescription& other) const { return !(*this == other); }
@@ -132,6 +80,7 @@ public:
     FontSmoothingMode fontSmoothing() const { return static_cast<FontSmoothingMode>(m_fontSmoothing); }
     TextRenderingMode textRenderingMode() const { return static_cast<TextRenderingMode>(m_textRendering); }
     UScriptCode script() const { return static_cast<UScriptCode>(m_script); }
+    const AtomicString& locale() const { return m_locale; }
 
     FontTraitsMask traitsMask() const;
     bool isSpecifiedFont() const { return m_isSpecifiedFont; }
@@ -139,6 +88,7 @@ public:
     NonCJKGlyphOrientation nonCJKGlyphOrientation() const { return static_cast<NonCJKGlyphOrientation>(m_nonCJKGlyphOrientation); }
     FontWidthVariant widthVariant() const { return static_cast<FontWidthVariant>(m_widthVariant); }
     FontFeatureSettings* featureSettings() const { return m_featureSettings.get(); }
+    FontSynthesis fontSynthesis() const { return static_cast<FontSynthesis>(m_fontSynthesis); }
 
     void setOneFamily(const AtomicString& family) { ASSERT(m_families.size() == 1); m_families[0] = family; }
     void setFamilies(const Vector<AtomicString>& families) { m_families = RefCountedArray<AtomicString>(families); }
@@ -174,9 +124,10 @@ public:
     void setIsSpecifiedFont(bool isSpecifiedFont) { m_isSpecifiedFont = isSpecifiedFont; }
     void setOrientation(FontOrientation orientation) { m_orientation = orientation; }
     void setNonCJKGlyphOrientation(NonCJKGlyphOrientation orientation) { m_nonCJKGlyphOrientation = orientation; }
-    void setWidthVariant(FontWidthVariant widthVariant) { m_widthVariant = widthVariant; }
-    void setScript(UScriptCode s) { m_script = s; }
+    void setWidthVariant(FontWidthVariant widthVariant) { m_widthVariant = widthVariant; } // Make sure new callers of this sync with FontPlatformData::isForTextCombine()!
+    void setLocale(const AtomicString&);
     void setFeatureSettings(PassRefPtr<FontFeatureSettings> settings) { m_featureSettings = settings; }
+    void setFontSynthesis(FontSynthesis fontSynthesis) { m_fontSynthesis = fontSynthesis; }
 
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     bool familiesEqualForTextAutoSizing(const FontDescription& other) const;
@@ -196,14 +147,17 @@ public:
     static Kerning initialKerning() { return AutoKerning; }
     static FontSmoothingMode initialFontSmoothing() { return AutoSmoothing; }
     static TextRenderingMode initialTextRenderingMode() { return AutoTextRendering; }
+    static FontSynthesis initialFontSynthesis() { return FontSynthesisWeight | FontSynthesisStyle; }
+    static const AtomicString& initialLocale() { return nullAtom; }
 
 private:
-    RefCountedArray<AtomicString> m_families;
+    RefCountedArray<AtomicString> m_families { 1 };
     RefPtr<FontFeatureSettings> m_featureSettings;
+    AtomicString m_locale { initialLocale() };
 
-    float m_specifiedSize;   // Specified CSS value. Independent of rendering issues such as integer
+    float m_specifiedSize { 0 };   // Specified CSS value. Independent of rendering issues such as integer
                              // rounding, minimum font sizes, and zooming.
-    float m_computedSize;    // Computed size adjusted for the minimum font size and the zoom factor.  
+    float m_computedSize { 0 };    // Computed size adjusted for the minimum font size and the zoom factor.
 
     unsigned m_orientation : 1; // FontOrientation - Whether the font is rendering on a horizontal line or a vertical line.
     unsigned m_nonCJKGlyphOrientation : 1; // NonCJKGlyphOrientation - Only used by vertical text. Determines the default orientation for non-ideograph glyphs.
@@ -231,6 +185,7 @@ private:
     unsigned m_textRendering : 2; // TextRenderingMode
     unsigned m_isSpecifiedFont : 1; // True if a web page specifies a non-generic font family as the first font family.
     unsigned m_script : 7; // Used to help choose an appropriate font for generic font families.
+    unsigned m_fontSynthesis : 2; // FontSynthesis type
 };
 
 inline bool FontDescription::operator==(const FontDescription& other) const
@@ -254,8 +209,9 @@ inline bool FontDescription::operator==(const FontDescription& other) const
         && m_orientation == other.m_orientation
         && m_nonCJKGlyphOrientation == other.m_nonCJKGlyphOrientation
         && m_widthVariant == other.m_widthVariant
-        && m_script == other.m_script
-        && m_featureSettings == other.m_featureSettings;
+        && m_locale == other.m_locale
+        && m_featureSettings == other.m_featureSettings
+        && m_fontSynthesis == other.m_fontSynthesis;
 }
 
 }

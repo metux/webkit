@@ -45,6 +45,7 @@ public:
             , minimumScale(0)
             , maximumScale(0)
             , allowsUserScaling(false)
+            , allowsShrinkToFit(false)
             , widthIsSet(false)
             , heightIsSet(false)
             , initialScaleIsSet(false)
@@ -57,6 +58,7 @@ public:
         double minimumScale;
         double maximumScale;
         bool allowsUserScaling;
+        bool allowsShrinkToFit;
 
         bool widthIsSet;
         bool heightIsSet;
@@ -77,13 +79,16 @@ public:
     const ViewportArguments& viewportArguments() const { return m_viewportArguments; }
     WEBCORE_EXPORT void setViewportArguments(const ViewportArguments&);
 
-    void setIgnoreScalingConstraints(bool ignoreScalingConstraints) {m_ignoreScalingConstraints = ignoreScalingConstraints; }
+    void setCanIgnoreScalingConstraints(bool canIgnoreScalingConstraints) { m_canIgnoreScalingConstraints = canIgnoreScalingConstraints; }
+    void setForceAlwaysUserScalable(bool forceAlwaysUserScalable) { m_forceAlwaysUserScalable = forceAlwaysUserScalable; }
 
     WEBCORE_EXPORT IntSize layoutSize() const;
     WEBCORE_EXPORT double initialScale() const;
+    WEBCORE_EXPORT double initialScaleIgnoringContentSize() const;
     WEBCORE_EXPORT double minimumScale() const;
     double maximumScale() const { return m_configuration.maximumScale; }
     WEBCORE_EXPORT bool allowsUserScaling() const;
+    bool allowsShrinkToFit() const;
 
     WEBCORE_EXPORT static Parameters webpageParameters();
     WEBCORE_EXPORT static Parameters textDocumentParameters();
@@ -95,12 +100,17 @@ public:
     WTF::CString description() const;
     void dump() const;
 #endif
-    
+
 private:
     void updateConfiguration();
     double viewportArgumentsLength(double length) const;
+    double initialScaleFromSize(double width, double height, bool shouldIgnoreScalingConstraints) const;
     int layoutWidth() const;
     int layoutHeight() const;
+
+    bool shouldIgnoreScalingConstraints() const;
+    bool shouldIgnoreVerticalScalingConstraints() const;
+    bool shouldIgnoreHorizontalScalingConstraints() const;
 
     Parameters m_configuration;
     Parameters m_defaultConfiguration;
@@ -108,7 +118,8 @@ private:
     FloatSize m_minimumLayoutSize;
     ViewportArguments m_viewportArguments;
 
-    bool m_ignoreScalingConstraints;
+    bool m_canIgnoreScalingConstraints;
+    bool m_forceAlwaysUserScalable;
 };
 
 } // namespace WebCore

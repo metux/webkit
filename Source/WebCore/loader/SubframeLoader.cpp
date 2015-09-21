@@ -125,8 +125,9 @@ bool SubframeLoader::pluginIsLoadable(HTMLPlugInImageElement& pluginElement, con
         String declaredMimeType = document()->isPluginDocument() && document()->ownerElement() ?
             document()->ownerElement()->fastGetAttribute(HTMLNames::typeAttr) :
             pluginElement.fastGetAttribute(HTMLNames::typeAttr);
-        if (!document()->contentSecurityPolicy()->allowObjectFromSource(url)
-            || !document()->contentSecurityPolicy()->allowPluginType(mimeType, declaredMimeType, url)) {
+        bool isInUserAgentShadowTree = pluginElement.isInUserAgentShadowTree();
+        if (!document()->contentSecurityPolicy()->allowObjectFromSource(url, isInUserAgentShadowTree)
+            || !document()->contentSecurityPolicy()->allowPluginType(mimeType, declaredMimeType, url, isInUserAgentShadowTree)) {
             RenderEmbeddedObject* renderer = pluginElement.renderEmbeddedObject();
             renderer->setPluginUnavailabilityReason(RenderEmbeddedObject::PluginBlockedByContentSecurityPolicy);
             return false;
@@ -144,7 +145,7 @@ bool SubframeLoader::requestPlugin(HTMLPlugInImageElement& ownerElement, const U
     // Application plug-ins are plug-ins implemented by the user agent, for example Qt plug-ins,
     // as opposed to third-party code such as Flash. The user agent decides whether or not they are
     // permitted, rather than WebKit.
-    if ((!allowPlugins(AboutToInstantiatePlugin) && !MIMETypeRegistry::isApplicationPluginMIMEType(mimeType)))
+    if ((!allowPlugins() && !MIMETypeRegistry::isApplicationPluginMIMEType(mimeType)))
         return false;
 
     if (!pluginIsLoadable(ownerElement, url, mimeType))
@@ -167,8 +168,11 @@ static String findPluginMIMETypeFromURL(Page* page, const String& url)
 
     const PluginData& pluginData = page->pluginData();
 
-    for (size_t i = 0; i < pluginData.mimes().size(); ++i) {
-        const MimeClassInfo& mimeClassInfo = pluginData.mimes()[i];
+    Vector<MimeClassInfo> mimes;
+    Vector<size_t> mimePluginIndices;
+    pluginData.getWebVisibleMimesAndPluginIndices(mimes, mimePluginIndices);
+    for (size_t i = 0; i < mimes.size(); ++i) {
+        const MimeClassInfo& mimeClassInfo = mimes[i];
         for (size_t j = 0; j < mimeClassInfo.extensions.size(); ++j) {
             if (equalIgnoringCase(extension, mimeClassInfo.extensions[j]))
                 return mimeClassInfo.type;
@@ -191,17 +195,17 @@ static void logPluginRequest(Page* page, const String& mimeType, const String& u
             return;
     }
 
-    String pluginFile = page->pluginData().pluginFileForMimeType(newMIMEType);
+    String pluginFile = page->pluginData().pluginFileForWebVisibleMimeType(newMIMEType);
     String description = !pluginFile ? newMIMEType : pluginFile;
 
     DiagnosticLoggingClient& diagnosticLoggingClient = page->mainFrame().diagnosticLoggingClient();
-    diagnosticLoggingClient.logDiagnosticMessage(success ? DiagnosticLoggingKeys::pluginLoadedKey() : DiagnosticLoggingKeys::pluginLoadingFailedKey(), description);
+    diagnosticLoggingClient.logDiagnosticMessage(success ? DiagnosticLoggingKeys::pluginLoadedKey() : DiagnosticLoggingKeys::pluginLoadingFailedKey(), description, ShouldSample::No);
 
     if (!page->hasSeenAnyPlugin())
-        diagnosticLoggingClient.logDiagnosticMessage(DiagnosticLoggingKeys::pageContainsAtLeastOnePluginKey(), emptyString());
+        diagnosticLoggingClient.logDiagnosticMessage(DiagnosticLoggingKeys::pageContainsAtLeastOnePluginKey(), emptyString(), ShouldSample::No);
 
     if (!page->hasSeenPlugin(description))
-        diagnosticLoggingClient.logDiagnosticMessage(DiagnosticLoggingKeys::pageContainsPluginKey(), description);
+        diagnosticLoggingClient.logDiagnosticMessage(DiagnosticLoggingKeys::pageContainsPluginKey(), description, ShouldSample::No);
 
     page->sawPlugin(description);
 }
@@ -250,8 +254,9 @@ PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, H
         }
 
         const char javaAppletMimeType[] = "application/x-java-applet";
-        if (!element.document().contentSecurityPolicy()->allowObjectFromSource(codeBaseURL)
-            || !element.document().contentSecurityPolicy()->allowPluginType(javaAppletMimeType, javaAppletMimeType, codeBaseURL))
+        bool isInUserAgentShadowTree = element.isInUserAgentShadowTree();
+        if (!element.document().contentSecurityPolicy()->allowObjectFromSource(codeBaseURL, isInUserAgentShadowTree)
+            || !element.document().contentSecurityPolicy()->allowPluginType(javaAppletMimeType, javaAppletMimeType, codeBaseURL, isInUserAgentShadowTree))
             return nullptr;
     }
 
@@ -260,7 +265,7 @@ PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, H
     URL baseURL = completeURL(baseURLString);
 
     RefPtr<Widget> widget;
-    if (allowPlugins(AboutToInstantiatePlugin))
+    if (allowPlugins())
         widget = m_frame.loader().client().createJavaAppletWidget(size, &element, baseURL, paramNames, paramValues);
 
     logPluginRequest(document()->page(), element.serviceType(), String(), widget);
@@ -281,7 +286,7 @@ Frame* SubframeLoader::loadOrRedirectSubframe(HTMLFrameOwnerElement& ownerElemen
 {
     Frame* frame = ownerElement.contentFrame();
     if (frame)
-        frame->navigationScheduler().scheduleLocationChange(m_frame.document()->securityOrigin(), url, m_frame.loader().outgoingReferrer(), lockHistory, lockBackForwardList);
+        frame->navigationScheduler().scheduleLocationChange(m_frame.document(), m_frame.document()->securityOrigin(), url, m_frame.loader().outgoingReferrer(), lockHistory, lockBackForwardList);
     else
         frame = loadSubframe(ownerElement, url, frameName, m_frame.loader().outgoingReferrer());
 
@@ -315,7 +320,13 @@ Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement& ownerElement, const U
         return nullptr;
 
     String referrerToUse = SecurityPolicy::generateReferrerHeader(ownerElement.document().referrerPolicy(), url, referrer);
+
+    // Prevent initial empty document load from triggering load events.
+    m_frame.document()->incrementLoadEventDelayCount();
+
     RefPtr<Frame> frame = m_frame.loader().client().createFrame(url, name, &ownerElement, referrerToUse, allowsScrolling, marginWidth, marginHeight);
+
+    m_frame.document()->decrementLoadEventDelayCount();
 
     if (!frame)  {
         m_frame.loader().checkCallImplicitClose();
@@ -352,7 +363,7 @@ Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement& ownerElement, const U
     return frame.get();
 }
 
-bool SubframeLoader::allowPlugins(ReasonForCallingAllowPlugins)
+bool SubframeLoader::allowPlugins()
 {
     return m_frame.settings().arePluginsEnabled();
 }
@@ -367,7 +378,7 @@ bool SubframeLoader::shouldUsePlugin(const URL& url, const String& mimeType, boo
     // Allow other plug-ins to win over QuickTime because if the user has installed a plug-in that
     // can handle TIFF (which QuickTime can also handle) they probably intended to override QT.
     if (m_frame.page() && (mimeType == "image/tiff" || mimeType == "image/tif" || mimeType == "image/x-tiff")) {
-        String pluginName = m_frame.page()->pluginData().pluginNameForMimeType(mimeType);
+        String pluginName = m_frame.page()->pluginData().pluginNameForWebVisibleMimeType(mimeType);
         if (!pluginName.isEmpty() && !pluginName.contains("QuickTime", false)) 
             return true;
     }

@@ -58,6 +58,7 @@ void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << canRunBeforeUnloadConfirmPanel;
     encoder << canRunModal;
     encoder << deviceScaleFactor;
+    encoder << viewScaleFactor;
     encoder << topContentInset;
     encoder << mediaVolume;
     encoder << muted;
@@ -65,6 +66,7 @@ void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << minimumLayoutSize;
     encoder << autoSizingShouldExpandToViewHeight;
     encoder.encodeEnum(scrollPinningBehavior);
+    encoder << scrollbarOverlayStyle;
     encoder << backgroundExtendsBeyondPage;
     encoder.encodeEnum(layerHostingMode);
     encoder << mimeTypesWithCustomContentProviders;
@@ -81,6 +83,8 @@ void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << textAutosizingWidth;
 #endif
     encoder << appleMailPaginationQuirkEnabled;
+    encoder << shouldScaleViewToFitDocument;
+    encoder << userContentExtensionsEnabled;
 }
 
 bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCreationParameters& parameters)
@@ -135,6 +139,8 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
         return false;
     if (!decoder.decode(parameters.deviceScaleFactor))
         return false;
+    if (!decoder.decode(parameters.viewScaleFactor))
+        return false;
     if (!decoder.decode(parameters.topContentInset))
         return false;
     if (!decoder.decode(parameters.mediaVolume))
@@ -148,6 +154,8 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
     if (!decoder.decode(parameters.autoSizingShouldExpandToViewHeight))
         return false;
     if (!decoder.decodeEnum(parameters.scrollPinningBehavior))
+        return false;
+    if (!decoder.decode(parameters.scrollbarOverlayStyle))
         return false;
     if (!decoder.decode(parameters.backgroundExtendsBeyondPage))
         return false;
@@ -176,6 +184,12 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
 #endif
 
     if (!decoder.decode(parameters.appleMailPaginationQuirkEnabled))
+        return false;
+
+    if (!decoder.decode(parameters.shouldScaleViewToFitDocument))
+        return false;
+
+    if (!decoder.decode(parameters.userContentExtensionsEnabled))
         return false;
 
     return true;

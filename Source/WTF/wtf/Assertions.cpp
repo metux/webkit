@@ -50,7 +50,7 @@
 #if USE(CF)
 #include <CoreFoundation/CFString.h>
 #if PLATFORM(COCOA)
-#define WTF_USE_APPLE_SYSTEM_LOG 1
+#define USE_APPLE_SYSTEM_LOG 1
 #include <asl.h>
 #endif
 #endif // USE(CF)
@@ -140,7 +140,7 @@ static void vprintf_stderr_common(const char* format, va_list args)
     vfprintf(stderr, format, args);
 }
 
-#if COMPILER(CLANG) || COMPILER(GCC)
+#if COMPILER(GCC_OR_CLANG)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #endif
@@ -173,7 +173,7 @@ static void vprintf_stderr_with_trailing_newline(const char* format, va_list arg
     vprintf_stderr_common(formatWithNewline.get(), args);
 }
 
-#if COMPILER(CLANG) || COMPILER(GCC)
+#if COMPILER(GCC_OR_CLANG)
 #pragma GCC diagnostic pop
 #endif
 
@@ -262,10 +262,10 @@ void WTFReportBacktrace()
 #if OS(DARWIN) || OS(LINUX)
 #  if PLATFORM(GTK)
 #    if defined(__GLIBC__) && !defined(__UCLIBC__)
-#      define WTF_USE_BACKTRACE_SYMBOLS 1
+#      define USE_BACKTRACE_SYMBOLS 1
 #    endif
 #  else
-#    define WTF_USE_DLADDR 1
+#    define USE_DLADDR 1
 #  endif
 #endif
 
@@ -302,8 +302,8 @@ void WTFPrintBacktrace(void** stack, int size)
 #endif
 }
 
-#undef WTF_USE_BACKTRACE_SYMBOLS
-#undef WTF_USE_DLADDR
+#undef USE_BACKTRACE_SYMBOLS
+#undef USE_DLADDR
 
 static WTFCrashHookFunction globalHook = 0;
 
@@ -320,7 +320,7 @@ void WTFCrash()
     WTFReportBacktrace();
     *(int *)(uintptr_t)0xbbadbeef = 0;
     // More reliable, but doesn't say BBADBEEF.
-#if COMPILER(CLANG) || COMPILER(GCC)
+#if COMPILER(GCC_OR_CLANG)
     __builtin_trap();
 #else
     ((void(*)())0)();
@@ -334,7 +334,7 @@ void WTFCrashWithSecurityImplication()
     WTFReportBacktrace();
     *(int *)(uintptr_t)0xfbadbeef = 0;
     // More reliable, but doesn't say fbadbeef.
-#if COMPILER(CLANG) || COMPILER(GCC)
+#if COMPILER(GCC_OR_CLANG)
     __builtin_trap();
 #else
     ((void(*)())0)();

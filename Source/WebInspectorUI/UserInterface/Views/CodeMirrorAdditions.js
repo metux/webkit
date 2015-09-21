@@ -182,7 +182,7 @@
 
     function extendedCSSToken(stream, state)
     {
-        const hexColorRegex = /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g;
+        var hexColorRegex = /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g;
 
         if (state._urlTokenize) {
             // Call the link tokenizer instead.
@@ -465,17 +465,17 @@
 
             var startChar = line === range.start.line ? range.start.ch : (lineContent.length - lineContent.trimLeft().length);
             var endChar = line === range.end.line ? range.end.ch : lineContent.length;
-            var firstCharCoords = this.cursorCoords({ch: startChar, line: line});
-            var endCharCoords = this.cursorCoords({ch: endChar, line: line});
+            var firstCharCoords = this.cursorCoords({ch: startChar, line});
+            var endCharCoords = this.cursorCoords({ch: endChar, line});
 
             // Handle line wrapping.
             if (firstCharCoords.bottom !== endCharCoords.bottom) {
                 var maxY = -Number.MAX_VALUE;
                 for (var ch = startChar; ch <= endChar; ++ch) {
-                    var coords = this.cursorCoords({ch: ch, line: line});
+                    var coords = this.cursorCoords({ch, line});
                     if (coords.bottom > maxY) {
                         if (ch > startChar) {
-                            var maxX = Math.ceil(this.cursorCoords({ch: ch - 1, line: line}).right);
+                            var maxX = Math.ceil(this.cursorCoords({ch: ch - 1, line}).right);
                             lineRects.push(new WebInspector.Rect(minX, minY, maxX - minX, maxY - minY));
                         }
                         var minX = Math.floor(coords.left);
@@ -494,140 +494,6 @@
             }
         }
         return lineRects;
-    });
-
-    CodeMirror.defineExtension("createColorMarkers", function(range, callback) {
-        var createdMarkers = [];
-
-        var start = range instanceof WebInspector.TextRange ? range.startLine : 0;
-        var end = range instanceof WebInspector.TextRange ? range.endLine + 1 : this.lineCount();
-
-        // Matches rgba(0, 0, 0, 0.5), rgb(0, 0, 0), hsl(), hsla(), #fff, #ffffff, white
-        const colorRegex = /((?:rgb|hsl)a?\([^)]+\)|#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}|\b\w+\b(?![-.]))/g;
-
-        for (var lineNumber = start; lineNumber < end; ++lineNumber) {
-            var lineContent = this.getLine(lineNumber);
-            var match = colorRegex.exec(lineContent);
-            while (match) {
-
-                // Act as a negative look-behind and disallow the color from being prefixing with certain characters.
-                if (match.index > 0 && /[-.]/.test(lineContent[match.index - 1])) {
-                    match = colorRegex.exec(lineContent);
-                    continue;
-                }
-
-                var from = {line: lineNumber, ch: match.index};
-                var to = {line: lineNumber, ch: match.index + match[0].length};
-
-                var foundColorMarker = false;
-                var markers = this.findMarksAt(to);
-                for (var j = 0; j < markers.length; ++j) {
-                    if (WebInspector.TextMarker.textMarkerForCodeMirrorTextMarker(markers[j]).type === WebInspector.TextMarker.Type.Color) {
-                        foundColorMarker = true;
-                        break;
-                    }
-                }
-
-                if (foundColorMarker) {
-                    match = colorRegex.exec(lineContent);
-                    continue;
-                }
-
-                // We're not interested in text within a CSS selector.
-                var tokenType = this.getTokenTypeAt(from);
-                if (tokenType && (tokenType.indexOf("builtin") !== -1 || tokenType.indexOf("tag") !== -1)) {
-                    match = colorRegex.exec(lineContent);
-                    continue;
-                }
-
-                var colorString = match[0];
-                var color = WebInspector.Color.fromString(colorString);
-                if (!color) {
-                    match = colorRegex.exec(lineContent);
-                    continue;
-                }
-
-                var marker = this.markText(from, to);
-                marker = new WebInspector.TextMarker(marker, WebInspector.TextMarker.Type.Color);
-
-                createdMarkers.push(marker);
-
-                if (callback)
-                    callback(marker, color, colorString);
-
-                match = colorRegex.exec(lineContent);
-            }
-        }
-
-        return createdMarkers;
-    });
-
-    CodeMirror.defineExtension("createGradientMarkers", function(range, callback) {
-        var createdMarkers = [];
-
-        var start = range instanceof WebInspector.TextRange ? range.startLine : 0;
-        var end = range instanceof WebInspector.TextRange ? range.endLine + 1 : this.lineCount();
-
-        const gradientRegex = /(repeating-)?(linear|radial)-gradient\s*\(\s*/g;
-
-        for (var lineNumber = start; lineNumber < end; ++lineNumber) {
-            var lineContent = this.getLine(lineNumber);
-            var match = gradientRegex.exec(lineContent);
-            while (match) {
-                var startLine = lineNumber;
-                var startChar = match.index;
-                var endChar = match.index + match[0].length;
-
-                var openParentheses = 0;
-                var c = null;
-                while (c = lineContent[endChar]) {
-                    if (c === "(")
-                        openParentheses++;
-                    if (c === ")")
-                        openParentheses--;
-
-                    if (openParentheses === -1) {
-                        endChar++;
-                        break;
-                    }
-
-                    endChar++;
-                    if (endChar >= lineContent.length) {
-                        lineNumber++;
-                        endChar = 0;
-                        lineContent = this.getLine(lineNumber);
-                        if (!lineContent)
-                            break;
-                    }
-                }
-
-                if (openParentheses !== -1) {
-                    match = gradientRegex.exec(lineContent);
-                    continue;
-                }
-
-                var from = {line: startLine, ch: startChar};
-                var to = {line: lineNumber, ch: endChar};
-
-                var gradientString = this.getRange(from, to);
-                var gradient = WebInspector.Gradient.fromString(gradientString);
-                if (!gradient) {
-                    match = gradientRegex.exec(lineContent);
-                    continue;
-                }
-
-                var marker = new WebInspector.TextMarker(this.markText(from, to), WebInspector.TextMarker.Type.Gradient);
-
-                createdMarkers.push(marker);
-
-                if (callback)
-                    callback(marker, gradient, gradientString);
-
-                match = gradientRegex.exec(lineContent);
-            }
-        }
-
-        return createdMarkers;
     });
 
     function ignoreKey(codeMirror)
@@ -653,23 +519,23 @@
 
     // Register some extra MIME-types for CodeMirror. These are in addition to the
     // ones CodeMirror already registers, like text/html, text/javascript, etc.
-    const extraXMLTypes = ["text/xml", "text/xsl"];
+    var extraXMLTypes = ["text/xml", "text/xsl"];
     extraXMLTypes.forEach(function(type) {
         CodeMirror.defineMIME(type, "xml");
     });
 
-    const extraHTMLTypes = ["application/xhtml+xml", "image/svg+xml"];
+    var extraHTMLTypes = ["application/xhtml+xml", "image/svg+xml"];
     extraHTMLTypes.forEach(function(type) {
         CodeMirror.defineMIME(type, "htmlmixed");
     });
 
-    const extraJavaScriptTypes = ["text/ecmascript", "application/javascript", "application/ecmascript", "application/x-javascript",
+    var extraJavaScriptTypes = ["text/ecmascript", "application/javascript", "application/ecmascript", "application/x-javascript",
         "text/x-javascript", "text/javascript1.1", "text/javascript1.2", "text/javascript1.3", "text/jscript", "text/livescript"];
     extraJavaScriptTypes.forEach(function(type) {
         CodeMirror.defineMIME(type, "javascript");
     });
 
-    const extraJSONTypes = ["application/x-json", "text/x-json"];
+    var extraJSONTypes = ["application/x-json", "text/x-json"];
     extraJSONTypes.forEach(function(type) {
         CodeMirror.defineMIME(type, {name: "javascript", json: true});
     });

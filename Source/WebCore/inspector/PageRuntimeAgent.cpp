@@ -44,6 +44,7 @@
 #include "SecurityOrigin.h"
 #include <inspector/InjectedScript.h>
 #include <inspector/InjectedScriptManager.h>
+#include <profiler/Profile.h>
 
 using Inspector::Protocol::Runtime::ExecutionContextDescription;
 
@@ -68,7 +69,7 @@ void PageRuntimeAgent::didCreateFrontendAndBackend(Inspector::FrontendChannel* f
 void PageRuntimeAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReason reason)
 {
     m_frontendDispatcher = nullptr;
-    m_backendDispatcher.clear();
+    m_backendDispatcher = nullptr;
 
     String unused;
     disable(unused);
@@ -164,8 +165,13 @@ void PageRuntimeAgent::reportExecutionContextCreation()
 void PageRuntimeAgent::notifyContextCreated(const String& frameId, JSC::ExecState* scriptState, SecurityOrigin* securityOrigin, bool isPageContext)
 {
     ASSERT(securityOrigin || isPageContext);
+
+    InjectedScript result = injectedScriptManager()->injectedScriptFor(scriptState);
+    if (result.hasNoValue())
+        return;
+
     int executionContextId = injectedScriptManager()->injectedScriptIdFor(scriptState);
-    String name = securityOrigin ? securityOrigin->toRawString() : "";
+    String name = securityOrigin ? securityOrigin->toRawString() : String();
     m_frontendDispatcher->executionContextCreated(ExecutionContextDescription::create()
         .setId(executionContextId)
         .setIsPageContext(isPageContext)

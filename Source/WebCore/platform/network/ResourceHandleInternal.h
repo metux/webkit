@@ -28,6 +28,7 @@
 
 #include "NetworkingContext.h"
 #include "ResourceHandle.h"
+#include "ResourceHandleClient.h"
 #include "ResourceRequest.h"
 #include "AuthenticationChallenge.h"
 #include "Timer.h"
@@ -51,8 +52,8 @@
 #if USE(SOUP)
 #include "GUniquePtrSoup.h"
 #include <libsoup/soup.h>
-#include <wtf/gobject/GMainLoopSource.h>
-#include <wtf/gobject/GRefPtr.h>
+#include <wtf/glib/GMainLoopSource.h>
+#include <wtf/glib/GRefPtr.h>
 #endif
 
 #if PLATFORM(COCOA)
@@ -70,8 +71,6 @@ typedef const struct __CFURLStorageSession* CFURLStorageSessionRef;
 
 namespace WebCore {
 
-    class ResourceHandleClient;
-
     class ResourceHandleInternal {
         WTF_MAKE_NONCOPYABLE(ResourceHandleInternal); WTF_MAKE_FAST_ALLOCATED;
     public:
@@ -83,17 +82,12 @@ namespace WebCore {
             , status(0)
             , m_defersLoading(defersLoading)
             , m_shouldContentSniff(shouldContentSniff)
+            , m_usesAsyncCallbacks(client && client->usesAsyncCallbacks())
 #if USE(CFNETWORK)
             , m_currentRequest(request)
 #endif
 #if USE(CURL)
-            , m_handle(0)
-            , m_url(0)
-            , m_customHeaders(0)
-            , m_cancelled(false)
-            , m_authFailureCount(0)
             , m_formDataStream(loader)
-            , m_sslErrors(0)
 #endif
 #if USE(SOUP)
             , m_cancelled(false)
@@ -135,6 +129,7 @@ namespace WebCore {
 
         bool m_defersLoading;
         bool m_shouldContentSniff;
+        bool m_usesAsyncCallbacks;
 #if USE(CFNETWORK)
         RetainPtr<CFURLConnectionRef> m_connection;
         ResourceRequest m_currentRequest;
@@ -151,18 +146,19 @@ namespace WebCore {
         RetainPtr<CFURLStorageSessionRef> m_storageSession;
 #endif
 #if USE(CURL)
-        CURL* m_handle;
-        char* m_url;
-        struct curl_slist* m_customHeaders;
+        CURL* m_handle { nullptr };
+        char* m_url { nullptr };
+        struct curl_slist* m_customHeaders { nullptr };
         ResourceResponse m_response;
-        bool m_cancelled;
-        unsigned short m_authFailureCount;
+        bool m_cancelled { false };
+        unsigned short m_authFailureCount { 0 };
 
         FormDataStream m_formDataStream;
-        unsigned m_sslErrors;
+        unsigned m_sslErrors { 0 };
         Vector<char> m_postBytes;
 
-        OwnPtr<MultipartHandle> m_multipartHandle;
+        std::unique_ptr<MultipartHandle> m_multipartHandle;
+        bool m_addedCacheValidationHeaders { false };
 #endif
 #if USE(SOUP)
         GRefPtr<SoupMessage> m_soupMessage;

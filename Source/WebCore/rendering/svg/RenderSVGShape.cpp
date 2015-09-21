@@ -271,7 +271,7 @@ void RenderSVGShape::strokeShape(GraphicsContext* context)
 
 void RenderSVGShape::fillStrokeMarkers(PaintInfo& childPaintInfo)
 {
-    Vector<PaintType> paintOrder = style().svgStyle().paintTypesForPaintOrder();
+    auto paintOrder = style().svgStyle().paintTypesForPaintOrder();
     for (unsigned i = 0; i < paintOrder.size(); ++i) {
         switch (paintOrder.at(i)) {
         case PaintTypeFill:
@@ -476,7 +476,9 @@ void RenderSVGShape::processMarkerPositions()
     ASSERT(m_path);
 
     SVGMarkerData markerData(m_markerPositions);
-    m_path->apply(&markerData, SVGMarkerData::updateFromPathElement);
+    m_path->apply([&markerData](const PathElement& pathElement) {
+        SVGMarkerData::updateFromPathElement(markerData, pathElement);
+    });
     markerData.pathIsDone();
 }
 

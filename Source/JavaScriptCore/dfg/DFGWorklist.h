@@ -30,10 +30,11 @@
 
 #include "DFGPlan.h"
 #include "DFGThreadData.h"
+#include <wtf/Condition.h>
 #include <wtf/Deque.h>
 #include <wtf/HashMap.h>
+#include <wtf/Lock.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/ThreadingPrimitives.h>
 
 namespace JSC {
 
@@ -48,7 +49,7 @@ public:
 
     ~Worklist();
     
-    static PassRefPtr<Worklist> create(CString worklistName, unsigned numberOfThreads, int relativePriority = 0);
+    static Ref<Worklist> create(CString worklistName, unsigned numberOfThreads, int relativePriority = 0);
     
     void enqueue(PassRefPtr<Plan>);
     
@@ -85,7 +86,7 @@ private:
     
     void removeAllReadyPlansForVM(VM&, Vector<RefPtr<Plan>, 8>&);
 
-    void dump(const MutexLocker&, PrintStream&) const;
+    void dump(const LockHolder&, PrintStream&) const;
     
     CString m_threadName;
     
@@ -103,11 +104,11 @@ private:
     // be completed.
     Vector<RefPtr<Plan>, 16> m_readyPlans;
 
-    Mutex m_suspensionLock;
+    Lock m_suspensionLock;
     
-    mutable Mutex m_lock;
-    ThreadCondition m_planEnqueued;
-    ThreadCondition m_planCompiled;
+    mutable Lock m_lock;
+    Condition m_planEnqueued;
+    Condition m_planCompiled;
     
     Vector<std::unique_ptr<ThreadData>> m_threads;
     unsigned m_numberOfActiveThreads;

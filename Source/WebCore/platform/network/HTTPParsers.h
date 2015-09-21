@@ -33,6 +33,7 @@
 
 #include "ContentSecurityPolicy.h"
 #include <wtf/Forward.h>
+#include <wtf/Optional.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -64,7 +65,7 @@ ContentDispositionType contentDispositionType(const String&);
 bool isValidHTTPHeaderValue(const String&);
 bool isValidHTTPToken(const String&);
 bool parseHTTPRefresh(const String& refresh, bool fromHttpEquivMeta, double& delay, String& url);
-double parseDate(const String&);
+Optional<std::chrono::system_clock::time_point> parseHTTPDate(const String&);
 String filenameFromHTTPContentDisposition(const String&); 
 String extractMIMETypeFromMediaType(const String&);
 String extractCharsetFromMediaType(const String&); 
@@ -85,6 +86,17 @@ enum HTTPVersion { Unknown, HTTP_1_0, HTTP_1_1 };
 size_t parseHTTPRequestLine(const char* data, size_t length, String& failureReason, String& method, String& url, HTTPVersion&);
 size_t parseHTTPHeader(const char* data, size_t length, String& failureReason, String& nameStr, String& valueStr, bool strict = true);
 size_t parseHTTPRequestBody(const char* data, size_t length, Vector<unsigned char>& body);
+
+inline bool isHTTPSpace(UChar character)
+{
+    return character <= ' ' && (character == ' ' || character == '\n' || character == '\t' || character == '\r');
+}
+
+// Strip leading and trailing whitespace as defined in https://fetch.spec.whatwg.org/#concept-header-value-normalize.
+inline String stripLeadingAndTrailingHTTPSpaces(const String& string)
+{
+    return string.stripWhiteSpace(isHTTPSpace);
+}
 
 }
 

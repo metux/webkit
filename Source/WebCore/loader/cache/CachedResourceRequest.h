@@ -26,6 +26,7 @@
 #ifndef CachedResourceRequest_h
 #define CachedResourceRequest_h
 
+#include "DocumentLoader.h"
 #include "Element.h"
 #include "ResourceLoadPriority.h"
 #include "ResourceLoaderOptions.h"
@@ -52,26 +53,27 @@ public:
     const ResourceLoaderOptions& options() const { return m_options; }
     void setOptions(const ResourceLoaderOptions& options) { m_options = options; }
     const Optional<ResourceLoadPriority>& priority() const { return m_priority; }
-    const Optional<String>& acceptOverride() const { return m_acceptOverride; }
     bool forPreload() const { return m_forPreload; }
     void setForPreload(bool forPreload) { m_forPreload = forPreload; }
     DeferOption defer() const { return m_defer; }
     void setDefer(DeferOption defer) { m_defer = defer; }
     void setInitiator(PassRefPtr<Element>);
     void setInitiator(const AtomicString& name);
-    void setAcceptOverride(const String& accept) { m_acceptOverride = accept; }
     const AtomicString& initiatorName() const;
+
+    void setInitiator(DocumentLoader&);
+    DocumentLoader* initiatingDocumentLoader() const { return m_initiatingDocumentLoader.get(); }
 
 private:
     ResourceRequest m_resourceRequest;
     String m_charset;
     ResourceLoaderOptions m_options;
     Optional<ResourceLoadPriority> m_priority;
-    Optional<String> m_acceptOverride;
     bool m_forPreload;
     DeferOption m_defer;
     RefPtr<Element> m_initiatorElement;
     AtomicString m_initiatorName;
+    RefPtr<DocumentLoader> m_initiatingDocumentLoader;
 };
 
 } // namespace WebCore

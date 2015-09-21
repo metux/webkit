@@ -30,7 +30,6 @@
 #include "config.h"
 #include "StyleResolver.h"
 
-#include "Attribute.h"
 #include "CSSBorderImage.h"
 #include "CSSCalculationValue.h"
 #include "CSSCursorImageValue.h"
@@ -134,7 +133,6 @@
 #include "VisitedLinkState.h"
 #include "WebKitCSSFilterValue.h"
 #include "WebKitCSSRegionRule.h"
-#include "WebKitCSSResourceValue.h"
 #include "WebKitCSSTransformValue.h"
 #include "WebKitFontFamilyNames.h"
 #include "XMLNames.h"
@@ -169,7 +167,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static const CSSPropertyID lastHighPriorityProperty = CSSPropertyZoom;
+static const CSSPropertyID lastHighPriorityProperty = CSSPropertyFontSynthesis;
 static const CSSPropertyID firstLowPriorityProperty = static_cast<CSSPropertyID>(lastHighPriorityProperty + 1);
 
 class StyleResolver::CascadedProperties {
@@ -240,7 +238,6 @@ inline void StyleResolver::State::clear()
     m_regionForStyling = nullptr;
     m_pendingImageProperties.clear();
     m_filtersWithPendingSVGDocuments.clear();
-    m_maskImagesWithPendingSVGDocuments.clear();
     m_cssToLengthConversionData = CSSToLengthConversionData();
 }
 
@@ -323,9 +320,8 @@ StyleResolver::StyleResolver(Document& document, bool matchAuthorAndUserStyles)
 #if ENABLE(SVG_FONTS)
     if (m_document.svgExtensions()) {
         const HashSet<SVGFontFaceElement*>& svgFontFaceElements = m_document.svgExtensions()->svgFontFaceElements();
-        HashSet<SVGFontFaceElement*>::const_iterator end = svgFontFaceElements.end();
-        for (HashSet<SVGFontFaceElement*>::const_iterator it = svgFontFaceElements.begin(); it != end; ++it)
-            m_document.fontSelector().addFontFaceRule((*it)->fontFaceRule());
+        for (auto* svgFontFaceElement : svgFontFaceElements)
+            m_document.fontSelector().addFontFaceRule(svgFontFaceElement->fontFaceRule(), svgFontFaceElement->isInUserAgentShadowTree());
     }
 #endif
 
@@ -447,7 +443,7 @@ inline void StyleResolver::State::initForStyleResolve(Document& document, Elemen
     } else
         m_parentStyle = parentStyle;
 
-    Node* docElement = e ? e->document().documentElement() : 0;
+    Node* docElement = e ? e->document().documentElement() : nullptr;
     RenderStyle* docStyle = document.renderStyle();
     m_rootElementStyle = docElement && e != docElement ? docElement->renderStyle() : docStyle;
 
@@ -507,14 +503,14 @@ Node* StyleResolver::locateCousinList(Element* parent, unsigned& visitedNodeCoun
                 return currentNode->lastChild();
             }
             if (subcount >= cStyleSearchThreshold)
-                return 0;
+                return nullptr;
             currentNode = currentNode->previousSibling();
         }
         currentNode = locateCousinList(thisCousin->parentElement(), visitedNodeCount);
         thisCousin = currentNode;
     }
 
-    return 0;
+    return nullptr;
 }
 
 bool StyleResolver::styleSharingCandidateMatchesRuleSet(RuleSet* ruleSet)
@@ -535,7 +531,7 @@ bool StyleResolver::canShareStyleWithControl(StyledElement* element) const
     if (!thisInputElement || !otherInputElement)
         return false;
 
-    if (thisInputElement->isAutofilled() != otherInputElement->isAutofilled())
+    if (thisInputElement->isAutoFilled() != otherInputElement->isAutoFilled())
         return false;
     if (thisInputElement->shouldAppearChecked() != otherInputElement->shouldAppearChecked())
         return false;
@@ -736,7 +732,7 @@ RenderStyle* StyleResolver::locateSharedStyle()
     // Check previous siblings and their cousins.
     unsigned count = 0;
     unsigned visitedNodeCount = 0;
-    StyledElement* shareElement = 0;
+    StyledElement* shareElement = nullptr;
     Node* cousinList = state.styledElement()->previousSibling();
     while (cousinList) {
         shareElement = findSiblingForStyleSharing(cousinList, count);
@@ -869,14 +865,13 @@ Ref<RenderStyle> StyleResolver::styleForKeyframe(const RenderStyle* elementStyle
 
     applyCascadedProperties(cascade, firstCSSProperty, lastHighPriorityProperty);
 
-    // If our font got dirtied, go ahead and update it now.
+    // If our font got dirtied, update it now.
     updateFont();
 
     // Now do rest of the properties.
     applyCascadedProperties(cascade, firstLowPriorityProperty, lastCSSProperty);
 
-    // If our font got dirtied by one of the non-essential font props,
-    // go ahead and update it a second time.
+    // If our font got dirtied by one of the non-essential font props, update it a second time.
     updateFont();
 
     cascade.applyDeferredProperties(*this);
@@ -922,7 +917,7 @@ void StyleResolver::keyframeStylesForAnimation(Element* e, const RenderStyle* el
 
         const StyleKeyframe* keyframe = keyframes[i].get();
 
-        KeyframeValue keyframeValue(0, 0);
+        KeyframeValue keyframeValue(0, nullptr);
         keyframeValue.setStyle(styleForKeyframe(elementStyle, keyframe, keyframeValue));
 
         // Add this keyframe style to all the indicated key times
@@ -937,10 +932,10 @@ void StyleResolver::keyframeStylesForAnimation(Element* e, const RenderStyle* el
     if (initialListSize > 0 && list[0].key()) {
         static StyleKeyframe* zeroPercentKeyframe;
         if (!zeroPercentKeyframe) {
-            zeroPercentKeyframe = StyleKeyframe::create(MutableStyleProperties::create()).leakRef();
+            zeroPercentKeyframe = &StyleKeyframe::create(MutableStyleProperties::create()).leakRef();
             zeroPercentKeyframe->setKeyText("0%");
         }
-        KeyframeValue keyframeValue(0, 0);
+        KeyframeValue keyframeValue(0, nullptr);
         keyframeValue.setStyle(styleForKeyframe(elementStyle, zeroPercentKeyframe, keyframeValue));
         list.insert(keyframeValue);
     }
@@ -949,10 +944,10 @@ void StyleResolver::keyframeStylesForAnimation(Element* e, const RenderStyle* el
     if (initialListSize > 0 && (list[list.size() - 1].key() != 1)) {
         static StyleKeyframe* hundredPercentKeyframe;
         if (!hundredPercentKeyframe) {
-            hundredPercentKeyframe = StyleKeyframe::create(MutableStyleProperties::create()).leakRef();
+            hundredPercentKeyframe = &StyleKeyframe::create(MutableStyleProperties::create()).leakRef();
             hundredPercentKeyframe->setKeyText("100%");
         }
-        KeyframeValue keyframeValue(1, 0);
+        KeyframeValue keyframeValue(1, nullptr);
         keyframeValue.setStyle(styleForKeyframe(elementStyle, hundredPercentKeyframe, keyframeValue));
         list.insert(keyframeValue);
     }
@@ -962,7 +957,7 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* element, c
 {
     ASSERT(parentStyle);
     if (!element)
-        return 0;
+        return nullptr;
 
     State& state = m_state;
 
@@ -993,14 +988,14 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* element, c
     }
 
     if (collector.matchedResult().matchedProperties().isEmpty())
-        return 0;
+        return nullptr;
 
     state.style()->setStyleType(pseudoStyleRequest.pseudoId);
 
     applyMatchedProperties(collector.matchedResult(), element);
 
     // Clean up our style object's display and text decorations (among other fixups).
-    adjustRenderStyle(*state.style(), *m_state.parentStyle(), 0);
+    adjustRenderStyle(*state.style(), *m_state.parentStyle(), nullptr);
 
     if (state.style()->hasViewportUnits())
         document().setHasStyleWithViewportUnits();
@@ -1035,7 +1030,7 @@ Ref<RenderStyle> StyleResolver::styleForPage(int pageIndex)
 
     applyCascadedProperties(cascade, firstCSSProperty, lastHighPriorityProperty);
 
-    // If our font got dirtied, go ahead and update it now.
+    // If our font got dirtied, update it now.
     updateFont();
 
     applyCascadedProperties(cascade, firstLowPriorityProperty, lastCSSProperty);
@@ -1144,26 +1139,6 @@ static bool doesNotInheritTextDecoration(const RenderStyle& style, Element* e)
         || style.isFloating() || style.hasOutOfFlowPosition();
 }
 
-static bool isDisplayFlexibleBox(EDisplay display)
-{
-    return display == FLEX || display == INLINE_FLEX;
-}
-
-static inline bool isDisplayGridBox(EDisplay display)
-{
-#if ENABLE(CSS_GRID_LAYOUT)
-    return display == GRID || display == INLINE_GRID;
-#else
-    UNUSED_PARAM(display);
-    return false;
-#endif
-}
-
-static bool isDisplayFlexibleOrGridBox(EDisplay display)
-{
-    return isDisplayFlexibleBox(display) || isDisplayGridBox(display);
-}
-
 #if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
 static bool isScrollableOverflow(EOverflow overflow)
 {
@@ -1179,60 +1154,6 @@ void StyleResolver::adjustStyleForInterCharacterRuby()
     style->setTextAlign(CENTER);
     if (style->isHorizontalWritingMode())
         style->setWritingMode(LeftToRightWritingMode);
-}
-
-void StyleResolver::adjustStyleForMaskImages()
-{
-    // If we already have the same mask image objects loaded on the old style,
-    // use the old ones instead of loading new ones.
-    RenderStyle* newStyle = m_state.style();
-    RenderStyle* oldStyle = (m_state.element() ? m_state.element()->renderStyle() : nullptr);
-
-    if (newStyle && oldStyle) {
-        Vector<RefPtr<MaskImageOperation>> removedExternalResources;
-        
-        // Get all mask objects from the old style in a vector
-        // so we can remove them as we match them, making the following steps faster.
-        Vector<RefPtr<MaskImageOperation>> oldStyleMaskImages;
-        const FillLayer* oldMaskLayer = oldStyle->maskLayers();
-        while (oldMaskLayer) {
-            RefPtr<MaskImageOperation> oldMaskImage = oldMaskLayer->maskImage();
-            if (oldMaskImage.get())
-                oldStyleMaskImages.append(oldMaskImage);
-
-            oldMaskLayer = oldMaskLayer->next();
-        }
-        
-        // Try to match the new mask objects through the list from the old style.
-        // This should work perfectly and optimal when the list of masks remained
-        // the same and also work correctly (but slower) when they were reordered.
-        FillLayer* newMaskLayer = &newStyle->ensureMaskLayers();
-        int countOldStyleMaskImages = oldStyleMaskImages.size();
-        while (newMaskLayer && countOldStyleMaskImages) {
-            RefPtr<MaskImageOperation> newMaskImage = newMaskLayer->maskImage();
-            if (newMaskImage.get()) {
-                for (int i = 0; i < countOldStyleMaskImages; i++) {
-                    RefPtr<MaskImageOperation> oldMaskImage = oldStyleMaskImages[i];
-                    if (*oldMaskImage == *newMaskImage) {
-                        newMaskLayer->setMaskImage(oldMaskImage);
-                        if (newMaskImage->isExternalDocument())
-                            removedExternalResources.append(newMaskImage);
-
-                        oldStyleMaskImages.remove(i);
-                        countOldStyleMaskImages--;
-                        break;
-                    }
-                }
-            }
-
-            newMaskLayer = newMaskLayer->next();
-        }
-
-        Vector<RefPtr<MaskImageOperation>>& pendingResources = m_state.maskImagesWithPendingSVGDocuments();
-        pendingResources.removeAllMatching([&removedExternalResources] (const RefPtr<MaskImageOperation>& resource) {
-            return removedExternalResources.contains(resource);
-        });
-    }
 }
 
 void StyleResolver::adjustRenderStyle(RenderStyle& style, const RenderStyle& parentStyle, Element *e)
@@ -1320,14 +1241,14 @@ void StyleResolver::adjustRenderStyle(RenderStyle& style, const RenderStyle& par
         if (style.writingMode() != TopToBottomWritingMode && (style.display() == BOX || style.display() == INLINE_BOX))
             style.setWritingMode(TopToBottomWritingMode);
 
-        if (isDisplayFlexibleOrGridBox(parentStyle.display())) {
+        if (parentStyle.isDisplayFlexibleOrGridBox()) {
             style.setFloating(NoFloat);
             style.setDisplay(equivalentBlockDisplay(style.display(), style.isFloating(), !document().inQuirksMode()));
         }
     }
 
     // Make sure our z-index value is only applied if the object is positioned.
-    if (style.position() == StaticPosition && !isDisplayFlexibleOrGridBox(parentStyle.display()))
+    if (style.position() == StaticPosition && !parentStyle.isDisplayFlexibleOrGridBox())
         style.setHasAutoZIndex();
 
     // Auto z-index becomes 0 for the root element and transparent objects. This prevents
@@ -1456,6 +1377,11 @@ void StyleResolver::adjustRenderStyle(RenderStyle& style, const RenderStyle& par
         if ((e->hasTagName(SVGNames::foreignObjectTag) || e->hasTagName(SVGNames::textTag)) && style.isDisplayInlineType())
             style.setDisplay(BLOCK);
     }
+
+    // If the inherited value of justify-items includes the legacy keyword, 'auto'
+    // computes to the the inherited value.
+    if (parentStyle.justifyItemsPositionType() == LegacyPosition && style.justifyItemsPosition() == ItemPositionAuto)
+        style.setJustifyItems(parentStyle.justifyItems());
 }
 
 bool StyleResolver::checkRegionStyle(Element* regionElement)
@@ -1524,7 +1450,7 @@ Vector<RefPtr<StyleRule>> StyleResolver::pseudoStyleRulesForElement(Element* ele
         return Vector<RefPtr<StyleRule>>();
 
     initElement(element);
-    m_state.initForStyleResolve(document(), element, 0);
+    m_state.initForStyleResolve(document(), element, nullptr);
 
     ElementRuleCollector collector(*element, m_state.style(), m_ruleSets, m_selectorFilter);
     collector.setMode(SelectorChecker::Mode::CollectingRules);
@@ -1548,13 +1474,6 @@ Vector<RefPtr<StyleRule>> StyleResolver::pseudoStyleRulesForElement(Element* ele
     }
 
     return collector.matchedRuleList();
-}
-
-// -------------------------------------------------------------------------------------
-
-static Length convertToFloatLength(const CSSPrimitiveValue* primitiveValue, const CSSToLengthConversionData& conversionData)
-{
-    return primitiveValue ? primitiveValue->convertToLength<FixedFloatConversion | PercentConversion | CalculatedConversion>(conversionData) : Length(Undefined);
 }
 
 static bool shouldApplyPropertyInParseOrder(CSSPropertyID propertyID)
@@ -1637,18 +1556,18 @@ const StyleResolver::MatchedPropertiesCacheItem* StyleResolver::findFromMatchedP
 
     MatchedPropertiesCache::iterator it = m_matchedPropertiesCache.find(hash);
     if (it == m_matchedPropertiesCache.end())
-        return 0;
+        return nullptr;
     MatchedPropertiesCacheItem& cacheItem = it->value;
 
     size_t size = matchResult.matchedProperties().size();
     if (size != cacheItem.matchedProperties.size())
-        return 0;
+        return nullptr;
     for (size_t i = 0; i < size; ++i) {
         if (matchResult.matchedProperties()[i] != cacheItem.matchedProperties[i])
-            return 0;
+            return nullptr;
     }
     if (cacheItem.ranges != matchResult.ranges)
-        return 0;
+        return nullptr;
     return &cacheItem;
 }
 
@@ -1746,7 +1665,7 @@ void StyleResolver::applyMatchedProperties(const MatchResult& matchResult, const
     State& state = m_state;
     unsigned cacheHash = shouldUseMatchedPropertiesCache && matchResult.isCacheable ? computeMatchedPropertiesHash(matchResult.matchedProperties().data(), matchResult.matchedProperties().size()) : 0;
     bool applyInheritedOnly = false;
-    const MatchedPropertiesCacheItem* cacheItem = 0;
+    const MatchedPropertiesCacheItem* cacheItem = nullptr;
     if (cacheHash && (cacheItem = findFromMatchedPropertiesCache(cacheHash, matchResult))
         && isCacheableInMatchedPropertiesCache(element, state.style(), state.parentStyle())) {
         // We can build up the style by copying non-inherited properties from an earlier style object built using the same exact
@@ -1811,7 +1730,7 @@ void StyleResolver::applyMatchedProperties(const MatchResult& matchResult, const
     if (cacheItem && cacheItem->renderStyle->effectiveZoom() != state.style()->effectiveZoom())
         return applyMatchedProperties(matchResult, element, DoNotUseMatchedPropertiesCache);
 
-    // If our font got dirtied, go ahead and update it now.
+    // If our font got dirtied, update it now.
     updateFont();
 
     // If the font changed, we can't use the matched properties cache. Start over.
@@ -1825,8 +1744,6 @@ void StyleResolver::applyMatchedProperties(const MatchResult& matchResult, const
     // There are some CSS properties that affect the same RenderStyle values,
     // so to preserve behavior, we queue them up during cascade and flush here.
     cascade.applyDeferredProperties(*this);
-    
-    adjustStyleForMaskImages();
 
     // Start loading resources referenced by this style.
     loadPendingResources();
@@ -1842,7 +1759,7 @@ void StyleResolver::applyMatchedProperties(const MatchResult& matchResult, const
 
 void StyleResolver::applyPropertyToStyle(CSSPropertyID id, CSSValue* value, RenderStyle* style)
 {
-    initElement(0);
+    initElement(nullptr);
     m_state.initForStyleResolve(document(), nullptr, style);
     m_state.setStyle(*style);
     applyPropertyToCurrentStyle(id, value);
@@ -2067,7 +1984,7 @@ void StyleResolver::checkForZoomChange(RenderStyle* style, RenderStyle* parentSt
     if (!parentStyle)
         return;
     
-    if (style->effectiveZoom() == parentStyle->effectiveZoom())
+    if (style->effectiveZoom() == parentStyle->effectiveZoom() && style->textZoom() == parentStyle->textZoom())
         return;
 
     const FontDescription& childFont = style->fontDescription();
@@ -2255,30 +2172,18 @@ void StyleResolver::loadPendingSVGDocuments()
     // style is NULL. We don't know exactly why this happens. Our guess is
     // reentering styleForElement().
     ASSERT(state.style());
-    if (!state.style())
+    if (!state.style() || !state.style()->hasFilter() || state.filtersWithPendingSVGDocuments().isEmpty())
         return;
-    
-    bool hasFilters = (state.style()->hasFilter() && !state.filtersWithPendingSVGDocuments().isEmpty());
-    bool hasMasks = (state.style()->hasMask() && !state.maskImagesWithPendingSVGDocuments().isEmpty());
-    
-    if (!hasFilters && !hasMasks)
-        return;
+
+    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+    options.setContentSecurityPolicyImposition(m_state.element() && m_state.element()->isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
 
     CachedResourceLoader& cachedResourceLoader = state.document().cachedResourceLoader();
     
-    if (hasFilters) {
-        for (auto& filterOperation : state.filtersWithPendingSVGDocuments())
-            filterOperation->getOrCreateCachedSVGDocumentReference()->load(cachedResourceLoader);
+    for (auto& filterOperation : state.filtersWithPendingSVGDocuments())
+        filterOperation->getOrCreateCachedSVGDocumentReference()->load(cachedResourceLoader, options);
 
-        state.filtersWithPendingSVGDocuments().clear();
-    }
-    
-    if (hasMasks) {
-        for (auto& maskImageOperation : state.maskImagesWithPendingSVGDocuments())
-            maskImageOperation->ensureCachedSVGDocumentReference()->load(cachedResourceLoader);
-
-        state.maskImagesWithPendingSVGDocuments().clear();
-    }
+    state.filtersWithPendingSVGDocuments().clear();
 }
 
 bool StyleResolver::createFilterOperations(CSSValue& inValue, FilterOperations& outOperations)
@@ -2423,12 +2328,12 @@ PassRefPtr<StyleImage> StyleResolver::loadPendingImage(const StylePendingImage& 
         return imageValue->cachedImage(m_state.document().cachedResourceLoader(), options);
 
     if (auto imageGeneratorValue = pendingImage.cssImageGeneratorValue()) {
-        imageGeneratorValue->loadSubimages(m_state.document().cachedResourceLoader());
+        imageGeneratorValue->loadSubimages(m_state.document().cachedResourceLoader(), options);
         return StyleGeneratedImage::create(*imageGeneratorValue);
     }
 
     if (auto cursorImageValue = pendingImage.cssCursorImageValue())
-        return cursorImageValue->cachedImage(m_state.document().cachedResourceLoader());
+        return cursorImageValue->cachedImage(m_state.document().cachedResourceLoader(), options);
 
 #if ENABLE(CSS_IMAGE_SET)
     if (auto imageSetValue = pendingImage.cssImageSetValue())
@@ -2440,7 +2345,9 @@ PassRefPtr<StyleImage> StyleResolver::loadPendingImage(const StylePendingImage& 
 
 PassRefPtr<StyleImage> StyleResolver::loadPendingImage(const StylePendingImage& pendingImage)
 {
-    return loadPendingImage(pendingImage, CachedResourceLoader::defaultCachedResourceOptions());
+    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+    options.setContentSecurityPolicyImposition(m_state.element() && m_state.element()->isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+    return loadPendingImage(pendingImage, options);
 }
 
 #if ENABLE(CSS_SHAPES)
@@ -2458,6 +2365,7 @@ void StyleResolver::loadPendingShapeImage(ShapeValue* shapeValue)
     ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
     options.setRequestOriginPolicy(PotentiallyCrossOriginEnabled);
     options.setAllowCredentials(DoNotAllowStoredCredentials);
+    options.setContentSecurityPolicyImposition(m_state.element() && m_state.element()->isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
 
     shapeValue->setImage(loadPendingImage(pendingImage, options));
 }
@@ -2538,10 +2446,9 @@ void StyleResolver::loadPendingImages()
         }
         case CSSPropertyWebkitMaskImage: {
             for (FillLayer* maskLayer = &m_state.style()->ensureMaskLayers(); maskLayer; maskLayer = maskLayer->next()) {
-                RefPtr<MaskImageOperation> maskImage = maskLayer->maskImage();
-                auto* styleImage = maskImage.get() ? maskImage->image() : nullptr;
+                auto* styleImage = maskLayer->image();
                 if (is<StylePendingImage>(styleImage))
-                    maskImage->setImage(loadPendingImage(downcast<StylePendingImage>(*styleImage)));
+                    maskLayer->setImage(loadPendingImage(downcast<StylePendingImage>(*styleImage)));
             }
             break;
         }
@@ -2589,7 +2496,7 @@ void StyleResolver::loadPendingResources()
 }
 
 inline StyleResolver::MatchedProperties::MatchedProperties()
-    : possiblyPaddedMember(0)
+    : possiblyPaddedMember(nullptr)
 {
 }
 

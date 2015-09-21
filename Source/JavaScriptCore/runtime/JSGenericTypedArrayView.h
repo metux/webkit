@@ -87,6 +87,8 @@ template<typename Adaptor>
 class JSGenericTypedArrayView : public JSArrayBufferView {
 public:
     typedef JSArrayBufferView Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetPropertyNames | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero;
+
     static const unsigned elementSize = sizeof(typename Adaptor::Type);
     
 protected:
@@ -228,8 +230,6 @@ public:
     
 protected:
     friend struct TypedArrayClassInfos;
-    
-    static const unsigned StructureFlags = OverridesGetPropertyNames | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | Base::StructureFlags;
 
     static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
     static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
@@ -260,11 +260,11 @@ private:
 };
 
 template<typename Adaptor>
-inline PassRefPtr<typename Adaptor::ViewType> toNativeTypedView(JSValue value)
+inline RefPtr<typename Adaptor::ViewType> toNativeTypedView(JSValue value)
 {
     typename Adaptor::JSViewType* wrapper = jsDynamicCast<typename Adaptor::JSViewType*>(value);
     if (!wrapper)
-        return 0;
+        return nullptr;
     return wrapper->typedImpl();
 }
 

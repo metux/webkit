@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2011, 2014 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2011, 2014-2015 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -66,7 +66,14 @@ public:
     void setVerticalSnapOffsets(std::unique_ptr<Vector<LayoutUnit>>);
     void clearHorizontalSnapOffsets();
     void clearVerticalSnapOffsets();
+    unsigned currentHorizontalSnapPointIndex() const { return m_currentHorizontalSnapPointIndex; }
+    void setCurrentHorizontalSnapPointIndex(unsigned index) { m_currentHorizontalSnapPointIndex = index; }
+    unsigned currentVerticalSnapPointIndex() const { return m_currentVerticalSnapPointIndex; }
+    void setCurrentVerticalSnapPointIndex(unsigned index) { m_currentVerticalSnapPointIndex = index; }
+    IntPoint nearestActiveSnapPoint(const IntPoint&);
 #endif
+
+    void updateScrollSnapState();
 
 #if ENABLE(TOUCH_EVENTS)
     virtual bool isTouchScrollable() const { return false; }
@@ -112,12 +119,21 @@ public:
 
     WEBCORE_EXPORT virtual void contentsResized();
 
+    // Force the contents to recompute their size (i.e. do layout).
+    virtual void updateContentsSize() { }
+
+    enum class AvailableSizeChangeReason {
+        ScrollbarsChanged,
+        AreaSizeChanged
+    };
+    WEBCORE_EXPORT virtual void availableContentSizeChanged(AvailableSizeChangeReason);
+
     bool hasOverlayScrollbars() const;
     WEBCORE_EXPORT virtual void setScrollbarOverlayStyle(ScrollbarOverlayStyle);
     ScrollbarOverlayStyle scrollbarOverlayStyle() const { return static_cast<ScrollbarOverlayStyle>(m_scrollbarOverlayStyle); }
 
     // This getter will create a ScrollAnimator if it doesn't already exist.
-    WEBCORE_EXPORT ScrollAnimator* scrollAnimator() const;
+    WEBCORE_EXPORT ScrollAnimator& scrollAnimator() const;
 
     // This getter will return null if the ScrollAnimator hasn't been created yet.
     ScrollAnimator* existingScrollAnimator() const { return m_scrollAnimator.get(); }
@@ -201,7 +217,7 @@ public:
     WEBCORE_EXPORT IntSize totalContentsSize() const;
 
     virtual bool shouldSuspendScrollAnimations() const { return true; }
-    virtual void scrollbarStyleChanged(int /*newStyle*/, bool /*forceUpdate*/) { }
+    WEBCORE_EXPORT virtual void scrollbarStyleChanged(ScrollbarStyle /*newStyle*/, bool /*forceUpdate*/);
     virtual void setVisibleScrollerThumbRect(const IntRect&) { }
     
     // Note that this only returns scrollable areas that can actually be scrolled.
@@ -214,6 +230,7 @@ public:
     virtual IntRect scrollableAreaBoundingBox() const = 0;
 
     virtual bool isRubberBandInProgress() const { return false; }
+    virtual bool isScrollSnapInProgress() const { return false; }
 
     virtual bool scrollAnimatorEnabled() const { return false; }
 
@@ -244,7 +261,11 @@ public:
 #endif
 
     virtual TiledBacking* tiledBacking() const { return 0; }
+
+    // True if scrolling happens by moving compositing layers.
     virtual bool usesCompositedScrolling() const { return false; }
+    // True if the contents can be scrolled asynchronously (i.e. by a ScrollingCoordinator).
+    virtual bool usesAsyncScrolling() const { return false; }
 
     virtual GraphicsLayer* layerForHorizontalScrollbar() const { return 0; }
     virtual GraphicsLayer* layerForVerticalScrollbar() const { return 0; }
@@ -287,11 +308,13 @@ private:
     // scroll of the content.
     virtual void setScrollOffset(const IntPoint&) = 0;
 
-    mutable OwnPtr<ScrollAnimator> m_scrollAnimator;
+    mutable std::unique_ptr<ScrollAnimator> m_scrollAnimator;
 
 #if ENABLE(CSS_SCROLL_SNAP)
     std::unique_ptr<Vector<LayoutUnit>> m_horizontalSnapOffsets;
     std::unique_ptr<Vector<LayoutUnit>> m_verticalSnapOffsets;
+    unsigned m_currentHorizontalSnapPointIndex { 0 };
+    unsigned m_currentVerticalSnapPointIndex { 0 };
 #endif
 
     // There are 8 possible combinations of writing mode and direction. Scroll origin will be non-zero in the x or y axis

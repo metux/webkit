@@ -29,98 +29,100 @@
 #if ENABLE(NETWORK_CACHE)
 
 namespace WebKit {
+namespace NetworkCache {
 
-NetworkCacheEncoder::NetworkCacheEncoder()
-    : m_checksum(0)
+Encoder::Encoder()
 {
 }
 
-NetworkCacheEncoder::~NetworkCacheEncoder()
+Encoder::~Encoder()
 {
 }
 
-uint8_t* NetworkCacheEncoder::grow(size_t size)
+uint8_t* Encoder::grow(size_t size)
 {
     size_t newPosition = m_buffer.size();
     m_buffer.grow(m_buffer.size() + size);
     return m_buffer.data() + newPosition;
 }
 
-void NetworkCacheEncoder::updateChecksumForData(unsigned& checksum, const uint8_t* data, size_t size)
+void Encoder::updateChecksumForData(SHA1& sha1, const uint8_t* data, size_t size)
 {
-    // FIXME: hashMemory should not require alignment.
-    size_t hashSize = size - size % 2;
-    unsigned hash = StringHasher::hashMemory(data, hashSize) ^ NetworkCacheEncoder::Salt<uint8_t*>::value;
-    checksum = WTF::pairIntHash(checksum, hash);
+    auto typeSalt = Salt<uint8_t*>::value;
+    sha1.addBytes(reinterpret_cast<uint8_t*>(&typeSalt), sizeof(typeSalt));
+    sha1.addBytes(data, size);
 }
 
-void NetworkCacheEncoder::encodeFixedLengthData(const uint8_t* data, size_t size)
+void Encoder::encodeFixedLengthData(const uint8_t* data, size_t size)
 {
-    updateChecksumForData(m_checksum, data, size);
+    updateChecksumForData(m_sha1, data, size);
 
     uint8_t* buffer = grow(size);
     memcpy(buffer, data, size);
 }
 
 template<typename Type>
-void NetworkCacheEncoder::encodeNumber(Type value)
+void Encoder::encodeNumber(Type value)
 {
-    NetworkCacheEncoder::updateChecksumForNumber(m_checksum, value);
+    Encoder::updateChecksumForNumber(m_sha1, value);
 
     uint8_t* buffer = grow(sizeof(Type));
     memcpy(buffer, &value, sizeof(Type));
 }
 
-void NetworkCacheEncoder::encode(bool value)
+void Encoder::encode(bool value)
 {
     encodeNumber(value);
 }
 
-void NetworkCacheEncoder::encode(uint8_t value)
+void Encoder::encode(uint8_t value)
 {
     encodeNumber(value);
 }
 
-void NetworkCacheEncoder::encode(uint16_t value)
+void Encoder::encode(uint16_t value)
 {
     encodeNumber(value);
 }
 
-void NetworkCacheEncoder::encode(uint32_t value)
+void Encoder::encode(uint32_t value)
 {
     encodeNumber(value);
 }
 
-void NetworkCacheEncoder::encode(uint64_t value)
+void Encoder::encode(uint64_t value)
 {
     encodeNumber(value);
 }
 
-void NetworkCacheEncoder::encode(int32_t value)
+void Encoder::encode(int32_t value)
 {
     encodeNumber(value);
 }
 
-void NetworkCacheEncoder::encode(int64_t value)
+void Encoder::encode(int64_t value)
 {
     encodeNumber(value);
 }
 
-void NetworkCacheEncoder::encode(float value)
+void Encoder::encode(float value)
 {
     encodeNumber(value);
 }
 
-void NetworkCacheEncoder::encode(double value)
+void Encoder::encode(double value)
 {
     encodeNumber(value);
 }
 
-void NetworkCacheEncoder::encodeChecksum()
+void Encoder::encodeChecksum()
 {
-    encodeNumber(m_checksum);
+    SHA1::Digest hash;
+    m_sha1.computeHash(hash);
+    encodeFixedLengthData(hash.data(), hash.size());
 }
 
+}
 }
 
 #endif

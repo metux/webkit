@@ -50,7 +50,11 @@ DrawingAreaImpl::~DrawingAreaImpl()
 }
 
 DrawingAreaImpl::DrawingAreaImpl(WebPage& webPage, const WebPageCreationParameters& parameters)
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
+    : DrawingArea(DrawingAreaTypeCoordinated, webPage)
+#else
     : DrawingArea(DrawingAreaTypeImpl, webPage)
+#endif
     , m_backingStoreStateID(0)
     , m_isPaintingEnabled(true)
     , m_inUpdateBackingStoreState(false)
@@ -456,8 +460,10 @@ void DrawingAreaImpl::enterAcceleratedCompositingMode(GraphicsLayer* graphicsLay
     ASSERT(!m_layerTreeHost);
 
     m_layerTreeHost = LayerTreeHost::create(&m_webPage);
+#if USE(TEXTURE_MAPPER_GL) && PLATFORM(GTK)
     if (m_nativeSurfaceHandleForCompositing)
         m_layerTreeHost->setNativeSurfaceHandleForCompositing(m_nativeSurfaceHandleForCompositing);
+#endif
     if (!m_inUpdateBackingStoreState)
         m_layerTreeHost->setShouldNotifyAfterNextScheduledLayerFlush(true);
 

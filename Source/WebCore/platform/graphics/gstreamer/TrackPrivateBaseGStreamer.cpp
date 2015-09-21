@@ -35,7 +35,7 @@
 #include <glib-object.h>
 #include <gst/gst.h>
 #include <gst/tag/tag.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
 
 GST_DEBUG_CATEGORY_EXTERN(webkit_media_player_debug);
@@ -102,7 +102,7 @@ void TrackPrivateBaseGStreamer::tagsChanged()
     GRefPtr<GstTagList> tags;
     g_object_get(m_pad.get(), "tags", &tags.outPtr(), NULL);
     {
-        MutexLocker lock(m_tagMutex);
+        LockHolder lock(m_tagMutex);
         m_tags.swap(tags);
     }
 
@@ -158,7 +158,7 @@ void TrackPrivateBaseGStreamer::notifyTrackOfTagsChanged()
 
     GRefPtr<GstTagList> tags;
     {
-        MutexLocker lock(m_tagMutex);
+        LockHolder lock(m_tagMutex);
         tags.swap(m_tags);
     }
     if (!tags)

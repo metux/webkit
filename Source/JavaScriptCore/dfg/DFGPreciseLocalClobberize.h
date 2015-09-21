@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,7 +49,7 @@ public:
     
     void read(AbstractHeap heap)
     {
-        if (heap.kind() == Variables) {
+        if (heap.kind() == Stack) {
             if (heap.payload().isTop()) {
                 readTop();
                 return;
@@ -59,7 +59,7 @@ public:
             return;
         }
         
-        if (heap.overlaps(Variables)) {
+        if (heap.overlaps(Stack)) {
             readTop();
             return;
         }
@@ -67,20 +67,14 @@ public:
     
     void write(AbstractHeap heap)
     {
-        if (heap.kind() == Variables) {
-            if (heap.payload().isTop()) {
-                writeTop();
-                return;
-            }
-            
+        // We expect stack writes to already be precisely characterized by DFG::clobberize().
+        if (heap.kind() == Stack) {
+            RELEASE_ASSERT(!heap.payload().isTop());
             callIfAppropriate(m_write, VirtualRegister(heap.payload().value32()));
             return;
         }
         
-        if (heap.overlaps(Variables)) {
-            writeTop();
-            return;
-        }
+        RELEASE_ASSERT(!heap.overlaps(Stack));
     }
     
     void def(PureValue)
@@ -88,12 +82,12 @@ public:
         // PureValue defs never have anything to do with locals, so ignore this.
     }
     
-    void def(HeapLocation location, Node* node)
+    void def(HeapLocation location, LazyNode node)
     {
-        if (location.kind() != VariableLoc)
+        if (location.kind() != StackLoc)
             return;
         
-        RELEASE_ASSERT(location.heap().kind() == Variables);
+        RELEASE_ASSERT(location.heap().kind() == Stack);
         
         m_def(VirtualRegister(location.heap().payload().value32()), node);
     }
@@ -113,40 +107,47 @@ private:
     
     void readTop()
     {
-        // All of the outermost arguments, except this, are definitely read.
-        for (unsigned i = m_graph.m_codeBlock->numParameters(); i-- > 1;)
-            m_read(virtualRegisterForArgument(i));
-        
-        // The stack header is read.
-        for (unsigned i = 0; i < JSStack::ThisArgument; ++i)
-            m_read(VirtualRegister(i));
-        
-        // Read all of the captured variables.
-        const BitVector& capturedVars =
-            m_graph.capturedVarsFor(m_node->origin.semantic.inlineCallFrame);
-        for (unsigned i : capturedVars.setBits())
-            m_read(virtualRegisterForLocal(i));
-        
-        // Read all of the inline arguments and call frame headers that we didn't already capture.
-        for (InlineCallFrame* inlineCallFrame = m_node->origin.semantic.inlineCallFrame; inlineCallFrame; inlineCallFrame = inlineCallFrame->caller.inlineCallFrame) {
+        switch (m_node->op()) {
+        case GetMyArgumentByVal:
+        case ForwardVarargs:
+        case CallForwardVarargs:
+        case ConstructForwardVarargs: {
+            InlineCallFrame* inlineCallFrame = m_node->child1()->origin.semantic.inlineCallFrame;
+            if (!inlineCallFrame) {
+                // Read the outermost arguments and argument count.
+                for (unsigned i = m_graph.m_codeBlock->numParameters(); i-- > 1;)
+                    m_read(virtualRegisterForArgument(i));
+                m_read(VirtualRegister(JSStack::ArgumentCount));
+                break;
+            }
+            
             for (unsigned i = inlineCallFrame->arguments.size(); i-- > 1;)
                 m_read(VirtualRegister(inlineCallFrame->stackOffset + virtualRegisterForArgument(i).offset()));
-            if (inlineCallFrame->isClosureCall)
-                m_read(VirtualRegister(inlineCallFrame->stackOffset + JSStack::Callee));
+            if (inlineCallFrame->isVarargs())
+                m_read(VirtualRegister(inlineCallFrame->stackOffset + JSStack::ArgumentCount));
+            break;
         }
-    }
-    
-    void writeTop()
-    {
-        if (m_graph.m_codeBlock->usesArguments()) {
+            
+        default: {
+            // All of the outermost arguments, except this, are definitely read.
             for (unsigned i = m_graph.m_codeBlock->numParameters(); i-- > 1;)
-                m_write(virtualRegisterForArgument(i));
-        }
-
-        const BitVector& capturedVars =
-            m_graph.capturedVarsFor(m_node->origin.semantic.inlineCallFrame);
-        for (unsigned i : capturedVars.setBits())
-            m_write(virtualRegisterForLocal(i));
+                m_read(virtualRegisterForArgument(i));
+        
+            // The stack header is read.
+            for (unsigned i = 0; i < JSStack::ThisArgument; ++i)
+                m_read(VirtualRegister(i));
+        
+            // Read all of the inline arguments and call frame headers that we didn't already capture.
+            for (InlineCallFrame* inlineCallFrame = m_node->origin.semantic.inlineCallFrame; inlineCallFrame; inlineCallFrame = inlineCallFrame->caller.inlineCallFrame) {
+                for (unsigned i = inlineCallFrame->arguments.size(); i-- > 1;)
+                    m_read(VirtualRegister(inlineCallFrame->stackOffset + virtualRegisterForArgument(i).offset()));
+                if (inlineCallFrame->isClosureCall)
+                    m_read(VirtualRegister(inlineCallFrame->stackOffset + JSStack::Callee));
+                if (inlineCallFrame->isVarargs())
+                    m_read(VirtualRegister(inlineCallFrame->stackOffset + JSStack::ArgumentCount));
+            }
+            break;
+        } }
     }
     
     Graph& m_graph;
@@ -156,20 +157,6 @@ private:
     const DefFunctor& m_def;
 };
 
-template<typename ReadFunctor>
-void forEachLocalReadByUnwind(Graph& graph, CodeOrigin codeOrigin, const ReadFunctor& read)
-{
-    if (graph.uncheckedActivationRegister().isValid())
-        read(graph.activationRegister());
-    if (graph.m_codeBlock->usesArguments())
-        read(unmodifiedArgumentsRegister(graph.argumentsRegisterFor(nullptr)));
-    
-    for (InlineCallFrame* inlineCallFrame = codeOrigin.inlineCallFrame; inlineCallFrame; inlineCallFrame = inlineCallFrame->caller.inlineCallFrame) {
-        if (inlineCallFrame->executable->usesArguments())
-            read(unmodifiedArgumentsRegister(graph.argumentsRegisterFor(inlineCallFrame)));
-    }
-}
-
 template<typename ReadFunctor, typename WriteFunctor, typename DefFunctor>
 void preciseLocalClobberize(
     Graph& graph, Node* node,
@@ -178,8 +165,6 @@ void preciseLocalClobberize(
     PreciseLocalClobberizeAdaptor<ReadFunctor, WriteFunctor, DefFunctor>
         adaptor(graph, node, read, write, def);
     clobberize(graph, node, adaptor);
-    if (mayExit(graph, node))
-        forEachLocalReadByUnwind(graph, node->origin.forExit, read);
 }
 
 } } // namespace JSC::DFG

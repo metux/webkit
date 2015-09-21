@@ -26,6 +26,8 @@
 #ifndef WebGL2RenderingContext_h
 #define WebGL2RenderingContext_h
 
+#if ENABLE(WEBGL2)
+
 #include "WebGLRenderingContextBase.h"
 
 namespace WebCore {
@@ -40,7 +42,7 @@ class WebGL2RenderingContext final : public WebGLRenderingContextBase {
 public:
     WebGL2RenderingContext(HTMLCanvasElement*, GraphicsContext3D::Attributes);
     WebGL2RenderingContext(HTMLCanvasElement*, PassRefPtr<GraphicsContext3D>, GraphicsContext3D::Attributes);
-    virtual bool isWebGL2() const { return true; }
+    virtual bool isWebGL2() const override { return true; }
 
     /* Buffer objects */
     void copyBufferSubData(GC3Denum readTarget, GC3Denum writeTarget, GC3Dint64 readOffset, GC3Dint64 writeOffset, GC3Dint64 size);
@@ -48,7 +50,7 @@ public:
     void getBufferSubData(GC3Denum target, GC3Dint64 offset, ArrayBuffer* returnedData);
     
     /* Framebuffer objects */
-    WebGLGetInfo getFramebufferAttachmentParameter(GC3Denum target, GC3Denum attachment, GC3Denum pname, ExceptionCode&);
+    virtual WebGLGetInfo getFramebufferAttachmentParameter(GC3Denum target, GC3Denum attachment, GC3Denum pname, ExceptionCode&) override;
     void blitFramebuffer(GC3Dint srcX0, GC3Dint srcY0, GC3Dint srcX1, GC3Dint srcY1, GC3Dint dstX0, GC3Dint dstY0, GC3Dint dstX1, GC3Dint dstY1, GC3Dbitfield mask, GC3Denum filter);
     void framebufferTextureLayer(GC3Denum target, GC3Denum attachment, GC3Duint texture, GC3Dint level, GC3Dint layer);
     WebGLGetInfo getInternalformatParameter(GC3Denum target, GC3Denum internalformat, GC3Denum pname);
@@ -97,6 +99,7 @@ public:
     void vertexAttribIPointer(GC3Duint index, GC3Dint size, GC3Denum type, GC3Dsizei stride, GC3Dint64 offset);
     
     /* Writing to the drawing buffer */
+    virtual void clear(GC3Dbitfield mask) override;
     void vertexAttribDivisor(GC3Duint index, GC3Duint divisor);
     void drawArraysInstanced(GC3Denum mode, GC3Dint first, GC3Dsizei count, GC3Dsizei instanceCount);
     void drawElementsInstanced(GC3Denum mode, GC3Dsizei count, GC3Denum type, GC3Dint64 offset, GC3Dsizei instanceCount);
@@ -167,9 +170,10 @@ public:
     /* Extensions */
     virtual WebGLExtension* getExtension(const String&) override;
     virtual Vector<String> getSupportedExtensions() override;
-
     virtual WebGLGetInfo getParameter(GC3Denum pname, ExceptionCode&) override;
-    
+
+    virtual void renderbufferStorage(GC3Denum target, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height) override;
+    virtual void hint(GC3Denum target, GC3Denum mode) override;
     virtual void copyTexImage2D(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height, GC3Dint border) override;
     virtual void texSubImage2DBase(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum internalformat, GC3Denum format, GC3Denum type, const void* pixels, ExceptionCode&) override;
     virtual void texSubImage2DImpl(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Denum format, GC3Denum type, Image*, GraphicsContext3D::ImageHtmlDomSource, bool flipY, bool premultiplyAlpha, ExceptionCode&) override;
@@ -188,6 +192,11 @@ public:
 #endif
 
 protected:
+    virtual void initializeVertexArrayObjects() override;
+    virtual GC3Dint getMaxDrawBuffers() override;
+    virtual GC3Dint getMaxColorAttachments() override;
+    virtual bool validateIndexArrayConservative(GC3Denum type, unsigned& numElementsRequired) override;
+    virtual bool validateBlendEquation(const char* functionName, GC3Denum mode) override;
     virtual bool validateTexFuncFormatAndType(const char* functionName, GC3Denum internalformat, GC3Denum format, GC3Denum type, GC3Dint level) override;
     virtual bool validateTexFuncParameters(const char* functionName,
         TexFuncValidationFunctionType,
@@ -201,11 +210,16 @@ protected:
         ArrayBufferView* pixels,
         NullDisposition) override;
     virtual bool validateCapability(const char* functionName, GC3Denum cap) override;
+    virtual bool validateFramebufferFuncParameters(const char* functionName, GC3Denum target, GC3Denum attachment) override;
     
 private:
     GC3Denum baseInternalFormatFromInternalFormat(GC3Denum internalformat);
+    bool isIntegerFormat(GC3Denum internalformat);
+    void initializeShaderExtensions();
 };
 
 } // namespace WebCore
+
+#endif // WEBGL2
 
 #endif

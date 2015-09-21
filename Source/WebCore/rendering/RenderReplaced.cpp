@@ -130,14 +130,22 @@ void RenderReplaced::intrinsicSizeChanged()
     setNeedsLayoutAndPrefWidthsRecalc();
 }
 
+bool RenderReplaced::shouldDrawSelectionTint() const
+{
+    return selectionState() != SelectionNone && !document().printing();
+}
+
 void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
     if (!shouldPaint(paintInfo, paintOffset))
         return;
-    
+
+#ifndef NDEBUG
+    SetLayoutNeededForbiddenScope scope(this);
+#endif
     LayoutPoint adjustedPaintOffset = paintOffset + location();
     
-    if (hasBoxDecorations() && (paintInfo.phase == PaintPhaseForeground || paintInfo.phase == PaintPhaseSelection)) 
+    if (hasBoxDecorations() && paintInfo.phase == PaintPhaseForeground)
         paintBoxDecorations(paintInfo, adjustedPaintOffset);
     
     if (paintInfo.phase == PaintPhaseMask) {
@@ -155,7 +163,7 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     if (!paintInfo.shouldPaintWithinRoot(*this))
         return;
     
-    bool drawSelectionTint = selectionState() != SelectionNone && !document().printing();
+    bool drawSelectionTint = shouldDrawSelectionTint();
     if (paintInfo.phase == PaintPhaseSelection) {
         if (selectionState() == SelectionNone)
             return;
@@ -273,6 +281,9 @@ bool RenderReplaced::hasReplacedLogicalHeight() const
             return false;
         return true;
     }
+
+    if (style().logicalHeight().isIntrinsic())
+        return true;
 
     return false;
 }
@@ -478,13 +489,13 @@ void RenderReplaced::computePreferredLogicalWidths()
 
     // We cannot resolve any percent logical width here as the available logical
     // width may not be set on our containing block.
-    if (style().logicalWidth().isPercent())
+    if (style().logicalWidth().isPercentOrCalculated())
         computeIntrinsicLogicalWidths(m_minPreferredLogicalWidth, m_maxPreferredLogicalWidth);
     else
         m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = computeReplacedLogicalWidth(ComputePreferred);
 
     const RenderStyle& styleToUse = style();
-    if (styleToUse.logicalWidth().isPercent() || styleToUse.logicalMaxWidth().isPercent())
+    if (styleToUse.logicalWidth().isPercentOrCalculated() || styleToUse.logicalMaxWidth().isPercentOrCalculated())
         m_minPreferredLogicalWidth = 0;
 
     if (styleToUse.logicalMinWidth().isFixed() && styleToUse.logicalMinWidth().value() > 0) {

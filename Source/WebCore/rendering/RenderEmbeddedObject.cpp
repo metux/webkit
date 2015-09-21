@@ -246,14 +246,17 @@ void RenderEmbeddedObject::paint(PaintInfo& paintInfo, const LayoutPoint& paintO
 {
     Page* page = frame().page();
 
+    // The relevant repainted object heuristic is not tuned for plugin documents.
+    bool countsTowardsRelevantObjects = page && !document().isPluginDocument() && paintInfo.phase == PaintPhaseForeground;
+
     if (isPluginUnavailable()) {
-        if (page && paintInfo.phase == PaintPhaseForeground)
+        if (countsTowardsRelevantObjects)
             page->addRelevantUnpaintedObject(this, visualOverflowRect());
         RenderReplaced::paint(paintInfo, paintOffset);
         return;
     }
 
-    if (page && paintInfo.phase == PaintPhaseForeground)
+    if (countsTowardsRelevantObjects)
         page->addRelevantRepaintedObject(this, visualOverflowRect());
 
     RenderWidget::paint(paintInfo, paintOffset);
@@ -299,7 +302,7 @@ void RenderEmbeddedObject::paintReplaced(PaintInfo& paintInfo, const LayoutPoint
     FloatRect replacementTextRect;
     FloatRect arrowRect;
     FontCascade font;
-    TextRun run("");
+    TextRun run(emptyString());
     float textWidth;
     if (!getReplacementTextGeometry(paintOffset, contentRect, indicatorRect, replacementTextRect, arrowRect, font, run, textWidth))
         return;
@@ -392,7 +395,7 @@ LayoutRect RenderEmbeddedObject::unavailablePluginIndicatorBounds(const LayoutPo
     FloatRect replacementTextRect;
     FloatRect arrowRect;
     FontCascade font;
-    TextRun run("", 0);
+    TextRun run(emptyString());
     float textWidth;
     if (getReplacementTextGeometry(accumulatedOffset, contentRect, indicatorRect, replacementTextRect, arrowRect, font, run, textWidth))
         return LayoutRect(indicatorRect);
@@ -583,7 +586,7 @@ bool RenderEmbeddedObject::isInUnavailablePluginIndicator(const FloatPoint& poin
     FloatRect replacementTextRect;
     FloatRect arrowRect;
     FontCascade font;
-    TextRun run("");
+    TextRun run(emptyString());
     float textWidth;
     return getReplacementTextGeometry(IntPoint(), contentRect, indicatorRect, replacementTextRect, arrowRect, font, run, textWidth)
         && indicatorRect.contains(point);

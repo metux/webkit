@@ -1,3 +1,5 @@
+set(JavaScriptCore_OUTPUT_NAME javascriptcoregtk-${WEBKITGTK_API_VERSION})
+
 configure_file(javascriptcoregtk.pc.in ${CMAKE_BINARY_DIR}/Source/JavaScriptCore/javascriptcoregtk-${WEBKITGTK_API_VERSION}.pc @ONLY)
 configure_file(JavaScriptCore.gir.in ${CMAKE_BINARY_DIR}/JavaScriptCore-${WEBKITGTK_API_VERSION}.gir @ONLY)
 
@@ -37,6 +39,6 @@ add_definitions(-DSTATICALLY_LINKED_WITH_WTF)
 list(APPEND JavaScriptCore_LIBRARIES
     ${GLIB_LIBRARIES}
 )
-list(APPEND JavaScriptCore_INCLUDE_DIRECTORIES
+list(APPEND JavaScriptCore_SYSTEM_INCLUDE_DIRECTORIES
     ${GLIB_INCLUDE_DIRS}
 )

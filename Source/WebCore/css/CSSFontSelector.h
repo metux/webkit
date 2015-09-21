@@ -67,15 +67,15 @@ public:
 
     void clearDocument();
 
-    void addFontFaceRule(const StyleRuleFontFace*);
+    void addFontFaceRule(const StyleRuleFontFace*, bool isInitiatingElementInUserAgentShadowTree);
 
     void fontLoaded();
     virtual void fontCacheInvalidated() override;
 
     bool isEmpty() const;
 
-    virtual void registerForInvalidationCallbacks(FontSelectorClient*) override;
-    virtual void unregisterForInvalidationCallbacks(FontSelectorClient*) override;
+    virtual void registerForInvalidationCallbacks(FontSelectorClient&) override;
+    virtual void unregisterForInvalidationCallbacks(FontSelectorClient&) override;
 
     Document* document() const { return m_document; }
 

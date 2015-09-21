@@ -71,7 +71,7 @@ void ResourceHandle::registerBuiltinSynchronousLoader(const AtomicString& protoc
 }
 
 ResourceHandle::ResourceHandle(NetworkingContext* context, const ResourceRequest& request, ResourceHandleClient* client, bool defersLoading, bool shouldContentSniff)
-    : d(adoptPtr(new ResourceHandleInternal(this, context, request, client, defersLoading, shouldContentSniff && shouldContentSniffURL(request.url()))))
+    : d(std::make_unique<ResourceHandleInternal>(this, context, request, client, defersLoading, shouldContentSniff && shouldContentSniffURL(request.url())))
 {
     if (!request.url().isValid()) {
         scheduleFailure(InvalidURLFailure);
@@ -147,9 +147,9 @@ ResourceHandleClient* ResourceHandle::client() const
     return d->m_client;
 }
 
-void ResourceHandle::setClient(ResourceHandleClient* client)
+void ResourceHandle::clearClient()
 {
-    d->m_client = client;
+    d->m_client = nullptr;
 }
 
 #if !PLATFORM(COCOA) && !USE(CFNETWORK) && !USE(SOUP)
@@ -237,6 +237,11 @@ void ResourceHandle::setDefersLoading(bool defers)
     }
 
     platformSetDefersLoading(defers);
+}
+
+bool ResourceHandle::usesAsyncCallbacks() const
+{
+    return d->m_usesAsyncCallbacks;
 }
 
 } // namespace WebCore

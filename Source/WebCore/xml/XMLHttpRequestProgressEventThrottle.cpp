@@ -66,8 +66,7 @@ void XMLHttpRequestProgressEventThrottle::dispatchThrottledProgressEvent(bool le
     }
 
     if (!isActive()) {
-        // The timer is not active so the least frequent event for now is every byte.
-        // Just go ahead and dispatch the event.
+        // The timer is not active so the least frequent event for now is every byte. Just dispatch the event.
 
         // We should not have any throttled progress event.
         ASSERT(!m_hasThrottledProgressEvent);
@@ -122,7 +121,7 @@ void XMLHttpRequestProgressEventThrottle::flushProgressEvent()
     if (m_deferEvents && m_deferredProgressEvent) {
         // Move the progress event to the queue, to get it in the right order on resume.
         m_deferredEvents.append(m_deferredProgressEvent);
-        m_deferredProgressEvent = 0;
+        m_deferredProgressEvent = nullptr;
         return;
     }
 

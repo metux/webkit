@@ -59,8 +59,7 @@ const int maxValueForCssLength = intMaxForLayoutUnit - 2;
 const int minValueForCssLength = intMinForLayoutUnit + 2;
 
 // Dimension calculations are imprecise, often resulting in values of e.g.
-// 44.99998. We need to go ahead and round if we're really close to the next
-// integer value.
+// 44.99998. We need to round if we're really close to the next integer value.
 template<typename T> inline T roundForImpreciseConversion(double value)
 {
     value += (value < 0) ? -0.01 : +0.01;
@@ -182,13 +181,14 @@ public:
     bool isAttr() const { return m_primitiveUnitType == CSS_ATTR; }
     bool isCounter() const { return m_primitiveUnitType == CSS_COUNTER; }
     bool isFontIndependentLength() const { return m_primitiveUnitType >= CSS_PX && m_primitiveUnitType <= CSS_PC; }
-    bool isFontRelativeLength() const
+    static bool isFontRelativeLength(unsigned primitiveUnitType)
     {
-        return m_primitiveUnitType == CSS_EMS
-            || m_primitiveUnitType == CSS_EXS
-            || m_primitiveUnitType == CSS_REMS
-            || m_primitiveUnitType == CSS_CHS;
+        return primitiveUnitType == CSS_EMS
+            || primitiveUnitType == CSS_EXS
+            || primitiveUnitType == CSS_REMS
+            || primitiveUnitType == CSS_CHS;
     }
+    bool isFontRelativeLength() const { return isFontRelativeLength(m_primitiveUnitType); }
 
     static bool isViewportPercentageLength(unsigned short type) { return type >= CSS_VW && type <= CSS_VMAX; }
     bool isViewportPercentageLength() const { return isViewportPercentageLength(m_primitiveUnitType); }
@@ -239,8 +239,8 @@ public:
     static Ref<CSSPrimitiveValue> createColor(unsigned rgbValue) { return adoptRef(*new CSSPrimitiveValue(rgbValue)); }
     static Ref<CSSPrimitiveValue> create(double value, UnitTypes type) { return adoptRef(*new CSSPrimitiveValue(value, type)); }
     static Ref<CSSPrimitiveValue> create(const String& value, UnitTypes type) { return adoptRef(*new CSSPrimitiveValue(value, type)); }
-    static Ref<CSSPrimitiveValue> create(const Length& value, const RenderStyle* style) { return adoptRef(*new CSSPrimitiveValue(value, style)); }
-    static Ref<CSSPrimitiveValue> create(const LengthSize& value, const RenderStyle* style) { return adoptRef(*new CSSPrimitiveValue(value, style)); }
+    static Ref<CSSPrimitiveValue> create(const Length& value, const RenderStyle& style) { return adoptRef(*new CSSPrimitiveValue(value, style)); }
+    static Ref<CSSPrimitiveValue> create(const LengthSize& value, const RenderStyle& style) { return adoptRef(*new CSSPrimitiveValue(value, style)); }
 
     template<typename T> static Ref<CSSPrimitiveValue> create(T&& value)
     {
@@ -264,10 +264,10 @@ public:
 
     unsigned short primitiveType() const;
 
-    double computeDegrees();
+    double computeDegrees() const;
 
     enum TimeUnit { Seconds, Milliseconds };
-    template <typename T, TimeUnit timeUnit> T computeTime()
+    template <typename T, TimeUnit timeUnit> T computeTime() const
     {
         if (timeUnit == Seconds && primitiveType() == CSS_S)
             return getValue<T>();
@@ -295,6 +295,8 @@ public:
 
     // Converts to a Length, mapping various unit types appropriately.
     template<int> Length convertToLength(const CSSToLengthConversionData&) const;
+
+    bool convertingToLengthRequiresNonNullStyle(int lengthConversion) const;
 
     // use with care!!!
     void setPrimitiveType(unsigned short type) { m_primitiveUnitType = type; }
@@ -361,7 +363,7 @@ public:
 
     void addSubresourceStyleURLs(ListHashSet<URL>&, const StyleSheetContents*) const;
 
-    PassRefPtr<CSSPrimitiveValue> cloneForCSSOM() const;
+    RefPtr<CSSPrimitiveValue> cloneForCSSOM() const;
     void setCSSOMSafe() { m_isCSSOMSafe = true; }
 
     bool equals(const CSSPrimitiveValue&) const;
@@ -369,6 +371,7 @@ public:
     static UnitTypes canonicalUnitTypeForCategory(UnitCategory);
     static double conversionToCanonicalUnitsScaleFactor(unsigned short unitType);
 
+    static double computeNonCalcLengthDouble(const CSSToLengthConversionData&, unsigned short primitiveType, double value);
 private:
     CSSPrimitiveValue(CSSValueID);
     CSSPrimitiveValue(CSSPropertyID);
@@ -376,22 +379,17 @@ private:
     CSSPrimitiveValue(int parserOperator);
     CSSPrimitiveValue(unsigned color); // RGB value
     CSSPrimitiveValue(const Length&);
-    CSSPrimitiveValue(const Length&, const RenderStyle*);
-    CSSPrimitiveValue(const LengthSize&, const RenderStyle*);
+    CSSPrimitiveValue(const Length&, const RenderStyle&);
+    CSSPrimitiveValue(const LengthSize&, const RenderStyle&);
     CSSPrimitiveValue(const String&, UnitTypes);
     CSSPrimitiveValue(double, UnitTypes);
 
     template<typename T> CSSPrimitiveValue(T); // Defined in CSSPrimitiveValueMappings.h
-    template<typename T> CSSPrimitiveValue(T* val)
-        : CSSValue(PrimitiveClass)
-    {
-        init(PassRefPtr<T>(val));
-    }
 
-    template<typename T> CSSPrimitiveValue(PassRefPtr<T> value)
+    template<typename T> CSSPrimitiveValue(RefPtr<T>&& value)
         : CSSValue(PrimitiveClass)
     {
-        init(value);
+        init(WTF::move(value));
     }
 
     template<typename T> CSSPrimitiveValue(Ref<T>&& value)
@@ -405,17 +403,19 @@ private:
     template<typename T> operator T*(); // compile-time guard
 
     void init(const Length&);
-    void init(const LengthSize&, const RenderStyle*);
+    void init(const LengthSize&, const RenderStyle&);
     void init(Ref<Counter>&&);
-    void init(PassRefPtr<Rect>);
-    void init(PassRefPtr<Pair>);
-    void init(PassRefPtr<Quad>);
+    void init(Ref<Rect>&&);
+    void init(Ref<Pair>&&);
+    void init(Ref<Quad>&&);
 #if ENABLE(CSS_SCROLL_SNAP)
-    void init(PassRefPtr<LengthRepeat>);
+    void init(Ref<LengthRepeat>&&);
 #endif
-    void init(PassRefPtr<DashboardRegion>); // FIXME: Dashboard region should not be a primitive value.
-    void init(PassRefPtr<CSSBasicShape>);
-    void init(PassRefPtr<CSSCalcValue>);
+#if ENABLE(DASHBOARD_SUPPORT)
+    void init(RefPtr<DashboardRegion>&&); // FIXME: Dashboard region should not be a primitive value.
+#endif
+    void init(Ref<CSSBasicShape>&&);
+    void init(RefPtr<CSSCalcValue>&&);
     bool getDoubleValueInternal(UnitTypes targetUnitType, double* result) const;
 
     double computeLengthDouble(const CSSToLengthConversionData&) const;

@@ -57,7 +57,7 @@ SmallStringsStorage::SmallStringsStorage()
     RefPtr<StringImpl> baseString = StringImpl::createUninitialized(singleCharacterStringCount, characterBuffer);
     for (unsigned i = 0; i < singleCharacterStringCount; ++i) {
         characterBuffer[i] = i;
-        m_reps[i] = AtomicString::add(PassRefPtr<StringImpl>(StringImpl::createSubstringSharingImpl(baseString, i, 1)).get());
+        m_reps[i] = AtomicStringImpl::add(PassRefPtr<StringImpl>(StringImpl::createSubstringSharingImpl(baseString, i, 1)).get());
     }
 }
 
@@ -130,7 +130,7 @@ StringImpl* SmallStrings::singleCharacterStringRep(unsigned char character)
 
 void SmallStrings::initialize(VM* vm, JSString*& string, const char* value)
 {
-    string = JSString::create(*vm, StringImpl::create(value));
+    string = JSString::create(*vm, Identifier::fromString(vm, value).impl());
     m_needsToBeVisited = true;
 }
 

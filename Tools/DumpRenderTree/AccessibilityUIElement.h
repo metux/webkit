@@ -109,6 +109,7 @@ public:
     void uiElementArrayAttributeValue(JSStringRef attribute, Vector<AccessibilityUIElement>& elements) const;
     AccessibilityUIElement uiElementAttributeValue(JSStringRef attribute) const;    
     bool boolAttributeValue(JSStringRef attribute);
+    void setBoolAttributeValue(JSStringRef attribute, bool value);
     bool isAttributeSupported(JSStringRef attribute);
     bool isAttributeSettable(JSStringRef attribute);
     bool isPressActionSupported();
@@ -220,6 +221,11 @@ public:
     void increaseTextSelection();
     void decreaseTextSelection();
     AccessibilityUIElement linkedElement();
+    
+    bool scrollPageUp();
+    bool scrollPageDown();
+    bool scrollPageLeft();
+    bool scrollPageRight();
 #endif
 
 #if PLATFORM(GTK) || PLATFORM(EFL)
@@ -251,6 +257,9 @@ public:
     AccessibilityUIElement accessibilityElementForTextMarker(AccessibilityTextMarker*);
     AccessibilityTextMarker startTextMarker();
     AccessibilityTextMarker endTextMarker();
+    AccessibilityTextMarkerRange selectedTextMarkerRange();
+    void resetSelectedTextMarkerRange();
+    bool setSelectedVisibleTextRange(AccessibilityTextMarkerRange*);
     
     JSStringRef stringForTextMarkerRange(AccessibilityTextMarkerRange*);
     int textMarkerRangeLength(AccessibilityTextMarkerRange*);
@@ -270,14 +279,10 @@ public:
     void removeNotificationListener();
     
 #if PLATFORM(IOS)
-    JSStringRef iphoneLabel();
-    JSStringRef iphoneValue();
-    JSStringRef iphoneTraits();
-    JSStringRef iphoneHint();
-    JSStringRef iphoneIdentifier();
-    bool iphoneIsElement();
-    int iphoneElementTextPosition();
-    int iphoneElementTextLength();
+    JSStringRef traits();
+    JSStringRef identifier();
+    int elementTextPosition();
+    int elementTextLength();
     AccessibilityUIElement headerElementAtIndex(unsigned);
     // This will simulate the accessibilityDidBecomeFocused API in UIKit.
     void assistiveTechnologySimulatedFocus();
@@ -296,9 +301,7 @@ private:
     static JSClassRef getJSClass();
     PlatformUIElement m_element;
     
-#if PLATFORM(IOS) 
-    JSObjectRef m_notificationFunctionCallback;
-#elif PLATFORM(MAC)
+#if PLATFORM(COCOA)
     // A retained, platform specific object used to help manage notifications for this object.
     NotificationHandler m_notificationHandler;
 #endif

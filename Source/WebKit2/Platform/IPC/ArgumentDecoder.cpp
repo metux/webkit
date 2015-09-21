@@ -46,14 +46,8 @@ ArgumentDecoder::ArgumentDecoder(const uint8_t* buffer, size_t bufferSize, Vecto
 ArgumentDecoder::~ArgumentDecoder()
 {
     ASSERT(m_buffer);
-    free(m_buffer);
-#if !USE(UNIX_DOMAIN_SOCKETS)
+    fastFree(m_buffer);
     // FIXME: We need to dispose of the mach ports in cases of failure.
-#else
-    Vector<Attachment>::iterator end = m_attachments.end();
-    for (Vector<Attachment>::iterator it = m_attachments.begin(); it != end; ++it)
-        it->dispose();
-#endif
 }
 
 static inline uint8_t* roundUpToAlignment(uint8_t* ptr, unsigned alignment)
@@ -67,7 +61,7 @@ static inline uint8_t* roundUpToAlignment(uint8_t* ptr, unsigned alignment)
 
 void ArgumentDecoder::initialize(const uint8_t* buffer, size_t bufferSize)
 {
-    m_buffer = static_cast<uint8_t*>(malloc(bufferSize));
+    m_buffer = static_cast<uint8_t*>(fastMalloc(bufferSize));
 
     ASSERT(!(reinterpret_cast<uintptr_t>(m_buffer) % alignof(uint64_t)));
 
@@ -219,8 +213,7 @@ bool ArgumentDecoder::removeAttachment(Attachment& attachment)
     if (m_attachments.isEmpty())
         return false;
 
-    attachment = m_attachments.last();
-    m_attachments.removeLast();
+    attachment = m_attachments.takeLast();
     return true;
 }
 

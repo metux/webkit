@@ -40,6 +40,7 @@
 #include "PageGroup.h"
 #include "ScriptController.h"
 #include <heap/StrongInlines.h>
+#include <profiler/Profile.h>
 #include <runtime/JSLock.h>
 #include <runtime/WeakGCMapInlines.h>
 
@@ -108,7 +109,7 @@ void ScriptCachedFrameData::clear()
 
     JSLockHolder lock(JSDOMWindowBase::commonVM());
     m_windows.clear();
-    gcController().garbageCollectSoon();
+    GCController::singleton().garbageCollectSoon();
 }
 
 } // namespace WebCore

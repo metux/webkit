@@ -31,6 +31,12 @@
 #include <wtf/Noncopyable.h>
 #include <wtf/StdLibExtras.h>
 
+#if ASAN_ENABLED
+extern "C" void __asan_poison_memory_region(void const volatile *addr, size_t size);
+extern "C" void __asan_unpoison_memory_region(void const volatile *addr, size_t size);
+extern "C" bool __asan_address_is_poisoned(void const volatile *addr);
+#endif
+
 namespace WTF {
 
 inline void adopted(const void*) { }
@@ -42,6 +48,10 @@ template<typename T> class Ref {
 public:
     ~Ref()
     {
+#if ASAN_ENABLED
+        if (__asan_address_is_poisoned(this))
+            __asan_unpoison_memory_region(this, sizeof(*this));
+#endif
         if (m_ptr)
             m_ptr->deref();
     }
@@ -126,7 +136,11 @@ public:
     {
         ASSERT(m_ptr);
 
-        return *std::exchange(m_ptr, nullptr);
+        T& result = *std::exchange(m_ptr, nullptr);
+#if ASAN_ENABLED
+        __asan_poison_memory_region(this, sizeof(*this));
+#endif
+        return result;
     }
 
 private:
@@ -148,6 +162,16 @@ template<typename T> template<typename U> inline Ref<T> Ref<T>::replace(Ref<U>&&
     return oldReference;
 }
 
+template<typename T, typename U> inline Ref<T> static_reference_cast(Ref<U>& reference)
+{
+    return Ref<T>(static_cast<T&>(reference.get()));
+}
+
+template<typename T, typename U> inline Ref<T> static_reference_cast(const Ref<U>& reference)
+{
+    return Ref<T>(static_cast<T&>(reference.copyRef().get()));
+}
+
 template <typename T>
 struct GetPtrHelper<Ref<T>> {
     typedef T* PtrType;
@@ -166,5 +190,6 @@ inline Ref<T> adoptRef(T& reference)
 
 using WTF::Ref;
 using WTF::adoptRef;
+using WTF::static_reference_cast;
 
 #endif // WTF_Ref_h

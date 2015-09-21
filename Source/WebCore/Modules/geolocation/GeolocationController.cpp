@@ -63,7 +63,7 @@ void GeolocationController::addObserver(Geolocation* observer, bool enableHighAc
 
     if (enableHighAccuracy)
         m_client.setEnableHighAccuracy(true);
-    if (wasEmpty)
+    if (wasEmpty && m_page.isVisible())
         m_client.startUpdating();
 }
 
@@ -104,16 +104,16 @@ void GeolocationController::positionChanged(GeolocationPosition* position)
     m_lastPosition = position;
     Vector<RefPtr<Geolocation>> observersVector;
     copyToVector(m_observers, observersVector);
-    for (size_t i = 0; i < observersVector.size(); ++i)
-        observersVector[i]->positionChanged();
+    for (auto& observer : observersVector)
+        observer->positionChanged();
 }
 
 void GeolocationController::errorOccurred(GeolocationError* error)
 {
     Vector<RefPtr<Geolocation>> observersVector;
     copyToVector(m_observers, observersVector);
-    for (size_t i = 0; i < observersVector.size(); ++i)
-        observersVector[i]->setError(error);
+    for (auto& observer : observersVector)
+        observer->setError(error);
 }
 
 GeolocationPosition* GeolocationController::lastPosition()
@@ -124,8 +124,17 @@ GeolocationPosition* GeolocationController::lastPosition()
     return m_client.lastPosition();
 }
 
-void GeolocationController::viewStateDidChange(ViewState::Flags, ViewState::Flags)
+void GeolocationController::viewStateDidChange(ViewState::Flags oldViewState, ViewState::Flags newViewState)
 {
+    // Toggle GPS based on page visibility to save battery.
+    ViewState::Flags changed = oldViewState ^ newViewState;
+    if (changed & ViewState::IsVisible && !m_observers.isEmpty()) {
+        if (newViewState & ViewState::IsVisible)
+            m_client.startUpdating();
+        else
+            m_client.stopUpdating();
+    }
+
     if (!m_page.isVisible())
         return;
 

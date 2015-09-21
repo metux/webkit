@@ -52,7 +52,7 @@ ApplicationCache::ApplicationCache()
 
 ApplicationCache::~ApplicationCache()
 {
-    if (m_group && !m_group->isCopy())
+    if (m_group)
         m_group->cacheDestroyed(this);
 }
     
@@ -91,7 +91,7 @@ void ApplicationCache::addResource(PassRefPtr<ApplicationCacheResource> resource
         ASSERT(resource->type() & ApplicationCacheResource::Master);
         
         // Add the resource to the storage.
-        cacheStorage().store(resource.get(), this);
+        ApplicationCacheStorage::singleton().store(resource.get(), this);
     }
 
     m_estimatedSizeInStorage += resource->estimatedSizeInStorage();
@@ -190,46 +190,6 @@ void ApplicationCache::clearStorageID()
         resource->clearStorageID();
 }
     
-void ApplicationCache::deleteCacheForOrigin(SecurityOrigin* origin)
-{
-    Vector<URL> urls;
-    if (!cacheStorage().getManifestURLs(&urls)) {
-        LOG_ERROR("Failed to retrieve ApplicationCache manifest URLs");
-        return;
-    }
-
-    URL originURL(URL(), origin->toString());
-
-    size_t count = urls.size();
-    for (size_t i = 0; i < count; ++i) {
-        if (protocolHostAndPortAreEqual(urls[i], originURL)) {
-            ApplicationCacheGroup* group = cacheStorage().findInMemoryCacheGroup(urls[i]);
-            if (group)
-                group->makeObsolete();
-            else
-                cacheStorage().deleteCacheGroup(urls[i]);
-        }
-    }
-}
-
-void ApplicationCache::deleteAllCaches()
-{
-    HashSet<RefPtr<SecurityOrigin>> origins;
-
-    cacheStorage().getOriginsWithCache(origins);
-    for (auto& origin : origins)
-        deleteCacheForOrigin(origin.get());
-
-    cacheStorage().vacuumDatabaseFile();
-}
-
-int64_t ApplicationCache::diskUsageForOrigin(SecurityOrigin* origin)
-{
-    int64_t usage = 0;
-    cacheStorage().calculateUsageForOrigin(origin, usage);
-    return usage;
-}
-
 #ifndef NDEBUG
 void ApplicationCache::dump()
 {

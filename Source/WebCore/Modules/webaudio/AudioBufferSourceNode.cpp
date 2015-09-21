@@ -56,7 +56,7 @@ Ref<AudioBufferSourceNode> AudioBufferSourceNode::create(AudioContext* context, 
 
 AudioBufferSourceNode::AudioBufferSourceNode(AudioContext* context, float sampleRate)
     : AudioScheduledSourceNode(context, sampleRate)
-    , m_buffer(0)
+    , m_buffer(nullptr)
     , m_isLooping(false)
     , m_loopStart(0)
     , m_loopEnd(0)
@@ -65,7 +65,7 @@ AudioBufferSourceNode::AudioBufferSourceNode(AudioContext* context, float sample
     , m_grainOffset(0.0)
     , m_grainDuration(DefaultGrainDuration)
     , m_lastGain(1.0)
-    , m_pannerNode(0)
+    , m_pannerNode(nullptr)
 {
     setNodeType(NodeTypeAudioBufferSource);
 
@@ -94,7 +94,7 @@ void AudioBufferSourceNode::process(size_t framesToProcess)
     }
 
     // The audio thread can't block on this lock, so we use std::try_to_lock instead.
-    std::unique_lock<std::mutex> lock(m_processMutex, std::try_to_lock);
+    std::unique_lock<Lock> lock(m_processMutex, std::try_to_lock);
     if (!lock.owns_lock()) {
         // Too bad - the try_lock() failed. We must be in the middle of changing buffers and were already outputting silence anyway.
         outputBus->zero();
@@ -416,7 +416,7 @@ bool AudioBufferSourceNode::setBuffer(AudioBuffer* buffer)
     AudioContext::AutoLocker contextLocker(*context());
     
     // This synchronizes with process().
-    std::lock_guard<std::mutex> lock(m_processMutex);
+    std::lock_guard<Lock> lock(m_processMutex);
     
     if (buffer) {
         // Do any necesssary re-configuration to the buffer's number of channels.
@@ -469,8 +469,7 @@ void AudioBufferSourceNode::startPlaying(BufferPlaybackMode playbackMode, double
 {
     ASSERT(isMainThread());
 
-    if (ScriptController::processingUserGesture())
-        context()->removeBehaviorRestriction(AudioContext::RequireUserGestureForAudioStartRestriction);
+    context()->nodeWillBeginPlayback();
 
     if (m_playbackState != UNSCHEDULED_STATE) {
         ec = INVALID_STATE_ERR;
@@ -602,7 +601,7 @@ void AudioBufferSourceNode::clearPannerNode()
 {
     if (m_pannerNode) {
         m_pannerNode->deref(AudioNode::RefTypeConnection);
-        m_pannerNode = 0;
+        m_pannerNode = nullptr;
     }
 }
 

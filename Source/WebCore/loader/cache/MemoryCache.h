@@ -28,6 +28,7 @@
 #include "NativeImagePtr.h"
 #include "SecurityOriginHash.h"
 #include "SessionID.h"
+#include "Timer.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
@@ -91,7 +92,6 @@ public:
 
     WEBCORE_EXPORT static MemoryCache& singleton();
 
-    WEBCORE_EXPORT CachedResource* resourceForURL(const URL&, SessionID = SessionID::defaultSessionID());
     WEBCORE_EXPORT CachedResource* resourceForRequest(const ResourceRequest&, SessionID);
 
     bool add(CachedResource&);
@@ -115,8 +115,10 @@ public:
     bool disabled() const { return m_disabled; }
 
     WEBCORE_EXPORT void evictResources();
+    WEBCORE_EXPORT void evictResources(SessionID);
     
     void prune();
+    void pruneSoon();
     unsigned size() const { return m_liveSize + m_deadSize; }
 
     void setDeadDecodedDataDeletionInterval(std::chrono::milliseconds interval) { m_deadDecodedDataDeletionInterval = interval; }
@@ -146,7 +148,9 @@ public:
 
     typedef HashSet<RefPtr<SecurityOrigin>> SecurityOriginSet;
     WEBCORE_EXPORT void removeResourcesWithOrigin(SecurityOrigin&);
+    WEBCORE_EXPORT void removeResourcesWithOrigins(SessionID, const HashSet<RefPtr<SecurityOrigin>>&);
     WEBCORE_EXPORT void getOriginsWithCache(SecurityOriginSet& origins);
+    WEBCORE_EXPORT HashSet<RefPtr<SecurityOrigin>> originsWithCache(SessionID) const;
 
 #if USE(CG)
     // FIXME: Remove the USE(CG) once we either make NativeImagePtr a smart pointer on all platforms or
@@ -160,6 +164,9 @@ public:
     WEBCORE_EXPORT void pruneDeadResources(); // Automatically decide how much to prune.
     WEBCORE_EXPORT void pruneLiveResources(bool shouldDestroyDecodedDataForAllLiveResources = false);
 
+    WEBCORE_EXPORT void pruneDeadResourcesToSize(unsigned targetSize);
+    WEBCORE_EXPORT void pruneLiveResourcesToSize(unsigned targetSize, bool shouldDestroyDecodedDataForAllLiveResources = false);
+
 private:
 #if ENABLE(CACHE_PARTITIONING)
     typedef HashMap<std::pair<URL, String /* partitionName */>, CachedResource*> CachedResourceMap;
@@ -167,9 +174,6 @@ private:
     typedef HashMap<URL, CachedResource*> CachedResourceMap;
 #endif
     typedef ListHashSet<CachedResource*> LRUList;
-
-    WEBCORE_EXPORT void pruneDeadResourcesToSize(unsigned targetSize);
-    WEBCORE_EXPORT void pruneLiveResourcesToSize(unsigned targetSize, bool shouldDestroyDecodedDataForAllLiveResources = false);
 
     MemoryCache();
     ~MemoryCache(); // Not implemented to make sure nobody accidentally calls delete -- WebCore does not delete singletons.
@@ -182,6 +186,7 @@ private:
 
     unsigned liveCapacity() const;
     unsigned deadCapacity() const;
+    bool needsPruning() const;
 
     CachedResource* resourceForRequestImpl(const ResourceRequest&, CachedResourceMap&);
 
@@ -211,6 +216,8 @@ private:
     // referenced by a Web page).
     typedef HashMap<SessionID, std::unique_ptr<CachedResourceMap>> SessionCachedResourceMap;
     SessionCachedResourceMap m_sessionResources;
+
+    Timer m_pruneTimer;
 };
 
 }

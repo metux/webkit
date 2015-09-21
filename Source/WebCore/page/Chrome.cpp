@@ -23,14 +23,13 @@
 #include "Chrome.h"
 
 #include "ChromeClient.h"
-#include "DNS.h"
-#include "DateTimeChooser.h"
 #include "Document.h"
 #include "DocumentType.h"
 #include "FileIconLoader.h"
 #include "FileChooser.h"
 #include "FileList.h"
 #include "FloatRect.h"
+#include "FrameLoaderClient.h"
 #include "FrameTree.h"
 #include "Geolocation.h"
 #include "HTMLFormElement.h"
@@ -98,7 +97,7 @@ void Chrome::scroll(const IntSize& scrollDelta, const IntRect& rectToScroll, con
     InspectorInstrumentation::didScroll(m_page);
 }
 
-#if USE(TILED_BACKING_STORE)
+#if USE(COORDINATED_GRAPHICS)
 void Chrome::delegatedScrollRequested(const IntPoint& scrollPoint)
 {
     m_client.delegatedScrollRequested(scrollPoint);
@@ -348,24 +347,10 @@ void Chrome::setStatusbarText(Frame* frame, const String& status)
     m_client.setStatusbarText(frame->displayStringModifiedByEncoding(status));
 }
 
-bool Chrome::shouldInterruptJavaScript()
-{
-    // Defer loads in case the client method runs a new event loop that would
-    // otherwise cause the load to continue while we're in the middle of executing JavaScript.
-    PageGroupLoadDeferrer deferrer(m_page, true);
-
-    return m_client.shouldInterruptJavaScript();
-}
-
-IntRect Chrome::windowResizerRect() const
-{
-    return m_client.windowResizerRect();
-}
-
 void Chrome::mouseDidMoveOverElement(const HitTestResult& result, unsigned modifierFlags)
 {
     if (result.innerNode() && result.innerNode()->document().isDNSPrefetchEnabled())
-        prefetchDNS(result.absoluteLinkURL().host());
+        m_page.mainFrame().loader().client().prefetchDNS(result.absoluteLinkURL().host());
     m_client.mouseDidMoveOverElement(result, modifierFlags);
 
     InspectorInstrumentation::mouseDidMoveOverElement(m_page, result, modifierFlags);
@@ -451,14 +436,6 @@ std::unique_ptr<ColorChooser> Chrome::createColorChooser(ColorChooserClient* cli
 {
     notifyPopupOpeningObservers();
     return m_client.createColorChooser(client, initialColor);
-}
-#endif
-
-#if ENABLE(DATE_AND_TIME_INPUT_TYPES) && !PLATFORM(IOS)
-PassRefPtr<DateTimeChooser> Chrome::openDateTimeChooser(DateTimeChooserClient* client, const DateTimeChooserParameters& parameters)
-{
-    notifyPopupOpeningObservers();
-    return m_client.openDateTimeChooser(client, parameters);
 }
 #endif
 
@@ -571,13 +548,13 @@ bool Chrome::hasOpenedPopup() const
     return m_client.hasOpenedPopup();
 }
 
-PassRefPtr<PopupMenu> Chrome::createPopupMenu(PopupMenuClient* client) const
+RefPtr<PopupMenu> Chrome::createPopupMenu(PopupMenuClient* client) const
 {
     notifyPopupOpeningObservers();
     return m_client.createPopupMenu(client);
 }
 
-PassRefPtr<SearchPopupMenu> Chrome::createSearchPopupMenu(PopupMenuClient* client) const
+RefPtr<SearchPopupMenu> Chrome::createSearchPopupMenu(PopupMenuClient* client) const
 {
     notifyPopupOpeningObservers();
     return m_client.createSearchPopupMenu(client);
@@ -618,8 +595,8 @@ void Chrome::unregisterPopupOpeningObserver(PopupOpeningObserver* observer)
 void Chrome::notifyPopupOpeningObservers() const
 {
     const Vector<PopupOpeningObserver*> observers(m_popupOpeningObservers);
-    for (size_t i = 0; i < observers.size(); ++i)
-        observers[i]->willOpenPopup();
+    for (auto& observer : observers)
+        observer->willOpenPopup();
 }
 
 void Chrome::didBeginTrackingPotentialLongMousePress(const IntPoint& mouseDownPosition, const HitTestResult& hitTestResult)

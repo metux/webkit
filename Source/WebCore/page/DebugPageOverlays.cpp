@@ -74,9 +74,9 @@ protected:
 
 class MouseWheelRegionOverlay final : public RegionOverlay {
 public:
-    static PassRefPtr<MouseWheelRegionOverlay> create(MainFrame& frame)
+    static Ref<MouseWheelRegionOverlay> create(MainFrame& frame)
     {
-        return adoptRef(new MouseWheelRegionOverlay(frame));
+        return adoptRef(*new MouseWheelRegionOverlay(frame));
     }
 
 private:
@@ -91,14 +91,20 @@ private:
 bool MouseWheelRegionOverlay::updateRegion()
 {
     std::unique_ptr<Region> region = std::make_unique<Region>();
+    
+    for (const Frame* frame = &m_frame; frame; frame = frame->tree().traverseNext()) {
+        if (!frame->view() || !frame->document())
+            continue;
 
-    for (auto& element : descendantsOfType<Element>(*m_frame.document())) {
-        if (element.hasEventListeners(eventNames().mousewheelEvent) || element.hasEventListeners(eventNames().wheelEvent)) {
-            IntRect elementRect = element.boundsInRootViewSpace();
-            elementRect = m_frame.view()->rootViewToContents(elementRect);
-            region->unite(Region(elementRect));
-        }
+        Document::RegionFixedPair frameRegion = frame->document()->absoluteRegionForEventTargets(frame->document()->wheelEventTargets());
+    
+        IntPoint frameOffset = frame->view()->contentsToRootView(IntPoint());
+        frameRegion.first.translate(toIntSize(frameOffset));
+        
+        region->unite(frameRegion.first);
     }
+    
+    region->translate(m_overlay->viewToOverlayOffset());
 
     bool regionChanged = !m_region || !(*m_region == *region);
     m_region = WTF::move(region);
@@ -107,9 +113,9 @@ bool MouseWheelRegionOverlay::updateRegion()
 
 class NonFastScrollableRegionOverlay final : public RegionOverlay {
 public:
-    static PassRefPtr<NonFastScrollableRegionOverlay> create(MainFrame& frame)
+    static Ref<NonFastScrollableRegionOverlay> create(MainFrame& frame)
     {
-        return adoptRef(new NonFastScrollableRegionOverlay(frame));
+        return adoptRef(*new NonFastScrollableRegionOverlay(frame));
     }
 
 private:
@@ -127,11 +133,8 @@ bool NonFastScrollableRegionOverlay::updateRegion()
 
     if (Page* page = m_frame.page()) {
         if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-            *region = scrollingCoordinator->computeNonFastScrollableRegion(&m_frame, IntPoint());
+            *region = scrollingCoordinator->absoluteNonFastScrollableRegion();
     }
-
-    // computeNonFastScrollableRegion() applies topContentInset.
-    region->translate(IntSize(0, -m_frame.view()->topContentInset()));
 
     bool regionChanged = !m_region || !(*m_region == *region);
     m_region = WTF::move(region);
@@ -262,9 +265,9 @@ void DebugPageOverlays::hideRegionOverlay(MainFrame& frame, RegionType regionTyp
     }
 }
 
-void DebugPageOverlays::regionChanged(MainFrame& frame, RegionType regionType)
+void DebugPageOverlays::regionChanged(Frame& frame, RegionType regionType)
 {
-    if (RegionOverlay* visualizer = regionOverlayForFrame(frame, regionType))
+    if (RegionOverlay* visualizer = regionOverlayForFrame(frame.mainFrame(), regionType))
         visualizer->recomputeRegion();
 }
 

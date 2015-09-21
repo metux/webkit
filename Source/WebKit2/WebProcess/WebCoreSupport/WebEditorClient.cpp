@@ -53,6 +53,10 @@
 #include <wtf/NeverDestroyed.h>
 #include <wtf/text/StringView.h>
 
+#if PLATFORM(X11)
+#include <WebCore/PlatformDisplay.h>
+#endif
+
 using namespace WebCore;
 using namespace HTMLNames;
 
@@ -155,6 +159,11 @@ bool WebEditorClient::shouldApplyStyle(StyleProperties* style, Range* range)
     return result;
 }
 
+void WebEditorClient::didApplyStyle()
+{
+    notImplemented();
+}
+
 bool WebEditorClient::shouldMoveRangeAfterDelete(Range*, Range*)
 {
     notImplemented();
@@ -188,6 +197,11 @@ void WebEditorClient::respondToChangedSelection(Frame* frame)
 #if PLATFORM(GTK)
     updateGlobalSelection(frame);
 #endif
+}
+
+void WebEditorClient::didChangeSelectionAndUpdateLayout()
+{
+    m_page->sendPostLayoutEditorStateIfNeeded();
 }
 
 void WebEditorClient::discardedComposition(Frame*)
@@ -512,15 +526,20 @@ void WebEditorClient::willSetInputMethodState()
 {
 }
 
-void WebEditorClient::setInputMethodState(bool)
+void WebEditorClient::setInputMethodState(bool enabled)
 {
+#if PLATFORM(GTK)
+    m_page->setInputMethodState(enabled);
+#else
     notImplemented();
+    UNUSED_PARAM(enabled);
+#endif
 }
 
 bool WebEditorClient::supportsGlobalSelection()
 {
 #if PLATFORM(GTK) && PLATFORM(X11)
-    return true;
+    return PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::X11;
 #else
     // FIXME: Return true on other X11 platforms when they support global selection.
     return false;

@@ -39,19 +39,28 @@
 namespace WebCore {
 
 class DOMWrapperWorld;
+class DocumentLoader;
 class Page;
+class ResourceRequest;
+class StyleSheetContents;
 class URL;
 class UserScript;
 class UserStyleSheet;
 class UserMessageHandlerDescriptor;
 
+enum class ResourceType : uint16_t;
+
+struct ResourceLoadInfo;
+
 namespace ContentExtensions {
+class CompiledContentExtension;
 class ContentExtensionsBackend;
+struct Action;
 }
 
 class UserContentController : public RefCounted<UserContentController> {
 public:
-    WEBCORE_EXPORT static RefPtr<UserContentController> create();
+    WEBCORE_EXPORT static Ref<UserContentController> create();
     WEBCORE_EXPORT ~UserContentController();
 
     void addPage(Page&);
@@ -79,12 +88,12 @@ public:
 #endif
 
 #if ENABLE(CONTENT_EXTENSIONS)
-    // FIXME: This should really take a pointer to a compiled UserContentFilter.
-    WEBCORE_EXPORT void addUserContentFilter(const String& name, const String& ruleList);
-    WEBCORE_EXPORT void removeAllUserContentFilters();
-    
-    // FIXME: Consider putting this (and other future content filter predicates) in its own class.
-    bool contentFilterBlocksURL(const URL&);
+    WEBCORE_EXPORT void addUserContentExtension(const String& name, RefPtr<ContentExtensions::CompiledContentExtension>);
+    WEBCORE_EXPORT void removeUserContentExtension(const String& name);
+    WEBCORE_EXPORT void removeAllUserContentExtensions();
+
+    void processContentExtensionRulesForLoad(Page&, ResourceRequest&, ResourceType, DocumentLoader& initiatingDocumentLoader);
+    Vector<ContentExtensions::Action> actionsForResourceLoad(Page&, const ResourceLoadInfo&);
 #endif
 
 private:

@@ -28,17 +28,23 @@
 
 #if ENABLE(CONTENT_EXTENSIONS)
 
+#include "ContentExtension.h"
 #include "ContentExtensionRule.h"
-#include "DFA.h"
 #include <wtf/HashMap.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
+class DocumentLoader;
+class ResourceRequest;
 class URL;
 
+struct ResourceLoadInfo;
+
 namespace ContentExtensions {
+
+class CompiledContentExtension;
 
 // The ContentExtensionsBackend is the internal model of all the content extensions.
 //
@@ -51,20 +57,20 @@ public:
 
     // Set a list of rules for a given name. If there were existing rules for the name, they are overriden.
     // The identifier cannot be empty.
-    void setRuleList(const String& identifier, const Vector<ContentExtensionRule>&);
-    void removeRuleList(const String& identifier);
-    void removeAllRuleLists();
+    WEBCORE_EXPORT void addContentExtension(const String& identifier, RefPtr<CompiledContentExtension>);
+    WEBCORE_EXPORT void removeContentExtension(const String& identifier);
+    WEBCORE_EXPORT void removeAllContentExtensions();
 
     // - Internal WebCore Interface.
-    bool shouldBlockURL(const URL&);
+    WEBCORE_EXPORT Vector<Action> actionsForResourceLoad(const ResourceLoadInfo&) const;
+    WEBCORE_EXPORT StyleSheetContents* globalDisplayNoneStyleSheet(const String& identifier) const;
+
+    void processContentExtensionRulesForLoad(ResourceRequest&, ResourceType, DocumentLoader& initiatingDocumentLoader);
+
+    static const String& displayNoneCSSRule();
 
 private:
-    struct CompiledContentExtension {
-        DFA dfa;
-        Vector<ContentExtensionRule> ruleList;
-    };
-
-    HashMap<String, CompiledContentExtension> m_ruleLists;
+    HashMap<String, RefPtr<ContentExtension>> m_contentExtensions;
 };
 
 } // namespace ContentExtensions

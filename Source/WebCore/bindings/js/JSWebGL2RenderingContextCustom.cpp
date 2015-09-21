@@ -25,7 +25,7 @@
 
 #include "config.h"
 
-#if ENABLE(WEBGL)
+#if ENABLE(WEBGL) && ENABLE(WEBGL2)
 #include "JSWebGL2RenderingContext.h"
 
 #include "NotImplemented.h"
@@ -68,12 +68,6 @@ static JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, const WebG
 void JSWebGL2RenderingContext::visitAdditionalChildren(SlotVisitor& visitor)
 {
     visitor.addOpaqueRoot(&impl());
-}
-    
-JSValue JSWebGL2RenderingContext::getFramebufferAttachmentParameter(ExecState* exec)
-{
-    UNUSED_PARAM(exec);
-    return jsUndefined();
 }
 
 JSValue JSWebGL2RenderingContext::getInternalformatParameter(ExecState* exec)

@@ -58,6 +58,7 @@ typedef const struct _xpc_type_s* xpc_type_t;
 
 #if COMPILER_SUPPORTS(BLOCKS)
 typedef bool (^xpc_array_applier_t)(size_t index, xpc_object_t);
+typedef bool (^xpc_dictionary_applier_t)(const char *key, xpc_object_t value);
 typedef void (^xpc_handler_t)(xpc_object_t);
 #endif
 
@@ -98,6 +99,7 @@ EXTERN_C const struct _xpc_type_s _xpc_type_string;
 EXTERN_C xpc_object_t xpc_array_create(const xpc_object_t*, size_t count);
 #if COMPILER_SUPPORTS(BLOCKS)
 EXTERN_C bool xpc_array_apply(xpc_object_t, xpc_array_applier_t);
+EXTERN_C bool xpc_dictionary_apply(xpc_object_t xdict, xpc_dictionary_applier_t applier);
 #endif
 EXTERN_C size_t xpc_array_get_count(xpc_object_t);
 EXTERN_C const char* xpc_array_get_string(xpc_object_t, size_t index);
@@ -127,10 +129,9 @@ EXTERN_C void xpc_dictionary_set_uint64(xpc_object_t, const char* key, uint64_t 
 EXTERN_C void xpc_dictionary_set_value(xpc_object_t, const char*key, xpc_object_t value);
 EXTERN_C xpc_type_t xpc_get_type(xpc_object_t);
 EXTERN_C void xpc_main(xpc_connection_handler_t);
-EXTERN_C xpc_object_t xpc_retain(xpc_object_t);
-EXTERN_C void xpc_release(xpc_object_t);
 EXTERN_C const char* xpc_string_get_string_ptr(xpc_object_t);
 EXTERN_C void xpc_transaction_begin(void);
+EXTERN_C void xpc_track_activity(void);
 
 EXTERN_C xpc_object_t xpc_connection_copy_entitlement_value(xpc_connection_t, const char* entitlement);
 EXTERN_C void xpc_connection_get_audit_token(xpc_connection_t, audit_token_t*);
@@ -141,14 +142,24 @@ EXTERN_C void xpc_dictionary_set_mach_send(xpc_object_t, const char*, mach_port_
 
 #if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 EXTERN_C void xpc_connection_set_bootstrap(xpc_connection_t, xpc_object_t bootstrap);
+EXTERN_C xpc_object_t xpc_copy_bootstrap(void);
+EXTERN_C void xpc_connection_set_oneshot_instance(xpc_connection_t, uuid_t instance);
 #endif
 
-#if !defined(xpc_retain) && OS_OBJECT_USE_OBJC_RETAIN_RELEASE
+#if OS_OBJECT_USE_OBJC_RETAIN_RELEASE
+#if !defined(xpc_retain)
 #define xpc_retain(object) ({ xpc_object_t _o = (object); _xpc_object_validate(_o); [_o retain]; })
 #endif
+#else
+EXTERN_C xpc_object_t xpc_retain(xpc_object_t);
+#endif
 
-#if !defined(xpc_release) && OS_OBJECT_USE_OBJC_RETAIN_RELEASE
+#if OS_OBJECT_USE_OBJC_RETAIN_RELEASE
+#if !defined(xpc_retain)
 #define xpc_release(object) ({ xpc_object_t _o = (object); _xpc_object_validate(_o); [_o release]; })
+#endif
+#else
+EXTERN_C void xpc_release(xpc_object_t);
 #endif
 
 #endif // XPCSPI_h

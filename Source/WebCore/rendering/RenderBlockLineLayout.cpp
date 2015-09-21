@@ -26,7 +26,7 @@
 
 #include "AXObjectCache.h"
 #include "BidiResolver.h"
-#include "BreakingContextInlineHeaders.h"
+#include "BreakingContext.h"
 #include "FloatingObjects.h"
 #include "InlineElementBox.h"
 #include "InlineIterator.h"
@@ -71,13 +71,12 @@ static void determineDirectionality(TextDirection& dir, InlineIterator iter)
     }
 }
 
-inline BidiRun* createRun(int start, int end, RenderObject* obj, InlineBidiResolver& resolver)
+inline BidiRun* createRun(int start, int end, RenderObject& obj, InlineBidiResolver& resolver)
 {
-    ASSERT(obj);
-    return new BidiRun(start, end, *obj, resolver.context(), resolver.dir());
+    return new BidiRun(start, end, obj, resolver.context(), resolver.dir());
 }
 
-void RenderBlockFlow::appendRunsForObject(BidiRunList<BidiRun>& runs, int start, int end, RenderObject* obj, InlineBidiResolver& resolver)
+void RenderBlockFlow::appendRunsForObject(BidiRunList<BidiRun>* runs, int start, int end, RenderObject& obj, InlineBidiResolver& resolver)
 {
     if (start > end || shouldSkipCreatingRunsForObject(obj))
         return;
@@ -88,34 +87,34 @@ void RenderBlockFlow::appendRunsForObject(BidiRunList<BidiRun>& runs, int start,
     if (haveNextMidpoint)
         nextMidpoint = lineMidpointState.midpoints()[lineMidpointState.currentMidpoint()];
     if (lineMidpointState.betweenMidpoints()) {
-        if (!(haveNextMidpoint && nextMidpoint.renderer() == obj))
+        if (!haveNextMidpoint || (&obj != nextMidpoint.renderer()))
             return;
         // This is a new start point. Stop ignoring objects and
         // adjust our start.
-        lineMidpointState.setBetweenMidpoints(false);
         start = nextMidpoint.offset();
         lineMidpointState.incrementCurrentMidpoint();
-        if (start < end)
-            return appendRunsForObject(runs, start, end, obj, resolver);
+        if (start < end) {
+            appendRunsForObject(runs, start, end, obj, resolver);
+            return;
+        }
     } else {
-        if (!haveNextMidpoint || (obj != nextMidpoint.renderer())) {
-            runs.addRun(createRun(start, end, obj, resolver));
+        if (!haveNextMidpoint || (&obj != nextMidpoint.renderer())) {
+            if (runs)
+                runs->addRun(createRun(start, end, obj, resolver));
             return;
         }
 
-        // An end midpoint has been encountered within our object.  We
-        // need to go ahead and append a run with our endpoint.
+        // An end midpoint has been encountered within our object. We need to append a run with our endpoint.
         if (static_cast<int>(nextMidpoint.offset() + 1) <= end) {
-            lineMidpointState.setBetweenMidpoints(true);
             lineMidpointState.incrementCurrentMidpoint();
             // The end of the line is before the object we're inspecting. Skip everything and return
             if (nextMidpoint.refersToEndOfPreviousNode())
                 return;
-            if (static_cast<int>(nextMidpoint.offset() + 1) > start)
-                runs.addRun(createRun(start, nextMidpoint.offset() + 1, obj, resolver));
+            if (static_cast<int>(nextMidpoint.offset() + 1) > start && runs)
+                runs->addRun(createRun(start, nextMidpoint.offset() + 1, obj, resolver));
             appendRunsForObject(runs, nextMidpoint.offset() + 1, end, obj, resolver);
-        } else
-           runs.addRun(createRun(start, end, obj, resolver));
+        } else if (runs)
+            runs->addRun(createRun(start, end, obj, resolver));
     }
 }
 
@@ -193,6 +192,7 @@ InlineFlowBox* RenderBlockFlow::createLineBoxes(RenderObject* obj, const LineInf
     InlineFlowBox* parentBox = nullptr;
     InlineFlowBox* result = nullptr;
     bool hasDefaultLineBoxContain = style().lineBoxContain() == RenderStyle::initialLineBoxContain();
+    bool isBlockInsideInline = childBox->renderer().isAnonymousInlineBlock();
     do {
         ASSERT_WITH_SECURITY_IMPLICATION(is<RenderInline>(*obj) || obj == this);
 
@@ -216,6 +216,7 @@ InlineFlowBox* RenderBlockFlow::createLineBoxes(RenderObject* obj, const LineInf
             parentBox = downcast<InlineFlowBox>(newBox);
             parentBox->setIsFirstLine(lineInfo.isFirstLine());
             parentBox->setIsHorizontal(isHorizontalWritingMode());
+            parentBox->setHasAnonymousInlineBlock(isBlockInsideInline);
             if (!hasDefaultLineBoxContain)
                 parentBox->clearDescendantsHaveSameLineHeightAndBaseline();
             constructedNewBox = true;
@@ -283,6 +284,7 @@ RootInlineBox* RenderBlockFlow::constructLine(BidiRunList<BidiRun>& bidiRuns, co
     bool rootHasSelectedChildren = false;
     InlineFlowBox* parentBox = 0;
     int runCount = bidiRuns.runCount() - lineInfo.runsFromLeadingWhitespace();
+    
     for (BidiRun* r = bidiRuns.firstRun(); r; r = r->next()) {
         // Create a box for our object.
         bool isOnlyRun = (runCount == 1);
@@ -297,14 +299,15 @@ RootInlineBox* RenderBlockFlow::constructLine(BidiRunList<BidiRun>& bidiRuns, co
 
         if (!rootHasSelectedChildren && box->renderer().selectionState() != RenderObject::SelectionNone)
             rootHasSelectedChildren = true;
-
+        
         // If we have no parent box yet, or if the run is not simply a sibling,
         // then we need to construct inline boxes as necessary to properly enclose the
         // run's inline box. Segments can only be siblings at the root level, as
         // they are positioned separately.
         if (!parentBox || &parentBox->renderer() != r->renderer().parent()) {
             // Create new inline boxes all the way back to the appropriate insertion point.
-            parentBox = createLineBoxes(r->renderer().parent(), lineInfo, box);
+            RenderObject* parentToUse = r->renderer().parent();
+            parentBox = createLineBoxes(parentToUse, lineInfo, box);
         } else {
             // Append the inline box to this line.
             parentBox->addToLine(box);
@@ -413,8 +416,7 @@ static void updateLogicalWidthForRightAlignedBlock(bool isLeftToRightDirection, 
             totalLogicalWidth -= trailingSpaceRun->box()->logicalWidth();
             trailingSpaceRun->box()->setLogicalWidth(0);
         }
-        if (totalLogicalWidth < availableLogicalWidth)
-            logicalLeft += availableLogicalWidth - totalLogicalWidth;
+        logicalLeft += std::max(0.f, availableLogicalWidth - totalLogicalWidth);
         return;
     }
 
@@ -455,13 +457,13 @@ void RenderBlockFlow::setMarginsForRubyRun(BidiRun* run, RenderRubyRun& renderer
     setMarginEndForChild(renderer, -endOverhang);
 }
 
-static inline void setLogicalWidthForTextRun(RootInlineBox* lineBox, BidiRun* run, RenderText* renderer, float xPos, const LineInfo& lineInfo,
+static inline void setLogicalWidthForTextRun(RootInlineBox* lineBox, BidiRun* run, RenderText& renderer, float xPos, const LineInfo& lineInfo,
     GlyphOverflowAndFallbackFontsMap& textBoxDataMap, VerticalPositionCache& verticalPositionCache, WordMeasurements& wordMeasurements)
 {
     HashSet<const Font*> fallbackFonts;
     GlyphOverflow glyphOverflow;
 
-    const FontCascade& font = lineStyle(*renderer->parent(), lineInfo).fontCascade();
+    const FontCascade& font = lineStyle(*renderer.parent(), lineInfo).fontCascade();
     // Always compute glyph overflow if the block's line-box-contain value is "glyphs".
     if (lineBox->fitsToGlyphs()) {
         // If we don't stick out of the root line's font box, then don't bother computing our glyph overflow. This optimization
@@ -483,7 +485,7 @@ static inline void setLogicalWidthForTextRun(RootInlineBox* lineBox, BidiRun* ru
     float measuredWidth = 0;
 
     bool kerningIsEnabled = font.typesettingFeatures() & Kerning;
-    bool canUseSimpleFontCodePath = renderer->canUseSimpleFontCodePath();
+    bool canUseSimpleFontCodePath = renderer.canUseSimpleFontCodePath();
     
     // Since we don't cache glyph overflows, we need to re-measure the run if
     // the style is linebox-contain: glyph.
@@ -494,18 +496,18 @@ static inline void setLogicalWidthForTextRun(RootInlineBox* lineBox, BidiRun* ru
             WordMeasurement& wordMeasurement = wordMeasurements[i];
             if (wordMeasurement.width <= 0 || wordMeasurement.startOffset == wordMeasurement.endOffset)
                 continue;
-            if (wordMeasurement.renderer != renderer || wordMeasurement.startOffset != lastEndOffset || wordMeasurement.endOffset > run->m_stop)
+            if (wordMeasurement.renderer != &renderer || wordMeasurement.startOffset != lastEndOffset || wordMeasurement.endOffset > run->m_stop)
                 continue;
 
             lastEndOffset = wordMeasurement.endOffset;
             if (kerningIsEnabled && lastEndOffset == run->m_stop) {
                 int wordLength = lastEndOffset - wordMeasurement.startOffset;
                 GlyphOverflow overflow;
-                measuredWidth += renderer->width(wordMeasurement.startOffset, wordLength, xPos + measuredWidth, lineInfo.isFirstLine(),
+                measuredWidth += renderer.width(wordMeasurement.startOffset, wordLength, xPos + measuredWidth, lineInfo.isFirstLine(),
                     &wordMeasurement.fallbackFonts, &overflow);
-                UChar c = renderer->characterAt(wordMeasurement.startOffset);
+                UChar c = renderer.characterAt(wordMeasurement.startOffset);
                 if (i > 0 && wordLength == 1 && (c == ' ' || c == '\t'))
-                    measuredWidth += renderer->style().fontCascade().wordSpacing();
+                    measuredWidth += renderer.style().fontCascade().wordSpacing();
             } else
                 measuredWidth += wordMeasurement.width;
             if (!wordMeasurement.fallbackFonts.isEmpty()) {
@@ -522,7 +524,7 @@ static inline void setLogicalWidthForTextRun(RootInlineBox* lineBox, BidiRun* ru
     }
 
     if (!measuredWidth)
-        measuredWidth = renderer->width(run->m_start, run->m_stop - run->m_start, xPos, lineInfo.isFirstLine(), &fallbackFonts, &glyphOverflow);
+        measuredWidth = renderer.width(run->m_start, run->m_stop - run->m_start, xPos, lineInfo.isFirstLine(), &fallbackFonts, &glyphOverflow);
 
     run->box()->setLogicalWidth(measuredWidth + hyphenWidth);
     if (!fallbackFonts.isEmpty()) {
@@ -534,7 +536,7 @@ static inline void setLogicalWidthForTextRun(RootInlineBox* lineBox, BidiRun* ru
     }
 
     // Include text decoration visual overflow as part of the glyph overflow.
-    if (renderer->style().textDecorationsInEffect() != TextDecorationNone)
+    if (renderer.style().textDecorationsInEffect() != TextDecorationNone)
         glyphOverflow.extendTo(visualOverflowForDecorations(run->box()->lineStyle(), downcast<InlineTextBox>(run->box())));
 
     if (!glyphOverflow.isEmpty()) {
@@ -566,33 +568,29 @@ void RenderBlockFlow::updateRubyForJustifiedText(RenderRubyRun& rubyRun, BidiRun
         totalOpportunitiesInRun += opportunitiesInRun;
     }
 
-    if (totalOpportunitiesInRun) {
-        ASSERT(!rubyRun.hasOverrideWidth());
-        float newBaseWidth = rubyRun.logicalWidth() + totalExpansion + marginStartForChild(rubyRun) + marginEndForChild(rubyRun);
-        float newRubyRunWidth = rubyRun.logicalWidth() + totalExpansion;
-        rubyBase.setInitialOffset((newRubyRunWidth - newBaseWidth) / 2);
-        rubyRun.setOverrideLogicalContentWidth(newRubyRunWidth);
-        rubyRun.setNeedsLayout(MarkOnlyThis);
-        rootBox.markDirty();
-        if (RenderRubyText* rubyText = rubyRun.rubyText()) {
-            if (RootInlineBox* textRootBox = rubyText->firstRootBox())
-                textRootBox->markDirty();
-        }
-        rubyRun.layoutBlock(true);
-        rubyRun.clearOverrideLogicalContentWidth();
-        r.box()->setExpansion(newRubyRunWidth - r.box()->logicalWidth());
-
-        // This relayout caused the size of the RenderRubyText and the RenderRubyBase to change, dependent on the line's current expansion. Next time we relayout the
-        // RenderRubyRun, make sure that we relayout the RenderRubyBase and RenderRubyText as well.
-        rubyBase.setNeedsLayout(MarkOnlyThis);
-        if (RenderRubyText* rubyText = rubyRun.rubyText())
-            rubyText->setNeedsLayout(MarkOnlyThis);
-        if (rubyBase.lastLeafChild() && is<RenderText>(rubyBase.lastLeafChild()) && r.box() && r.box()->nextLeafChild() && !r.box()->nextLeafChild()->isLineBreak())
-            downcast<RenderText>(rubyBase.lastLeafChild())->setContentIsKnownToFollow(true);
-
-        totalLogicalWidth += totalExpansion;
-        expansionOpportunityCount -= totalOpportunitiesInRun;
+    ASSERT(!rubyRun.hasOverrideLogicalContentWidth());
+    float newBaseWidth = rubyRun.logicalWidth() + totalExpansion + marginStartForChild(rubyRun) + marginEndForChild(rubyRun);
+    float newRubyRunWidth = rubyRun.logicalWidth() + totalExpansion;
+    rubyBase.setInitialOffset((newRubyRunWidth - newBaseWidth) / 2);
+    rubyRun.setOverrideLogicalContentWidth(newRubyRunWidth);
+    rubyRun.setNeedsLayout(MarkOnlyThis);
+    rootBox.markDirty();
+    if (RenderRubyText* rubyText = rubyRun.rubyText()) {
+        if (RootInlineBox* textRootBox = rubyText->firstRootBox())
+            textRootBox->markDirty();
     }
+    rubyRun.layoutBlock(true);
+    rubyRun.clearOverrideLogicalContentWidth();
+    r.box()->setExpansion(newRubyRunWidth - r.box()->logicalWidth());
+
+    // This relayout caused the size of the RenderRubyText and the RenderRubyBase to change, dependent on the line's current expansion. Next time we relayout the
+    // RenderRubyRun, make sure that we relayout the RenderRubyBase and RenderRubyText as well.
+    rubyBase.setNeedsLayout(MarkOnlyThis);
+    if (RenderRubyText* rubyText = rubyRun.rubyText())
+        rubyText->setNeedsLayout(MarkOnlyThis);
+
+    totalLogicalWidth += totalExpansion;
+    expansionOpportunityCount -= totalOpportunitiesInRun;
 }
 
 void RenderBlockFlow::computeExpansionForJustifiedText(BidiRun* firstRun, BidiRun* trailingSpaceRun, const Vector<unsigned, 16>& expansionOpportunities, unsigned expansionOpportunityCount, float totalLogicalWidth, float availableLogicalWidth)
@@ -676,11 +674,17 @@ void RenderBlockFlow::updateLogicalWidthForAlignment(const ETextAlign& textAlign
     }
 }
 
-static void updateLogicalInlinePositions(RenderBlockFlow& block, float& lineLogicalLeft, float& lineLogicalRight, float& availableLogicalWidth, bool firstLine, IndentTextOrNot shouldIndentText, LayoutUnit boxLogicalHeight)
+static void updateLogicalInlinePositions(RenderBlockFlow& block, float& lineLogicalLeft, float& lineLogicalRight, float& availableLogicalWidth, bool firstLine, IndentTextOrNot shouldIndentText, LayoutUnit boxLogicalHeight,
+    RootInlineBox* rootBox)
 {
     LayoutUnit lineLogicalHeight = block.minLineHeightForReplacedRenderer(firstLine, boxLogicalHeight);
-    lineLogicalLeft = block.logicalLeftOffsetForLine(block.logicalHeight(), shouldIndentText == IndentText, lineLogicalHeight);
-    lineLogicalRight = block.logicalRightOffsetForLine(block.logicalHeight(), shouldIndentText == IndentText, lineLogicalHeight);
+    if (rootBox->hasAnonymousInlineBlock()) {
+        lineLogicalLeft = block.logicalLeftOffsetForContent(block.logicalHeight());
+        lineLogicalRight = block.logicalRightOffsetForContent(block.logicalHeight());
+    } else {
+        lineLogicalLeft = block.logicalLeftOffsetForLine(block.logicalHeight(), shouldIndentText == IndentText, lineLogicalHeight);
+        lineLogicalRight = block.logicalRightOffsetForLine(block.logicalHeight(), shouldIndentText == IndentText, lineLogicalHeight);
+    }
     availableLogicalWidth = lineLogicalRight - lineLogicalLeft;
 }
 
@@ -698,12 +702,12 @@ void RenderBlockFlow::computeInlineDirectionPositionsForLine(RootInlineBox* line
     float lineLogicalLeft;
     float lineLogicalRight;
     float availableLogicalWidth;
-    updateLogicalInlinePositions(*this, lineLogicalLeft, lineLogicalRight, availableLogicalWidth, isFirstLine, shouldIndentText, 0);
+    updateLogicalInlinePositions(*this, lineLogicalLeft, lineLogicalRight, availableLogicalWidth, isFirstLine, shouldIndentText, 0, lineBox);
     bool needsWordSpacing;
 
     if (firstRun && firstRun->renderer().isReplaced()) {
         RenderBox& renderBox = downcast<RenderBox>(firstRun->renderer());
-        updateLogicalInlinePositions(*this, lineLogicalLeft, lineLogicalRight, availableLogicalWidth, isFirstLine, shouldIndentText, renderBox.logicalHeight());
+        updateLogicalInlinePositions(*this, lineLogicalLeft, lineLogicalRight, availableLogicalWidth, isFirstLine, shouldIndentText, renderBox.logicalHeight(), lineBox);
     }
 
     computeInlineDirectionPositionsForSegment(lineBox, lineInfo, textAlign, lineLogicalLeft, availableLogicalWidth, firstRun, trailingSpaceRun, textBoxDataMap, verticalPositionCache, wordMeasurements);
@@ -711,6 +715,94 @@ void RenderBlockFlow::computeInlineDirectionPositionsForLine(RootInlineBox* line
     // compute accurate widths for the inline flow boxes).
     needsWordSpacing = false;
     lineBox->placeBoxesInInlineDirection(lineLogicalLeft, needsWordSpacing);
+}
+
+static inline ExpansionBehavior expansionBehaviorForInlineTextBox(RenderBlockFlow& block, InlineTextBox& textBox, BidiRun* previousRun, BidiRun* nextRun, ETextAlign textAlign, bool isAfterExpansion)
+{
+    ExpansionBehavior result = 0;
+    bool setLeadingExpansion = false;
+    bool setTrailingExpansion = false;
+    if (textAlign == JUSTIFY) {
+        // If the next box is ruby, and we're justifying, and the first box in the ruby base has a leading expansion, and we are a text box, then
+        // force a trailing expansion.
+        if (nextRun && is<RenderRubyRun>(nextRun->renderer()) && downcast<RenderRubyRun>(nextRun->renderer()).rubyBase() && nextRun->renderer().style().collapseWhiteSpace()) {
+            auto& rubyBase = *downcast<RenderRubyRun>(nextRun->renderer()).rubyBase();
+            if (rubyBase.firstRootBox() && !rubyBase.firstRootBox()->nextRootBox()) {
+                if (auto* leafChild = rubyBase.firstRootBox()->firstLeafChild()) {
+                    if (is<InlineTextBox>(*leafChild)) {
+                        // FIXME: This leadingExpansionOpportunity doesn't actually work because it doesn't perform the UBA
+                        if (FontCascade::leadingExpansionOpportunity(downcast<RenderText>(leafChild->renderer()).stringView(), leafChild->direction())) {
+                            setTrailingExpansion = true;
+                            result |= ForceTrailingExpansion;
+                        }
+                    }
+                }
+            }
+        }
+        // Same thing, except if we're following a ruby
+        if (previousRun && is<RenderRubyRun>(previousRun->renderer()) && downcast<RenderRubyRun>(previousRun->renderer()).rubyBase() && previousRun->renderer().style().collapseWhiteSpace()) {
+            auto& rubyBase = *downcast<RenderRubyRun>(previousRun->renderer()).rubyBase();
+            if (rubyBase.firstRootBox() && !rubyBase.firstRootBox()->nextRootBox()) {
+                if (auto* leafChild = rubyBase.firstRootBox()->lastLeafChild()) {
+                    if (is<InlineTextBox>(*leafChild)) {
+                        // FIXME: This leadingExpansionOpportunity doesn't actually work because it doesn't perform the UBA
+                        if (FontCascade::trailingExpansionOpportunity(downcast<RenderText>(leafChild->renderer()).stringView(), leafChild->direction())) {
+                            setLeadingExpansion = true;
+                            result |= ForceLeadingExpansion;
+                        }
+                    }
+                }
+            }
+        }
+        // If we're the first box inside a ruby base, forbid a leading expansion, and vice-versa
+        if (is<RenderRubyBase>(block)) {
+            RenderRubyBase& rubyBase = downcast<RenderRubyBase>(block);
+            if (&textBox == rubyBase.firstRootBox()->firstLeafChild()) {
+                setLeadingExpansion = true;
+                result |= ForbidLeadingExpansion;
+            } if (&textBox == rubyBase.firstRootBox()->lastLeafChild()) {
+                setTrailingExpansion = true;
+                result |= ForbidTrailingExpansion;
+            }
+        }
+    }
+    if (!setLeadingExpansion)
+        result |= isAfterExpansion ? ForbidLeadingExpansion : AllowLeadingExpansion;
+    if (!setTrailingExpansion)
+        result |= AllowTrailingExpansion;
+    return result;
+}
+
+static inline void applyExpansionBehavior(InlineTextBox& textBox, ExpansionBehavior expansionBehavior)
+{
+    switch (expansionBehavior & LeadingExpansionMask) {
+    case ForceLeadingExpansion:
+        textBox.setForceLeadingExpansion();
+        break;
+    case ForbidLeadingExpansion:
+        textBox.setCanHaveLeadingExpansion(false);
+        break;
+    case AllowLeadingExpansion:
+        textBox.setCanHaveLeadingExpansion(true);
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+    switch (expansionBehavior & TrailingExpansionMask) {
+    case ForceTrailingExpansion:
+        textBox.setForceTrailingExpansion();
+        break;
+    case ForbidTrailingExpansion:
+        textBox.setCanHaveTrailingExpansion(false);
+        break;
+    case AllowTrailingExpansion:
+        textBox.setCanHaveTrailingExpansion(true);
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
 }
 
 BidiRun* RenderBlockFlow::computeInlineDirectionPositionsForSegment(RootInlineBox* lineBox, const LineInfo& lineInfo, ETextAlign textAlign, float& logicalLeft, 
@@ -722,9 +814,9 @@ BidiRun* RenderBlockFlow::computeInlineDirectionPositionsForSegment(RootInlineBo
     unsigned expansionOpportunityCount = 0;
     bool isAfterExpansion = is<RenderRubyBase>(*this) ? downcast<RenderRubyBase>(*this).isAfterExpansion() : true;
     Vector<unsigned, 16> expansionOpportunities;
-    RenderObject* previousObject = nullptr;
 
     BidiRun* run = firstRun;
+    BidiRun* previousRun = nullptr;
     for (; run; run = run->next()) {
         if (!run->box() || run->renderer().isOutOfFlowPositioned() || run->box()->isLineBreak()) {
             continue; // Positioned objects are only participating to figure out their
@@ -733,10 +825,12 @@ BidiRun* RenderBlockFlow::computeInlineDirectionPositionsForSegment(RootInlineBo
         }
         if (is<RenderText>(run->renderer())) {
             auto& renderText = downcast<RenderText>(run->renderer());
+            auto& textBox = downcast<InlineTextBox>(*run->box());
             if (textAlign == JUSTIFY && run != trailingSpaceRun) {
-                if (!isAfterExpansion)
-                    downcast<InlineTextBox>(*run->box()).setCanHaveLeadingExpansion(true);
-                unsigned opportunitiesInRun = FontCascade::expansionOpportunityCount(renderText.stringView(run->m_start, run->m_stop), run->box()->direction(), isAfterExpansion);
+                ExpansionBehavior expansionBehavior = expansionBehaviorForInlineTextBox(*this, textBox, previousRun, run->next(), textAlign, isAfterExpansion);
+                applyExpansionBehavior(textBox, expansionBehavior);
+                unsigned opportunitiesInRun;
+                std::tie(opportunitiesInRun, isAfterExpansion) = FontCascade::expansionOpportunityCount(renderText.stringView(run->m_start, run->m_stop), run->box()->direction(), expansionBehavior);
                 expansionOpportunities.append(opportunitiesInRun);
                 expansionOpportunityCount += opportunitiesInRun;
             }
@@ -747,7 +841,7 @@ BidiRun* RenderBlockFlow::computeInlineDirectionPositionsForSegment(RootInlineBo
                 needsWordSpacing = !isSpaceOrNewline(renderText.characterAt(run->m_stop - 1)) && run->m_stop == length;
             }
 
-            setLogicalWidthForTextRun(lineBox, run, &renderText, totalLogicalWidth, lineInfo, textBoxDataMap, verticalPositionCache, wordMeasurements);
+            setLogicalWidthForTextRun(lineBox, run, renderText, totalLogicalWidth, lineInfo, textBoxDataMap, verticalPositionCache, wordMeasurements);
         } else {
             bool encounteredJustifiedRuby = false;
             if (is<RenderRubyRun>(run->renderer()) && textAlign == JUSTIFY && run != trailingSpaceRun && downcast<RenderRubyRun>(run->renderer()).rubyBase()) {
@@ -757,11 +851,13 @@ BidiRun* RenderBlockFlow::computeInlineDirectionPositionsForSegment(RootInlineBo
                     for (auto* leafChild = rubyBase->firstRootBox()->firstLeafChild(); leafChild; leafChild = leafChild->nextLeafChild()) {
                         if (!is<InlineTextBox>(*leafChild))
                             continue;
-                        if (!isAfterExpansion)
-                            downcast<InlineTextBox>(*leafChild).setCanHaveLeadingExpansion(true);
+                        auto& textBox = downcast<InlineTextBox>(*leafChild);
                         encounteredJustifiedRuby = true;
                         auto& renderText = downcast<RenderText>(leafChild->renderer());
-                        unsigned opportunitiesInRun = FontCascade::expansionOpportunityCount(renderText.stringView(), leafChild->direction(), isAfterExpansion);
+                        ExpansionBehavior expansionBehavior = expansionBehaviorForInlineTextBox(*rubyBase, textBox, nullptr, nullptr, textAlign, isAfterExpansion);
+                        applyExpansionBehavior(textBox, expansionBehavior);
+                        unsigned opportunitiesInRun;
+                        std::tie(opportunitiesInRun, isAfterExpansion) = FontCascade::expansionOpportunityCount(renderText.stringView(), leafChild->direction(), expansionBehavior);
                         expansionOpportunities.append(opportunitiesInRun);
                         expansionOpportunityCount += opportunitiesInRun;
                     }
@@ -774,35 +870,23 @@ BidiRun* RenderBlockFlow::computeInlineDirectionPositionsForSegment(RootInlineBo
             if (!is<RenderInline>(run->renderer())) {
                 auto& renderBox = downcast<RenderBox>(run->renderer());
                 if (is<RenderRubyRun>(renderBox))
-                    setMarginsForRubyRun(run, downcast<RenderRubyRun>(renderBox), previousObject, lineInfo);
+                    setMarginsForRubyRun(run, downcast<RenderRubyRun>(renderBox), previousRun ? &previousRun->renderer() : nullptr, lineInfo);
                 run->box()->setLogicalWidth(logicalWidthForChild(renderBox));
                 totalLogicalWidth += marginStartForChild(renderBox) + marginEndForChild(renderBox);
             }
         }
 
         totalLogicalWidth += run->box()->logicalWidth();
-        previousObject = &run->renderer();
+        previousRun = run;
     }
 
     if (isAfterExpansion && !expansionOpportunities.isEmpty()) {
-        bool shouldShareExpansionsWithContainingLine = true;
-        if (is<RenderRubyBase>(*this)) {
-            if (RenderRubyRun* rubyRun = downcast<RenderRubyBase>(*this).rubyRun()) {
-                if (RenderElement* rubyElement = rubyRun->parent()) {
-                    if (rubyElement->style().display() == INLINE) {
-                        if (RenderBlock* containingBlock = rubyElement->containingBlock()) {
-                            if (containingBlock->style().textAlign() == JUSTIFY)
-                                shouldShareExpansionsWithContainingLine = false;
-                        }
-                    }
-                }
-            }
-        }
-        if (shouldShareExpansionsWithContainingLine) {
-            expansionOpportunities.last()--;
-            expansionOpportunityCount--;
-        }
+        expansionOpportunities.last()--;
+        expansionOpportunityCount--;
     }
+
+    if (is<RenderRubyBase>(*this) && !expansionOpportunityCount)
+        textAlign = CENTER;
 
     updateLogicalWidthForAlignment(textAlign, lineBox, trailingSpaceRun, logicalLeft, totalLogicalWidth, availableLogicalWidth, expansionOpportunityCount);
 
@@ -926,13 +1010,23 @@ void RenderBlockFlow::appendFloatingObjectToLastLine(FloatingObject* floatingObj
     lastRootBox()->appendFloat(floatingObject->renderer());
 }
 
-static inline void setUpResolverToResumeInIsolate(InlineBidiResolver& resolver, RenderObject* root, RenderObject* startObject)
+static inline void notifyResolverToResumeInIsolate(InlineBidiResolver& resolver, RenderObject* root, RenderObject* startObject)
 {
     if (root != startObject) {
         RenderObject* parent = startObject->parent();
-        setUpResolverToResumeInIsolate(resolver, root, parent);
+        notifyResolverToResumeInIsolate(resolver, root, parent);
         notifyObserverEnteredObject(&resolver, startObject);
     }
+}
+
+static inline void setUpResolverToResumeInIsolate(InlineBidiResolver& resolver, InlineBidiResolver& topResolver, BidiRun* isolatedRun, RenderObject* root, RenderObject* startObject)
+{
+    // Set up m_midpointState
+    resolver.midpointState() = topResolver.midpointState();
+    resolver.midpointState().setCurrentMidpoint(topResolver.midpointForIsolatedRun(isolatedRun));
+
+    // Set up m_nestedIsolateCount
+    notifyResolverToResumeInIsolate(resolver, root, startObject);
 }
 
 // FIXME: BidiResolver should have this logic.
@@ -971,7 +1065,7 @@ static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, 
         }
         isolatedResolver.setStatus(BidiStatus(direction, isOverride(unicodeBidi)));
 
-        setUpResolverToResumeInIsolate(isolatedResolver, isolatedInline, &startObject);
+        setUpResolverToResumeInIsolate(isolatedResolver, topResolver, isolatedRun, isolatedInline, &startObject);
 
         // The starting position is the beginning of the first run within the isolate that was identified
         // during the earlier call to createBidiRunsForLine. This can be but is not necessarily the
@@ -994,6 +1088,8 @@ static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, 
         // to the top resolver's list for later processing.
         if (!isolatedResolver.isolatedRuns().isEmpty()) {
             topResolver.isolatedRuns().appendVector(isolatedResolver.isolatedRuns());
+            for (auto* run : isolatedResolver.isolatedRuns())
+                topResolver.setMidpointForIsolatedRun(run, isolatedResolver.midpointForIsolatedRun(run));
             isolatedResolver.isolatedRuns().clear();
             currentRoot = isolatedInline;
         }
@@ -1004,14 +1100,14 @@ static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, 
 RootInlineBox* RenderBlockFlow::createLineBoxesFromBidiRuns(unsigned bidiLevel, BidiRunList<BidiRun>& bidiRuns, const InlineIterator& end, LineInfo& lineInfo, VerticalPositionCache& verticalPositionCache, BidiRun* trailingSpaceRun, WordMeasurements& wordMeasurements)
 {
     if (!bidiRuns.runCount())
-        return 0;
+        return nullptr;
 
     // FIXME: Why is this only done when we had runs?
     lineInfo.setLastLine(!end.renderer());
 
     RootInlineBox* lineBox = constructLine(bidiRuns, lineInfo);
     if (!lineBox)
-        return 0;
+        return nullptr;
 
     lineBox->setBidiLevel(bidiLevel);
     lineBox->setEndsWithBreak(lineInfo.previousLineBrokeCleanly());
@@ -1119,16 +1215,6 @@ void RenderBlockFlow::layoutRunsAndFloats(LineLayoutState& layoutState, bool has
     repaintDirtyFloats(layoutState.floats());
 }
 
-RenderTextInfo::RenderTextInfo()
-    : m_text(0)
-    , m_font(0)
-{
-}
-
-RenderTextInfo::~RenderTextInfo()
-{
-}
-
 // Before restarting the layout loop with a new logicalHeight, remove all floats that were added and reset the resolver.
 inline const InlineIterator& RenderBlockFlow::restartLayoutRunsAndFloatsInRange(LayoutUnit oldLogicalHeight, LayoutUnit newLogicalHeight,  FloatingObject* lastFloatFromPreviousLine, InlineBidiResolver& resolver,  const InlineIterator& oldEnd)
 {
@@ -1171,8 +1257,8 @@ void RenderBlockFlow::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, I
 
         WordMeasurements wordMeasurements;
         end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), renderTextInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, wordMeasurements);
-        cachePriorCharactersIfNeeded(renderTextInfo.m_lineBreakIterator);
-        renderTextInfo.m_lineBreakIterator.resetPriorContext();
+        cachePriorCharactersIfNeeded(renderTextInfo.lineBreakIterator);
+        renderTextInfo.lineBreakIterator.resetPriorContext();
         if (resolver.position().atEnd()) {
             // FIXME: We shouldn't be creating any runs in nextLineBreak to begin with!
             // Once BidiRunList is separated from BidiResolver this will not be needed.
@@ -1202,7 +1288,7 @@ void RenderBlockFlow::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, I
             constructBidiRunsForSegment(resolver, bidiRuns, end, override, layoutState.lineInfo().previousLineBrokeCleanly());
             ASSERT(resolver.position() == end);
 
-            BidiRun* trailingSpaceRun = !layoutState.lineInfo().previousLineBrokeCleanly() ? handleTrailingSpaces(bidiRuns, resolver.context()) : 0;
+            BidiRun* trailingSpaceRun = !layoutState.lineInfo().previousLineBrokeCleanly() ? handleTrailingSpaces(bidiRuns, resolver.context()) : nullptr;
 
             if (bidiRuns.runCount() && lineBreaker.lineWasHyphenated()) {
                 bidiRuns.logicallyLastRun()->m_hasHyphen = true;
@@ -1515,10 +1601,12 @@ void RenderBlockFlow::layoutLineBoxes(bool relayoutChildren, LayoutUnit& repaint
                 else if (isFullLayout || box.needsLayout()) {
                     // Replaced element.
                     box.dirtyLineBoxes(isFullLayout);
-                    if (isFullLayout)
-                        replacedChildren.append(&box);
-                    else
-                        box.layoutIfNeeded();
+                    if (!o.isAnonymousInlineBlock()) {
+                        if (isFullLayout)
+                            replacedChildren.append(&box);
+                        else
+                            box.layoutIfNeeded();
+                    }
                 }
             } else if (o.isTextOrLineBreak() || (is<RenderInline>(o) && !walker.atEndOfInline())) {
                 if (is<RenderInline>(o))
@@ -1902,7 +1990,7 @@ void RenderBlockFlow::checkLinesForTextOverflow()
     // Determine the width of the ellipsis using the current font.
     // FIXME: CSS3 says this is configurable, also need to use 0x002E (FULL STOP) if horizontal ellipsis is "not renderable"
     const FontCascade& font = style().fontCascade();
-    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, ellipsisStr, (&horizontalEllipsis, 1));
+    static NeverDestroyed<AtomicString> ellipsisStr(&horizontalEllipsis, 1);
     const FontCascade& firstLineFont = firstLineStyle().fontCascade();
     float firstLineEllipsisWidth = firstLineFont.width(constructTextRun(this, firstLineFont, &horizontalEllipsis, 1, firstLineStyle()));
     float ellipsisWidth = (font == firstLineFont) ? firstLineEllipsisWidth : font.width(constructTextRun(this, font, &horizontalEllipsis, 1, style()));
@@ -1930,8 +2018,8 @@ void RenderBlockFlow::checkLinesForTextOverflow()
                 float totalLogicalWidth = curr->placeEllipsis(ellipsisStr, ltr, blockLeftEdge, blockRightEdge, width);
 
                 float logicalLeft = 0; // We are only interested in the delta from the base position.
-                float truncatedWidth = logicalRightOffsetForLine(curr->lineTop(), firstLine);
-                updateLogicalWidthForAlignment(textAlign, curr, 0, logicalLeft, totalLogicalWidth, truncatedWidth, 0);
+                float truncatedWidth = availableLogicalWidthForLine(curr->lineTop(), firstLine);
+                updateLogicalWidthForAlignment(textAlign, curr, nullptr, logicalLeft, totalLogicalWidth, truncatedWidth, 0);
                 if (ltr)
                     curr->adjustLogicalPosition(logicalLeft, 0);
                 else

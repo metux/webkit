@@ -70,7 +70,7 @@ static String combinedSecurityOriginIdentifier(const WebCore::SecurityOrigin& op
     if (originString == "null")
         return String();
     stringBuilder.append(originString);
-    stringBuilder.append("_");
+    stringBuilder.append('_');
 
     originString = mainFrameOrigin.toString();
     if (originString == "null")
@@ -98,15 +98,14 @@ void WebIDBFactoryBackend::getDatabaseNames(PassRefPtr<IDBCallbacks> callbacks, 
         return;
     }
 
-    auto recentNameIterator = sharedRecentDatabaseNameMap().find(securityOriginIdentifier);
-    if (recentNameIterator == sharedRecentDatabaseNameMap().end())
-        return;
-
     RefPtr<DOMStringList> databaseNames = DOMStringList::create();
 
-    HashSet<String>& foundNames = recentNameIterator->value;
-    for (const String& name : foundNames)
-        databaseNames->append(name);
+    auto recentNameIterator = sharedRecentDatabaseNameMap().find(securityOriginIdentifier);
+    if (recentNameIterator != sharedRecentDatabaseNameMap().end()) {
+        HashSet<String>& foundNames = recentNameIterator->value;
+        for (const String& name : foundNames)
+            databaseNames->append(name);
+    }
 
     callbacks->onSuccess(databaseNames.release());
 }

@@ -57,10 +57,7 @@ namespace WebCore {
 
 JSValue JSCommandLineAPIHost::inspectedObject(ExecState* exec)
 {
-    if (exec->argumentCount() < 1)
-        return jsUndefined();
-
-    CommandLineAPIHost::InspectableObject* object = impl().inspectedObject(exec->uncheckedArgument(0).toInt32(exec));
+    CommandLineAPIHost::InspectableObject* object = impl().inspectedObject();
     if (!object)
         return jsUndefined();
 
@@ -92,8 +89,8 @@ static JSArray* getJSListenerFunctions(ExecState* exec, Document* document, cons
             continue;
 
         JSObject* listenerEntry = constructEmptyObject(exec);
-        listenerEntry->putDirect(exec->vm(), Identifier(exec, "listener"), function);
-        listenerEntry->putDirect(exec->vm(), Identifier(exec, "useCapture"), jsBoolean(listenerInfo.eventListenerVector[i].useCapture));
+        listenerEntry->putDirect(exec->vm(), Identifier::fromString(exec, "listener"), function);
+        listenerEntry->putDirect(exec->vm(), Identifier::fromString(exec, "useCapture"), jsBoolean(listenerInfo.eventListenerVector[i].useCapture));
         result->putDirectIndex(exec, outputIndex++, JSValue(listenerEntry));
     }
     return result;
@@ -121,7 +118,7 @@ JSValue JSCommandLineAPIHost::getEventListeners(ExecState* exec)
         if (!listeners->length())
             continue;
         AtomicString eventType = listenersArray[i].eventType;
-        result->putDirect(exec->vm(), Identifier(exec, eventType.impl()), JSValue(listeners));
+        result->putDirect(exec->vm(), Identifier::fromString(exec, eventType.impl()), JSValue(listeners));
     }
 
     return result;

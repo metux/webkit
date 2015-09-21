@@ -301,8 +301,8 @@ void GraphicsLayerTextureMapper::setContentsToImage(Image* image)
             m_compositedImage = TextureMapperTiledBackingStore::create();
         m_compositedImage->setContentsToImage(image);
     } else {
-        m_compositedNativeImagePtr = 0;
-        m_compositedImage = 0;
+        m_compositedNativeImagePtr = nullptr;
+        m_compositedImage = nullptr;
     }
 
     setContentsToPlatformLayer(m_compositedImage.get(), ContentsLayerForImage);
@@ -363,7 +363,7 @@ void GraphicsLayerTextureMapper::setIsScrollable(bool isScrollable)
     notifyChange(IsScrollableChange);
 }
 
-void GraphicsLayerTextureMapper::flushCompositingStateForThisLayerOnly()
+void GraphicsLayerTextureMapper::flushCompositingStateForThisLayerOnly(bool)
 {
     prepareBackingStoreIfNeeded();
     commitLayerChanges();
@@ -496,19 +496,19 @@ void GraphicsLayerTextureMapper::commitLayerChanges()
     m_changeMask = NoChanges;
 }
 
-void GraphicsLayerTextureMapper::flushCompositingState(const FloatRect& rect)
+void GraphicsLayerTextureMapper::flushCompositingState(const FloatRect& rect, bool viewportIsStable)
 {
     if (!m_layer.textureMapper())
         return;
 
-    flushCompositingStateForThisLayerOnly();
+    flushCompositingStateForThisLayerOnly(viewportIsStable);
 
     if (maskLayer())
-        maskLayer()->flushCompositingState(rect);
+        maskLayer()->flushCompositingState(rect, viewportIsStable);
     if (replicaLayer())
-        replicaLayer()->flushCompositingState(rect);
+        replicaLayer()->flushCompositingState(rect, viewportIsStable);
     for (auto* child : children())
-        child->flushCompositingState(rect);
+        child->flushCompositingState(rect, viewportIsStable);
 }
 
 void GraphicsLayerTextureMapper::updateBackingStoreIncludingSubLayers()
@@ -561,13 +561,13 @@ bool GraphicsLayerTextureMapper::addAnimation(const KeyframeValueList& valueList
 {
     ASSERT(!keyframesName.isEmpty());
 
-    if (!anim || anim->isEmptyOrZeroDuration() || valueList.size() < 2 || (valueList.property() != AnimatedPropertyWebkitTransform && valueList.property() != AnimatedPropertyOpacity))
+    if (!anim || anim->isEmptyOrZeroDuration() || valueList.size() < 2 || (valueList.property() != AnimatedPropertyTransform && valueList.property() != AnimatedPropertyOpacity))
         return false;
 
     bool listsMatch = false;
     bool hasBigRotation;
 
-    if (valueList.property() == AnimatedPropertyWebkitTransform)
+    if (valueList.property() == AnimatedPropertyTransform)
         listsMatch = validateTransformOperations(valueList, hasBigRotation) >= 0;
 
     const double currentTime = monotonicallyIncreasingTime();
@@ -602,8 +602,7 @@ void GraphicsLayerTextureMapper::removeAnimation(const String& animationName)
 bool GraphicsLayerTextureMapper::setFilters(const FilterOperations& filters)
 {
     TextureMapper* textureMapper = m_layer.textureMapper();
-    // TextureMapperImageBuffer does not support CSS filters.
-    if (!textureMapper || textureMapper->accelerationMode() == TextureMapper::SoftwareMode)
+    if (!textureMapper)
         return false;
     notifyChange(FilterChange);
     return GraphicsLayer::setFilters(filters);

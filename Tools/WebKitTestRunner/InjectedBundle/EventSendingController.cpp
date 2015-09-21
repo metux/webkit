@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2014-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -208,8 +208,8 @@ static WKMutableDictionaryRef createMouseMessageBody(MouseState state, int butto
 
 void EventSendingController::mouseDown(int button, JSValueRef modifierArray) 
 {
-    auto& injectedBungle = InjectedBundle::singleton();
-    WKBundlePageRef page = injectedBungle.page()->page();
+    auto& injectedBundle = InjectedBundle::singleton();
+    WKBundlePageRef page = injectedBundle.page()->page();
     WKBundleFrameRef frame = WKBundlePageGetMainFrame(page);
     JSContextRef context = WKBundleFrameGetJavaScriptContext(frame);
     WKEventModifiers modifiers = parseModifierArray(context, modifierArray);
@@ -217,7 +217,7 @@ void EventSendingController::mouseDown(int button, JSValueRef modifierArray)
     WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
     WKRetainPtr<WKMutableDictionaryRef> EventSenderMessageBody(AdoptWK, createMouseMessageBody(MouseDown, button, modifiers));
 
-    WKBundlePostSynchronousMessage(injectedBungle.bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(page, EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::mouseUp(int button, JSValueRef modifierArray)
@@ -230,7 +230,7 @@ void EventSendingController::mouseUp(int button, JSValueRef modifierArray)
     WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
     WKRetainPtr<WKMutableDictionaryRef> EventSenderMessageBody(AdoptWK, createMouseMessageBody(MouseUp, button, modifiers));
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::mouseMoveTo(int x, int y)
@@ -250,7 +250,49 @@ void EventSendingController::mouseMoveTo(int x, int y)
     WKRetainPtr<WKDoubleRef> yRef(AdoptWK, WKDoubleCreate(y));
     WKDictionarySetItem(EventSenderMessageBody.get(), yKey.get(), yRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    m_position = WKPointMake(x, y);
+    
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+}
+
+void EventSendingController::mouseForceDown()
+{
+    WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
+    WKRetainPtr<WKMutableDictionaryRef> EventSenderMessageBody(AdoptWK, WKMutableDictionaryCreate());
+
+    WKRetainPtr<WKStringRef> subMessageKey(AdoptWK, WKStringCreateWithUTF8CString("SubMessage"));
+    WKRetainPtr<WKStringRef> subMessageName(AdoptWK, WKStringCreateWithUTF8CString("MouseForceDown"));
+    WKDictionarySetItem(EventSenderMessageBody.get(), subMessageKey.get(), subMessageName.get());
+
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+}
+
+void EventSendingController::mouseForceUp()
+{
+    WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
+    WKRetainPtr<WKMutableDictionaryRef> EventSenderMessageBody(AdoptWK, WKMutableDictionaryCreate());
+
+    WKRetainPtr<WKStringRef> subMessageKey(AdoptWK, WKStringCreateWithUTF8CString("SubMessage"));
+    WKRetainPtr<WKStringRef> subMessageName(AdoptWK, WKStringCreateWithUTF8CString("MouseForceUp"));
+    WKDictionarySetItem(EventSenderMessageBody.get(), subMessageKey.get(), subMessageName.get());
+
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+}
+
+void EventSendingController::mouseForceChanged(double force)
+{
+    WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
+    WKRetainPtr<WKMutableDictionaryRef> EventSenderMessageBody(AdoptWK, WKMutableDictionaryCreate());
+
+    WKRetainPtr<WKStringRef> subMessageKey(AdoptWK, WKStringCreateWithUTF8CString("SubMessage"));
+    WKRetainPtr<WKStringRef> subMessageName(AdoptWK, WKStringCreateWithUTF8CString("MouseForceChanged"));
+    WKDictionarySetItem(EventSenderMessageBody.get(), subMessageKey.get(), subMessageName.get());
+
+    WKRetainPtr<WKStringRef> forceKey(AdoptWK, WKStringCreateWithUTF8CString("Force"));
+    WKRetainPtr<WKDoubleRef> forceRef(AdoptWK, WKDoubleCreate(force));
+    WKDictionarySetItem(EventSenderMessageBody.get(), forceKey.get(), forceRef.get());
+
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::leapForward(int milliseconds)
@@ -266,7 +308,7 @@ void EventSendingController::leapForward(int milliseconds)
     WKRetainPtr<WKUInt64Ref> timeRef(AdoptWK, WKUInt64Create(milliseconds));
     WKDictionarySetItem(EventSenderMessageBody.get(), timeKey.get(), timeRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::scheduleAsynchronousClick()
@@ -278,11 +320,11 @@ void EventSendingController::scheduleAsynchronousClick()
 
     // Asynchronous mouse down.
     WKRetainPtr<WKMutableDictionaryRef> mouseDownMessageBody(AdoptWK, createMouseMessageBody(MouseDown, button, modifiers));
-    WKBundlePostMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), mouseDownMessageBody.get());
+    WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), mouseDownMessageBody.get());
 
     // Asynchronous mouse up.
     WKRetainPtr<WKMutableDictionaryRef> mouseUpMessageBody(AdoptWK, createMouseMessageBody(MouseUp, button, modifiers));
-    WKBundlePostMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), mouseUpMessageBody.get());
+    WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), mouseUpMessageBody.get());
 }
 
 static WKRetainPtr<WKMutableDictionaryRef> createKeyDownMessageBody(JSStringRef key, WKEventModifiers modifiers, int location)
@@ -317,7 +359,7 @@ void EventSendingController::keyDown(JSStringRef key, JSValueRef modifierArray, 
     WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
     WKRetainPtr<WKMutableDictionaryRef> keyDownMessageBody = createKeyDownMessageBody(key, modifiers, location);
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), keyDownMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), keyDownMessageBody.get(), 0);
 }
 
 void EventSendingController::scheduleAsynchronousKeyDown(JSStringRef key)
@@ -325,7 +367,7 @@ void EventSendingController::scheduleAsynchronousKeyDown(JSStringRef key)
     WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
     WKRetainPtr<WKMutableDictionaryRef> keyDownMessageBody = createKeyDownMessageBody(key, 0 /* modifiers */, 0 /* location */);
 
-    WKBundlePostMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), keyDownMessageBody.get());
+    WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), keyDownMessageBody.get());
 }
 
 void EventSendingController::mouseScrollBy(int x, int y)
@@ -345,7 +387,7 @@ void EventSendingController::mouseScrollBy(int x, int y)
     WKRetainPtr<WKDoubleRef> yRef(AdoptWK, WKDoubleCreate(y));
     WKDictionarySetItem(EventSenderMessageBody.get(), yKey.get(), yRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::mouseScrollByWithWheelAndMomentumPhases(int x, int y, JSStringRef phaseStr, JSStringRef momentumStr, bool asyncScrolling)
@@ -398,9 +440,9 @@ void EventSendingController::mouseScrollByWithWheelAndMomentumPhases(int x, int 
     WKDictionarySetItem(EventSenderMessageBody.get(), momentumKey.get(), momentumRef.get());
 
     if (asyncScrolling)
-        WKBundlePostMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get());
+        WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get());
     else
-        WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+        WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::continuousMouseScrollBy(int x, int y, bool paged)
@@ -424,7 +466,7 @@ void EventSendingController::continuousMouseScrollBy(int x, int y, bool paged)
     WKRetainPtr<WKUInt64Ref> pagedRef(AdoptWK, WKUInt64Create(paged));
     WKDictionarySetItem(EventSenderMessageBody.get(), pagedKey.get(), pagedRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 JSValueRef EventSendingController::contextClick()
@@ -433,11 +475,14 @@ JSValueRef EventSendingController::contextClick()
     WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(page);
     JSContextRef context = WKBundleFrameGetJavaScriptContext(mainFrame);
 #if ENABLE(CONTEXT_MENUS)
+#if PLATFORM(GTK) || PLATFORM(EFL)
     // Do mouse context click.
     mouseDown(2, 0);
     mouseUp(2, 0);
-
     WKRetainPtr<WKArrayRef> menuEntries = adoptWK(WKBundlePageCopyContextMenuItems(page));
+#else
+    WKRetainPtr<WKArrayRef> menuEntries = adoptWK(WKBundlePageCopyContextMenuAtPointInWindow(page, m_position));
+#endif
     JSValueRef arrayResult = JSObjectMakeArray(context, 0, 0, 0);
     JSObjectRef arrayObj = JSValueToObject(context, arrayResult, 0);
     size_t entriesSize = WKArrayGetSize(menuEntries.get());
@@ -501,6 +546,54 @@ void EventSendingController::scalePageBy(double scale, double x, double y)
     WKBundlePageSetScaleAtOrigin(InjectedBundle::singleton().page()->page(), scale, origin);
 }
 
+void EventSendingController::monitorWheelEvents()
+{
+    WKBundlePageRef page = InjectedBundle::singleton().page()->page();
+    
+    WKBundlePageStartMonitoringScrollOperations(page);
+}
+
+struct ScrollCompletionCallbackData {
+    JSContextRef m_context;
+    JSObjectRef m_function;
+
+    ScrollCompletionCallbackData(JSContextRef context, JSObjectRef function)
+        : m_context(context), m_function(function)
+    {
+    }
+};
+
+static void executeCallback(void* context)
+{
+    if (!context)
+        return;
+
+    std::unique_ptr<ScrollCompletionCallbackData> callBackData(reinterpret_cast<ScrollCompletionCallbackData*>(context));
+
+    JSObjectCallAsFunction(callBackData->m_context, callBackData->m_function, nullptr, 0, nullptr, nullptr);
+    JSValueUnprotect(callBackData->m_context, callBackData->m_function);
+}
+
+void EventSendingController::callAfterScrollingCompletes(JSValueRef functionCallback)
+{
+    if (!functionCallback)
+        return;
+
+    WKBundlePageRef page = InjectedBundle::singleton().page()->page();
+    WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(page);
+    JSContextRef context = WKBundleFrameGetJavaScriptContext(mainFrame);
+    
+    JSObjectRef functionCallbackObject = JSValueToObject(context, functionCallback, nullptr);
+    if (!functionCallbackObject)
+        return;
+    
+    JSValueProtect(context, functionCallbackObject);
+
+    auto scrollCompletionCallbackData = std::make_unique<ScrollCompletionCallbackData>(context, functionCallbackObject);
+
+    WKBundlePageRegisterScrollOperationCompletionCallback(page, executeCallback, scrollCompletionCallbackData.release());
+}
+
 #if ENABLE(TOUCH_EVENTS)
 void EventSendingController::addTouchPoint(int x, int y)
 {
@@ -519,7 +612,7 @@ void EventSendingController::addTouchPoint(int x, int y)
     WKRetainPtr<WKUInt64Ref> yRef(AdoptWK, WKUInt64Create(y));
     WKDictionarySetItem(EventSenderMessageBody.get(), yKey.get(), yRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::updateTouchPoint(int index, int x, int y)
@@ -543,7 +636,7 @@ void EventSendingController::updateTouchPoint(int index, int x, int y)
     WKRetainPtr<WKUInt64Ref> yRef(AdoptWK, WKUInt64Create(y));
     WKDictionarySetItem(EventSenderMessageBody.get(), yKey.get(), yRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::setTouchModifier(const JSStringRef &modifier, bool enable)
@@ -573,7 +666,7 @@ void EventSendingController::setTouchModifier(const JSStringRef &modifier, bool 
     WKRetainPtr<WKUInt64Ref> enableRef(AdoptWK, WKUInt64Create(enable));
     WKDictionarySetItem(EventSenderMessageBody.get(), enableKey.get(), enableRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 
@@ -594,7 +687,7 @@ void EventSendingController::setTouchPointRadius(int radiusX, int radiusY)
     WKRetainPtr<WKUInt64Ref> yRef(AdoptWK, WKUInt64Create(radiusY));
     WKDictionarySetItem(EventSenderMessageBody.get(), yKey.get(), yRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::touchStart()
@@ -606,7 +699,7 @@ void EventSendingController::touchStart()
     WKRetainPtr<WKStringRef> subMessageName(AdoptWK, WKStringCreateWithUTF8CString("TouchStart"));
     WKDictionarySetItem(EventSenderMessageBody.get(), subMessageKey.get(), subMessageName.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::touchMove()
@@ -618,7 +711,7 @@ void EventSendingController::touchMove()
     WKRetainPtr<WKStringRef> subMessageName(AdoptWK, WKStringCreateWithUTF8CString("TouchMove"));
     WKDictionarySetItem(EventSenderMessageBody.get(), subMessageKey.get(), subMessageName.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::touchEnd()
@@ -630,7 +723,7 @@ void EventSendingController::touchEnd()
     WKRetainPtr<WKStringRef> subMessageName(AdoptWK, WKStringCreateWithUTF8CString("TouchEnd"));
     WKDictionarySetItem(EventSenderMessageBody.get(), subMessageKey.get(), subMessageName.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::touchCancel()
@@ -642,7 +735,7 @@ void EventSendingController::touchCancel()
     WKRetainPtr<WKStringRef> subMessageName(AdoptWK, WKStringCreateWithUTF8CString("TouchCancel"));
     WKDictionarySetItem(EventSenderMessageBody.get(), subMessageKey.get(), subMessageName.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::clearTouchPoints()
@@ -654,7 +747,7 @@ void EventSendingController::clearTouchPoints()
     WKRetainPtr<WKStringRef> subMessageName(AdoptWK, WKStringCreateWithUTF8CString("ClearTouchPoints"));
     WKDictionarySetItem(EventSenderMessageBody.get(), subMessageKey.get(), subMessageName.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::releaseTouchPoint(int index)
@@ -670,7 +763,7 @@ void EventSendingController::releaseTouchPoint(int index)
     WKRetainPtr<WKUInt64Ref> indexRef(AdoptWK, WKUInt64Create(index));
     WKDictionarySetItem(EventSenderMessageBody.get(), indexKey.get(), indexRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 
 void EventSendingController::cancelTouchPoint(int index)
@@ -686,7 +779,7 @@ void EventSendingController::cancelTouchPoint(int index)
     WKRetainPtr<WKUInt64Ref> indexRef(AdoptWK, WKUInt64Create(index));
     WKDictionarySetItem(EventSenderMessageBody.get(), indexKey.get(), indexRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }
 #endif
 

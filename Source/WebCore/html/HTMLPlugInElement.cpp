@@ -23,7 +23,6 @@
 #include "config.h"
 #include "HTMLPlugInElement.h"
 
-#include "Attribute.h"
 #include "BridgeJSC.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
@@ -105,7 +104,7 @@ bool HTMLPlugInElement::willRespondToMouseClickEvents()
 
 void HTMLPlugInElement::willDetachRenderers()
 {
-    m_instance.clear();
+    m_instance = nullptr;
 
     if (m_isCapturingMouseEvents) {
         if (Frame* frame = document().frame())
@@ -123,7 +122,7 @@ void HTMLPlugInElement::willDetachRenderers()
 
 void HTMLPlugInElement::resetInstance()
 {
-    m_instance.clear();
+    m_instance = nullptr;
 }
 
 PassRefPtr<JSC::Bindings::Instance> HTMLPlugInElement::getInstance()
@@ -292,10 +291,10 @@ NPObject* HTMLPlugInElement::getNPObject()
 
 #endif /* ENABLE(NETSCAPE_PLUGIN_API) */
 
-RenderPtr<RenderElement> HTMLPlugInElement::createElementRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> HTMLPlugInElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition& insertionPosition)
 {
     if (m_pluginReplacement && m_pluginReplacement->willCreateRenderer())
-        return m_pluginReplacement->createElementRenderer(*this, WTF::move(style));
+        return m_pluginReplacement->createElementRenderer(*this, WTF::move(style), insertionPosition);
 
     return createRenderer<RenderEmbeddedObject>(*this, WTF::move(style));
 }

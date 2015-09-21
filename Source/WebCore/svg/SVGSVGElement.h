@@ -43,7 +43,7 @@ class SVGSVGElement final : public SVGGraphicsElement, public SVGExternalResourc
         DECLARE_ANIMATED_LENGTH(Y, y)
         DECLARE_ANIMATED_LENGTH(Width, width)
         DECLARE_ANIMATED_LENGTH(Height, height)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
         DECLARE_ANIMATED_RECT(ViewBox, viewBox)
         DECLARE_ANIMATED_PRESERVEASPECTRATIO(PreserveAspectRatio, preserveAspectRatio)
     END_DECLARE_ANIMATED_PROPERTIES
@@ -97,7 +97,7 @@ public: // DOM
     static SVGTransform createSVGTransform();
     static SVGTransform createSVGTransformFromMatrix(const SVGMatrix&);
 
-    Element* getElementById(const String&);
+    Element* getElementById(const AtomicString&);
 
     SVGZoomAndPanType zoomAndPan() const;
     void setZoomAndPan(unsigned short);
@@ -134,7 +134,7 @@ private:
     virtual void didMoveToNewDocument(Document* oldDocument) override;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual bool rendererIsNeeded(const RenderStyle&) override;
-    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
     virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
     virtual void removedFrom(ContainerNode&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;

@@ -30,6 +30,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+if (!window.Symbol) {
+    window.Symbol = function(string)
+    {
+        return string;
+    }
+}
+
 if (!window.InspectorFrontendHost) {
     WebInspector.InspectorFrontendHostStub = function()
     {
@@ -78,6 +85,10 @@ if (!window.InspectorFrontendHost) {
         },
 
         setToolbarHeight: function(width)
+        {
+        },
+
+        startWindowDrag: function()
         {
         },
 
@@ -140,6 +151,10 @@ if (!window.InspectorFrontendHost) {
         },
 
         beep: function()
+        {
+        },
+
+        showContextMenu: function(event, menuObject)
         {
         },
 

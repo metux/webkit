@@ -21,7 +21,6 @@
 #include "config.h"
 #include "SVGTextElement.h"
 
-#include "Attribute.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGText.h"
 #include "SVGNames.h"
@@ -65,7 +64,7 @@ AffineTransform SVGTextElement::animatedLocalTransform() const
     return matrix;
 }
 
-RenderPtr<RenderElement> SVGTextElement::createElementRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> SVGTextElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderSVGText>(*this, WTF::move(style));
 }

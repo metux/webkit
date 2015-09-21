@@ -182,18 +182,16 @@ void RenderThemeWin::setWebKitIsBeingUnloaded()
     gWebKitIsBeingUnloaded = true;
 }
 
-PassRefPtr<RenderTheme> RenderThemeWin::create()
+Ref<RenderTheme> RenderThemeWin::create()
 {
-    return adoptRef(new RenderThemeWin);
+    return adoptRef(*new RenderThemeWin);
 }
 
-#if !USE(SAFARI_THEME)
 PassRefPtr<RenderTheme> RenderTheme::themeForPage(Page* page)
 {
-    static RenderTheme* winTheme = RenderThemeWin::create().leakRef();
-    return winTheme;
+    static RenderTheme& winTheme = RenderThemeWin::create().leakRef();
+    return &winTheme;
 }
-#endif
 
 RenderThemeWin::RenderThemeWin()
     : m_buttonTheme(0)
@@ -749,7 +747,7 @@ bool RenderThemeWin::paintMenuList(const RenderObject& renderer, const PaintInfo
 
     drawControl(paintInfo.context, renderer, theme, ThemeData(part, determineState(renderer)), IntRect(rect));
     
-    return paintMenuListButtonDecorations(renderer, paintInfo, FloatRect(rect));
+    return paintMenuListButtonDecorations(downcast<RenderBox>(renderer), paintInfo, FloatRect(rect));
 }
 
 void RenderThemeWin::adjustMenuListStyle(StyleResolver& styleResolver, RenderStyle& style, Element* e) const
@@ -789,7 +787,7 @@ void RenderThemeWin::adjustMenuListButtonStyle(StyleResolver& styleResolver, Ren
     style.setWhiteSpace(PRE);
 }
 
-bool RenderThemeWin::paintMenuListButtonDecorations(const RenderObject& renderer, const PaintInfo& paintInfo, const FloatRect& rect)
+bool RenderThemeWin::paintMenuListButtonDecorations(const RenderBox& renderer, const PaintInfo& paintInfo, const FloatRect& rect)
 {
     // FIXME: Don't make hardcoded assumptions about the thickness of the textfield border.
     int borderThickness = haveTheme ? 1 : 2;
@@ -1068,7 +1066,7 @@ String RenderThemeWin::stringWithContentsOfFile(CFStringRef name, CFStringRef ty
         return String();
 
     long long filesize = -1;
-    if (!getFileSize(requestedFilePath, filesize)) {
+    if (!getFileSize(requestedFileHandle, filesize)) {
         closeFile(requestedFileHandle);
         return String();
     }

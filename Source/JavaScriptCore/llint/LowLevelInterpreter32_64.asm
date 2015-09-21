@@ -693,7 +693,7 @@ macro branchIfException(label)
     loadp Callee + PayloadOffset[cfr], t3
     andp MarkedBlockMask, t3
     loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t3], t3
-    bieq VM::m_exception + TagOffset[t3], EmptyValueTag, .noException
+    btiz VM::m_exception[t3], .noException
     jmp label
 .noException:
 end
@@ -720,13 +720,6 @@ _llint_op_enter:
     dispatch(1)
 
 
-_llint_op_create_lexical_environment:
-    traceExecution()
-    loadi 4[PC], t0
-    callSlowPath(_llint_slow_path_create_lexical_environment)
-    dispatch(3)
-
-
 _llint_op_get_scope:
     traceExecution()
     loadi Callee + PayloadOffset[cfr], t0
@@ -737,54 +730,29 @@ _llint_op_get_scope:
     dispatch(2)
 
 
-_llint_op_init_lazy_reg:
-    traceExecution()
-    loadi 4[PC], t0
-    storei EmptyValueTag, TagOffset[cfr, t0, 8]
-    storei 0, PayloadOffset[cfr, t0, 8]
-    dispatch(2)
-
-
-_llint_op_create_arguments:
-    traceExecution()
-    loadi 4[PC], t0
-    bineq TagOffset[cfr, t0, 8], EmptyValueTag, .opCreateArgumentsDone
-    callSlowPath(_slow_path_create_arguments)
-.opCreateArgumentsDone:
-    dispatch(3)
-
-
 _llint_op_create_this:
     traceExecution()
     loadi 8[PC], t0
     loadp PayloadOffset[cfr, t0, 8], t0
-    loadp JSFunction::m_allocationProfile + ObjectAllocationProfile::m_allocator[t0], t1
-    loadp JSFunction::m_allocationProfile + ObjectAllocationProfile::m_structure[t0], t2
+    loadp JSFunction::m_rareData[t0], t4
+    btpz t4, .opCreateThisSlow
+    loadp FunctionRareData::m_allocationProfile + ObjectAllocationProfile::m_allocator[t4], t1
+    loadp FunctionRareData::m_allocationProfile + ObjectAllocationProfile::m_structure[t4], t2
     btpz t1, .opCreateThisSlow
+    loadpFromInstruction(4, t4)
+    bpeq t4, 1, .hasSeenMultipleCallee
+    bpneq t4, t0, .opCreateThisSlow
+.hasSeenMultipleCallee:
     allocateJSObject(t1, t2, t0, t3, .opCreateThisSlow)
     loadi 4[PC], t1
     storei CellTag, TagOffset[cfr, t1, 8]
     storei t0, PayloadOffset[cfr, t1, 8]
-    dispatch(4)
+    dispatch(5)
 
 .opCreateThisSlow:
     callSlowPath(_slow_path_create_this)
-    dispatch(4)
+    dispatch(5)
 
-
-_llint_op_get_callee:
-    traceExecution()
-    loadi 4[PC], t0
-    loadp PayloadOffset + Callee[cfr], t1
-    loadpFromInstruction(2, t2)
-    bpneq t1, t2, .opGetCalleeSlow
-    storei CellTag, TagOffset[cfr, t0, 8]
-    storei t1, PayloadOffset[cfr, t0, 8]
-    dispatch(3)
-
-.opGetCalleeSlow:
-    callSlowPath(_slow_path_get_callee)
-    dispatch(3)
 
 _llint_op_to_this:
     traceExecution()
@@ -817,6 +785,17 @@ _llint_op_new_object:
     dispatch(4)
 
 
+_llint_op_check_tdz:
+    traceExecution()
+    loadisFromInstruction(1, t0)
+    loadConstantOrVariableTag(t0, t1)
+    bineq t1, EmptyValueTag, .opNotTDZ
+    callSlowPath(_slow_path_throw_tdz_error)
+
+.opNotTDZ:
+    dispatch(2)
+
+
 _llint_op_mov:
     traceExecution()
     loadi 8[PC], t1
@@ -826,14 +805,6 @@ _llint_op_mov:
     storei t3, PayloadOffset[cfr, t0, 8]
     dispatch(3)
 
-
-macro notifyWrite(set, valueTag, valuePayload, scratch, slow)
-    loadb VariableWatchpointSet::m_state[set], scratch
-    bieq scratch, IsInvalidated, .done
-    bineq valuePayload, VariableWatchpointSet::m_inferredValue + PayloadOffset[set], slow
-    bineq valueTag, VariableWatchpointSet::m_inferredValue + TagOffset[set], slow
-.done:
-end
 
 _llint_op_not:
     traceExecution()
@@ -952,10 +923,10 @@ macro strictEq(equalityOperation, slowPath)
     loadConstantOrVariable2Reg(t0, t2, t0)
     bineq t2, t3, .slow
     bib t2, LowestTag, .slow
-    bineq t2, CellTag, .notString
-    bbneq JSCell::m_type[t0], StringType, .notString
-    bbeq JSCell::m_type[t1], StringType, .slow
-.notString:
+    bineq t2, CellTag, .notStringOrSymbol
+    bbaeq JSCell::m_type[t0], ObjectType, .notStringOrSymbol
+    bbb JSCell::m_type[t1], ObjectType, .slow
+.notStringOrSymbol:
     loadi 4[PC], t2
     equalityOperation(t0, t1, t0)
     storei BooleanTag, TagOffset[cfr, t2, 8]
@@ -1019,6 +990,23 @@ _llint_op_to_number:
 
 .opToNumberSlow:
     callSlowPath(_slow_path_to_number)
+    dispatch(3)
+
+
+_llint_op_to_string:
+    traceExecution()
+    loadi 8[PC], t0
+    loadi 4[PC], t1
+    loadConstantOrVariable(t0, t2, t3)
+    bineq t2, CellTag, .opToStringSlow
+    bbneq JSCell::m_type[t3], StringType, .opToStringSlow
+.opToStringIsString:
+    storei t2, TagOffset[cfr, t1, 8]
+    storei t3, PayloadOffset[cfr, t1, 8]
+    dispatch(3)
+
+.opToStringSlow:
+    callSlowPath(_slow_path_to_string)
     dispatch(3)
 
 
@@ -1333,6 +1321,21 @@ _llint_op_is_string:
     dispatch(3)
 
 
+_llint_op_is_object:
+    traceExecution()
+    loadi 8[PC], t1
+    loadi 4[PC], t2
+    loadConstantOrVariable(t1, t0, t3)
+    storei BooleanTag, TagOffset[cfr, t2, 8]
+    bineq t0, CellTag, .opIsObjectNotCell
+    cbaeq JSCell::m_type[t3], ObjectType, t1
+    storei t1, PayloadOffset[cfr, t2, 8]
+    dispatch(3)
+.opIsObjectNotCell:
+    storep 0, PayloadOffset[cfr, t2, 8]
+    dispatch(3)
+
+
 macro loadPropertyAtVariableOffsetKnownNotInline(propertyOffset, objectAndStorage, tag, payload)
     assert(macro (ok) bigteq propertyOffset, firstOutOfLineOffset, ok end)
     negi propertyOffset
@@ -1364,17 +1367,6 @@ macro storePropertyAtVariableOffset(propertyOffsetAsInt, objectAndStorage, tag, 
     storei tag, TagOffset + (firstOutOfLineOffset - 2) * 8[objectAndStorage, propertyOffsetAsInt, 8]
     storei payload, PayloadOffset + (firstOutOfLineOffset - 2) * 8[objectAndStorage, propertyOffsetAsInt, 8]
 end
-
-
-_llint_op_init_global_const:
-    traceExecution()
-    writeBarrierOnGlobalObject(2)
-    loadi 8[PC], t1
-    loadi 4[PC], t0
-    loadConstantOrVariable(t1, t2, t3)
-    storei t2, TagOffset[t0]
-    storei t3, PayloadOffset[t0]
-    dispatch(5)
 
 
 # We only do monomorphic get_by_id caching for now, and we do not modify the
@@ -1437,22 +1429,6 @@ _llint_op_get_array_length:
 .opGetArrayLengthSlow:
     callSlowPath(_llint_slow_path_get_by_id)
     dispatch(9)
-
-
-_llint_op_get_arguments_length:
-    traceExecution()
-    loadi 8[PC], t0
-    loadi 4[PC], t1
-    bineq TagOffset[cfr, t0, 8], EmptyValueTag, .opGetArgumentsLengthSlow
-    loadi ArgumentCount + PayloadOffset[cfr], t2
-    subi 1, t2
-    storei Int32Tag, TagOffset[cfr, t1, 8]
-    storei t2, PayloadOffset[cfr, t1, 8]
-    dispatch(4)
-
-.opGetArgumentsLengthSlow:
-    callSlowPath(_llint_slow_path_get_arguments_length)
-    dispatch(4)
 
 
 macro putById(getPropertyStorage)
@@ -1603,30 +1579,6 @@ _llint_op_get_by_val:
 .opGetByValSlow:
     callSlowPath(_llint_slow_path_get_by_val)
     dispatch(6)
-
-
-_llint_op_get_argument_by_val:
-    # FIXME: At some point we should array profile this. Right now it isn't necessary
-    # since the DFG will never turn a get_argument_by_val into a GetByVal.
-    traceExecution()
-    loadi 8[PC], t0
-    loadi 12[PC], t1
-    bineq TagOffset[cfr, t0, 8], EmptyValueTag, .opGetArgumentByValSlow
-    loadConstantOrVariablePayload(t1, Int32Tag, t2, .opGetArgumentByValSlow)
-    loadi ArgumentCount + PayloadOffset[cfr], t1
-    subi 1, t1
-    biaeq t2, t1, .opGetArgumentByValSlow
-    loadi 4[PC], t3
-    loadi FirstArgumentOffset + TagOffset[cfr, t2, 8], t0
-    loadi FirstArgumentOffset + PayloadOffset[cfr, t2, 8], t1
-    storei t0, TagOffset[cfr, t3, 8]
-    storei t1, PayloadOffset[cfr, t3, 8]
-    valueProfile(t0, t1, 24, t2)
-    dispatch(7)
-
-.opGetArgumentByValSlow:
-    callSlowPath(_llint_slow_path_get_argument_by_val)
-    dispatch(7)
 
 
 macro contiguousPutByVal(storeCallback)
@@ -1910,16 +1862,6 @@ _llint_op_switch_char:
     dispatch(0)
 
 
-_llint_op_new_func:
-    traceExecution()
-    btiz 16[PC], .opNewFuncUnchecked
-    loadi 4[PC], t1
-    bineq TagOffset[cfr, t1, 8], EmptyValueTag, .opNewFuncDone
-.opNewFuncUnchecked:
-    callSlowPath(_llint_slow_path_new_func)
-.opNewFuncDone:
-    dispatch(5)
-
 macro arrayProfileForCall()
     loadi 16[PC], t3
     negi t3
@@ -1953,14 +1895,6 @@ macro doCall(slowPath)
     slowPathForCall(slowPath)
 end
 
-_llint_op_tear_off_arguments:
-    traceExecution()
-    loadi 4[PC], t0
-    bieq TagOffset[cfr, t0, 8], EmptyValueTag, .opTearOffArgumentsNotCreated
-    callSlowPath(_llint_slow_path_tear_off_arguments)
-.opTearOffArgumentsNotCreated:
-    dispatch(3)
-
 
 _llint_op_ret:
     traceExecution()
@@ -1976,7 +1910,7 @@ _llint_op_to_primitive:
     loadi 4[PC], t3
     loadConstantOrVariable(t2, t1, t0)
     bineq t1, CellTag, .opToPrimitiveIsImm
-    bbneq JSCell::m_type[t0], StringType, .opToPrimitiveSlowCase
+    bbaeq JSCell::m_type[t0], ObjectType, .opToPrimitiveSlowCase
 .opToPrimitiveIsImm:
     storei t1, TagOffset[cfr, t3, 8]
     storei t0, PayloadOffset[cfr, t3, 8]
@@ -2002,15 +1936,20 @@ _llint_op_catch:
     restoreStackPointerAfterCall()
 
     loadi VM::targetInterpreterPCForThrow[t3], PC
-    loadi VM::m_exception + PayloadOffset[t3], t0
-    loadi VM::m_exception + TagOffset[t3], t1
-    storei 0, VM::m_exception + PayloadOffset[t3]
-    storei EmptyValueTag, VM::m_exception + TagOffset[t3]
+    loadi VM::m_exception[t3], t0
+    storei 0, VM::m_exception[t3]
     loadi 4[PC], t2
     storei t0, PayloadOffset[cfr, t2, 8]
+    storei CellTag, TagOffset[cfr, t2, 8]
+
+    loadi Exception::m_value + TagOffset[t0], t1
+    loadi Exception::m_value + PayloadOffset[t0], t0
+    loadi 8[PC], t2
+    storei t0, PayloadOffset[cfr, t2, 8]
     storei t1, TagOffset[cfr, t2, 8]
+
     traceExecution()  # This needs to be here because we don't want to clobber t0, t1, t2, t3 above.
-    dispatch(2)
+    dispatch(3)
 
 _llint_op_end:
     traceExecution()
@@ -2088,7 +2027,7 @@ macro nativeCallTrampoline(executableOffsetToFunction)
     end
     
     functionEpilogue()
-    bineq VM::m_exception + TagOffset[t3], EmptyValueTag, .handleException
+    btinz VM::m_exception[t3], .handleException
     ret
 
 .handleException:
@@ -2202,10 +2141,9 @@ macro getGlobalVar()
 end
 
 macro getClosureVar()
-    loadp JSEnvironmentRecord::m_registers[t0], t0
     loadisFromInstruction(6, t3)
-    loadp TagOffset[t0, t3, 8], t1
-    loadp PayloadOffset[t0, t3, 8], t2
+    loadp JSEnvironmentRecord_variables + TagOffset[t0, t3, 8], t1
+    loadp JSEnvironmentRecord_variables + PayloadOffset[t0, t3, 8], t2
     valueProfile(t1, t2, 28, t0)
     loadisFromInstruction(1, t0)
     storei t1, TagOffset[cfr, t0, 8]
@@ -2243,7 +2181,6 @@ _llint_op_get_from_scope:
 .gGlobalVarWithVarInjectionChecks:
     bineq t0, GlobalVarWithVarInjectionChecks, .gClosureVarWithVarInjectionChecks
     varInjectionCheck(.gDynamic)
-    loadVariable(2, t2, t1, t0)
     getGlobalVar()
     dispatch(8)
 
@@ -2270,7 +2207,7 @@ macro putGlobalVar()
     loadisFromInstruction(3, t0)
     loadConstantOrVariable(t0, t1, t2)
     loadpFromInstruction(5, t3)
-    notifyWrite(t3, t1, t2, t0, .pDynamic)
+    notifyWrite(t3, .pDynamic)
     loadpFromInstruction(6, t0)
     storei t1, TagOffset[t0]
     storei t2, PayloadOffset[t0]
@@ -2279,10 +2216,9 @@ end
 macro putClosureVar()
     loadisFromInstruction(3, t1)
     loadConstantOrVariable(t1, t2, t3)
-    loadp JSEnvironmentRecord::m_registers[t0], t0
     loadisFromInstruction(6, t1)
-    storei t2, TagOffset[t0, t1, 8]
-    storei t3, PayloadOffset[t0, t1, 8]
+    storei t2, JSEnvironmentRecord_variables + TagOffset[t0, t1, 8]
+    storei t3, JSEnvironmentRecord_variables + PayloadOffset[t0, t1, 8]
 end
 
 macro putLocalClosureVar()
@@ -2290,12 +2226,11 @@ macro putLocalClosureVar()
     loadConstantOrVariable(t1, t2, t3)
     loadpFromInstruction(5, t4)
     btpz t4, .noVariableWatchpointSet
-    notifyWrite(t4, t2, t3, t1, .pDynamic)
+    notifyWrite(t4, .pDynamic)
 .noVariableWatchpointSet:
-    loadp JSEnvironmentRecord::m_registers[t0], t0
     loadisFromInstruction(6, t1)
-    storei t2, TagOffset[t0, t1, 8]
-    storei t3, PayloadOffset[t0, t1, 8]
+    storei t2, JSEnvironmentRecord_variables + TagOffset[t0, t1, 8]
+    storei t3, JSEnvironmentRecord_variables + PayloadOffset[t0, t1, 8]
 end
 
 
@@ -2357,6 +2292,45 @@ _llint_op_put_to_scope:
     callSlowPath(_llint_slow_path_put_to_scope)
     dispatch(7)
 
+
+_llint_op_get_from_arguments:
+    traceExecution()
+    loadisFromInstruction(2, t0)
+    loadi PayloadOffset[cfr, t0, 8], t0
+    loadi 12[PC], t1
+    loadi DirectArguments_storage + TagOffset[t0, t1, 8], t2
+    loadi DirectArguments_storage + PayloadOffset[t0, t1, 8], t3
+    loadisFromInstruction(1, t1)
+    valueProfile(t2, t3, 16, t0)
+    storei t2, TagOffset[cfr, t1, 8]
+    storei t3, PayloadOffset[cfr, t1, 8]
+    dispatch(5)
+
+
+_llint_op_put_to_arguments:
+    traceExecution()
+    writeBarrierOnOperands(1, 3)
+    loadisFromInstruction(1, t0)
+    loadi PayloadOffset[cfr, t0, 8], t0
+    loadisFromInstruction(3, t1)
+    loadConstantOrVariable(t1, t2, t3)
+    loadi 8[PC], t1
+    storei t2, DirectArguments_storage + TagOffset[t0, t1, 8]
+    storei t3, DirectArguments_storage + PayloadOffset[t0, t1, 8]
+    dispatch(4)
+
+
+_llint_op_get_parent_scope:
+    traceExecution()
+    loadisFromInstruction(2, t0)
+    loadp PayloadOffset[cfr, t0, 8], t0
+    loadp JSScope::m_next[t0], t0
+    loadisFromInstruction(1, t1)
+    storei CellTag, TagOffset[cfr, t1, 8]
+    storei t0, PayloadOffset[cfr, t1, 8]
+    dispatch(3)
+
+
 _llint_op_profile_type:
     traceExecution()
     loadp CodeBlock[cfr], t1
@@ -2367,6 +2341,8 @@ _llint_op_profile_type:
     # t0 is holding the payload, t4 is holding the tag.
     loadisFromInstruction(1, t2)
     loadConstantOrVariable(t2, t4, t0)
+
+    bieq t4, EmptyValueTag, .opProfileTypeDone
 
     # t2 is holding the pointer to the current log entry.
     loadp TypeProfilerLog::m_currentLogEntryPtr[t1], t2

@@ -49,7 +49,7 @@ namespace WebCore {
          * their values are derived by using a bit position corresponding
          * to the value of NodeType for the equivalent node type.
          */
-        enum {
+        enum : unsigned long {
             SHOW_ALL                       = 0xFFFFFFFF,
             SHOW_ELEMENT                   = 0x00000001,
             SHOW_ATTRIBUTE                 = 0x00000002,
@@ -65,14 +65,14 @@ namespace WebCore {
             SHOW_NOTATION                  = 0x00000800
         };
 
-        static PassRefPtr<NodeFilter> create(PassRefPtr<NodeFilterCondition> condition)
+        static Ref<NodeFilter> create(PassRefPtr<NodeFilterCondition> condition)
         {
-            return adoptRef(new NodeFilter(condition));
+            return adoptRef(*new NodeFilter(condition));
         }
 
-        static PassRefPtr<NodeFilter> create()
+        static Ref<NodeFilter> create()
         {
-            return adoptRef(new NodeFilter());
+            return adoptRef(*new NodeFilter());
         }
 
         short acceptNode(JSC::ExecState*, Node*) const;

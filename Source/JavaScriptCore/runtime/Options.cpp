@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2012, 2014-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,8 @@
 #include "HeapStatistics.h"
 #include <algorithm>
 #include <limits>
+#include <math.h>
+#include <mutex>
 #include <stdlib.h>
 #include <string.h>
 #include <wtf/DataLog.h>
@@ -36,6 +38,7 @@
 #include <wtf/PageBlock.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/StringExtras.h>
+#include <wtf/text/StringBuilder.h>
 
 #if OS(DARWIN) && ENABLE(PARALLEL_GC)
 #include <sys/sysctl.h>
@@ -82,6 +85,8 @@ static bool parse(const char* string, OptionRange& value)
 
 static bool parse(const char* string, const char*& value)
 {
+    if (!strlen(string))
+        string = nullptr;
     value = string;
     return true;
 }
@@ -147,6 +152,8 @@ static unsigned computeNumberOfGCMarkers(unsigned maxNumberOfGCMarkers)
 #endif
 }
 
+const char* const OptionRange::s_nullRangeStr = "<null>";
+
 bool OptionRange::init(const char* rangeString)
 {
     // rangeString should be in the form of [!]<low>[:<high>]
@@ -154,14 +161,16 @@ bool OptionRange::init(const char* rangeString)
 
     bool invert = false;
 
-    if (m_state > Uninitialized)
-        return true;
-
     if (!rangeString) {
         m_state = InitError;
         return false;
     }
 
+    if (!strcmp(rangeString, s_nullRangeStr)) {
+        m_state = Uninitialized;
+        return true;
+    }
+    
     m_rangeString = rangeString;
 
     if (*rangeString == '!') {
@@ -200,15 +209,53 @@ bool OptionRange::isInRange(unsigned count)
     return m_state == Normal ? false : true;
 }
 
+void OptionRange::dump(PrintStream& out) const
+{
+    out.print(m_rangeString);
+}
+
 Options::Entry Options::s_options[Options::numberOfOptions];
+Options::Entry Options::s_defaultOptions[Options::numberOfOptions];
 
 // Realize the names for each of the options:
 const Options::EntryInfo Options::s_optionsInfo[Options::numberOfOptions] = {
-#define FOR_EACH_OPTION(type_, name_, defaultValue_) \
-    { #name_, Options::type_##Type },
+#define FOR_EACH_OPTION(type_, name_, defaultValue_, description_) \
+    { #name_, description_, Options::Type::type_##Type },
     JSC_OPTIONS(FOR_EACH_OPTION)
 #undef FOR_EACH_OPTION
 };
+
+static void scaleJITPolicy()
+{
+    auto& scaleFactor = Options::jitPolicyScale();
+    if (scaleFactor > 1.0)
+        scaleFactor = 1.0;
+    else if (scaleFactor < 0.0)
+        scaleFactor = 0.0;
+
+    struct OptionToScale {
+        Options::OptionID id;
+        int32_t minVal;
+    };
+
+    static const OptionToScale optionsToScale[] = {
+        { Options::thresholdForJITAfterWarmUpID, 0 },
+        { Options::thresholdForJITSoonID, 0 },
+        { Options::thresholdForOptimizeAfterWarmUpID, 1 },
+        { Options::thresholdForOptimizeAfterLongWarmUpID, 1 },
+        { Options::thresholdForOptimizeSoonID, 1 },
+        { Options::thresholdForFTLOptimizeSoonID, 2 },
+        { Options::thresholdForFTLOptimizeAfterWarmUpID, 2 }
+    };
+
+    const int numberOfOptionsToScale = sizeof(optionsToScale) / sizeof(OptionToScale);
+    for (int i = 0; i < numberOfOptionsToScale; i++) {
+        Option option(optionsToScale[i].id);
+        ASSERT(option.type() == Options::Type::int32Type);
+        option.int32Val() *= scaleFactor;
+        option.int32Val() = std::max(option.int32Val(), optionsToScale[i].minVal);
+    }
+}
 
 static void recomputeDependentOptions()
 {
@@ -253,7 +300,22 @@ static void recomputeDependentOptions()
         || Options::verboseCFA()
         || Options::verboseFTLFailure())
         Options::alwaysComputeHash() = true;
+
+    if (Option(Options::jitPolicyScaleID).isOverridden())
+        scaleJITPolicy();
     
+    if (Options::forceEagerCompilation()) {
+        Options::thresholdForJITAfterWarmUp() = 10;
+        Options::thresholdForJITSoon() = 10;
+        Options::thresholdForOptimizeAfterWarmUp() = 20;
+        Options::thresholdForOptimizeAfterLongWarmUp() = 20;
+        Options::thresholdForOptimizeSoon() = 20;
+        Options::thresholdForFTLOptimizeAfterWarmUp() = 20;
+        Options::thresholdForFTLOptimizeSoon() = 20;
+        Options::maximumEvalCacheableSourceLength() = 150000;
+        Options::enableConcurrentJIT() = false;
+    }
+
     // Compute the maximum value of the reoptimization retry counter. This is simply
     // the largest value at which we don't overflow the execute counter, when using it
     // to left-shift the execution counter by this amount. Currently the value ends
@@ -269,31 +331,136 @@ static void recomputeDependentOptions()
 
 void Options::initialize()
 {
-    // Initialize each of the options with their default values:
-#define FOR_EACH_OPTION(type_, name_, defaultValue_) \
-    name_() = defaultValue_;
-    JSC_OPTIONS(FOR_EACH_OPTION)
+    static std::once_flag initializeOptionsOnceFlag;
+    
+    std::call_once(
+        initializeOptionsOnceFlag,
+        [] {
+            // Initialize each of the options with their default values:
+#define FOR_EACH_OPTION(type_, name_, defaultValue_, description_)      \
+            name_() = defaultValue_;                                    \
+            name_##Default() = defaultValue_;
+            JSC_OPTIONS(FOR_EACH_OPTION)
 #undef FOR_EACH_OPTION
+    
+                // It *probably* makes sense for other platforms to enable this.
+#if PLATFORM(IOS) && CPU(ARM64)
+                enableLLVMFastISel() = true;
+#endif
         
-    // Allow environment vars to override options if applicable.
-    // The evn var should be the name of the option prefixed with
-    // "JSC_".
-#define FOR_EACH_OPTION(type_, name_, defaultValue_) \
-    if (overrideOptionWithHeuristic(name_(), "JSC_" #name_)) \
-        s_options[OPT_##name_].didOverride = true;
-    JSC_OPTIONS(FOR_EACH_OPTION)
+            // Allow environment vars to override options if applicable.
+            // The evn var should be the name of the option prefixed with
+            // "JSC_".
+#define FOR_EACH_OPTION(type_, name_, defaultValue_, description_)      \
+            overrideOptionWithHeuristic(name_(), "JSC_" #name_);
+            JSC_OPTIONS(FOR_EACH_OPTION)
 #undef FOR_EACH_OPTION
 
 #if 0
-    ; // Deconfuse editors that do auto indentation
+                ; // Deconfuse editors that do auto indentation
 #endif
     
-    recomputeDependentOptions();
+            recomputeDependentOptions();
 
-    // Do range checks where needed and make corrections to the options:
-    ASSERT(Options::thresholdForOptimizeAfterLongWarmUp() >= Options::thresholdForOptimizeAfterWarmUp());
-    ASSERT(Options::thresholdForOptimizeAfterWarmUp() >= Options::thresholdForOptimizeSoon());
-    ASSERT(Options::thresholdForOptimizeAfterWarmUp() >= 0);
+            // Do range checks where needed and make corrections to the options:
+            ASSERT(Options::thresholdForOptimizeAfterLongWarmUp() >= Options::thresholdForOptimizeAfterWarmUp());
+            ASSERT(Options::thresholdForOptimizeAfterWarmUp() >= Options::thresholdForOptimizeSoon());
+            ASSERT(Options::thresholdForOptimizeAfterWarmUp() >= 0);
+
+            dumpOptionsIfNeeded();
+            ensureOptionsAreCoherent();
+        });
+}
+
+void Options::dumpOptionsIfNeeded()
+{
+    if (Options::showOptions()) {
+        DumpLevel level = static_cast<DumpLevel>(Options::showOptions());
+        if (level > DumpLevel::Verbose)
+            level = DumpLevel::Verbose;
+            
+        const char* title = nullptr;
+        switch (level) {
+        case DumpLevel::None:
+            break;
+        case DumpLevel::Overridden:
+            title = "Overridden JSC options:";
+            break;
+        case DumpLevel::All:
+            title = "All JSC options:";
+            break;
+        case DumpLevel::Verbose:
+            title = "All JSC options with descriptions:";
+            break;
+        }
+
+        StringBuilder builder;
+        dumpAllOptions(builder, level, title, nullptr, "   ", "\n", ShowDefaults);
+        dataLog(builder.toString());
+    }
+}
+
+bool Options::setOptions(const char* optionsStr)
+{
+    Vector<char*> options;
+
+    size_t length = strlen(optionsStr);
+    char* optionsStrCopy = WTF::fastStrDup(optionsStr);
+    char* end = optionsStrCopy + length;
+    char* p = optionsStrCopy;
+
+    while (p < end) {
+        char* optionStart = p;
+        p = strstr(p, "=");
+        if (!p) {
+            dataLogF("'=' not found in option string: %p\n", optionStart);
+            return false;
+        }
+        p++;
+
+        char* valueBegin = p;
+        bool hasStringValue = false;
+        const int minStringLength = 2; // The min is an empty string i.e. 2 double quotes.
+        if ((p + minStringLength < end) && (*p == '"')) {
+            p = strstr(p + 1, "\"");
+            if (!p) {
+                dataLogF("Missing trailing '\"' in option string: %p\n", optionStart);
+                return false; // End of string not found.
+            }
+            hasStringValue = true;
+        }
+
+        p = strstr(p, " ");
+        if (!p)
+            p = end; // No more " " separator. Hence, this is the last arg.
+
+        // If we have a well-formed string value, strip the quotes.
+        if (hasStringValue) {
+            char* valueEnd = p;
+            ASSERT((*valueBegin == '"') && ((valueEnd - valueBegin) >= minStringLength) && (valueEnd[-1] == '"'));
+            memmove(valueBegin, valueBegin + 1, valueEnd - valueBegin - minStringLength);
+            valueEnd[-minStringLength] = '\0';
+        }
+
+        // Strip leading -- if present.
+        if ((p -  optionStart > 2) && optionStart[0] == '-' && optionStart[1] == '-')
+            optionStart += 2;
+
+        *p++ = '\0';
+        options.append(optionStart);
+    }
+
+    bool success = true;
+    for (auto& option : options) {
+        bool optionSuccess = setOption(option);
+        if (!optionSuccess) {
+            dataLogF("Failed to set option : %s\n", option);
+            success = false;
+        }
+    }
+
+    dumpOptionsIfNeeded();
+    return success;
 }
 
 // Parses a single command line option in the format "<optionName>=<value>"
@@ -310,18 +477,18 @@ bool Options::setOption(const char* arg)
 
     // For each option, check if the specify arg is a match. If so, set the arg
     // if the value makes sense. Otherwise, move on to checking the next option.
-#define FOR_EACH_OPTION(type_, name_, defaultValue_)    \
-    if (!strncmp(arg, #name_, equalStr - arg)) {        \
-        type_ value;                                    \
-        value = (defaultValue_);                        \
-        bool success = parse(valueStr, value);          \
-        if (success) {                                  \
-            name_() = value;                            \
-            s_options[OPT_##name_].didOverride = true;  \
-            recomputeDependentOptions();                \
-            return true;                                \
-        }                                               \
-        return false;                                   \
+#define FOR_EACH_OPTION(type_, name_, defaultValue_, description_) \
+    if (strlen(#name_) == static_cast<size_t>(equalStr - arg)      \
+        && !strncmp(arg, #name_, equalStr - arg)) {                \
+        type_ value;                                               \
+        value = (defaultValue_);                                   \
+        bool success = parse(valueStr, value);                     \
+        if (success) {                                             \
+            name_() = value;                                       \
+            recomputeDependentOptions();                           \
+            return true;                                           \
+        }                                                          \
+        return false;                                              \
     }
 
     JSC_OPTIONS(FOR_EACH_OPTION)
@@ -330,48 +497,131 @@ bool Options::setOption(const char* arg)
     return false; // No option matched.
 }
 
-void Options::dumpAllOptions(FILE* stream)
+void Options::dumpAllOptions(StringBuilder& builder, DumpLevel level, const char* title,
+    const char* separator, const char* optionHeader, const char* optionFooter, ShowDefaultsOption showDefaultsOption)
 {
-    fprintf(stream, "JSC runtime options:\n");
-    for (int id = 0; id < numberOfOptions; id++)
-        dumpOption(static_cast<OptionID>(id), stream, "   ", "\n");
+    if (title) {
+        builder.append(title);
+        builder.append('\n');
+    }
+
+    for (int id = 0; id < numberOfOptions; id++) {
+        if (separator && id)
+            builder.append(separator);
+        dumpOption(builder, level, static_cast<OptionID>(id), optionHeader, optionFooter, showDefaultsOption);
+    }
 }
 
-void Options::dumpOption(OptionID id, FILE* stream, const char* header, const char* footer)
+void Options::dumpAllOptionsInALine(StringBuilder& builder)
+{
+    dumpAllOptions(builder, DumpLevel::All, nullptr, " ", nullptr, nullptr, DontShowDefaults);
+}
+
+void Options::dumpAllOptions(FILE* stream, DumpLevel level, const char* title)
+{
+    StringBuilder builder;
+    dumpAllOptions(builder, level, title, nullptr, "   ", "\n", ShowDefaults);
+    fprintf(stream, "%s", builder.toString().ascii().data());
+}
+
+void Options::dumpOption(StringBuilder& builder, DumpLevel level, OptionID id,
+    const char* header, const char* footer, ShowDefaultsOption showDefaultsOption)
 {
     if (id >= numberOfOptions)
         return; // Illegal option.
 
-    fprintf(stream, "%s%s: ", header, s_optionsInfo[id].name);
-    switch (s_optionsInfo[id].type) {
-    case boolType:
-        fprintf(stream, "%s", s_options[id].u.boolVal?"true":"false");
+    Option option(id);
+    bool wasOverridden = option.isOverridden();
+    bool needsDescription = (level == DumpLevel::Verbose && option.description());
+
+    if (level == DumpLevel::Overridden && !wasOverridden)
+        return;
+
+    if (header)
+        builder.append(header);
+    builder.append(option.name());
+    builder.append('=');
+    option.dump(builder);
+
+    if (wasOverridden && (showDefaultsOption == ShowDefaults)) {
+        builder.append(" (default: ");
+        option.defaultOption().dump(builder);
+        builder.append(")");
+    }
+
+    if (needsDescription) {
+        builder.append("   ... ");
+        builder.append(option.description());
+    }
+
+    builder.append(footer);
+}
+
+void Options::ensureOptionsAreCoherent()
+{
+    bool coherent = true;
+    if (!(useLLInt() || useJIT())) {
+        coherent = false;
+        dataLog("INCOHERENT OPTIONS: at least one of useLLInt or useJIT must be true\n");
+    }
+    if (!coherent)
+        CRASH();
+}
+
+void Option::dump(StringBuilder& builder) const
+{
+    switch (type()) {
+    case Options::Type::boolType:
+        builder.append(m_entry.boolVal ? "true" : "false");
         break;
-    case unsignedType:
-        fprintf(stream, "%u", s_options[id].u.unsignedVal);
+    case Options::Type::unsignedType:
+        builder.appendNumber(m_entry.unsignedVal);
         break;
-    case doubleType:
-        fprintf(stream, "%lf", s_options[id].u.doubleVal);
+    case Options::Type::doubleType:
+        builder.appendNumber(m_entry.doubleVal);
         break;
-    case int32Type:
-        fprintf(stream, "%d", s_options[id].u.int32Val);
+    case Options::Type::int32Type:
+        builder.appendNumber(m_entry.int32Val);
         break;
-    case optionRangeType:
-        fprintf(stream, "%s", s_options[id].u.optionRangeVal.rangeString());
+    case Options::Type::optionRangeType:
+        builder.append(m_entry.optionRangeVal.rangeString());
         break;
-    case optionStringType: {
-        const char* option = s_options[id].u.optionStringVal;
+    case Options::Type::optionStringType: {
+        const char* option = m_entry.optionStringVal;
         if (!option)
             option = "";
-        fprintf(stream, "%s", option);
+        builder.append('"');
+        builder.append(option);
+        builder.append('"');
         break;
     }
-    case gcLogLevelType: {
-        fprintf(stream, "%s", GCLogging::levelAsString(s_options[id].u.gcLogLevelVal));
+    case Options::Type::gcLogLevelType: {
+        builder.append(GCLogging::levelAsString(m_entry.gcLogLevelVal));
         break;
     }
     }
-    fprintf(stream, "%s", footer);
+}
+
+bool Option::operator==(const Option& other) const
+{
+    switch (type()) {
+    case Options::Type::boolType:
+        return m_entry.boolVal == other.m_entry.boolVal;
+    case Options::Type::unsignedType:
+        return m_entry.unsignedVal == other.m_entry.unsignedVal;
+    case Options::Type::doubleType:
+        return (m_entry.doubleVal == other.m_entry.doubleVal) || (isnan(m_entry.doubleVal) && isnan(other.m_entry.doubleVal));
+    case Options::Type::int32Type:
+        return m_entry.int32Val == other.m_entry.int32Val;
+    case Options::Type::optionRangeType:
+        return m_entry.optionRangeVal.rangeString() == other.m_entry.optionRangeVal.rangeString();
+    case Options::Type::optionStringType:
+        return (m_entry.optionStringVal == other.m_entry.optionStringVal)
+            || (m_entry.optionStringVal && other.m_entry.optionStringVal && !strcmp(m_entry.optionStringVal, other.m_entry.optionStringVal));
+    case Options::Type::gcLogLevelType:
+        return m_entry.gcLogLevelVal == other.m_entry.gcLogLevelVal;
+    }
+    return false;
 }
 
 } // namespace JSC

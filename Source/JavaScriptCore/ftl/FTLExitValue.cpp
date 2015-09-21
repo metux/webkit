@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@
 
 #include "FTLExitTimeObjectMaterialization.h"
 #include "JSCInlines.h"
+#include "TrackedReferences.h"
 
 namespace JSC { namespace FTL {
 
@@ -39,6 +40,48 @@ ExitValue ExitValue::materializeNewObject(ExitTimeObjectMaterialization* data)
     result.m_kind = ExitValueMaterializeNewObject;
     result.u.newObjectMaterializationData = data;
     return result;
+}
+
+ExitValue ExitValue::withLocalsOffset(int offset) const
+{
+    if (!isInJSStackSomehow())
+        return *this;
+    if (!virtualRegister().isLocal())
+        return *this;
+    return withVirtualRegister(virtualRegister() + offset);
+}
+
+ValueFormat ExitValue::valueFormat() const
+{
+    switch (kind()) {
+    case InvalidExitValue:
+        RELEASE_ASSERT_NOT_REACHED();
+        return InvalidValueFormat;
+            
+    case ExitValueDead:
+    case ExitValueConstant:
+    case ExitValueInJSStack:
+    case ExitValueMaterializeNewObject:
+        return ValueFormatJSValue;
+            
+    case ExitValueArgument:
+        return exitArgument().format();
+            
+    case ExitValueInJSStackAsInt32:
+        return ValueFormatInt32;
+            
+    case ExitValueInJSStackAsInt52:
+        return ValueFormatInt52;
+            
+    case ExitValueInJSStackAsDouble:
+        return ValueFormatDouble;
+            
+    case ExitValueRecovery:
+        return recoveryFormat();
+    }
+        
+    RELEASE_ASSERT_NOT_REACHED();
+    return InvalidValueFormat;
 }
 
 void ExitValue::dumpInContext(PrintStream& out, DumpContext* context) const
@@ -68,14 +111,11 @@ void ExitValue::dumpInContext(PrintStream& out, DumpContext* context) const
     case ExitValueInJSStackAsDouble:
         out.print("InJSStackAsDouble:", virtualRegister());
         return;
-    case ExitValueArgumentsObjectThatWasNotCreated:
-        out.print("ArgumentsObjectThatWasNotCreated");
-        return;
     case ExitValueRecovery:
         out.print("Recovery(", recoveryOpcode(), ", arg", leftRecoveryArgument(), ", arg", rightRecoveryArgument(), ", ", recoveryFormat(), ")");
         return;
     case ExitValueMaterializeNewObject:
-        out.print("Materialize(", pointerDump(objectMaterialization()), ")");
+        out.print("Materialize(", WTF::RawPointer(objectMaterialization()), ")");
         return;
     }
     
@@ -85,6 +125,12 @@ void ExitValue::dumpInContext(PrintStream& out, DumpContext* context) const
 void ExitValue::dump(PrintStream& out) const
 {
     dumpInContext(out, 0);
+}
+
+void ExitValue::validateReferences(const TrackedReferences& trackedReferences) const
+{
+    if (isConstant())
+        trackedReferences.check(constant());
 }
 
 } } // namespace JSC::FTL

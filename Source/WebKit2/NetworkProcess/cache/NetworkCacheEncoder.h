@@ -29,20 +29,20 @@
 #if ENABLE(NETWORK_CACHE)
 
 #include "NetworkCacheCoder.h"
-
-#include <wtf/StringHasher.h>
+#include <wtf/SHA1.h>
 #include <wtf/Vector.h>
 
 namespace WebKit {
+namespace NetworkCache {
 
-class NetworkCacheEncoder;
+class Encoder;
 class DataReference;
 
-class NetworkCacheEncoder {
+class Encoder {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    NetworkCacheEncoder();
-    virtual ~NetworkCacheEncoder();
+    Encoder();
+    virtual ~Encoder();
 
     void encodeChecksum();
     void encodeFixedLengthData(const uint8_t*, size_t);
@@ -56,10 +56,10 @@ public:
 
     template<typename T> void encode(const T& t)
     {
-        NetworkCacheCoder<T>::encode(*this, t);
+        Coder<T>::encode(*this, t);
     }
 
-    template<typename T> NetworkCacheEncoder& operator<<(const T& t)
+    template<typename T> Encoder& operator<<(const T& t)
     {
         encode(t);
         return *this;
@@ -68,8 +68,8 @@ public:
     const uint8_t* buffer() const { return m_buffer.data(); }
     size_t bufferSize() const { return m_buffer.size(); }
 
-    static void updateChecksumForData(unsigned& checksum, const uint8_t*, size_t);
-    template <typename Type> static void updateChecksumForNumber(unsigned& checksum, Type);
+    static void updateChecksumForData(SHA1&, const uint8_t*, size_t);
+    template <typename Type> static void updateChecksumForNumber(SHA1&, Type);
 
 private:
     void encode(bool);
@@ -89,27 +89,29 @@ private:
     template <typename Type> struct Salt;
 
     Vector<uint8_t, 4096> m_buffer;
-    unsigned m_checksum;
+    SHA1 m_sha1;
 };
 
-template <> struct NetworkCacheEncoder::Salt<bool> { static const unsigned value = 3; };
-template <> struct NetworkCacheEncoder::Salt<uint8_t> { static const  unsigned value = 5; };
-template <> struct NetworkCacheEncoder::Salt<uint16_t> { static const unsigned value = 7; };
-template <> struct NetworkCacheEncoder::Salt<uint32_t> { static const unsigned value = 11; };
-template <> struct NetworkCacheEncoder::Salt<uint64_t> { static const unsigned value = 13; };
-template <> struct NetworkCacheEncoder::Salt<int32_t> { static const unsigned value = 17; };
-template <> struct NetworkCacheEncoder::Salt<int64_t> { static const unsigned value = 19; };
-template <> struct NetworkCacheEncoder::Salt<float> { static const unsigned value = 23; };
-template <> struct NetworkCacheEncoder::Salt<double> { static const unsigned value = 29; };
-template <> struct NetworkCacheEncoder::Salt<uint8_t*> { static const unsigned value = 101; };
+template <> struct Encoder::Salt<bool> { static const unsigned value = 3; };
+template <> struct Encoder::Salt<uint8_t> { static const  unsigned value = 5; };
+template <> struct Encoder::Salt<uint16_t> { static const unsigned value = 7; };
+template <> struct Encoder::Salt<uint32_t> { static const unsigned value = 11; };
+template <> struct Encoder::Salt<uint64_t> { static const unsigned value = 13; };
+template <> struct Encoder::Salt<int32_t> { static const unsigned value = 17; };
+template <> struct Encoder::Salt<int64_t> { static const unsigned value = 19; };
+template <> struct Encoder::Salt<float> { static const unsigned value = 23; };
+template <> struct Encoder::Salt<double> { static const unsigned value = 29; };
+template <> struct Encoder::Salt<uint8_t*> { static const unsigned value = 101; };
 
 template <typename Type>
-void NetworkCacheEncoder::updateChecksumForNumber(unsigned& checksum, Type value)
+void Encoder::updateChecksumForNumber(SHA1& sha1, Type value)
 {
-    unsigned hash = WTF::intHash(static_cast<uint64_t>(value)) ^ NetworkCacheEncoder::Salt<Type>::value;
-    checksum = WTF::pairIntHash(checksum, hash);
+    auto typeSalt = Salt<Type>::value;
+    sha1.addBytes(reinterpret_cast<uint8_t*>(&typeSalt), sizeof(typeSalt));
+    sha1.addBytes(reinterpret_cast<uint8_t*>(&value), sizeof(value));
 }
 
+}
 }
 
 #endif

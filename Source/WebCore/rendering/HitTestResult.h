@@ -27,7 +27,7 @@
 #include "HitTestLocation.h"
 #include "HitTestRequest.h"
 #include "LayoutRect.h"
-#include "TextDirection.h"
+#include "TextFlags.h"
 #include <memory>
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
@@ -94,6 +94,7 @@ public:
 
     WEBCORE_EXPORT Frame* targetFrame() const;
     WEBCORE_EXPORT bool isSelected() const;
+    WEBCORE_EXPORT String selectedText() const;
     WEBCORE_EXPORT String spellingToolTip(TextDirection&) const;
     String replacedString() const;
     WEBCORE_EXPORT String title(TextDirection&) const;
@@ -106,8 +107,10 @@ public:
     WEBCORE_EXPORT URL absolutePDFURL() const;
     WEBCORE_EXPORT URL absoluteMediaURL() const;
     WEBCORE_EXPORT URL absoluteLinkURL() const;
+#if ENABLE(ATTACHMENT_ELEMENT)
+    WEBCORE_EXPORT URL absoluteAttachmentURL() const;
+#endif
     WEBCORE_EXPORT String textContent() const;
-    WEBCORE_EXPORT bool isLiveLink() const;
     bool isOverLink() const;
     WEBCORE_EXPORT bool isContentEditable() const;
     void toggleMediaControlsDisplay() const;

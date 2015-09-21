@@ -31,25 +31,25 @@
 #include "NetworkCacheEncoder.h"
 
 namespace WebKit {
+namespace NetworkCache {
 
-NetworkCacheDecoder::NetworkCacheDecoder(const uint8_t* buffer, size_t bufferSize)
+Decoder::Decoder(const uint8_t* buffer, size_t bufferSize)
     : m_buffer(buffer)
     , m_bufferPosition(buffer)
     , m_bufferEnd(buffer + bufferSize)
-    , m_checksum(0)
 {
 }
 
-NetworkCacheDecoder::~NetworkCacheDecoder()
+Decoder::~Decoder()
 {
 }
 
-bool NetworkCacheDecoder::bufferIsLargeEnoughToContain(size_t size) const
+bool Decoder::bufferIsLargeEnoughToContain(size_t size) const
 {
-    return m_bufferPosition + size <= m_bufferEnd;
+    return size <= static_cast<size_t>(m_bufferEnd - m_bufferPosition);
 }
 
-bool NetworkCacheDecoder::decodeFixedLengthData(uint8_t* data, size_t size)
+bool Decoder::decodeFixedLengthData(uint8_t* data, size_t size)
 {
     if (!bufferIsLargeEnoughToContain(size))
         return false;
@@ -57,12 +57,12 @@ bool NetworkCacheDecoder::decodeFixedLengthData(uint8_t* data, size_t size)
     memcpy(data, m_bufferPosition, size);
     m_bufferPosition += size;
 
-    NetworkCacheEncoder::updateChecksumForData(m_checksum, data, size);
+    Encoder::updateChecksumForData(m_sha1, data, size);
     return true;
 }
 
 template<typename Type>
-bool NetworkCacheDecoder::decodeNumber(Type& value)
+bool Decoder::decodeNumber(Type& value)
 {
     if (!bufferIsLargeEnoughToContain(sizeof(value)))
         return false;
@@ -70,64 +70,68 @@ bool NetworkCacheDecoder::decodeNumber(Type& value)
     memcpy(&value, m_bufferPosition, sizeof(value));
     m_bufferPosition += sizeof(Type);
 
-    NetworkCacheEncoder::updateChecksumForNumber(m_checksum, value);
+    Encoder::updateChecksumForNumber(m_sha1, value);
     return true;
 }
 
-bool NetworkCacheDecoder::decode(bool& result)
+bool Decoder::decode(bool& result)
 {
     return decodeNumber(result);
 }
 
-bool NetworkCacheDecoder::decode(uint8_t& result)
+bool Decoder::decode(uint8_t& result)
 {
     return decodeNumber(result);
 }
 
-bool NetworkCacheDecoder::decode(uint16_t& result)
+bool Decoder::decode(uint16_t& result)
 {
     return decodeNumber(result);
 }
 
-bool NetworkCacheDecoder::decode(uint32_t& result)
+bool Decoder::decode(uint32_t& result)
 {
     return decodeNumber(result);
 }
 
-bool NetworkCacheDecoder::decode(uint64_t& result)
+bool Decoder::decode(uint64_t& result)
 {
     return decodeNumber(result);
 }
 
-bool NetworkCacheDecoder::decode(int32_t& result)
+bool Decoder::decode(int32_t& result)
 {
     return decodeNumber(result);
 }
 
-bool NetworkCacheDecoder::decode(int64_t& result)
+bool Decoder::decode(int64_t& result)
 {
     return decodeNumber(result);
 }
 
-bool NetworkCacheDecoder::decode(float& result)
+bool Decoder::decode(float& result)
 {
     return decodeNumber(result);
 }
 
-bool NetworkCacheDecoder::decode(double& result)
+bool Decoder::decode(double& result)
 {
     return decodeNumber(result);
 }
 
-bool NetworkCacheDecoder::verifyChecksum()
+bool Decoder::verifyChecksum()
 {
-    unsigned computedChecksum = m_checksum;
-    unsigned decodedChecksum;
-    if (!decodeNumber(decodedChecksum))
+    SHA1::Digest computedHash;
+    m_sha1.computeHash(computedHash);
+
+    SHA1::Digest savedHash;
+    if (!decodeFixedLengthData(savedHash.data(), sizeof(savedHash)))
         return false;
-    return computedChecksum == decodedChecksum;
+
+    return computedHash == savedHash;
 }
 
+}
 }
 
 #endif

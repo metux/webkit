@@ -50,7 +50,7 @@ class WebSocketChannelClient;
 
 class ThreadableWebSocketChannelClientWrapper : public ThreadSafeRefCounted<ThreadableWebSocketChannelClientWrapper> {
 public:
-    static PassRefPtr<ThreadableWebSocketChannelClientWrapper> create(ScriptExecutionContext*, WebSocketChannelClient*);
+    static Ref<ThreadableWebSocketChannelClientWrapper> create(ScriptExecutionContext*, WebSocketChannelClient*);
 
     void clearSyncMethodDone();
     void setSyncMethodDone();
@@ -79,7 +79,7 @@ public:
 
     void didConnect();
     void didReceiveMessage(const String& message);
-    void didReceiveBinaryData(PassOwnPtr<Vector<char>>);
+    void didReceiveBinaryData(Vector<char>&&);
     void didUpdateBufferedAmount(unsigned long bufferedAmount);
     void didStartClosingHandshake();
     void didClose(unsigned long unhandledBufferedAmount, WebSocketChannelClient::ClosingHandshakeCompletionStatus, unsigned short code, const String& reason);

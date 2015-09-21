@@ -23,9 +23,8 @@
 #include "SVGAnimateMotionElement.h"
 
 #include "AffineTransform.h"
-#include "Attribute.h"
 #include "ElementIterator.h"
-#include "RenderObject.h"
+#include "PathTraversalState.h"
 #include "RenderSVGResource.h"
 #include "SVGImageElement.h"
 #include "SVGMPathElement.h"
@@ -36,7 +35,6 @@
 #include "SVGPathUtilities.h"
 #include "SVGTransformList.h"
 #include <wtf/MathExtras.h>
-#include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringView.h>
 
@@ -96,21 +94,8 @@ bool SVGAnimateMotionElement::hasValidAttributeName()
     return true;
 }
 
-bool SVGAnimateMotionElement::isSupportedAttribute(const QualifiedName& attrName)
-{
-    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
-    if (supportedAttributes.get().isEmpty())
-        supportedAttributes.get().add(SVGNames::pathAttr);
-    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
-}
-
 void SVGAnimateMotionElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(name)) {
-        SVGAnimationElement::parseAttribute(name, value);
-        return;
-    }
-
     if (name == SVGNames::pathAttr) {
         m_path = Path();
         buildPathFromString(value, m_path);
@@ -118,7 +103,7 @@ void SVGAnimateMotionElement::parseAttribute(const QualifiedName& name, const At
         return;
     }
 
-    ASSERT_NOT_REACHED();
+    SVGAnimationElement::parseAttribute(name, value);
 }
     
 SVGAnimateMotionElement::RotateMode SVGAnimateMotionElement::rotateMode() const
@@ -228,16 +213,19 @@ void SVGAnimateMotionElement::buildTransformForProgress(AffineTransform* transfo
 {
     ASSERT(!m_animationPath.isEmpty());
 
-    bool ok = false;
+    bool success = false;
     float positionOnPath = m_animationPath.length() * percentage;
-    FloatPoint position = m_animationPath.pointAtLength(positionOnPath, ok);
-    if (!ok)
+    auto traversalState(m_animationPath.traversalStateAtLength(positionOnPath, success));
+    if (!success)
         return;
+
+    FloatPoint position = traversalState.current();
+    float angle = traversalState.normalAngle();
+
     transform->translate(position.x(), position.y());
     RotateMode rotateMode = this->rotateMode();
     if (rotateMode != RotateAuto && rotateMode != RotateAutoReverse)
         return;
-    float angle = m_animationPath.normalAngleAtLength(positionOnPath, ok);
     if (rotateMode == RotateAutoReverse)
         angle += 180;
     transform->rotate(angle);

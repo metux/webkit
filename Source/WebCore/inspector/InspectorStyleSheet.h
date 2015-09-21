@@ -56,12 +56,12 @@ class InspectorCSSId {
 public:
     InspectorCSSId() { }
 
-    explicit InspectorCSSId(const RefPtr<Inspector::InspectorObject>&& value)
+    explicit InspectorCSSId(const Inspector::InspectorObject& value)
     {
-        if (!value->getString(ASCIILiteral("styleSheetId"), m_styleSheetId))
+        if (!value.getString(ASCIILiteral("styleSheetId"), m_styleSheetId))
             return;
 
-        if (!value->getInteger(ASCIILiteral("ordinal"), m_ordinal))
+        if (!value.getInteger(ASCIILiteral("ordinal"), m_ordinal))
             m_styleSheetId = String();
     }
 
@@ -139,10 +139,6 @@ public:
 
 private:
     InspectorStyle(const InspectorCSSId& styleId, RefPtr<CSSStyleDeclaration>&&, InspectorStyleSheet* parentStyleSheet);
-
-    // FIXME: Remove these aliases and update all the current call sites to use the new public methods.
-    bool styleText(String* result) const { return getText(result); }
-    bool applyStyleText(const String& text) { ExceptionCode ec = 0; return setText(text, ec); }
 
     bool populateAllProperties(Vector<InspectorStyleProperty>* result) const;
     Ref<Inspector::Protocol::CSS::CSSStyle> styleWithProperties() const;

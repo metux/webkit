@@ -27,9 +27,9 @@
 #include "WebKitPrivate.h"
 #include "WebKitWebExtensionPrivate.h"
 #include "WebKitWebPagePrivate.h"
-#include <WebCore/DNS.h>
+#include "WebProcess.h"
 #include <wtf/HashMap.h>
-#include <wtf/gobject/GRefPtr.h>
+#include <wtf/glib/GRefPtr.h>
 
 using namespace WebKit;
 
@@ -161,7 +161,7 @@ static void webkitWebExtensionDidReceiveMessage(WebKitWebExtension*, const Strin
 {
     if (messageName == String::fromUTF8("PrefetchDNS")) {
         API::String* hostname = static_cast<API::String*>(message.get(String::fromUTF8("Hostname")));
-        WebCore::prefetchDNS(hostname->string());
+        WebProcess::singleton().prefetchDNS(hostname->string());
     } else
         ASSERT_NOT_REACHED();
 }

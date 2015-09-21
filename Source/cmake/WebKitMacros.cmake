@@ -1,4 +1,5 @@
-macro(INCLUDE_IF_EXISTS _file)
+macro(WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS)
+    set(_file ${CMAKE_CURRENT_SOURCE_DIR}/Platform${PORT}.cmake)
     if (EXISTS ${_file})
         message(STATUS "Using platform-specific CMakeLists: ${_file}")
         include(${_file})
@@ -6,7 +7,6 @@ macro(INCLUDE_IF_EXISTS _file)
         message(STATUS "Platform-specific CMakeLists not found: ${_file}")
     endif ()
 endmacro()
-
 
 # Append the given dependencies to the source file
 macro(ADD_SOURCE_DEPENDENCIES _source _deps)
@@ -23,6 +23,22 @@ macro(ADD_SOURCE_DEPENDENCIES _source _deps)
     set_source_files_properties(${_source} PROPERTIES OBJECT_DEPENDS "${_tmp}")
 endmacro()
 
+macro(ADD_PRECOMPILED_HEADER _header _cpp _source)
+    if (MSVC)
+        get_filename_component(PrecompiledBasename ${_header} NAME_WE)
+        set(PrecompiledBinary "${CMAKE_CURRENT_BINARY_DIR}/${PrecompiledBasename}.pch")
+        set(_sources ${${_source}})
+
+        set_source_files_properties(${_cpp}
+            PROPERTIES COMPILE_FLAGS "/Yc\"${_header}\" /Fp\"${PrecompiledBinary}\""
+            OBJECT_OUTPUTS "${PrecompiledBinary}")
+        set_source_files_properties(${_sources}
+            PROPERTIES COMPILE_FLAGS "/Yu\"${_header}\" /FI\"${_header}\" /Fp\"${PrecompiledBinary}\""
+            OBJECT_DEPENDS "${PrecompiledBinary}")
+        list(APPEND ${_source} ${_cpp})
+    endif ()
+    #FIXME: Add support for Xcode.
+endmacro()
 
 # Helper macro which wraps generate-bindings.pl script.
 #   _output_source is a list name which will contain generated sources.(eg. WebCore_SOURCES)
@@ -190,13 +206,6 @@ macro(MAKE_HASH_TOOLS _source)
     unset(_hash_tools_h)
 endmacro()
 
-macro(WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS)
-    if (PORT_FALLBACK)
-        INCLUDE_IF_EXISTS(${CMAKE_CURRENT_SOURCE_DIR}/Platform${PORT_FALLBACK}.cmake)
-    endif ()
-    INCLUDE_IF_EXISTS(${CMAKE_CURRENT_SOURCE_DIR}/Platform${PORT}.cmake)
-endmacro()
-
 macro(WEBKIT_WRAP_SOURCELIST)
     foreach (_file ${ARGN})
         get_filename_component(_basename ${_file} NAME_WE)
@@ -286,4 +295,26 @@ macro(GENERATE_WEBKIT2_MESSAGE_SOURCES _output_source _input_files)
 
         list(APPEND ${_output_source} ${DERIVED_SOURCES_WEBKIT2_DIR}/${_name}MessageReceiver.cpp)
     endforeach ()
+endmacro()
+
+# Helper macro for using all-in-one builds
+# This macro removes the sources included in the _all_in_one_file from the input _file_list.
+# _file_list is a list of source files
+# _all_in_one_file is an all-in-one cpp file includes other cpp files
+# _result_file_list is the output file list
+macro(PROCESS_ALLINONE_FILE _file_list _all_in_one_file _result_file_list)
+    file(STRINGS ${_all_in_one_file} _all_in_one_file_content)
+    set(${_result_file_list} ${_file_list})
+    foreach (_line ${_all_in_one_file_content})
+        string(REGEX MATCH "^#include [\"<](.*)[\">]" _found ${_line})
+        if (_found)
+            list(APPEND _allins ${CMAKE_MATCH_1})
+        endif ()
+    endforeach ()
+
+    foreach (_allin ${_allins})
+        string(REGEX REPLACE ";[^;]*/${_allin};" ";" _new_result "${${_result_file_list}}")
+        set(${_result_file_list} ${_new_result})
+    endforeach ()
+
 endmacro()

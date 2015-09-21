@@ -27,7 +27,7 @@
 
 #include "FloatSize.h"
 #include "TransformationMatrix.h"
-#include <wtf/PassRefPtr.h>
+#include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
 #include <wtf/TypeCasts.h>
 
@@ -54,6 +54,8 @@ public:
 
     virtual ~TransformOperation() { }
 
+    virtual Ref<TransformOperation> clone() const = 0;
+
     virtual bool operator==(const TransformOperation&) const = 0;
     bool operator!=(const TransformOperation& o) const { return !(*this == o); }
 
@@ -62,10 +64,12 @@ public:
     // Return true if the borderBoxSize was used in the computation, false otherwise.
     virtual bool apply(TransformationMatrix&, const FloatSize& borderBoxSize) const = 0;
 
-    virtual PassRefPtr<TransformOperation> blend(const TransformOperation* from, double progress, bool blendToIdentity = false) = 0;
+    virtual Ref<TransformOperation> blend(const TransformOperation* from, double progress, bool blendToIdentity = false) = 0;
 
     virtual OperationType type() const = 0;
     virtual bool isSameType(const TransformOperation&) const { return false; }
+
+    virtual bool isAffectedByTransformOrigin() const { return false; }
     
     bool is3DOperation() const
     {

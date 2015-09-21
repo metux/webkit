@@ -64,25 +64,17 @@ static void setImageLoadingSettings(Page* page)
 
 static void invalidateAfterGenericFamilyChange(Page* page)
 {
-    invalidateFontGlyphsCache();
+    invalidateFontCascadeCache();
     if (page)
         page->setNeedsRecalcStyleInAllFrames();
 }
 
-double Settings::gDefaultMinDOMTimerInterval = 0.010; // 10 milliseconds
-double Settings::gDefaultDOMTimerAlignmentInterval = 0;
-double Settings::gHiddenPageDOMTimerAlignmentInterval = 1.0;
-
-#if USE(SAFARI_THEME)
-bool Settings::gShouldPaintNativeControls = true;
-#endif
-
 #if USE(AVFOUNDATION)
-bool Settings::gAVFoundationEnabled = false;
+bool Settings::gAVFoundationEnabled = true;
 #endif
 
 #if PLATFORM(COCOA)
-bool Settings::gQTKitEnabled = true;
+bool Settings::gQTKitEnabled = false;
 #endif
 
 bool Settings::gMockScrollbarsEnabled = false;
@@ -129,23 +121,27 @@ static EditingBehaviorType editingBehaviorTypeForPlatform()
 static const bool defaultFixedPositionCreatesStackingContext = true;
 static const bool defaultFixedBackgroundsPaintRelativeToDocument = true;
 static const bool defaultAcceleratedCompositingForFixedPositionEnabled = true;
-static const bool defaultMediaPlaybackAllowsInline = false;
-static const bool defaultMediaPlaybackRequiresUserGesture = true;
+static const bool defaultAllowsInlineMediaPlayback = false;
+static const bool defaultRequiresUserGestureForMediaPlayback = true;
+static const bool defaultAudioPlaybackRequiresUserGesture = true;
 static const bool defaultShouldRespectImageOrientation = true;
 static const bool defaultImageSubsamplingEnabled = true;
 static const bool defaultScrollingTreeIncludesFrames = true;
+static const bool defaultMediaControlsScaleWithPageZoom = true;
 #else
 static const bool defaultFixedPositionCreatesStackingContext = false;
 static const bool defaultFixedBackgroundsPaintRelativeToDocument = false;
 static const bool defaultAcceleratedCompositingForFixedPositionEnabled = false;
-static const bool defaultMediaPlaybackAllowsInline = true;
-static const bool defaultMediaPlaybackRequiresUserGesture = false;
+static const bool defaultAllowsInlineMediaPlayback = true;
+static const bool defaultRequiresUserGestureForMediaPlayback = false;
+static const bool defaultAudioPlaybackRequiresUserGesture = false;
 static const bool defaultShouldRespectImageOrientation = false;
 static const bool defaultImageSubsamplingEnabled = false;
 static const bool defaultScrollingTreeIncludesFrames = false;
+static const bool defaultMediaControlsScaleWithPageZoom = true;
 #endif
 
-static const bool defaultAllowsAlternateFullscreen = true;
+static const bool defaultAllowsPictureInPictureMediaPlayback = true;
 
 static const double defaultIncrementalRenderingSuppressionTimeoutInSeconds = 5;
 #if USE(UNIFIED_TEXT_CHECKING)
@@ -162,11 +158,13 @@ static const bool defaultSelectTrailingWhitespaceEnabled = false;
 static const auto layoutScheduleThreshold = std::chrono::milliseconds(250);
 
 Settings::Settings(Page* page)
-    : m_page(0)
+    : m_page(nullptr)
     , m_mediaTypeOverride("screen")
     , m_fontGenericFamilies(std::make_unique<FontGenericFamilies>())
     , m_storageBlockingPolicy(SecurityOrigin::AllowAllStorage)
     , m_layoutInterval(layoutScheduleThreshold)
+    , m_minimumDOMTimerInterval(DOMTimer::defaultMinimumInterval())
+    , m_domTimerAlignmentInterval(DOMTimer::defaultAlignmentInterval())
 #if ENABLE(TEXT_AUTOSIZING)
     , m_textAutosizingFontScaleFactor(1)
 #if HACK_FORCE_TEXT_AUTOSIZING_ON_DESKTOP
@@ -186,6 +184,7 @@ Settings::Settings(Page* page)
     , m_needsAdobeFrameReloadingQuirk(false)
     , m_usesPageCache(false)
     , m_fontRenderingMode(0)
+    , m_antialiasedFontDilationEnabled(false)
     , m_showTiledScrollingIndicator(false)
     , m_backgroundShouldExtendBeyondPage(false)
     , m_dnsPrefetchingEnabled(false)
@@ -200,6 +199,7 @@ Settings::Settings(Page* page)
 #endif
     , m_hiddenPageCSSAnimationSuspensionEnabled(false)
     , m_fontFallbackPrefersPictographs(false)
+    , m_forcePendingWebGLPolicy(false)
 {
     // A Frame may not have been created yet, so we initialize the AtomicString
     // hash before trying to use it.
@@ -212,22 +212,12 @@ Settings::~Settings()
 {
 }
 
-PassRefPtr<Settings> Settings::create(Page* page)
+Ref<Settings> Settings::create(Page* page)
 {
-    return adoptRef(new Settings(page));
+    return adoptRef(*new Settings(page));
 }
 
 SETTINGS_SETTER_BODIES
-
-void Settings::setHiddenPageDOMTimerAlignmentInterval(double hiddenPageDOMTimerAlignmentinterval)
-{
-    gHiddenPageDOMTimerAlignmentInterval = hiddenPageDOMTimerAlignmentinterval;
-}
-
-double Settings::hiddenPageDOMTimerAlignmentInterval()
-{
-    return gHiddenPageDOMTimerAlignmentInterval;
-}
 
 #if !PLATFORM(COCOA)
 void Settings::initializeDefaultFontFamilies()
@@ -357,6 +347,12 @@ void Settings::setTextAutosizingFontScaleFactor(float fontScaleFactor)
 
 #endif
 
+void Settings::setAntialiasedFontDilationEnabled(bool enabled)
+{
+    // FIXME: It's wrong for a setting to toggle a global, but this code is temporary.
+    FontCascade::setAntialiasedFontDilationEnabled(enabled);
+}
+
 void Settings::setMediaTypeOverride(const String& mediaTypeOverride)
 {
     if (m_mediaTypeOverride == mediaTypeOverride)
@@ -427,6 +423,11 @@ void Settings::setImagesEnabled(bool areImagesEnabled)
     m_setImageLoadingSettingsTimer.startOneShot(0);
 }
 
+void Settings::setForcePendingWebGLPolicy(bool forced)
+{
+    m_forcePendingWebGLPolicy = forced;
+}
+
 void Settings::setPluginsEnabled(bool arePluginsEnabled)
 {
     if (m_arePluginsEnabled == arePluginsEnabled)
@@ -454,44 +455,23 @@ void Settings::setNeedsAdobeFrameReloadingQuirk(bool shouldNotReloadIFramesForUn
     m_needsAdobeFrameReloadingQuirk = shouldNotReloadIFramesForUnchangedSRC;
 }
 
-void Settings::setDefaultMinDOMTimerInterval(double interval)
+void Settings::setMinimumDOMTimerInterval(double interval)
 {
-    gDefaultMinDOMTimerInterval = interval;
-}
+    double oldTimerInterval = m_minimumDOMTimerInterval;
+    m_minimumDOMTimerInterval = interval;
 
-double Settings::defaultMinDOMTimerInterval()
-{
-    return gDefaultMinDOMTimerInterval;
-}
-
-void Settings::setMinDOMTimerInterval(double interval)
-{
-    if (m_page)
-        m_page->setMinimumTimerInterval(interval);
-}
-
-double Settings::minDOMTimerInterval()
-{
     if (!m_page)
-        return 0;
-    return m_page->minimumTimerInterval();
+        return;
+
+    for (Frame* frame = &m_page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        if (frame->document())
+            frame->document()->adjustMinimumTimerInterval(oldTimerInterval);
+    }
 }
 
-void Settings::setDefaultDOMTimerAlignmentInterval(double interval)
+void Settings::setDOMTimerAlignmentInterval(double alignmentInterval)
 {
-    gDefaultDOMTimerAlignmentInterval = interval;
-}
-
-double Settings::defaultDOMTimerAlignmentInterval()
-{
-    return gDefaultDOMTimerAlignmentInterval;
-}
-
-double Settings::domTimerAlignmentInterval() const
-{
-    if (!m_page)
-        return 0;
-    return m_page->timerAlignmentInterval();
+    m_domTimerAlignmentInterval = alignmentInterval;
 }
 
 void Settings::setLayoutInterval(std::chrono::milliseconds layoutInterval)
@@ -528,13 +508,6 @@ FontRenderingMode Settings::fontRenderingMode() const
 {
     return static_cast<FontRenderingMode>(m_fontRenderingMode);
 }
-
-#if USE(SAFARI_THEME)
-void Settings::setShouldPaintNativeControls(bool shouldPaintNativeControls)
-{
-    gShouldPaintNativeControls = shouldPaintNativeControls;
-}
-#endif
 
 void Settings::setDNSPrefetchingEnabled(bool dnsPrefetchingEnabled)
 {

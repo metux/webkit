@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,6 +39,7 @@ namespace WTR {
 class TestInvocation;
 class PlatformWebView;
 class EventSenderProxy;
+struct ViewOptions;
 
 // FIXME: Rename this TestRunner?
 class TestController {
@@ -67,14 +68,16 @@ public:
 
     EventSenderProxy* eventSenderProxy() { return m_eventSenderProxy.get(); }
 
-    void ensureViewSupportsOptions(WKDictionaryRef options);
+    void ensureViewSupportsOptions(const ViewOptions&);
     bool shouldUseRemoteLayerTree() const { return m_shouldUseRemoteLayerTree; }
     
     // Runs the run loop until `done` is true or the timeout elapses.
     bool useWaitToDumpWatchdogTimer() { return m_useWaitToDumpWatchdogTimer; }
     void runUntil(bool& done, double timeoutSeconds);
     void notifyDone();
-    
+
+    bool shouldShowWebView() const { return m_shouldShowWebView; }
+
     void configureViewForTest(const TestInvocation&);
     
     bool beforeUnloadReturnValue() const { return m_beforeUnloadReturnValue; }
@@ -87,6 +90,7 @@ public:
     void setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed);
     void setMockGeolocationPositionUnavailableError(WKStringRef errorMessage);
     void handleGeolocationPermissionRequest(WKGeolocationPermissionRequestRef);
+    bool isGeolocationProviderActive() const;
 
     // MediaStream.
     void setUserMediaPermission(bool);
@@ -117,9 +121,11 @@ public:
 
     void setShouldLogHistoryClientCallbacks(bool shouldLog) { m_shouldLogHistoryClientCallbacks = shouldLog; }
 
+    bool isCurrentInvocation(TestInvocation* invocation) const { return invocation == m_currentInvocation.get(); }
+
 private:
     void initialize(int argc, const char* argv[]);
-    void createWebViewWithOptions(WKDictionaryRef);
+    void createWebViewWithOptions(const ViewOptions&);
     void run();
 
     void runTestingServerLoop();
@@ -146,6 +152,10 @@ private:
     // WKContextInjectedBundleClient
     static void didReceiveMessageFromInjectedBundle(WKContextRef, WKStringRef messageName, WKTypeRef messageBody, const void*);
     static void didReceiveSynchronousMessageFromInjectedBundle(WKContextRef, WKStringRef messageName, WKTypeRef messageBody, WKTypeRef* returnData, const void*);
+
+    // WKPageInjectedBundleClient
+    static void didReceivePageMessageFromInjectedBundle(WKPageRef, WKStringRef messageName, WKTypeRef messageBody, const void*);
+    static void didReceiveSynchronousPageMessageFromInjectedBundle(WKPageRef, WKStringRef messageName, WKTypeRef messageBody, WKTypeRef* returnData, const void*);
     void didReceiveMessageFromInjectedBundle(WKStringRef messageName, WKTypeRef messageBody);
     WKRetainPtr<WKTypeRef> didReceiveSynchronousMessageFromInjectedBundle(WKStringRef messageName, WKTypeRef messageBody);
 
@@ -214,6 +224,7 @@ private:
     bool m_gcBetweenTests;
     bool m_shouldDumpPixelsForAllTests;
     std::vector<std::string> m_paths;
+    std::vector<std::string> m_allowedHosts;
     WKRetainPtr<WKStringRef> m_injectedBundlePath;
     WKRetainPtr<WKStringRef> m_testPluginDirectory;
 
@@ -262,6 +273,7 @@ private:
     bool m_shouldUseRemoteLayerTree;
 
     bool m_shouldLogHistoryClientCallbacks;
+    bool m_shouldShowWebView;
 
     std::unique_ptr<EventSenderProxy> m_eventSenderProxy;
 

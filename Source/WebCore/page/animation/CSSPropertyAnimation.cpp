@@ -42,7 +42,6 @@
 #include "ClipPathOperation.h"
 #include "FloatConversion.h"
 #include "IdentityTransformOperation.h"
-#include "MaskImageOperation.h"
 #include "Matrix3DTransformOperation.h"
 #include "MatrixTransformOperation.h"
 #include "RenderBox.h"
@@ -117,7 +116,7 @@ static inline std::unique_ptr<ShadowData> blendFunc(const AnimationBase* anim, c
 
 static inline TransformOperations blendFunc(const AnimationBase* animation, const TransformOperations& from, const TransformOperations& to, double progress)
 {
-    if (animation->isTransformFunctionListValid())
+    if (animation->transformFunctionListsMatch())
         return to.blendByMatchingOperations(from, progress);
     return to.blendByUsingMatrixInterpolation(from, progress, is<RenderBox>(*animation->renderer()) ? downcast<RenderBox>(*animation->renderer()).borderBoxRect().size() : LayoutSize());
 }
@@ -195,12 +194,18 @@ static inline FilterOperations blendFilterOperations(const AnimationBase* anim, 
     return result;
 }
 
-static inline FilterOperations blendFunc(const AnimationBase* anim, const FilterOperations& from, const FilterOperations& to, double progress)
+static inline FilterOperations blendFunc(const AnimationBase* anim, const FilterOperations& from, const FilterOperations& to, double progress, bool animatingBackdropFilter = false)
 {
     FilterOperations result;
 
     // If we have a filter function list, use that to do a per-function animation.
+#if ENABLE(FILTERS_LEVEL_2)
+    if ((!animatingBackdropFilter && anim->filterFunctionListsMatch()) || (animatingBackdropFilter && anim->backdropFilterFunctionListsMatch()))
+#else
+    UNUSED_PARAM(animatingBackdropFilter);
     if (anim->filterFunctionListsMatch())
+#endif
+
         result = blendFilterOperations(anim, from, to, progress);
     else {
         // If the filter function lists don't match, we could try to cross-fade, but don't yet have a way to represent that in CSS.
@@ -218,7 +223,7 @@ static inline PassRefPtr<StyleImage> blendFilter(const AnimationBase* anim, Cach
 
     RefPtr<StyleCachedImage> styledImage = StyleCachedImage::create(image);
     auto imageValue = CSSImageValue::create(image->url(), styledImage.get());
-    auto filterValue = ComputedStyleExtractor::valueForFilter(&anim->renderer()->style(), filterResult, DoNotAdjustPixelValues);
+    auto filterValue = ComputedStyleExtractor::valueForFilter(anim->renderer()->style(), filterResult, DoNotAdjustPixelValues);
 
     auto result = CSSFilterImageValue::create(WTF::move(imageValue), WTF::move(filterValue));
     result.get().setFilterOperations(filterResult);
@@ -338,19 +343,6 @@ static inline PassRefPtr<StyleImage> blendFunc(const AnimationBase* anim, StyleI
     // https://bugs.webkit.org/show_bug.cgi?id=78293
     if (is<StyleCachedImage>(*from) && is<StyleCachedImage>(*to))
         return crossfadeBlend(anim, downcast<StyleCachedImage>(from), downcast<StyleCachedImage>(to), progress);
-
-    return to;
-}
-
-static inline PassRefPtr<MaskImageOperation> blendFunc(const AnimationBase* anim, const RefPtr<MaskImageOperation> from, const RefPtr<MaskImageOperation> to, double progress)
-{
-    if (!from.get() || !to.get())
-        return to;
-
-    // Only animates between masks using images (PNG, entire SVG, generated image).
-    // It does not animate between <mask> elements (file.svg#identifier).
-    if (from->image() && to->image())
-        return MaskImageOperation::create(blendFunc(anim, from->image(), to->image(), progress));
 
     return to;
 }
@@ -521,31 +513,6 @@ public:
     }
 };
 
-class MaskImagePropertyWrapper : public PropertyWrapper<const RefPtr<MaskImageOperation>> {
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    MaskImagePropertyWrapper()
-        : PropertyWrapper<const RefPtr<MaskImageOperation>>(CSSPropertyWebkitMaskImage, &RenderStyle::maskImage, &RenderStyle::setMaskImage)
-    {
-    }
-    
-    virtual bool equals(const RenderStyle* a, const RenderStyle* b) const
-    {
-        // If the style pointers are the same, don't bother doing the test.
-        // If either is null, return false. If both are null, return true.
-        if (a == b)
-            return true;
-        if (!a || !b)
-            return false;
-        
-        const RefPtr<MaskImageOperation> maskImageA = (a->*m_getter)();
-        const RefPtr<MaskImageOperation> maskImageB = (b->*m_getter)();
-        StyleImage* styleImageA = (maskImageA ? maskImageA->image() : nullptr);
-        StyleImage* styleImageB = (maskImageB ? maskImageB->image() : nullptr);
-        return StyleImage::imagesEquivalent(styleImageA, styleImageB);
-    }
-};
-
 class PropertyWrapperColor : public PropertyWrapperGetter<Color> {
     WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -588,7 +555,7 @@ class PropertyWrapperAcceleratedTransform : public PropertyWrapper<const Transfo
     WTF_MAKE_FAST_ALLOCATED;
 public:
     PropertyWrapperAcceleratedTransform()
-        : PropertyWrapper<const TransformOperations&>(CSSPropertyWebkitTransform, &RenderStyle::transform, &RenderStyle::setTransform)
+        : PropertyWrapper<const TransformOperations&>(CSSPropertyTransform, &RenderStyle::transform, &RenderStyle::setTransform)
     {
     }
 
@@ -615,6 +582,24 @@ public:
         dst->setFilter(blendFunc(anim, a->filter(), b->filter(), progress));
     }
 };
+
+#if ENABLE(FILTERS_LEVEL_2)
+class PropertyWrapperAcceleratedBackdropFilter : public PropertyWrapper<const FilterOperations&> {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    PropertyWrapperAcceleratedBackdropFilter()
+        : PropertyWrapper<const FilterOperations&>(CSSPropertyWebkitBackdropFilter, &RenderStyle::backdropFilter, &RenderStyle::setBackdropFilter)
+    {
+    }
+
+    virtual bool animationIsAccelerated() const { return true; }
+
+    virtual void blend(const AnimationBase* anim, RenderStyle* dst, const RenderStyle* a, const RenderStyle* b, double progress) const
+    {
+        dst->setBackdropFilter(blendFunc(anim, a->backdropFilter(), b->backdropFilter(), progress, true));
+    }
+};
+#endif
 
 static inline size_t shadowListLength(const ShadowData* shadow)
 {
@@ -1020,9 +1005,8 @@ public:
 
     virtual bool equals(const RenderStyle* a, const RenderStyle* b) const
     {
-        Vector<AnimationPropertyWrapperBase*>::const_iterator end = m_propertyWrappers.end();
-        for (Vector<AnimationPropertyWrapperBase*>::const_iterator it = m_propertyWrappers.begin(); it != end; ++it) {
-            if (!(*it)->equals(a, b))
+        for (auto& wrapper : m_propertyWrappers) {
+            if (!wrapper->equals(a, b))
                 return false;
         }
         return true;
@@ -1030,9 +1014,8 @@ public:
 
     virtual void blend(const AnimationBase* anim, RenderStyle* dst, const RenderStyle* a, const RenderStyle* b, double progress) const
     {
-        Vector<AnimationPropertyWrapperBase*>::const_iterator end = m_propertyWrappers.end();
-        for (Vector<AnimationPropertyWrapperBase*>::const_iterator it = m_propertyWrappers.begin(); it != end; ++it)
-            (*it)->blend(anim, dst, a, b, progress);
+        for (auto& wrapper : m_propertyWrappers)
+            wrapper->blend(anim, dst, a, b, progress);
     }
 
     const Vector<AnimationPropertyWrapperBase*>& propertyWrappers() const { return m_propertyWrappers; }
@@ -1133,7 +1116,7 @@ private:
 class CSSPropertyAnimationWrapperMap {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static CSSPropertyAnimationWrapperMap& instance()
+    static CSSPropertyAnimationWrapperMap& singleton()
     {
         // FIXME: This data is never destroyed. Maybe we should ref count it and toss it when the last AnimationController is destroyed?
         static NeverDestroyed<CSSPropertyAnimationWrapperMap> map;
@@ -1165,6 +1148,8 @@ public:
 
 private:
     CSSPropertyAnimationWrapperMap();
+    ~CSSPropertyAnimationWrapperMap() = delete;
+
     unsigned char& indexFromPropertyID(CSSPropertyID propertyID)
     {
         return m_propertyToIdMap[propertyID - firstCSSProperty];
@@ -1215,7 +1200,7 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
 
         new FillLayersPropertyWrapper(CSSPropertyBackgroundImage, &RenderStyle::backgroundLayers, &RenderStyle::ensureBackgroundLayers),
         new StyleImagePropertyWrapper(CSSPropertyListStyleImage, &RenderStyle::listStyleImage, &RenderStyle::setListStyleImage),
-        new MaskImagePropertyWrapper(),
+        new StyleImagePropertyWrapper(CSSPropertyWebkitMaskImage, &RenderStyle::maskImage, &RenderStyle::setMaskImage),
 
         new StyleImagePropertyWrapper(CSSPropertyBorderImageSource, &RenderStyle::borderImageSource, &RenderStyle::setBorderImageSource),
         new LengthPropertyWrapper<LengthBox>(CSSPropertyBorderImageSlice, &RenderStyle::borderImageSlices, &RenderStyle::setBorderImageSlices),
@@ -1260,12 +1245,12 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
         new LengthPropertyWrapper<Length>(CSSPropertyWordSpacing, &RenderStyle::wordSpacing, &RenderStyle::setWordSpacing),
         new LengthPropertyWrapper<Length>(CSSPropertyTextIndent, &RenderStyle::textIndent, &RenderStyle::setTextIndent),
 
-        new PropertyWrapper<float>(CSSPropertyWebkitPerspective, &RenderStyle::perspective, &RenderStyle::setPerspective),
-        new LengthPropertyWrapper<Length>(CSSPropertyWebkitPerspectiveOriginX, &RenderStyle::perspectiveOriginX, &RenderStyle::setPerspectiveOriginX),
-        new LengthPropertyWrapper<Length>(CSSPropertyWebkitPerspectiveOriginY, &RenderStyle::perspectiveOriginY, &RenderStyle::setPerspectiveOriginY),
-        new LengthPropertyWrapper<Length>(CSSPropertyWebkitTransformOriginX, &RenderStyle::transformOriginX, &RenderStyle::setTransformOriginX),
-        new LengthPropertyWrapper<Length>(CSSPropertyWebkitTransformOriginY, &RenderStyle::transformOriginY, &RenderStyle::setTransformOriginY),
-        new PropertyWrapper<float>(CSSPropertyWebkitTransformOriginZ, &RenderStyle::transformOriginZ, &RenderStyle::setTransformOriginZ),
+        new PropertyWrapper<float>(CSSPropertyPerspective, &RenderStyle::perspective, &RenderStyle::setPerspective),
+        new LengthPropertyWrapper<Length>(CSSPropertyPerspectiveOriginX, &RenderStyle::perspectiveOriginX, &RenderStyle::setPerspectiveOriginX),
+        new LengthPropertyWrapper<Length>(CSSPropertyPerspectiveOriginY, &RenderStyle::perspectiveOriginY, &RenderStyle::setPerspectiveOriginY),
+        new LengthPropertyWrapper<Length>(CSSPropertyTransformOriginX, &RenderStyle::transformOriginX, &RenderStyle::setTransformOriginX),
+        new LengthPropertyWrapper<Length>(CSSPropertyTransformOriginY, &RenderStyle::transformOriginY, &RenderStyle::setTransformOriginY),
+        new PropertyWrapper<float>(CSSPropertyTransformOriginZ, &RenderStyle::transformOriginZ, &RenderStyle::setTransformOriginZ),
         new LengthPropertyWrapper<LengthSize>(CSSPropertyBorderTopLeftRadius, &RenderStyle::borderTopLeftRadius, &RenderStyle::setBorderTopLeftRadius),
         new LengthPropertyWrapper<LengthSize>(CSSPropertyBorderTopRightRadius, &RenderStyle::borderTopRightRadius, &RenderStyle::setBorderTopRightRadius),
         new LengthPropertyWrapper<LengthSize>(CSSPropertyBorderBottomLeftRadius, &RenderStyle::borderBottomLeftRadius, &RenderStyle::setBorderBottomLeftRadius),
@@ -1278,6 +1263,9 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
         new PropertyWrapperAcceleratedOpacity(),
         new PropertyWrapperAcceleratedTransform(),
         new PropertyWrapperAcceleratedFilter(),
+#if ENABLE(FILTERS_LEVEL_2)
+        new PropertyWrapperAcceleratedBackdropFilter(),
+#endif
         new PropertyWrapperClipPath(CSSPropertyWebkitClipPath, &RenderStyle::clipPath, &RenderStyle::setClipPath),
 
 #if ENABLE(CSS_SHAPES)
@@ -1350,7 +1338,7 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
         CSSPropertyWebkitTextStroke,
         CSSPropertyColumnRule,
         CSSPropertyWebkitBorderRadius,
-        CSSPropertyWebkitTransformOrigin
+        CSSPropertyTransformOrigin
     };
     const unsigned animatableShorthandPropertiesCount = WTF_ARRAY_LENGTH(animatableShorthandProperties);
 
@@ -1424,7 +1412,7 @@ bool CSSPropertyAnimation::blendProperties(const AnimationBase* anim, CSSPropert
 {
     ASSERT(prop != CSSPropertyInvalid);
 
-    AnimationPropertyWrapperBase* wrapper = CSSPropertyAnimationWrapperMap::instance().wrapperForProperty(prop);
+    AnimationPropertyWrapperBase* wrapper = CSSPropertyAnimationWrapperMap::singleton().wrapperForProperty(prop);
     if (wrapper) {
         wrapper->blend(anim, dst, a, b, progress);
         return !wrapper->animationIsAccelerated() || !anim->isAccelerated();
@@ -1435,14 +1423,14 @@ bool CSSPropertyAnimation::blendProperties(const AnimationBase* anim, CSSPropert
 
 bool CSSPropertyAnimation::animationOfPropertyIsAccelerated(CSSPropertyID prop)
 {
-    AnimationPropertyWrapperBase* wrapper = CSSPropertyAnimationWrapperMap::instance().wrapperForProperty(prop);
+    AnimationPropertyWrapperBase* wrapper = CSSPropertyAnimationWrapperMap::singleton().wrapperForProperty(prop);
     return wrapper ? wrapper->animationIsAccelerated() : false;
 }
 
 // Note: this is inefficient. It's only called from pauseTransitionAtTime().
 HashSet<CSSPropertyID> CSSPropertyAnimation::animatableShorthandsAffectingProperty(CSSPropertyID property)
 {
-    CSSPropertyAnimationWrapperMap& map = CSSPropertyAnimationWrapperMap::instance();
+    CSSPropertyAnimationWrapperMap& map = CSSPropertyAnimationWrapperMap::singleton();
 
     HashSet<CSSPropertyID> foundProperties;
     for (unsigned i = 0; i < map.size(); ++i)
@@ -1453,7 +1441,7 @@ HashSet<CSSPropertyID> CSSPropertyAnimation::animatableShorthandsAffectingProper
 
 bool CSSPropertyAnimation::propertiesEqual(CSSPropertyID prop, const RenderStyle* a, const RenderStyle* b)
 {
-    AnimationPropertyWrapperBase* wrapper = CSSPropertyAnimationWrapperMap::instance().wrapperForProperty(prop);
+    AnimationPropertyWrapperBase* wrapper = CSSPropertyAnimationWrapperMap::singleton().wrapperForProperty(prop);
     if (wrapper)
         return wrapper->equals(a, b);
     return true;
@@ -1461,7 +1449,7 @@ bool CSSPropertyAnimation::propertiesEqual(CSSPropertyID prop, const RenderStyle
 
 CSSPropertyID CSSPropertyAnimation::getPropertyAtIndex(int i, bool& isShorthand)
 {
-    CSSPropertyAnimationWrapperMap& map = CSSPropertyAnimationWrapperMap::instance();
+    CSSPropertyAnimationWrapperMap& map = CSSPropertyAnimationWrapperMap::singleton();
 
     if (i < 0 || static_cast<unsigned>(i) >= map.size())
         return CSSPropertyInvalid;
@@ -1473,7 +1461,7 @@ CSSPropertyID CSSPropertyAnimation::getPropertyAtIndex(int i, bool& isShorthand)
 
 int CSSPropertyAnimation::getNumProperties()
 {
-    return CSSPropertyAnimationWrapperMap::instance().size();
+    return CSSPropertyAnimationWrapperMap::singleton().size();
 }
 
 }

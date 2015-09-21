@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,13 +30,11 @@
 
 #include "ScrollingStateTree.h"
 #include "TextStream.h"
-#include <wtf/OwnPtr.h>
 
 namespace WebCore {
 
 ScrollingStateScrollingNode::ScrollingStateScrollingNode(ScrollingStateTree& stateTree, ScrollingNodeType nodeType, ScrollingNodeID nodeID)
     : ScrollingStateNode(nodeType, stateTree, nodeID)
-    , m_requestedScrollPositionRepresentsProgrammaticScroll(false)
 {
 }
 
@@ -54,6 +52,7 @@ ScrollingStateScrollingNode::ScrollingStateScrollingNode(const ScrollingStateScr
 #endif
     , m_scrollableAreaParameters(stateNode.scrollableAreaParameters())
     , m_requestedScrollPositionRepresentsProgrammaticScroll(stateNode.requestedScrollPositionRepresentsProgrammaticScroll())
+    , m_expectsWheelEventTestTrigger(stateNode.expectsWheelEventTestTrigger())
 {
 }
 
@@ -124,6 +123,24 @@ void ScrollingStateScrollingNode::setVerticalSnapOffsets(const Vector<float>& sn
     m_verticalSnapOffsets = snapOffsets;
     setPropertyChanged(VerticalSnapOffsets);
 }
+
+void ScrollingStateScrollingNode::setCurrentHorizontalSnapPointIndex(unsigned index)
+{
+    if (m_currentHorizontalSnapPointIndex == index)
+        return;
+    
+    m_currentHorizontalSnapPointIndex = index;
+    setPropertyChanged(CurrentHorizontalSnapOffsetIndex);
+}
+
+void ScrollingStateScrollingNode::setCurrentVerticalSnapPointIndex(unsigned index)
+{
+    if (m_currentVerticalSnapPointIndex == index)
+        return;
+    
+    m_currentVerticalSnapPointIndex = index;
+    setPropertyChanged(CurrentVerticalSnapOffsetIndex);
+}
 #endif
 
 void ScrollingStateScrollingNode::setScrollableAreaParameters(const ScrollableAreaParameters& parameters)
@@ -140,6 +157,15 @@ void ScrollingStateScrollingNode::setRequestedScrollPosition(const FloatPoint& r
     m_requestedScrollPosition = requestedScrollPosition;
     m_requestedScrollPositionRepresentsProgrammaticScroll = representsProgrammaticScroll;
     setPropertyChanged(RequestedScrollPosition);
+}
+
+void ScrollingStateScrollingNode::setExpectsWheelEventTestTrigger(bool expectsTestTrigger)
+{
+    if (expectsTestTrigger == m_expectsWheelEventTestTrigger)
+        return;
+
+    m_expectsWheelEventTestTrigger = expectsTestTrigger;
+    setPropertyChanged(ExpectsWheelEventTestTrigger);
 }
 
 void ScrollingStateScrollingNode::dumpProperties(TextStream& ts, int indent) const

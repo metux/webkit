@@ -56,9 +56,7 @@ ThreadableLoaderOptions::ThreadableLoaderOptions(const ResourceLoaderOptions& ba
     , preflightPolicy(preflightPolicy)
     , crossOriginRequestPolicy(crossOriginRequestPolicy)
     , securityOrigin(WTF::move(securityOrigin))
-#if ENABLE(RESOURCE_TIMING)
     , initiator(WTF::move(initiator))
-#endif
 {
 }
 
@@ -67,12 +65,8 @@ std::unique_ptr<ThreadableLoaderOptions> ThreadableLoaderOptions::isolatedCopy()
     RefPtr<SecurityOrigin> securityOriginCopy;
     if (securityOrigin)
         securityOriginCopy = securityOrigin->isolatedCopy();
-#if ENABLE(RESOURCE_TIMING)
     return std::make_unique<ThreadableLoaderOptions>(*this, preflightPolicy, crossOriginRequestPolicy,
         WTF::move(securityOriginCopy), initiator.isolatedCopy());
-#else
-    return std::make_unique<ThreadableLoaderOptions>(*this, preflightPolicy, crossOriginRequestPolicy, WTF::move(securityOriginCopy), String());
-#endif
 }
 
 PassRefPtr<ThreadableLoader> ThreadableLoader::create(ScriptExecutionContext* context, ThreadableLoaderClient* client, const ResourceRequest& request, const ThreadableLoaderOptions& options)

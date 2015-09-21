@@ -26,6 +26,7 @@
 
 #include "GraphicsContext.h"
 #include "RenderSVGText.h"
+#include "RenderSVGTextPath.h"
 #include "SVGInlineFlowBox.h"
 #include "SVGInlineTextBox.h"
 #include "SVGNames.h"
@@ -104,7 +105,7 @@ void SVGRootInlineBox::layoutCharactersInTextBoxes(InlineFlowBox* start, SVGText
     for (InlineBox* child = start->firstChild(); child; child = child->nextOnLine()) {
         if (is<SVGInlineTextBox>(*child)) {
             ASSERT(is<RenderSVGInlineText>(child->renderer()));
-            characterLayout.layoutInlineTextBox(downcast<SVGInlineTextBox>(child));
+            characterLayout.layoutInlineTextBox(downcast<SVGInlineTextBox>(*child));
         } else {
             // Skip generated content.
             Node* node = child->renderer().node();
@@ -119,7 +120,7 @@ void SVGRootInlineBox::layoutCharactersInTextBoxes(InlineFlowBox* start, SVGText
                 SVGTextLayoutEngine lineLayout(characterLayout.layoutAttributes());
                 layoutCharactersInTextBoxes(&flowBox, lineLayout);
 
-                characterLayout.beginTextPathLayout(&child->renderer(), lineLayout);
+                characterLayout.beginTextPathLayout(downcast<RenderSVGTextPath>(child->renderer()), lineLayout);
             }
 
             layoutCharactersInTextBoxes(&flowBox, characterLayout);
@@ -195,7 +196,7 @@ InlineBox* SVGRootInlineBox::closestLeafChildForPosition(const LayoutPoint& poin
         return firstLeaf;
 
     // FIXME: Check for vertical text!
-    InlineBox* closestLeaf = 0;
+    InlineBox* closestLeaf = nullptr;
     for (InlineBox* leaf = firstLeaf; leaf; leaf = leaf->nextLeafChild()) {
         if (!leaf->isSVGInlineTextBox())
             continue;
@@ -238,8 +239,8 @@ static inline void swapItemsInLayoutAttributes(SVGTextLayoutAttributes* firstAtt
 static inline void findFirstAndLastAttributesInVector(Vector<SVGTextLayoutAttributes*>& attributes, RenderSVGInlineText* firstContext, RenderSVGInlineText* lastContext,
                                                       SVGTextLayoutAttributes*& first, SVGTextLayoutAttributes*& last)
 {
-    first = 0;
-    last = 0;
+    first = nullptr;
+    last = nullptr;
 
     unsigned attributesSize = attributes.size();
     for (unsigned i = 0; i < attributesSize; ++i) {

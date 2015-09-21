@@ -78,7 +78,7 @@ void LegacyProfiler::startProfiling(ExecState* exec, const String& title, PassRe
     m_currentProfiles.append(profileGenerator);
 }
 
-PassRefPtr<Profile> LegacyProfiler::stopProfiling(ExecState* exec, const String& title)
+RefPtr<Profile> LegacyProfiler::stopProfiling(ExecState* exec, const String& title)
 {
     if (!exec)
         return nullptr;
@@ -201,7 +201,7 @@ CallIdentifier createCallIdentifierFromFunctionImp(ExecState* exec, JSObject* fu
     const String& name = getCalculatedDisplayName(exec, function);
     JSFunction* jsFunction = jsDynamicCast<JSFunction*>(function);
     if (jsFunction && !jsFunction->isHostOrBuiltinFunction())
-        return CallIdentifier(name.isEmpty() ? ASCIILiteral(AnonymousFunction) : name, jsFunction->jsExecutable()->sourceURL(), jsFunction->jsExecutable()->lineNo(), jsFunction->jsExecutable()->startColumn());
+        return CallIdentifier(name.isEmpty() ? ASCIILiteral(AnonymousFunction) : name, jsFunction->jsExecutable()->sourceURL(), jsFunction->jsExecutable()->firstLine(), jsFunction->jsExecutable()->startColumn());
     return CallIdentifier(name.isEmpty() ? ASCIILiteral(AnonymousFunction) : name, defaultSourceURL, defaultLineNumber, defaultColumnNumber);
 }
 

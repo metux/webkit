@@ -33,10 +33,12 @@
 #include "PlatformProcessIdentifier.h"
 #include "PluginInfoStore.h"
 #include "ProcessLauncher.h"
+#include "ProcessThrottlerClient.h"
 #include "ResponsivenessTimer.h"
 #include "WebConnectionToWebProcess.h"
 #include "WebPageProxy.h"
 #include "WebProcessProxyMessages.h"
+#include "WebsiteDataTypes.h"
 #include <WebCore/LinkHash.h>
 #include <memory>
 #include <wtf/Forward.h>
@@ -57,12 +59,13 @@ struct PluginInfo;
 namespace WebKit {
 
 class DownloadProxyMap;
+class NetworkProcessProxy;
 class WebBackForwardListItem;
 class WebPageGroup;
 class WebProcessPool;
 struct WebNavigationDataStore;
     
-class WebProcessProxy : public ChildProcessProxy, ResponsivenessTimer::Client {
+class WebProcessProxy : public ChildProcessProxy, ResponsivenessTimer::Client, private ProcessThrottlerClient {
 public:
     typedef HashMap<uint64_t, RefPtr<WebBackForwardListItem>> WebBackForwardListItemMap;
     typedef HashMap<uint64_t, RefPtr<WebFrameProxy>> WebFrameProxyMap;
@@ -81,7 +84,7 @@ public:
     WebProcessPool& processPool() { return m_processPool; }
 
     static WebPageProxy* webPage(uint64_t pageID);
-    Ref<WebPageProxy> createWebPage(PageClient&, const WebPageConfiguration&);
+    Ref<WebPageProxy> createWebPage(PageClient&, Ref<API::PageConfiguration>&&);
     void addExistingWebPage(WebPageProxy*, uint64_t pageID);
     void removeWebPage(uint64_t pageID);
 
@@ -122,6 +125,10 @@ public:
     void didSaveToPageCache();
     void releasePageCache();
 
+    void fetchWebsiteData(WebCore::SessionID, WebsiteDataTypes, std::function<void (WebsiteData)> completionHandler);
+    void deleteWebsiteData(WebCore::SessionID, WebsiteDataTypes, std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler);
+    void deleteWebsiteDataForOrigins(WebCore::SessionID, WebsiteDataTypes, const Vector<RefPtr<WebCore::SecurityOrigin>>& origins, std::function<void ()> completionHandler);
+
     void enableSuddenTermination();
     void disableSuddenTermination();
 
@@ -137,16 +144,17 @@ public:
 
     void windowServerConnectionStateChanged();
 
-    void sendProcessWillSuspend();
     void processReadyToSuspend();
-    void sendCancelProcessWillSuspend();
     void didCancelProcessSuspension();
-    void sendProcessDidResume();
 
     void setIsHoldingLockedFiles(bool);
 
-    ProcessThrottler& throttler() { return *m_throttler; }
-    
+    ProcessThrottler& throttler() { return m_throttler; }
+
+#if ENABLE(NETWORK_PROCESS)
+    void reinstateNetworkProcessAssertionState(NetworkProcessProxy&);
+#endif
+
 private:
     explicit WebProcessProxy(WebProcessPool&);
 
@@ -154,17 +162,21 @@ private:
     virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) override;
     void platformGetLaunchOptions(ProcessLauncher::LaunchOptions&);
     virtual void connectionWillOpen(IPC::Connection&) override;
-    virtual void connectionDidClose(IPC::Connection&) override;
+    virtual void processWillShutDown(IPC::Connection&) override;
 
     // Called when the web process has crashed or we know that it will terminate soon.
     // Will potentially cause the WebProcessProxy object to be freed.
-    void disconnect();
+    void shutDown();
 
     // IPC message handlers.
     void addBackForwardItem(uint64_t itemID, uint64_t pageID, const PageState&);
     void didDestroyFrame(uint64_t);
     
     void shouldTerminate(bool& shouldTerminate);
+
+    void didFetchWebsiteData(uint64_t callbackID, const WebsiteData&);
+    void didDeleteWebsiteData(uint64_t callbackID);
+    void didDeleteWebsiteDataForOrigins(uint64_t callbackID);
 
     // Plugins
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -180,6 +192,10 @@ private:
     void getDatabaseProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetDatabaseProcessConnection::DelayedReply>);
 #endif
 
+    void retainIconForPageURL(const String& pageURL);
+    void releaseIconForPageURL(const String& pageURL);
+    void releaseRemainingIconsForPageURLs();
+
     // IPC::Connection::Client
     friend class WebConnectionToWebProcess;
     virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
@@ -193,6 +209,13 @@ private:
     void didBecomeUnresponsive(ResponsivenessTimer*) override;
     void interactionOccurredWhileUnresponsive(ResponsivenessTimer*) override;
     void didBecomeResponsive(ResponsivenessTimer*) override;
+
+    // ProcessThrottlerClient
+    void sendProcessWillSuspendImminently() override;
+    void sendPrepareToSuspend() override;
+    void sendCancelPrepareToSuspend() override;
+    void sendProcessDidResume() override;
+    void didSetAssertionState(AssertionState) override;
 
     // ProcessLauncher::Client
     virtual void didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier) override;
@@ -221,9 +244,19 @@ private:
     std::unique_ptr<DownloadProxyMap> m_downloadProxyMap;
     CustomProtocolManagerProxy m_customProtocolManagerProxy;
 
+    HashMap<uint64_t, std::function<void (WebsiteData)>> m_pendingFetchWebsiteDataCallbacks;
+    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataCallbacks;
+    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataForOriginsCallbacks;
+
     int m_numberOfTimesSuddenTerminationWasDisabled;
-    std::unique_ptr<ProcessThrottler> m_throttler;
+    ProcessThrottler m_throttler;
     ProcessThrottler::BackgroundActivityToken m_tokenForHoldingLockedFiles;
+#if PLATFORM(IOS) && ENABLE(NETWORK_PROCESS)
+    ProcessThrottler::ForegroundActivityToken m_foregroundTokenForNetworkProcess;
+    ProcessThrottler::BackgroundActivityToken m_backgroundTokenForNetworkProcess;
+#endif
+
+    HashMap<String, uint64_t> m_pageURLRetainCountMap;
 };
 
 } // namespace WebKit

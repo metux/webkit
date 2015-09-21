@@ -105,7 +105,7 @@ void RenderImage::collectSelectionRects(Vector<SelectionRect>& rects, unsigned, 
     }
 
     bool isFixed = false;
-    IntRect absoluteBounds = localToAbsoluteQuad(FloatRect(imageRect), false, &isFixed).enclosingBoundingBox();
+    IntRect absoluteBounds = localToAbsoluteQuad(FloatRect(imageRect), UseTransforms, &isFixed).enclosingBoundingBox();
     IntRect lineExtentBounds = localToAbsoluteQuad(FloatRect(lineExtentRect)).enclosingBoundingBox();
     if (!containingBlock->isHorizontalWritingMode())
         lineExtentBounds = lineExtentBounds.transposedRect();
@@ -314,9 +314,9 @@ void RenderImage::repaintOrMarkForLayout(ImageSizeChangeType imageSizeChange, co
         // if the containing block's size depends on the image's size (i.e., the container uses shrink-to-fit sizing).
         // There's no easy way to detect that shrink-to-fit is needed, always force a layout.
         bool containingBlockNeedsToRecomputePreferredSize =
-            style().logicalWidth().isPercent()
-            || style().logicalMaxWidth().isPercent()
-            || style().logicalMinWidth().isPercent();
+            style().logicalWidth().isPercentOrCalculated()
+            || style().logicalMaxWidth().isPercentOrCalculated()
+            || style().logicalMinWidth().isPercentOrCalculated();
 
         bool layoutSizeDependsOnIntrinsicSize = style().aspectRatioType() == AspectRatioFromIntrinsic;
 
@@ -557,12 +557,12 @@ void RenderImage::paintIntoRect(GraphicsContext* context, const FloatRect& rect)
         ImagePaintingOptions(compositeOperator, BlendModeNormal, orientationDescription, useLowQualityScaling));
 }
 
-bool RenderImage::boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance bleedAvoidance, InlineFlowBox*) const
+bool RenderImage::boxShadowShouldBeAppliedToBackground(const LayoutPoint& paintOffset, BackgroundBleedAvoidance bleedAvoidance, InlineFlowBox*) const
 {
-    if (!RenderBoxModelObject::boxShadowShouldBeAppliedToBackground(bleedAvoidance))
+    if (!RenderBoxModelObject::boxShadowShouldBeAppliedToBackground(paintOffset, bleedAvoidance))
         return false;
 
-    return !const_cast<RenderImage*>(this)->backgroundIsKnownToBeObscured();
+    return !const_cast<RenderImage*>(this)->backgroundIsKnownToBeObscured(paintOffset);
 }
 
 bool RenderImage::foregroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect, unsigned maxDepthToTest) const
@@ -589,13 +589,13 @@ bool RenderImage::foregroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect,
     return imageResource().cachedImage() && imageResource().cachedImage()->currentFrameKnownToBeOpaque(this);
 }
 
-bool RenderImage::computeBackgroundIsKnownToBeObscured()
+bool RenderImage::computeBackgroundIsKnownToBeObscured(const LayoutPoint& paintOffset)
 {
     if (!hasBackground())
         return false;
     
     LayoutRect paintedExtent;
-    if (!getBackgroundPaintedExtent(paintedExtent))
+    if (!getBackgroundPaintedExtent(paintOffset, paintedExtent))
         return false;
     return foregroundIsKnownToBeOpaqueInRect(paintedExtent, 0);
 }

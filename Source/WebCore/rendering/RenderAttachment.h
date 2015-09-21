@@ -40,11 +40,18 @@ public:
 
     HTMLAttachmentElement& attachmentElement() const;
 
+    void invalidate();
+
 private:
     void element() const = delete;
     virtual bool isAttachment() const override { return true; }
     virtual const char* renderName() const override { return "RenderAttachment"; }
-    virtual void paintReplaced(PaintInfo&, const LayoutPoint&) override;
+
+    virtual bool shouldDrawSelectionTint() const override { return false; }
+
+    virtual void layout() override;
+
+    virtual int baselinePosition(FontBaseline, bool, LineDirectionMode, LinePositionMode) const override;
 };
 
 } // namespace WebCore

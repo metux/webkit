@@ -88,7 +88,7 @@ struct SelectionIterator {
     
     RenderObject* next()
     {
-        RenderObject* currentSpan = m_spannerStack.isEmpty() ? 0 : m_spannerStack.last()->spanner();
+        RenderObject* currentSpan = m_spannerStack.isEmpty() ? nullptr : m_spannerStack.last()->spanner();
         m_current = m_current->nextInPreOrder(currentSpan);
         checkForSpanner();
         if (!m_current && currentSpan) {
@@ -117,18 +117,17 @@ private:
 RenderView::RenderView(Document& document, Ref<RenderStyle>&& style)
     : RenderBlockFlow(document, WTF::move(style))
     , m_frameView(*document.view())
-    , m_selectionUnsplitStart(0)
-    , m_selectionUnsplitEnd(0)
+    , m_selectionUnsplitStart(nullptr)
+    , m_selectionUnsplitEnd(nullptr)
     , m_selectionUnsplitStartPos(-1)
     , m_selectionUnsplitEndPos(-1)
-    , m_rendererCount(0)
     , m_maximalOutlineSize(0)
     , m_lazyRepaintTimer(*this, &RenderView::lazyRepaintTimerFired)
     , m_pageLogicalHeight(0)
     , m_pageLogicalHeightChanged(false)
     , m_layoutState(nullptr)
     , m_layoutStateDisableCount(0)
-    , m_renderQuoteHead(0)
+    , m_renderQuoteHead(nullptr)
     , m_renderCounterCount(0)
     , m_selectionWasCaret(false)
     , m_hasSoftwareFilters(false)
@@ -356,9 +355,9 @@ void RenderView::layout()
 
         for (auto& box : childrenOfType<RenderBox>(*this)) {
             if (box.hasRelativeLogicalHeight()
-                || box.style().logicalHeight().isPercent()
-                || box.style().logicalMinHeight().isPercent()
-                || box.style().logicalMaxHeight().isPercent()
+                || box.style().logicalHeight().isPercentOrCalculated()
+                || box.style().logicalMinHeight().isPercentOrCalculated()
+                || box.style().logicalMaxHeight().isPercentOrCalculated()
                 || box.isSVGRoot()
                 )
                 box.setChildNeedsLayout(MarkOnlyThis);
@@ -438,7 +437,7 @@ static inline LayoutSize fixedPositionOffset(const FrameView& frameView)
 
 void RenderView::mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags mode, bool* wasFixed) const
 {
-    // If a container was specified, and was not 0 or the RenderView,
+    // If a container was specified, and was not nullptr or the RenderView,
     // then we should have found it by now.
     ASSERT_ARG(repaintContainer, !repaintContainer || repaintContainer == this);
     ASSERT_UNUSED(wasFixed, !wasFixed || *wasFixed == (mode & IsFixed));
@@ -459,7 +458,7 @@ void RenderView::mapLocalToContainer(const RenderLayerModelObject* repaintContai
 
 const RenderObject* RenderView::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
 {
-    // If a container was specified, and was not 0 or the RenderView,
+    // If a container was specified, and was not nullptr or the RenderView,
     // then we should have found it by now.
     ASSERT_ARG(ancestorToStopAt, !ancestorToStopAt || ancestorToStopAt == this);
 
@@ -476,7 +475,7 @@ const RenderObject* RenderView::pushMappingToContainer(const RenderLayerModelObj
     } else
         geometryMap.pushView(this, scrollOffset);
 
-    return 0;
+    return nullptr;
 }
 
 void RenderView::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
@@ -705,7 +704,7 @@ LayoutRect RenderView::visualOverflowRect() const
 
 void RenderView::computeRectForRepaint(const RenderLayerModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
 {
-    // If a container was specified, and was not 0 or the RenderView,
+    // If a container was specified, and was not nullptr or the RenderView,
     // then we should have found it by now.
     ASSERT_ARG(repaintContainer, !repaintContainer || repaintContainer == this);
 
@@ -757,7 +756,7 @@ void RenderView::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
 static RenderObject* rendererAfterPosition(RenderObject* object, unsigned offset)
 {
     if (!object)
-        return 0;
+        return nullptr;
 
     RenderObject* child = object->childAt(offset);
     return child ? child : object->nextInPreOrderAfterChildren();
@@ -1155,26 +1154,26 @@ IntRect RenderView::unscaledDocumentRect() const
 
 bool RenderView::rootBackgroundIsEntirelyFixed() const
 {
-    RenderElement* rootObject = document().documentElement() ? document().documentElement()->renderer() : 0;
+    RenderElement* rootObject = document().documentElement() ? document().documentElement()->renderer() : nullptr;
     if (!rootObject)
         return false;
 
     return rootObject->rendererForRootBackground().hasEntirelyFixedBackground();
 }
     
-LayoutRect RenderView::unextendedBackgroundRect(RenderBox*) const
+LayoutRect RenderView::unextendedBackgroundRect() const
 {
     // FIXME: What is this? Need to patch for new columns?
     return unscaledDocumentRect();
 }
     
-LayoutRect RenderView::backgroundRect(RenderBox* backgroundRenderer) const
+LayoutRect RenderView::backgroundRect() const
 {
     // FIXME: New columns care about this?
     if (frameView().hasExtendedBackgroundRectForPainting())
         return frameView().extendedBackgroundRectForPainting();
 
-    return unextendedBackgroundRect(backgroundRenderer);
+    return unextendedBackgroundRect();
 }
 
 IntRect RenderView::documentRect() const
@@ -1452,5 +1451,17 @@ unsigned RenderView::pageCount() const
 
     return 0;
 }
+
+#if ENABLE(CSS_SCROLL_SNAP)
+void RenderView::registerBoxWithScrollSnapCoordinates(const RenderBox& box)
+{
+    m_boxesWithScrollSnapCoordinates.add(&box);
+}
+
+void RenderView::unregisterBoxWithScrollSnapCoordinates(const RenderBox& box)
+{
+    m_boxesWithScrollSnapCoordinates.remove(&box);
+}
+#endif
 
 } // namespace WebCore

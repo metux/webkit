@@ -24,7 +24,6 @@
 #include "config.h"
 #include "SVGRadialGradientElement.h"
 
-#include "Attribute.h"
 #include "FloatConversion.h"
 #include "FloatPoint.h"
 #include "RadialGradientAttributes.h"
@@ -93,9 +92,7 @@ void SVGRadialGradientElement::parseAttribute(const QualifiedName& name, const A
 {
     SVGParsingError parseError = NoError;
 
-    if (!isSupportedAttribute(name))
-        SVGGradientElement::parseAttribute(name, value);
-    else if (name == SVGNames::cxAttr)
+    if (name == SVGNames::cxAttr)
         setCxBaseValue(SVGLength::construct(LengthModeWidth, value, parseError));
     else if (name == SVGNames::cyAttr)
         setCyBaseValue(SVGLength::construct(LengthModeHeight, value, parseError));
@@ -107,10 +104,10 @@ void SVGRadialGradientElement::parseAttribute(const QualifiedName& name, const A
         setFyBaseValue(SVGLength::construct(LengthModeHeight, value, parseError));
     else if (name == SVGNames::frAttr)
         setFrBaseValue(SVGLength::construct(LengthModeOther, value, parseError, ForbidNegativeLengths));
-    else
-        ASSERT_NOT_REACHED();
 
     reportAttributeParsingError(parseError, name, value);
+
+    SVGGradientElement::parseAttribute(name, value);
 }
 
 void SVGRadialGradientElement::svgAttributeChanged(const QualifiedName& attrName)
@@ -128,7 +125,7 @@ void SVGRadialGradientElement::svgAttributeChanged(const QualifiedName& attrName
         object->setNeedsLayout();
 }
 
-RenderPtr<RenderElement> SVGRadialGradientElement::createElementRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> SVGRadialGradientElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderSVGResourceRadialGradient>(*this, WTF::move(style));
 }

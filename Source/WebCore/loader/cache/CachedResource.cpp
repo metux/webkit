@@ -68,37 +68,37 @@ static ResourceLoadPriority defaultPriorityForResourceType(CachedResource::Type 
 {
     switch (type) {
     case CachedResource::MainResource:
-        return ResourceLoadPriorityVeryHigh;
+        return ResourceLoadPriority::VeryHigh;
     case CachedResource::CSSStyleSheet:
-        return ResourceLoadPriorityHigh;
+        return ResourceLoadPriority::High;
     case CachedResource::Script:
 #if ENABLE(SVG_FONTS)
     case CachedResource::SVGFontResource:
 #endif
     case CachedResource::FontResource:
     case CachedResource::RawResource:
-        return ResourceLoadPriorityMedium;
+        return ResourceLoadPriority::Medium;
     case CachedResource::ImageResource:
-        return ResourceLoadPriorityLow;
+        return ResourceLoadPriority::Low;
 #if ENABLE(XSLT)
     case CachedResource::XSLStyleSheet:
-        return ResourceLoadPriorityHigh;
+        return ResourceLoadPriority::High;
 #endif
     case CachedResource::SVGDocumentResource:
-        return ResourceLoadPriorityLow;
+        return ResourceLoadPriority::Low;
 #if ENABLE(LINK_PREFETCH)
     case CachedResource::LinkPrefetch:
-        return ResourceLoadPriorityVeryLow;
+        return ResourceLoadPriority::VeryLow;
     case CachedResource::LinkSubresource:
-        return ResourceLoadPriorityVeryLow;
+        return ResourceLoadPriority::VeryLow;
 #endif
 #if ENABLE(VIDEO_TRACK)
     case CachedResource::TextTrackResource:
-        return ResourceLoadPriorityLow;
+        return ResourceLoadPriority::Low;
 #endif
     }
     ASSERT_NOT_REACHED();
-    return ResourceLoadPriorityLow;
+    return ResourceLoadPriority::Low;
 }
 
 static std::chrono::milliseconds deadDecodedDataDeletionIntervalForResourceType(CachedResource::Type type)
@@ -113,10 +113,10 @@ DEFINE_DEBUG_ONLY_GLOBAL(RefCountedLeakCounter, cachedResourceLeakCounter, ("Cac
 
 CachedResource::CachedResource(const ResourceRequest& request, Type type, SessionID sessionID)
     : m_resourceRequest(request)
-    , m_decodedDataDeletionTimer(*this, &CachedResource::decodedDataDeletionTimerFired, deadDecodedDataDeletionIntervalForResourceType(type))
+    , m_decodedDataDeletionTimer(*this, &CachedResource::destroyDecodedData, deadDecodedDataDeletionIntervalForResourceType(type))
     , m_sessionID(sessionID)
     , m_loadPriority(defaultPriorityForResourceType(type))
-    , m_responseTimestamp(currentTime())
+    , m_responseTimestamp(std::chrono::system_clock::now())
     , m_lastDecodedAccessTime(0)
     , m_loadFinishTime(0)
     , m_encodedSize(0)
@@ -317,7 +317,7 @@ void CachedResource::error(CachedResource::Status status)
 {
     setStatus(status);
     ASSERT(errorOccurred());
-    m_data.clear();
+    m_data = nullptr;
 
     setLoading(false);
     checkNotify();
@@ -360,22 +360,22 @@ bool CachedResource::isExpired() const
     return computeCurrentAge(m_response, m_responseTimestamp) > freshnessLifetime(m_response);
 }
 
-double CachedResource::freshnessLifetime(const ResourceResponse& response) const
+std::chrono::microseconds CachedResource::freshnessLifetime(const ResourceResponse& response) const
 {
     if (!response.url().protocolIsInHTTPFamily()) {
         // Don't cache non-HTTP main resources since we can't check for freshness.
         // FIXME: We should not cache subresources either, but when we tried this
         // it caused performance and flakiness issues in our test infrastructure.
         if (m_type == MainResource && !SchemeRegistry::shouldCacheResponsesFromURLSchemeIndefinitely(response.url().protocol()))
-            return 0;
+            return std::chrono::microseconds::zero();
 
-        return std::numeric_limits<double>::max();
+        return std::chrono::microseconds::max();
     }
 
     return computeFreshnessLifetimeForHTTPFamily(response, m_responseTimestamp);
 }
 
-void CachedResource::willSendRequest(ResourceRequest& request, const ResourceResponse& response)
+void CachedResource::redirectReceived(ResourceRequest& request, const ResourceResponse& response)
 {
     m_requestedFromNetworkingLayer = true;
     if (response.isNull())
@@ -396,7 +396,7 @@ const ResourceResponse& CachedResource::responseForSameOriginPolicyChecks() cons
 void CachedResource::responseReceived(const ResourceResponse& response)
 {
     setResponse(response);
-    m_responseTimestamp = currentTime();
+    m_responseTimestamp = std::chrono::system_clock::now();
     String encoding = response.textEncodingName();
     if (!encoding.isNull())
         setEncoding(encoding);
@@ -484,7 +484,7 @@ void CachedResource::removeClient(CachedResourceClient* client)
             // We allow non-secure content to be reused in history, but we do not allow secure content to be reused.
             memoryCache.remove(*this);
         }
-        memoryCache.prune();
+        memoryCache.pruneSoon();
     }
     // This object may be dead here.
 }
@@ -581,7 +581,7 @@ void CachedResource::didAccessDecodedData(double timeStamp)
             memoryCache.removeFromLiveDecodedResourcesList(*this);
             memoryCache.insertInLiveDecodedResourcesList(*this);
         }
-        memoryCache.prune();
+        memoryCache.pruneSoon();
     }
 }
     
@@ -592,29 +592,25 @@ void CachedResource::setResourceToRevalidate(CachedResource* resource)
     ASSERT(resource != this);
     ASSERT(m_handlesToRevalidate.isEmpty());
     ASSERT(resource->type() == type());
+    ASSERT(!resource->m_proxyResource);
 
     LOG(ResourceLoading, "CachedResource %p setResourceToRevalidate %p", this, resource);
-
-    // The following assert should be investigated whenever it occurs. Although it should never fire, it currently does in rare circumstances.
-    // https://bugs.webkit.org/show_bug.cgi?id=28604.
-    // So the code needs to be robust to this assert failing thus the "if (m_resourceToRevalidate->m_proxyResource == this)" in CachedResource::clearResourceToRevalidate.
-    ASSERT(!resource->m_proxyResource);
 
     resource->m_proxyResource = this;
     m_resourceToRevalidate = resource;
 }
 
 void CachedResource::clearResourceToRevalidate() 
-{ 
+{
     ASSERT(m_resourceToRevalidate);
+    ASSERT(m_resourceToRevalidate->m_proxyResource == this);
+
     if (m_switchingClientsToRevalidatedResource)
         return;
 
-    // A resource may start revalidation before this method has been called, so check that this resource is still the proxy resource before clearing it out.
-    if (m_resourceToRevalidate->m_proxyResource == this) {
-        m_resourceToRevalidate->m_proxyResource = 0;
-        m_resourceToRevalidate->deleteIfPossible();
-    }
+    m_resourceToRevalidate->m_proxyResource = nullptr;
+    m_resourceToRevalidate->deleteIfPossible();
+
     m_handlesToRevalidate.clear();
     m_resourceToRevalidate = 0;
     deleteIfPossible();
@@ -670,7 +666,7 @@ void CachedResource::switchClientsToRevalidatedResource()
 
 void CachedResource::updateResponseAfterRevalidation(const ResourceResponse& validatingResponse)
 {
-    m_responseTimestamp = currentTime();
+    m_responseTimestamp = std::chrono::system_clock::now();
 
     updateResponseHeadersAfterRevalidation(m_response, validatingResponse);
 }
@@ -704,48 +700,30 @@ bool CachedResource::canUseCacheValidator() const
     return m_response.hasCacheValidatorFields();
 }
 
-static inline void logResourceRevalidationReason(Frame* frame, const String& reason)
-{
-    if (frame)
-        frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), DiagnosticLoggingKeys::reasonKey(), reason);
-}
-
-bool CachedResource::mustRevalidateDueToCacheHeaders(const CachedResourceLoader& cachedResourceLoader, CachePolicy cachePolicy) const
+CachedResource::RevalidationDecision CachedResource::makeRevalidationDecision(CachePolicy cachePolicy) const
 {    
-    ASSERT(cachePolicy == CachePolicyRevalidate || cachePolicy == CachePolicyCache || cachePolicy == CachePolicyVerify);
+    switch (cachePolicy) {
+    case CachePolicyHistoryBuffer:
+        return RevalidationDecision::No;
 
-    if (cachePolicy == CachePolicyRevalidate) {
-        logResourceRevalidationReason(cachedResourceLoader.frame(), DiagnosticLoggingKeys::reloadKey());
-        return true;
-    }
+    case CachePolicyReload:
+    case CachePolicyRevalidate:
+        return RevalidationDecision::YesDueToCachePolicy;
 
-    if (m_response.cacheControlContainsNoCache() || m_response.cacheControlContainsNoStore()) {
-        LOG(ResourceLoading, "CachedResource %p mustRevalidate because of m_response.cacheControlContainsNoCache() || m_response.cacheControlContainsNoStore()\n", this);
+    case CachePolicyVerify:
+        if (m_response.cacheControlContainsNoCache())
+            return RevalidationDecision::YesDueToNoCache;
+        // FIXME: Cache-Control:no-store should prevent storing, not reuse.
         if (m_response.cacheControlContainsNoStore())
-            logResourceRevalidationReason(cachedResourceLoader.frame(), DiagnosticLoggingKeys::noStoreKey());
-        else
-            logResourceRevalidationReason(cachedResourceLoader.frame(), DiagnosticLoggingKeys::noCacheKey());
+            return RevalidationDecision::YesDueToNoStore;
 
-        return true;
-    }
+        if (isExpired())
+            return RevalidationDecision::YesDueToExpired;
 
-    if (cachePolicy == CachePolicyCache) {
-        if (m_response.cacheControlContainsMustRevalidate() && isExpired()) {
-            LOG(ResourceLoading, "CachedResource %p mustRevalidate because of cachePolicy == CachePolicyCache and m_response.cacheControlContainsMustRevalidate() && isExpired()\n", this);
-            logResourceRevalidationReason(cachedResourceLoader.frame(), DiagnosticLoggingKeys::mustRevalidateIsExpiredKey());
-            return true;
-        }
-        return false;
-    }
-
-    // CachePolicyVerify
-    if (isExpired()) {
-        LOG(ResourceLoading, "CachedResource %p mustRevalidate because of isExpired()\n", this);
-        logResourceRevalidationReason(cachedResourceLoader.frame(), DiagnosticLoggingKeys::isExpiredKey());
-        return true;
-    }
-
-    return false;
+        return RevalidationDecision::No;
+    };
+    ASSERT_NOT_REACHED();
+    return RevalidationDecision::No;
 }
 
 bool CachedResource::redirectChainAllowsReuse(ReuseExpiredRedirectionOrNot reuseExpiredRedirection) const
@@ -757,6 +735,18 @@ unsigned CachedResource::overheadSize() const
 {
     static const int kAverageClientsHashMapSize = 384;
     return sizeof(CachedResource) + m_response.memoryUsage() + kAverageClientsHashMapSize + m_resourceRequest.url().string().length() * 2;
+}
+
+bool CachedResource::areAllClientsXMLHttpRequests() const
+{
+    if (type() != RawResource)
+        return false;
+
+    for (auto& client : m_clients) {
+        if (!client.key->isXMLHttpRequest())
+            return false;
+    }
+    return true;
 }
 
 void CachedResource::setLoadPriority(const Optional<ResourceLoadPriority>& loadPriority)
@@ -786,7 +776,7 @@ void CachedResource::Callback::timerFired()
     m_resource.didAddClient(&m_client);
 }
 
-#if USE(FOUNDATION)
+#if USE(FOUNDATION) || USE(SOUP)
 
 void CachedResource::tryReplaceEncodedData(SharedBuffer& newBuffer)
 {

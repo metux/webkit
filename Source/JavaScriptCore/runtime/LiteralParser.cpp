@@ -57,20 +57,20 @@ bool LiteralParser<CharType>::tryJSONPParse(Vector<JSONPData>& results, bool nee
     do {
         Vector<JSONPPathEntry> path;
         // Unguarded next to start off the lexer
-        Identifier name = Identifier(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
+        Identifier name = Identifier::fromString(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
         JSONPPathEntry entry;
         if (name == m_exec->vm().propertyNames->varKeyword) {
             if (m_lexer.next() != TokIdentifier)
                 return false;
             entry.m_type = JSONPPathEntryTypeDeclare;
-            entry.m_pathEntryName = Identifier(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
+            entry.m_pathEntryName = Identifier::fromString(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
             path.append(entry);
         } else {
             entry.m_type = JSONPPathEntryTypeDot;
-            entry.m_pathEntryName = Identifier(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
+            entry.m_pathEntryName = Identifier::fromString(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
             path.append(entry);
         }
-        if (m_exec->vm().keywords->isKeyword(entry.m_pathEntryName))
+        if (isLexerKeyword(entry.m_pathEntryName))
             return false;
         TokenType tokenType = m_lexer.next();
         if (entry.m_type == JSONPPathEntryTypeDeclare && tokenType != TokAssign)
@@ -94,7 +94,7 @@ bool LiteralParser<CharType>::tryJSONPParse(Vector<JSONPData>& results, bool nee
                 entry.m_type = JSONPPathEntryTypeDot;
                 if (m_lexer.next() != TokIdentifier)
                     return false;
-                entry.m_pathEntryName = Identifier(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
+                entry.m_pathEntryName = Identifier::fromString(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
                 break;
             }
             case TokLParen: {
@@ -135,17 +135,17 @@ ALWAYS_INLINE const Identifier LiteralParser<CharType>::makeIdentifier(const LCh
     if (!length)
         return m_exec->vm().propertyNames->emptyIdentifier;
     if (characters[0] >= MaximumCachableCharacter)
-        return Identifier(&m_exec->vm(), characters, length);
+        return Identifier::fromString(&m_exec->vm(), characters, length);
 
     if (length == 1) {
         if (!m_shortIdentifiers[characters[0]].isNull())
             return m_shortIdentifiers[characters[0]];
-        m_shortIdentifiers[characters[0]] = Identifier(&m_exec->vm(), characters, length);
+        m_shortIdentifiers[characters[0]] = Identifier::fromString(&m_exec->vm(), characters, length);
         return m_shortIdentifiers[characters[0]];
     }
     if (!m_recentIdentifiers[characters[0]].isNull() && Identifier::equal(m_recentIdentifiers[characters[0]].impl(), characters, length))
         return m_recentIdentifiers[characters[0]];
-    m_recentIdentifiers[characters[0]] = Identifier(&m_exec->vm(), characters, length);
+    m_recentIdentifiers[characters[0]] = Identifier::fromString(&m_exec->vm(), characters, length);
     return m_recentIdentifiers[characters[0]];
 }
 
@@ -155,17 +155,17 @@ ALWAYS_INLINE const Identifier LiteralParser<CharType>::makeIdentifier(const UCh
     if (!length)
         return m_exec->vm().propertyNames->emptyIdentifier;
     if (characters[0] >= MaximumCachableCharacter)
-        return Identifier(&m_exec->vm(), characters, length);
+        return Identifier::fromString(&m_exec->vm(), characters, length);
 
     if (length == 1) {
         if (!m_shortIdentifiers[characters[0]].isNull())
             return m_shortIdentifiers[characters[0]];
-        m_shortIdentifiers[characters[0]] = Identifier(&m_exec->vm(), characters, length);
+        m_shortIdentifiers[characters[0]] = Identifier::fromString(&m_exec->vm(), characters, length);
         return m_shortIdentifiers[characters[0]];
     }
     if (!m_recentIdentifiers[characters[0]].isNull() && Identifier::equal(m_recentIdentifiers[characters[0]].impl(), characters, length))
         return m_recentIdentifiers[characters[0]];
-    m_recentIdentifiers[characters[0]] = Identifier(&m_exec->vm(), characters, length);
+    m_recentIdentifiers[characters[0]] = Identifier::fromString(&m_exec->vm(), characters, length);
     return m_recentIdentifiers[characters[0]];
 }
 
@@ -497,7 +497,7 @@ TokenType LiteralParser<CharType>::Lexer::lexNumber(LiteralParserToken<CharType>
         while (m_ptr < m_end && isASCIIDigit(*m_ptr))
             ++m_ptr;
     } else if (m_ptr < m_end && (*m_ptr != 'e' && *m_ptr != 'E') && (m_ptr - token.start) < 10) {
-        int result = 0;
+        double result = 0;
         token.type = TokNumber;
         token.end = m_ptr;
         const CharType* digit = token.start;
@@ -548,6 +548,7 @@ JSValue LiteralParser<CharType>::parse(ParserState initialState)
     JSValue lastValue;
     Vector<ParserState, 16, UnsafeVectorOverflow> stateStack;
     Vector<Identifier, 16, UnsafeVectorOverflow> identifierStack;
+    HashSet<JSObject*> visitedUnderscoreProto;
     while (1) {
         switch(state) {
             startParseArray:
@@ -649,11 +650,20 @@ JSValue LiteralParser<CharType>::parse(ParserState initialState)
             {
                 JSObject* object = asObject(objectStack.last());
                 PropertyName ident = identifierStack.last();
-                unsigned i = ident.asIndex();
-                if (i != PropertyName::NotAnIndex)
-                    object->putDirectIndex(m_exec, i, lastValue);
-                else
-                    object->putDirect(m_exec->vm(), ident, lastValue);
+                if (m_mode != StrictJSON && ident == m_exec->vm().propertyNames->underscoreProto) {
+                    if (!visitedUnderscoreProto.add(object).isNewEntry) {
+                        m_parseErrorMessage = ASCIILiteral("Attempted to redefine __proto__ property");
+                        return JSValue();
+                    }
+                    CodeBlock* codeBlock = m_exec->codeBlock();
+                    PutPropertySlot slot(object, codeBlock ? codeBlock->isStrictMode() : false);
+                    objectStack.last().put(m_exec, ident, lastValue, slot);
+                } else {
+                    if (Optional<uint32_t> index = parseIndex(ident))
+                        object->putDirectIndex(m_exec, index.value(), lastValue);
+                    else
+                        object->putDirect(m_exec->vm(), ident, lastValue);                    
+                }
                 identifierStack.removeLast();
                 if (m_lexer.currentToken().type == TokComma)
                     goto doParseObjectStartExpression;

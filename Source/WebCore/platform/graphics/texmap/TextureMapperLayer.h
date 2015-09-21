@@ -102,7 +102,7 @@ public:
     void setOpacity(float);
     void setSolidColor(const Color&);
     void setContentsTileSize(const FloatSize&);
-    void setContentsTilePhase(const FloatPoint&);
+    void setContentsTilePhase(const FloatSize&);
     void setFilters(const FilterOperations&);
 
     bool hasFilters() const
@@ -142,7 +142,7 @@ private:
 
     static void sortByZOrder(Vector<TextureMapperLayer* >& array);
 
-    PassRefPtr<BitmapTexture> texture() { return m_backingStore ? m_backingStore->texture() : 0; }
+    RefPtr<BitmapTexture> texture() { return m_backingStore ? m_backingStore->texture() : 0; }
     FloatPoint adjustedPosition() const { return m_state.pos + m_scrollPositionDelta - m_userScrollOffset; }
     bool isAncestorFixedToViewport() const;
     TransformationMatrix replicaTransform();
@@ -209,7 +209,7 @@ private:
         float opacity;
         FloatRect contentsRect;
         FloatSize contentsTileSize;
-        FloatPoint contentsTilePhase;
+        FloatSize contentsTilePhase;
         TextureMapperLayer* maskLayer;
         TextureMapperLayer* replicaLayer;
         Color solidColor;

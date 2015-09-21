@@ -106,9 +106,7 @@ namespace WebCore {
             PseudoClassLink,
             PseudoClassVisited,
             PseudoClassAny,
-#if ENABLE(CSS_SELECTORS_LEVEL4)
             PseudoClassAnyLink,
-#endif
             PseudoClassAnyLinkDeprecated,
             PseudoClassAutofill,
             PseudoClassHover,
@@ -224,18 +222,14 @@ namespace WebCore {
         const AtomicString& attributeCanonicalLocalName() const;
         const AtomicString& argument() const { return m_hasRareData ? m_data.m_rareData->m_argument : nullAtom; }
         bool attributeValueMatchingIsCaseInsensitive() const;
-#if ENABLE(CSS_SELECTORS_LEVEL4)
         const Vector<AtomicString>* langArgumentList() const { return m_hasRareData ? m_data.m_rareData->m_langArgumentList.get() : nullptr; }
-#endif
         const CSSSelectorList* selectorList() const { return m_hasRareData ? m_data.m_rareData->m_selectorList.get() : nullptr; }
 
         void setValue(const AtomicString&);
         void setAttribute(const QualifiedName&, bool isCaseInsensitive);
         void setArgument(const AtomicString&);
         void setAttributeValueMatchingIsCaseInsensitive(bool);
-#if ENABLE(CSS_SELECTORS_LEVEL4)
         void setLangArgumentList(std::unique_ptr<Vector<AtomicString>>);
-#endif
         void setSelectorList(std::unique_ptr<CSSSelectorList>);
 
         bool parseNth() const;
@@ -289,11 +283,13 @@ namespace WebCore {
             ASSERT(m_relation == relation);
         }
 
+#if ENABLE(CSS_SELECTORS_LEVEL4)
         void setDescendantUseDoubleChildSyntax()
         {
             ASSERT(relation() == Descendant);
             m_descendantDoubleChildSyntax = true;
         }
+#endif
 
         Match match() const { return static_cast<Match>(m_match); }
         void setMatch(Match match)
@@ -321,7 +317,9 @@ namespace WebCore {
         unsigned m_hasNameWithCase       : 1;
         unsigned m_isForPage             : 1;
         unsigned m_tagIsForNamespaceRule : 1;
+#if ENABLE(CSS_SELECTORS_LEVEL4)
         unsigned m_descendantDoubleChildSyntax : 1;
+#endif
         unsigned m_caseInsensitiveAttributeValueMatching : 1;
 
         unsigned simpleSelectorSpecificityForPage() const;
@@ -330,7 +328,7 @@ namespace WebCore {
         CSSSelector& operator=(const CSSSelector&);
 
         struct RareData : public RefCounted<RareData> {
-            static PassRefPtr<RareData> create(PassRefPtr<AtomicStringImpl> value) { return adoptRef(new RareData(value)); }
+            static Ref<RareData> create(PassRefPtr<AtomicStringImpl> value) { return adoptRef(*new RareData(value)); }
             ~RareData();
 
             bool parseNth();
@@ -342,10 +340,8 @@ namespace WebCore {
             QualifiedName m_attribute; // used for attribute selector
             AtomicString m_attributeCanonicalLocalName;
             AtomicString m_argument; // Used for :contains and :nth-*
-#if ENABLE(CSS_SELECTORS_LEVEL4)
-            std::unique_ptr<Vector<AtomicString>> m_langArgumentList;
-#endif
-            std::unique_ptr<CSSSelectorList> m_selectorList; // Used for :-webkit-any and :not
+            std::unique_ptr<Vector<AtomicString>> m_langArgumentList; // Used for :lang arguments.
+            std::unique_ptr<CSSSelectorList> m_selectorList; // Used for :matches() and :not().
         
         private:
             RareData(PassRefPtr<AtomicStringImpl> value);
@@ -463,7 +459,9 @@ inline CSSSelector::CSSSelector()
     , m_hasNameWithCase(false)
     , m_isForPage(false)
     , m_tagIsForNamespaceRule(false)
+#if ENABLE(CSS_SELECTORS_LEVEL4)
     , m_descendantDoubleChildSyntax(false)
+#endif
     , m_caseInsensitiveAttributeValueMatching(false)
 {
 }
@@ -479,7 +477,9 @@ inline CSSSelector::CSSSelector(const CSSSelector& o)
     , m_hasNameWithCase(o.m_hasNameWithCase)
     , m_isForPage(o.m_isForPage)
     , m_tagIsForNamespaceRule(o.m_tagIsForNamespaceRule)
+#if ENABLE(CSS_SELECTORS_LEVEL4)
     , m_descendantDoubleChildSyntax(o.m_descendantDoubleChildSyntax)
+#endif
     , m_caseInsensitiveAttributeValueMatching(o.m_caseInsensitiveAttributeValueMatching)
 {
     if (o.m_hasRareData) {

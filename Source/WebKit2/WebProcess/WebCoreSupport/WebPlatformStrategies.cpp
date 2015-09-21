@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 
 #include "BlockingResponseMap.h"
 #include "DataReference.h"
+#include "HangDetectionDisabler.h"
 #include "NetworkResourceLoadParameters.h"
 #include "PluginInfoStore.h"
 #include "SessionTracker.h"
@@ -44,6 +45,7 @@
 #include "WebProcess.h"
 #include "WebProcessProxyMessages.h"
 #include <WebCore/Color.h>
+#include <WebCore/DocumentLoader.h>
 #include <WebCore/IDBFactoryBackendInterface.h>
 #include <WebCore/LoaderStrategy.h>
 #include <WebCore/MainFrame.h>
@@ -53,6 +55,7 @@
 #include <WebCore/PageGroup.h>
 #include <WebCore/PlatformCookieJar.h>
 #include <WebCore/PlatformPasteboard.h>
+#include <WebCore/ProgressTracker.h>
 #include <WebCore/ResourceError.h>
 #include <WebCore/SessionID.h>
 #include <WebCore/StorageNamespace.h>
@@ -238,10 +241,39 @@ void WebPlatformStrategies::loadResourceSynchronously(NetworkingContext* context
 
     data.resize(0);
 
+    HangDetectionDisabler hangDetectionDisabler;
+
     if (!webProcess.networkConnection()->connection()->sendSync(Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad(loadParameters), Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::Reply(error, response, data), 0)) {
         response = ResourceResponse();
         error = internalError(request.url());
     }
+}
+
+void WebPlatformStrategies::createPingHandle(NetworkingContext* networkingContext, ResourceRequest& request, bool shouldUseCredentialStorage)
+{
+    // It's possible that call to createPingHandle might be made during initial empty Document creation before a NetworkingContext exists.
+    // It is not clear that we should send ping loads during that process anyways.
+    if (!networkingContext)
+        return;
+
+    auto& webProcess = WebProcess::singleton();
+    if (!webProcess.usesNetworkProcess()) {
+        LoaderStrategy::createPingHandle(networkingContext, request, shouldUseCredentialStorage);
+        return;
+    }
+
+    WebFrameNetworkingContext* webContext = static_cast<WebFrameNetworkingContext*>(networkingContext);
+    WebFrameLoaderClient* webFrameLoaderClient = webContext->webFrameLoaderClient();
+    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : nullptr;
+    WebPage* webPage = webFrame ? webFrame->page() : nullptr;
+    
+    NetworkResourceLoadParameters loadParameters;
+    loadParameters.request = request;
+    loadParameters.sessionID = webPage ? webPage->sessionID() : SessionID::defaultSessionID();
+    loadParameters.allowStoredCredentials = shouldUseCredentialStorage ? AllowStoredCredentials : DoNotAllowStoredCredentials;
+    loadParameters.shouldClearReferrerOnHTTPSToHTTPRedirect = networkingContext->shouldClearReferrerOnHTTPSToHTTPRedirect();
+
+    webProcess.networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::LoadPing(loadParameters), 0);
 }
 
 BlobRegistry* WebPlatformStrategies::createBlobRegistry()
@@ -266,9 +298,10 @@ void WebPlatformStrategies::refreshPlugins()
 void WebPlatformStrategies::getPluginInfo(const WebCore::Page* page, Vector<WebCore::PluginInfo>& plugins)
 {
 #if ENABLE(NETSCAPE_PLUGIN_API)
-    populatePluginCache();
+    ASSERT_ARG(page, page);
+    populatePluginCache(*page);
 
-    if (page->mainFrame().loader().subframeLoader().allowPlugins(NotAboutToInstantiatePlugin)) {
+    if (page->mainFrame().loader().subframeLoader().allowPlugins()) {
         plugins = m_cachedPlugins;
         return;
     }
@@ -280,20 +313,105 @@ void WebPlatformStrategies::getPluginInfo(const WebCore::Page* page, Vector<WebC
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 }
 
-#if ENABLE(NETSCAPE_PLUGIN_API)
-void WebPlatformStrategies::populatePluginCache()
+void WebPlatformStrategies::getWebVisiblePluginInfo(const Page* page, Vector<PluginInfo>& plugins)
 {
-    if (m_pluginCacheIsPopulated)
-        return;
+    ASSERT_ARG(page, page);
+    ASSERT_ARG(plugins, plugins.isEmpty());
 
-    ASSERT(m_cachedPlugins.isEmpty());
-    
-    // FIXME: Should we do something in case of error here?
-    if (!WebProcess::singleton().parentProcessConnection()->sendSync(Messages::WebProcessProxy::GetPlugins(m_shouldRefreshPlugins), Messages::WebProcessProxy::GetPlugins::Reply(m_cachedPlugins, m_cachedApplicationPlugins), 0))
-        return;
+    getPluginInfo(page, plugins);
 
-    m_shouldRefreshPlugins = false;
-    m_pluginCacheIsPopulated = true;
+#if PLATFORM(MAC)
+    for (int32_t i = plugins.size() - 1; i >= 0; --i) {
+        PluginInfo& info = plugins.at(i);
+        PluginLoadClientPolicy clientPolicy = info.clientLoadPolicy;
+        // Allow built-in plugins. Also tentatively allow plugins that the client might later selectively permit.
+        if (info.isApplicationPlugin || clientPolicy == PluginLoadClientPolicyAsk)
+            continue;
+
+        if (clientPolicy == PluginLoadClientPolicyBlock)
+            plugins.remove(i);
+    }
+#endif
+}
+
+#if PLATFORM(MAC)
+void WebPlatformStrategies::setPluginLoadClientPolicy(PluginLoadClientPolicy clientPolicy, const String& host, const String& bundleIdentifier, const String& versionString)
+{
+    String hostToSet = host.isNull() || !host.length() ? "*" : host;
+    String bundleIdentifierToSet = bundleIdentifier.isNull() || !bundleIdentifier.length() ? "*" : bundleIdentifier;
+    String versionStringToSet = versionString.isNull() || !versionString.length() ? "*" : versionString;
+
+    PluginPolicyMapsByIdentifier policiesByIdentifier;
+    if (m_hostsToPluginIdentifierData.contains(hostToSet))
+        policiesByIdentifier = m_hostsToPluginIdentifierData.get(hostToSet);
+
+    PluginLoadClientPoliciesByBundleVersion versionsToPolicies;
+    if (policiesByIdentifier.contains(bundleIdentifierToSet))
+        versionsToPolicies = policiesByIdentifier.get(bundleIdentifierToSet);
+
+    versionsToPolicies.set(versionStringToSet, clientPolicy);
+    policiesByIdentifier.set(bundleIdentifierToSet, versionsToPolicies);
+    m_hostsToPluginIdentifierData.set(hostToSet, policiesByIdentifier);
+}
+
+void WebPlatformStrategies::clearPluginClientPolicies()
+{
+    m_hostsToPluginIdentifierData.clear();
+}
+
+#endif
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
+#if PLATFORM(MAC)
+bool WebPlatformStrategies::pluginLoadClientPolicyForHost(const String& host, const PluginInfo& info, PluginLoadClientPolicy& policy) const
+{
+    String hostToLookUp = host;
+    if (!m_hostsToPluginIdentifierData.contains(hostToLookUp))
+        hostToLookUp = "*";
+    if (!m_hostsToPluginIdentifierData.contains(hostToLookUp))
+        return false;
+
+    PluginPolicyMapsByIdentifier policiesByIdentifier = m_hostsToPluginIdentifierData.get(hostToLookUp);
+    String identifier = info.bundleIdentifier;
+    if (!identifier || !policiesByIdentifier.contains(identifier))
+        identifier = "*";
+    if (!policiesByIdentifier.contains(identifier))
+        return false;
+
+    PluginLoadClientPoliciesByBundleVersion versionsToPolicies = policiesByIdentifier.get(identifier);
+    String version = info.versionString;
+    if (!version || !versionsToPolicies.contains(version))
+        version = "*";
+    if (!versionsToPolicies.contains(version))
+        return false;
+
+    policy = versionsToPolicies.get(version);
+    return true;
+}
+#endif // PLATFORM(MAC)
+
+void WebPlatformStrategies::populatePluginCache(const WebCore::Page& page)
+{
+    if (!m_pluginCacheIsPopulated) {
+        HangDetectionDisabler hangDetectionDisabler;
+
+        if (!WebProcess::singleton().parentProcessConnection()->sendSync(Messages::WebProcessProxy::GetPlugins(m_shouldRefreshPlugins), Messages::WebProcessProxy::GetPlugins::Reply(m_cachedPlugins, m_cachedApplicationPlugins), 0))
+            return;
+
+        m_shouldRefreshPlugins = false;
+        m_pluginCacheIsPopulated = true;
+    }
+
+#if PLATFORM(MAC)
+    String pageHost = page.mainFrame().loader().documentLoader()->responseURL().host();
+    for (PluginInfo& info : m_cachedPlugins) {
+        PluginLoadClientPolicy clientPolicy;
+        if (pluginLoadClientPolicyForHost(pageHost, info, clientPolicy))
+            info.clientLoadPolicy = clientPolicy;
+    }
+#else
+    UNUSED_PARAM(page);
+#endif // not PLATFORM(MAC)
 }
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 
@@ -325,7 +443,7 @@ PassRefPtr<WebCore::SharedBuffer> WebPlatformStrategies::bufferForType(const Str
     WebProcess::singleton().parentProcessConnection()->sendSync(Messages::WebPasteboardProxy::GetPasteboardBufferForType(pasteboardName, pasteboardType), Messages::WebPasteboardProxy::GetPasteboardBufferForType::Reply(handle, size), 0);
     if (handle.isNull())
         return 0;
-    RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::create(handle, SharedMemory::ReadOnly);
+    RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::map(handle, SharedMemory::Protection::ReadOnly);
     return SharedBuffer::create(static_cast<unsigned char *>(sharedMemoryBuffer->data()), size);
 }
 
@@ -394,12 +512,12 @@ long WebPlatformStrategies::setBufferForType(PassRefPtr<SharedBuffer> buffer, co
 {
     SharedMemory::Handle handle;
     if (buffer) {
-        RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::create(buffer->size());
+        RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::allocate(buffer->size());
         // FIXME: Null check prevents crashing, but it is not great that we will have empty pasteboard content for this type,
         // because we've already set the types.
         if (sharedMemoryBuffer) {
             memcpy(sharedMemoryBuffer->data(), buffer->data(), buffer->size());
-            sharedMemoryBuffer->createHandle(handle, SharedMemory::ReadOnly);
+            sharedMemoryBuffer->createHandle(handle, SharedMemory::Protection::ReadOnly);
         }
     }
     uint64_t newChangeCount;
@@ -451,7 +569,7 @@ PassRefPtr<WebCore::SharedBuffer> WebPlatformStrategies::readBufferFromPasteboar
     WebProcess::singleton().parentProcessConnection()->sendSync(Messages::WebPasteboardProxy::ReadBufferFromPasteboard(index, pasteboardType), Messages::WebPasteboardProxy::ReadBufferFromPasteboard::Reply(handle, size), 0);
     if (handle.isNull())
         return 0;
-    RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::create(handle, SharedMemory::ReadOnly);
+    RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::map(handle, SharedMemory::Protection::ReadOnly);
     return SharedBuffer::create(static_cast<unsigned char *>(sharedMemoryBuffer->data()), size);
 }
 

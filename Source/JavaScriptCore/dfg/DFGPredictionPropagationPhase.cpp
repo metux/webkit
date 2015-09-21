@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,6 +56,8 @@ public:
     {
         ASSERT(m_graph.m_form == ThreadedCPS);
         ASSERT(m_graph.m_unificationState == GloballyUnified);
+
+        propagateThroughArgumentPositions();
 
         m_pass = PrimaryPass;
         propagateToFixpoint();
@@ -148,6 +150,11 @@ private:
             changed |= setPrediction(type);
             break;
         }
+        case DoubleConstant: {
+            SpeculatedType type = speculationFromValue(node->asJSValue());
+            changed |= setPrediction(type);
+            break;
+        }
             
         case GetLocal: {
             VariableAccessData* variable = node->variableAccessData();
@@ -171,7 +178,8 @@ private:
         case BitRShift:
         case BitLShift:
         case BitURShift:
-        case ArithIMul: {
+        case ArithIMul:
+        case ArithClz32: {
             changed |= setPrediction(SpecInt32);
             break;
         }
@@ -182,16 +190,18 @@ private:
         case RegExpTest:
         case GetById:
         case GetByIdFlush:
-        case GetMyArgumentByValSafe:
         case GetByOffset:
         case MultiGetByOffset:
         case GetDirectPname:
         case Call:
         case Construct:
-        case NativeCall:
-        case NativeConstruct:
+        case CallVarargs:
+        case ConstructVarargs:
+        case CallForwardVarargs:
+        case ConstructForwardVarargs:
         case GetGlobalVar:
-        case GetClosureVar: {
+        case GetClosureVar:
+        case GetFromArguments: {
             changed |= setPrediction(node->getHeapPrediction());
             break;
         }
@@ -205,9 +215,13 @@ private:
         case GetGetter:
         case GetSetter:
         case GetCallee:
-        case NewFunctionNoCheck:
-        case NewFunctionExpression: {
+        case NewFunction: {
             changed |= setPrediction(SpecFunction);
+            break;
+        }
+            
+        case GetArgumentCount: {
+            changed |= setPrediction(SpecInt32);
             break;
         }
 
@@ -326,11 +340,20 @@ private:
         case ArithSqrt:
         case ArithFRound:
         case ArithSin:
-        case ArithCos: {
+        case ArithCos:
+        case ArithLog: {
             changed |= setPrediction(SpecBytecodeDouble);
             break;
         }
-            
+
+        case ArithRound: {
+            if (isInt32OrBooleanSpeculation(node->getHeapPrediction()) && m_graph.roundShouldSpeculateInt32(node, m_pass))
+                changed |= setPrediction(SpecInt32);
+            else
+                changed |= setPrediction(SpecBytecodeDouble);
+            break;
+        }
+
         case ArithAbs: {
             SpeculatedType child = node->child1()->prediction();
             if (isInt32OrBooleanSpeculationForArithmetic(child)
@@ -355,13 +378,14 @@ private:
         case IsNumber:
         case IsString:
         case IsObject:
+        case IsObjectOrNull:
         case IsFunction: {
             changed |= setPrediction(SpecBoolean);
             break;
         }
 
         case TypeOf: {
-            changed |= setPrediction(SpecString);
+            changed |= setPrediction(SpecStringIdent);
             break;
         }
 
@@ -373,9 +397,15 @@ private:
                 m_graph, node,
                 node->child1()->prediction(),
                 node->child2()->prediction(),
-                SpecNone, node->flags());
+                SpecNone);
             
             switch (arrayMode.type()) {
+            case Array::Int32:
+                if (arrayMode.isOutOfBounds())
+                    changed |= mergePrediction(node->getHeapPrediction() | SpecInt32);
+                else
+                    changed |= mergePrediction(SpecInt32);
+                break;
             case Array::Double:
                 if (arrayMode.isOutOfBounds())
                     changed |= mergePrediction(node->getHeapPrediction() | SpecDoubleReal);
@@ -408,12 +438,6 @@ private:
             break;
         }
             
-        case GetMyArgumentsLengthSafe: {
-            changed |= setPrediction(SpecInt32);
-            break;
-        }
-
-        case GetClosureRegisters:            
         case GetButterfly: 
         case GetIndexedPropertyStorage:
         case AllocatePropertyStorage:
@@ -469,6 +493,7 @@ private:
             break;
         }
         case StringCharAt:
+        case CallStringConstructor:
         case ToString:
         case MakeRope: {
             changed |= setPrediction(SpecString);
@@ -487,17 +512,18 @@ private:
             break;
         }
             
-        case CreateArguments: {
-            changed |= setPrediction(SpecArguments);
+        case CreateDirectArguments: {
+            changed |= setPrediction(SpecDirectArguments);
             break;
         }
             
-        case NewFunction: {
-            SpeculatedType child = node->child1()->prediction();
-            if (child & SpecEmpty)
-                changed |= mergePrediction((child & ~SpecEmpty) | SpecFunction);
-            else
-                changed |= mergePrediction(child);
+        case CreateScopedArguments: {
+            changed |= setPrediction(SpecScopedArguments);
+            break;
+        }
+            
+        case CreateClonedArguments: {
+            changed |= setPrediction(SpecObjectOther);
             break;
         }
             
@@ -512,36 +538,40 @@ private:
         case GetTypedArrayByteOffset:
         case DoubleAsInt32:
         case GetLocalUnlinked:
-        case GetMyArgumentsLength:
-        case GetMyArgumentByVal:
-        case PhantomArguments:
         case CheckArray:
         case Arrayify:
         case ArrayifyToStructure:
         case CheckTierUpInLoop:
         case CheckTierUpAtReturn:
         case CheckTierUpAndOSREnter:
+        case CheckTierUpWithNestedTriggerAndOSREnter:
         case InvalidationPoint:
         case CheckInBounds:
         case ValueToInt32:
-        case HardPhantom:
         case DoubleRep:
         case ValueRep:
         case Int52Rep:
-        case DoubleConstant:
         case Int52Constant:
         case Identity:
         case BooleanToNumber:
         case PhantomNewObject:
-        case PutByOffsetHint:
+        case PhantomNewFunction:
+        case PhantomCreateActivation:
+        case PhantomDirectArguments:
+        case PhantomClonedArguments:
+        case GetMyArgumentByVal:
+        case ForwardVarargs:
+        case PutHint:
         case CheckStructureImmediate:
-        case PutStructureHint:
         case MaterializeNewObject:
-        case PutLocal:
-        case KillLocal: {
+        case MaterializeCreateActivation:
+        case PutStack:
+        case KillStack:
+        case StoreBarrier:
+        case GetStack: {
             // This node should never be visible at this stage of compilation. It is
             // inserted by fixup(), which follows this phase.
-            RELEASE_ASSERT_NOT_REACHED();
+            DFG_CRASH(m_graph, node, "Unexpected node during prediction propagation");
             break;
         }
         
@@ -574,12 +604,15 @@ private:
             changed |= setPrediction(SpecBoolean);
             break;
         }
-        case GetStructurePropertyEnumerator:
-        case GetGenericPropertyEnumerator: {
+        case GetPropertyEnumerator: {
             changed |= setPrediction(SpecCell);
             break;
         }
-        case GetEnumeratorPname: {
+        case GetEnumeratorStructurePname: {
+            changed |= setPrediction(SpecCell | SpecOther);
+            break;
+        }
+        case GetEnumeratorGenericPname: {
             changed |= setPrediction(SpecCell | SpecOther);
             break;
         }
@@ -590,11 +623,10 @@ private:
 
 #ifndef NDEBUG
         // These get ignored because they don't return anything.
-        case StoreBarrier:
-        case StoreBarrierWithNullCheck:
         case PutByValDirect:
         case PutByVal:
         case PutClosureVar:
+        case PutToArguments:
         case Return:
         case Throw:
         case PutById:
@@ -616,13 +648,11 @@ private:
         case SetArgument:
         case CheckStructure:
         case CheckCell:
+        case CheckNotEmpty:
+        case CheckIdent:
         case CheckBadCell:
         case PutStructure:
-        case TearOffArguments:
-        case CheckArgumentsNotCreated:
-        case VariableWatchpoint:
         case VarInjectionWatchpoint:
-        case AllocationProfileWatchpoint:
         case Phantom:
         case Check:
         case PutGlobalVar:
@@ -630,11 +660,10 @@ private:
         case Unreachable:
         case LoopHint:
         case NotifyWrite:
-        case FunctionReentryWatchpoint:
-        case TypedArrayWatchpoint:
         case ConstantStoragePointer:
         case MovHint:
         case ZombieHint:
+        case LoadVarargs:
             break;
             
         // This gets ignored because it only pretends to produce a value.
@@ -775,6 +804,7 @@ private:
         case ArithSqrt:
         case ArithCos:
         case ArithSin:
+        case ArithLog:
             if (node->child1()->shouldSpeculateNumber())
                 m_graph.voteNode(node->child1(), VoteDouble, weight);
             else
@@ -841,14 +871,19 @@ private:
                 continue;
             m_changed |= variableAccessData->tallyVotesForShouldUseDoubleFormat();
         }
-        for (unsigned i = 0; i < m_graph.m_argumentPositions.size(); ++i)
-            m_changed |= m_graph.m_argumentPositions[i].mergeArgumentPredictionAwareness();
+        propagateThroughArgumentPositions();
         for (unsigned i = 0; i < m_graph.m_variableAccessData.size(); ++i) {
             VariableAccessData* variableAccessData = &m_graph.m_variableAccessData[i];
             if (!variableAccessData->isRoot())
                 continue;
             m_changed |= variableAccessData->makePredictionForDoubleFormat();
         }
+    }
+    
+    void propagateThroughArgumentPositions()
+    {
+        for (unsigned i = 0; i < m_graph.m_argumentPositions.size(); ++i)
+            m_changed |= m_graph.m_argumentPositions[i].mergeArgumentPredictionAwareness();
     }
     
     Node* m_currentNode;

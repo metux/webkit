@@ -106,10 +106,6 @@ public:
 
     bool active() const { return m_active; }
 
-    // ActiveDOMObject interface
-    virtual bool hasPendingActivity() const override;
-    virtual void stop() override;
-
     // EventTarget interface
     virtual ScriptExecutionContext* scriptExecutionContext() const override { return ActiveDOMObject::scriptExecutionContext(); }
     virtual EventTargetInterface eventTargetInterface() const override { return SourceBufferEventTargetInterfaceType; }
@@ -128,6 +124,10 @@ public:
     void setShouldGenerateTimestamps(bool flag) { m_shouldGenerateTimestamps = flag; }
 
     void rangeRemoval(const MediaTime&, const MediaTime&);
+
+    // ActiveDOMObject API.
+    bool hasPendingActivity() const override;
+
 protected:
     // EventTarget interface
     virtual void refEventTarget() override { ref(); }
@@ -136,7 +136,10 @@ protected:
 private:
     SourceBuffer(Ref<SourceBufferPrivate>&&, MediaSource*);
 
-    virtual const char* activeDOMObjectName() const override { return "SourceBuffer"; }
+    // ActiveDOMObject API.
+    void stop() override;
+    const char* activeDOMObjectName() const override;
+    bool canSuspendForPageCache() const override;
 
     // SourceBufferPrivateClient
     virtual void sourceBufferPrivateDidEndStream(SourceBufferPrivate*, const WTF::AtomicString&) override;
@@ -145,7 +148,7 @@ private:
     virtual bool sourceBufferPrivateHasAudio(const SourceBufferPrivate*) const override;
     virtual bool sourceBufferPrivateHasVideo(const SourceBufferPrivate*) const override;
     virtual void sourceBufferPrivateDidBecomeReadyForMoreSamples(SourceBufferPrivate*, AtomicString trackID) override;
-    virtual MediaTime sourceBufferPrivateFastSeekTimeForMediaTime(SourceBufferPrivate*, const MediaTime&, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold);
+    virtual MediaTime sourceBufferPrivateFastSeekTimeForMediaTime(SourceBufferPrivate*, const MediaTime&, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold) override;
     virtual void sourceBufferPrivateAppendComplete(SourceBufferPrivate*, AppendResult) override;
     virtual void sourceBufferPrivateDidReceiveRenderingError(SourceBufferPrivate*, int errorCode) override;
 

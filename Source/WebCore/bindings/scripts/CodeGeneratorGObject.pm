@@ -260,9 +260,7 @@ sub SkipAttribute {
         return 1;
     }
 
-    if ($attribute->signature->type eq "EventListener") {
-        return 1;
-    }
+    return 1 if $attribute->signature->type eq "EventHandler";
 
     if ($attribute->signature->type eq "MediaQueryListListener") {
         return 1;
@@ -285,9 +283,12 @@ sub SkipFunction {
 
     my $functionName = "webkit_dom_" . $decamelize . "_" . $prefix . decamelize($function->signature->name);
     my $functionReturnType = $prefix eq "set_" ? "void" : $function->signature->type;
-    my $isCustomFunction = $function->signature->extendedAttributes->{"Custom"};
+    my $isCustomFunction = $function->signature->extendedAttributes->{"Custom"} || $function->signature->extendedAttributes->{"CustomBinding"};
     my $callWith = $function->signature->extendedAttributes->{"CallWith"};
     my $isUnsupportedCallWith = $codeGenerator->ExtendedAttributeContains($callWith, "ScriptArguments") || $codeGenerator->ExtendedAttributeContains($callWith, "CallStack");
+
+    # Static methods are unsupported
+    return 1 if $function->isStatic;
 
     if (($isCustomFunction || $isUnsupportedCallWith) &&
         $functionName ne "webkit_dom_node_replace_child" &&
@@ -361,6 +362,14 @@ sub SkipFunction {
     }
 
     if ($function->signature->name eq "supports" && @{$function->parameters} == 1) {
+        return 1;
+    }
+
+    if ($function->signature->type eq "Promise") {
+        return 1;
+    }
+
+    if ($function->signature->type eq "Date") {
         return 1;
     }
 

@@ -445,7 +445,7 @@ void ArgumentCoder<TextureMapperAnimation>::encode(ArgumentEncoder& encoder, con
         case AnimatedPropertyOpacity:
             encoder << static_cast<const FloatAnimationValue&>(value).value();
             break;
-        case AnimatedPropertyWebkitTransform:
+        case AnimatedPropertyTransform:
             encoder << static_cast<const TransformAnimationValue&>(value).value();
             break;
         case AnimatedPropertyWebkitFilter:
@@ -527,7 +527,7 @@ bool ArgumentCoder<TextureMapperAnimation>::decode(ArgumentDecoder& decoder, Tex
             keyframes.insert(std::make_unique<FloatAnimationValue>(keyTime, value, timingFunction.get()));
             break;
         }
-        case AnimatedPropertyWebkitTransform: {
+        case AnimatedPropertyTransform: {
             TransformOperations transform;
             if (!decoder.decode(transform))
                 return false;
@@ -568,9 +568,6 @@ void ArgumentCoder<WebCore::GraphicsSurfaceToken>::encode(ArgumentEncoder& encod
 #if OS(DARWIN)
     encoder << Attachment(token.frontBufferHandle, MACH_MSG_TYPE_MOVE_SEND);
     encoder << Attachment(token.backBufferHandle, MACH_MSG_TYPE_MOVE_SEND);
-#elif OS(WINDOWS)
-    encoder << reinterpret_cast<uint64_t>(token.frontBufferHandle);
-    encoder << reinterpret_cast<uint64_t>(token.backBufferHandle);
 #elif OS(LINUX)
     encoder << token.frontBufferHandle;
 #endif
@@ -578,16 +575,7 @@ void ArgumentCoder<WebCore::GraphicsSurfaceToken>::encode(ArgumentEncoder& encod
 
 bool ArgumentCoder<WebCore::GraphicsSurfaceToken>::decode(ArgumentDecoder& decoder, WebCore::GraphicsSurfaceToken& token)
 {
-#if OS(WINDOWS)
-    uint64_t frontBufferHandle;
-    if (!decoder.decode(frontBufferHandle))
-        return false;
-    token.frontBufferHandle = reinterpret_cast<GraphicsSurfaceToken::BufferHandle>(frontBufferHandle);
-    uint64_t backBufferHandle;
-    if (!decoder.decode(backBufferHandle))
-        return false;
-    token.backBufferHandle = reinterpret_cast<GraphicsSurfaceToken::BufferHandle>(backBufferHandle);
-#elif OS(DARWIN)
+#if OS(DARWIN)
     Attachment frontAttachment, backAttachment;
     if (!decoder.decode(frontAttachment))
         return false;

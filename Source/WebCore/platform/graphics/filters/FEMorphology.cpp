@@ -33,7 +33,7 @@
 
 namespace WebCore {
 
-FEMorphology::FEMorphology(Filter* filter, MorphologyOperatorType type, float radiusX, float radiusY)
+FEMorphology::FEMorphology(Filter& filter, MorphologyOperatorType type, float radiusX, float radiusY)
     : FilterEffect(filter)
     , m_type(type)
     , m_radiusX(radiusX)
@@ -41,7 +41,7 @@ FEMorphology::FEMorphology(Filter* filter, MorphologyOperatorType type, float ra
 {
 }
 
-Ref<FEMorphology> FEMorphology::create(Filter* filter, MorphologyOperatorType type, float radiusX, float radiusY)
+Ref<FEMorphology> FEMorphology::create(Filter& filter, MorphologyOperatorType type, float radiusX, float radiusY)
 {
     return adoptRef(*new FEMorphology(filter, type, radiusX, radiusY));
 }
@@ -238,10 +238,10 @@ void FEMorphology::platformApplySoftware()
     PaintingData paintingData;
     paintingData.srcPixelArray = srcPixelArray.get();
     paintingData.dstPixelArray = dstPixelArray;
-    paintingData.width = effectDrawingRect.width();
-    paintingData.height = effectDrawingRect.height();
-    paintingData.radiusX = radiusX;
-    paintingData.radiusY = radiusY;
+    paintingData.width = ceilf(effectDrawingRect.width() * filter.filterScale());
+    paintingData.height = ceilf(effectDrawingRect.height() * filter.filterScale());
+    paintingData.radiusX = ceilf(radiusX * filter.filterScale());
+    paintingData.radiusY = ceilf(radiusY * filter.filterScale());
 
     platformApply(&paintingData);
 }

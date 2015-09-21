@@ -112,11 +112,14 @@ public:
     WTF_EXPORT_STRING_API String(const char* characters);
 
     // Construct a string referencing an existing StringImpl.
-    String(StringImpl& impl) : m_impl(&impl) { }
-    String(StringImpl* impl) : m_impl(impl) { }
-    String(PassRefPtr<StringImpl> impl) : m_impl(impl) { }
-    String(Ref<StringImpl>&& impl) : m_impl(WTF::move(impl)) { }
-    String(RefPtr<StringImpl>&& impl) : m_impl(impl) { }
+    String(StringImpl&);
+    String(StringImpl*);
+    String(PassRefPtr<StringImpl>);
+    String(Ref<StringImpl>&&);
+    String(RefPtr<StringImpl>&&);
+
+    String(Ref<AtomicStringImpl>&&);
+    String(RefPtr<AtomicStringImpl>&&);
 
     // Construct a string from a constant string literal.
     WTF_EXPORT_STRING_API String(ASCIILiteral characters);
@@ -189,7 +192,8 @@ public:
     WTF_EXPORT_STRING_API CString ascii() const;
     WTF_EXPORT_STRING_API CString latin1() const;
 
-    WTF_EXPORT_STRING_API CString utf8(ConversionMode = LenientConversion) const;
+    WTF_EXPORT_STRING_API CString utf8(ConversionMode) const;
+    WTF_EXPORT_STRING_API CString utf8() const;
 
     UChar at(unsigned index) const
     {
@@ -220,6 +224,10 @@ public:
         { return m_impl ? m_impl->find(str.impl()) : notFound; }
     size_t find(const String& str, unsigned start) const
         { return m_impl ? m_impl->find(str.impl(), start) : notFound; }
+    size_t findIgnoringASCIICase(const String& str) const
+        { return m_impl ? m_impl->findIgnoringASCIICase(str.impl()) : notFound; }
+    size_t findIgnoringASCIICase(const String& str, unsigned startOffset) const
+        { return m_impl ? m_impl->findIgnoringASCIICase(str.impl(), startOffset) : notFound; }
 
     size_t find(CharacterMatchFunctionPtr matchFunction, unsigned start = 0) const
         { return m_impl ? m_impl->find(matchFunction, start) : notFound; }
@@ -258,11 +266,19 @@ public:
     bool contains(UChar c) const { return find(c) != notFound; }
     bool contains(const LChar* str, bool caseSensitive = true, unsigned startOffset = 0) const 
         { return find(str, startOffset, caseSensitive) != notFound; }
-    bool contains(const String& str, bool caseSensitive = true, unsigned startOffset = 0) const 
+    bool contains(const String& str) const
+        { return find(str) != notFound; }
+    bool contains(const String& str, bool caseSensitive, unsigned startOffset = 0) const
         { return find(str, startOffset, caseSensitive) != notFound; }
+    bool containsIgnoringASCIICase(const String& str) const
+        { return findIgnoringASCIICase(str) != notFound; }
+    bool containsIgnoringASCIICase(const String& str, unsigned startOffset) const
+        { return findIgnoringASCIICase(str, startOffset) != notFound; }
 
     bool startsWith(const String& s) const
         { return m_impl ? m_impl->startsWith(s.impl()) : s.isEmpty(); }
+    bool startsWithIgnoringASCIICase(const String& s) const
+        { return m_impl ? m_impl->startsWithIgnoringASCIICase(s.impl()) : s.isEmpty(); }
     bool startsWith(const String& s, bool caseSensitive) const
         { return m_impl ? m_impl->startsWith(s.impl(), caseSensitive) : s.isEmpty(); }
     bool startsWith(UChar character) const
@@ -273,7 +289,11 @@ public:
     bool hasInfixStartingAt(const String& prefix, unsigned startOffset) const
         { return m_impl && prefix.impl() ? m_impl->hasInfixStartingAt(*prefix.impl(), startOffset) : false; }
 
-    bool endsWith(const String& s, bool caseSensitive = true) const
+    bool endsWith(const String& s) const
+        { return m_impl ? m_impl->endsWith(s.impl()) : s.isEmpty(); }
+    bool endsWithIgnoringASCIICase(const String& s) const
+        { return m_impl ? m_impl->endsWithIgnoringASCIICase(s.impl()) : s.isEmpty(); }
+    bool endsWith(const String& s, bool caseSensitive) const
         { return m_impl ? m_impl->endsWith(s.impl(), caseSensitive) : s.isEmpty(); }
     bool endsWith(UChar character) const
         { return m_impl ? m_impl->endsWith(character) : false; }
@@ -492,6 +512,10 @@ inline bool equalIgnoringCase(const String& a, const char* b) { return equalIgno
 inline bool equalIgnoringCase(const LChar* a, const String& b) { return equalIgnoringCase(a, b.impl()); }
 inline bool equalIgnoringCase(const char* a, const String& b) { return equalIgnoringCase(reinterpret_cast<const LChar*>(a), b.impl()); }
 
+inline bool equalIgnoringASCIICase(const String& a, const String& b) { return equalIgnoringASCIICase(a.impl(), b.impl()); }
+template<unsigned charactersCount>
+inline bool equalIgnoringASCIICase(const String& a, const char (&b)[charactersCount]) { return equalIgnoringASCIICase<charactersCount>(a.impl(), b); }
+
 inline bool equalPossiblyIgnoringCase(const String& a, const String& b, bool ignoreCase) 
 {
     return ignoreCase ? equalIgnoringCase(a, b) : (a == b);
@@ -507,6 +531,41 @@ inline bool operator!(const String& str) { return str.isNull(); }
 inline void swap(String& a, String& b) { a.swap(b); }
 
 // Definitions of string operations
+
+inline String::String(StringImpl& impl)
+    : m_impl(&impl)
+{
+}
+
+inline String::String(StringImpl* impl)
+    : m_impl(impl)
+{
+}
+
+inline String::String(PassRefPtr<StringImpl> impl)
+    : m_impl(impl)
+{
+}
+
+inline String::String(Ref<StringImpl>&& impl)
+    : m_impl(WTF::move(impl))
+{
+}
+
+inline String::String(RefPtr<StringImpl>&& impl)
+    : m_impl(WTF::move(impl))
+{
+}
+
+inline String::String(Ref<AtomicStringImpl>&& impl)
+    : m_impl(WTF::move(impl))
+{
+}
+
+inline String::String(RefPtr<AtomicStringImpl>&& impl)
+    : m_impl(WTF::move(impl))
+{
+}
 
 template<size_t inlineCapacity, typename OverflowHandler>
 String::String(const Vector<UChar, inlineCapacity, OverflowHandler>& vector)
@@ -638,14 +697,16 @@ private:
 // FIXME: Remove when we can use C++14 initialized lambda capture: [string = string.isolatedCopy()].
 class StringCapture {
 public:
-    explicit StringCapture(const String& string) : m_string(string) { }
+    StringCapture() { }
+    StringCapture(const String& string) : m_string(string) { }
     explicit StringCapture(String&& string) : m_string(string) { }
     StringCapture(const StringCapture& other) : m_string(other.m_string.isolatedCopy()) { }
     const String& string() const { return m_string; }
     String releaseString() { return WTF::move(m_string); }
 
+    void operator=(const StringCapture& other) { m_string = other.m_string.isolatedCopy(); }
+
 private:
-    void operator=(const StringCapture&) = delete;
     String m_string;
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@
 
 #include "Plugin.h"
 #include "WebEvent.h"
+#include "WebHitTestResult.h"
 #include <WebCore/AffineTransform.h>
 #include <WebCore/FindOptions.h>
 #include <WebCore/ScrollableArea.h>
@@ -67,7 +68,7 @@ class WebFrame;
 
 class PDFPlugin final : public Plugin, private WebCore::ScrollableArea {
 public:
-    static PassRefPtr<PDFPlugin> create(WebFrame*);
+    static Ref<PDFPlugin> create(WebFrame*);
     ~PDFPlugin();
 
     static WebCore::PluginInfo pluginInfo();
@@ -103,6 +104,11 @@ public:
     
     bool showContextMenuAtPoint(const WebCore::IntPoint&);
 
+    String lookupTextAtLocation(const WebCore::FloatPoint&, WebHitTestResult::Data&, PDFSelection **, NSDictionary **) const;
+    WebCore::FloatRect viewRectForSelection(PDFSelection *) const;
+
+    CGFloat scaleFactor() const;
+
 private:
     explicit PDFPlugin(WebFrame*);
 
@@ -112,7 +118,7 @@ private:
     virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRectInWindowCoordinates) override { }
     virtual void updateControlTints(WebCore::GraphicsContext*) override;
     virtual bool supportsSnapshotting() const override { return true; }
-    virtual PassRefPtr<ShareableBitmap> snapshot() override;
+    virtual RefPtr<ShareableBitmap> snapshot() override;
     virtual PlatformLayer* pluginLayer() override;
     virtual bool isTransparent() override { return false; }
     virtual bool wantsWheelEvents() override { return true; }
@@ -122,6 +128,7 @@ private:
     virtual void frameDidFinishLoading(uint64_t requestID) override;
     virtual void frameDidFail(uint64_t requestID, bool wasCancelled) override;
     virtual void didEvaluateJavaScript(uint64_t requestID, const String& result) override;
+    virtual void streamWillSendRequest(uint64_t streamID, const WebCore::URL& requestURL, const WebCore::URL& responseURL, int responseStatus) override { }
     virtual void streamDidReceiveResponse(uint64_t streamID, const WebCore::URL& responseURL, uint32_t streamLength, uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFileName) override;
     virtual void streamDidReceiveData(uint64_t streamID, const char* bytes, int length) override;
     virtual void streamDidFinishLoading(uint64_t streamID) override;
@@ -153,7 +160,7 @@ private:
     virtual void privateBrowsingStateChanged(bool) override { }
     virtual bool getFormValue(String& formValue) override { return false; }
     virtual bool handleScroll(WebCore::ScrollDirection, WebCore::ScrollGranularity) override;
-    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const override;
+    virtual RefPtr<WebCore::SharedBuffer> liveResourceData() const override;
 
     virtual bool isBeingAsynchronouslyInitialized() const override { return false; }
 
@@ -165,8 +172,10 @@ private:
 
     PDFSelection *nextMatchForString(const String& target, BOOL searchForward, BOOL caseSensitive, BOOL wrapSearch, PDFSelection *initialSelection, BOOL startInSelection);
 
-    virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) override;
-    virtual String getSelectionString() const override;
+    bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) override;
+    String getSelectionString() const override;
+    String getSelectionForWordAtPoint(const WebCore::FloatPoint&) const override;
+    bool existingSelectionContainsPoint(const WebCore::FloatPoint&) const override;
 
     virtual bool shouldAllowScripting() override { return false; }
     virtual bool shouldAllowNavigationFromDrags() override { return true; }
@@ -194,7 +203,7 @@ private:
     virtual WebCore::Scrollbar* horizontalScrollbar() const override { return m_horizontalScrollbar.get(); }
     virtual WebCore::Scrollbar* verticalScrollbar() const override { return m_verticalScrollbar.get(); }
     virtual bool shouldSuspendScrollAnimations() const override { return false; } // If we return true, ScrollAnimatorMac will keep cycling a timer forever, waiting for a good time to animate.
-    virtual void scrollbarStyleChanged(int newStyle, bool forceUpdate) override;
+    virtual void scrollbarStyleChanged(WebCore::ScrollbarStyle, bool forceUpdate) override;
     virtual WebCore::IntRect convertFromScrollbarToContainingView(const WebCore::Scrollbar*, const WebCore::IntRect& scrollbarRect) const override;
     virtual WebCore::IntRect convertFromContainingViewToScrollbar(const WebCore::Scrollbar*, const WebCore::IntRect& parentRect) const override;
     virtual WebCore::IntPoint convertFromScrollbarToContainingView(const WebCore::Scrollbar*, const WebCore::IntPoint& scrollbarPoint) const override;
@@ -303,6 +312,8 @@ private:
 };
 
 } // namespace WebKit
+
+SPECIALIZE_TYPE_TRAITS_PLUGIN(PDFPlugin, PDFPluginType)
 
 #endif // ENABLE(PDFKIT_PLUGIN)
 

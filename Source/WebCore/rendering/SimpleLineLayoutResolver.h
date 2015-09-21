@@ -28,7 +28,6 @@
 
 #include "LayoutRect.h"
 #include "RenderBlockFlow.h"
-#include "RenderText.h"
 #include "SimpleLineLayoutFlowContents.h"
 #include "SimpleLineLayoutFunctions.h"
 #include <wtf/Vector.h>
@@ -51,6 +50,7 @@ private:
 };
 
 class RunResolver {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     class Iterator;
 
@@ -61,35 +61,42 @@ public:
         unsigned start() const;
         unsigned end() const;
 
-        LayoutRect rect() const;
-        FloatPoint baseline() const;
+        FloatRect rect() const;
+        int baselinePosition() const;
         StringView text() const;
+        bool isEndOfLine() const;
 
         unsigned lineIndex() const;
 
     private:
+        float computeBaselinePosition() const;
+
         const Iterator& m_iterator;
     };
 
     class Iterator {
+    friend class Run;
+    friend class RunResolver;
+    friend class LineResolver;
     public:
         Iterator(const RunResolver&, unsigned runIndex, unsigned lineIndex);
 
         Iterator& operator++();
+        Iterator& operator--();
 
         bool operator==(const Iterator&) const;
         bool operator!=(const Iterator&) const;
 
         Run operator*() const;
 
-        Iterator& advance();
-        Iterator& advanceLines(unsigned);
-
-        const RunResolver& resolver() const { return m_resolver; }
+    private:
         const SimpleLineLayout::Run& simpleRun() const;
         unsigned lineIndex() const { return m_lineIndex; }
+        Iterator& advance();
+        Iterator& advanceLines(unsigned);
+        const RunResolver& resolver() const { return m_resolver; }
+        bool inQuirksMode() const { return m_resolver.m_inQuirksMode; }
 
-    private:
         const RunResolver& m_resolver;
         unsigned m_runIndex;
         unsigned m_lineIndex;
@@ -97,16 +104,18 @@ public:
 
     RunResolver(const RenderBlockFlow&, const Layout&);
 
+    const RenderBlockFlow& flow() const { return m_flowRenderer; }
     Iterator begin() const;
     Iterator end() const;
 
     Range<Iterator> rangeForRect(const LayoutRect&) const;
-    Range<Iterator> rangeForRenderer(const RenderText&) const;
+    Range<Iterator> rangeForRenderer(const RenderObject&) const;
 
 private:
     enum class IndexType { First, Last };
     unsigned lineIndexForHeight(LayoutUnit, IndexType) const;
 
+    const RenderBlockFlow& m_flowRenderer;
     const Layout& m_layout;
     const FlowContents m_flowContents;
     const LayoutUnit m_lineHeight;
@@ -114,6 +123,7 @@ private:
     const LayoutUnit m_borderAndPaddingBefore;
     const float m_ascent;
     const float m_descent;
+    const bool m_inQuirksMode;
 };
 
 class LineResolver {
@@ -128,7 +138,7 @@ public:
         bool operator==(const Iterator&) const;
         bool operator!=(const Iterator&) const;
 
-        const LayoutRect operator*() const;
+        const FloatRect operator*() const;
 
     private:
         RunResolver::Iterator m_runIterator;
@@ -159,6 +169,16 @@ inline unsigned RunResolver::Run::end() const
     return m_iterator.simpleRun().end;
 }
 
+inline int RunResolver::Run::baselinePosition() const
+{
+    return roundToInt(computeBaselinePosition());
+}
+
+inline bool RunResolver::Run::isEndOfLine() const
+{
+    return m_iterator.simpleRun().isEndOfLine;
+}
+
 inline unsigned RunResolver::Run::lineIndex() const
 {
     return m_iterator.lineIndex();
@@ -167,6 +187,20 @@ inline unsigned RunResolver::Run::lineIndex() const
 inline RunResolver::Iterator& RunResolver::Iterator::operator++()
 {
     return advance();
+}
+
+inline float RunResolver::Run::computeBaselinePosition() const
+{
+    auto& resolver = m_iterator.resolver();
+    return resolver.m_lineHeight * lineIndex() + resolver.m_baseline + resolver.m_borderAndPaddingBefore;
+}
+
+inline RunResolver::Iterator& RunResolver::Iterator::operator--()
+{
+    --m_runIndex;
+    if (simpleRun().isEndOfLine)
+        --m_lineIndex;
+    return *this;
 }
 
 inline bool RunResolver::Iterator::operator==(const Iterator& other) const

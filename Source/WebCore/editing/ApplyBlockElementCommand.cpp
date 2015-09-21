@@ -103,7 +103,7 @@ void ApplyBlockElementCommand::formatSelection(const VisiblePosition& startOfSel
     // Special case empty unsplittable elements because there's nothing to split
     // and there's nothing to move.
     Position start = startOfSelection.deepEquivalent().downstream();
-    if (isAtUnsplittableElement(start)) {
+    if (isAtUnsplittableElement(start) && startOfParagraph(start) == endOfParagraph(endOfSelection)) {
         RefPtr<Element> blockquote = createBlockElement();
         insertNodeAt(blockquote, start);
         RefPtr<Element> placeholder = createBreakElement(document());
@@ -136,14 +136,14 @@ void ApplyBlockElementCommand::formatSelection(const VisiblePosition& startOfSel
 
         Position afterEnd = end.next();
         Node* enclosingCell = enclosingNodeOfType(start, &isTableCell);
-        VisiblePosition endOfNextParagraph = endOfNextParagrahSplittingTextNodesIfNeeded(endOfCurrentParagraph, start, end);
+        VisiblePosition endOfNextParagraph = endOfNextParagraphSplittingTextNodesIfNeeded(endOfCurrentParagraph, start, end);
 
         formatRange(start, end, m_endOfLastParagraph, blockquoteForNextIndent);
 
         // Don't put the next paragraph in the blockquote we just created for this paragraph unless 
         // the next paragraph is in the same cell.
         if (enclosingCell && enclosingCell != enclosingNodeOfType(endOfNextParagraph.deepEquivalent(), &isTableCell))
-            blockquoteForNextIndent = 0;
+            blockquoteForNextIndent = nullptr;
 
         // indentIntoBlockquote could move more than one paragraph if the paragraph
         // is in a list item or a table. As a result, endAfterSelection could refer to a position
@@ -250,7 +250,7 @@ void ApplyBlockElementCommand::rangeForParagraphSplittingTextNodesIfNeeded(const
     }
 }
 
-VisiblePosition ApplyBlockElementCommand::endOfNextParagrahSplittingTextNodesIfNeeded(VisiblePosition& endOfCurrentParagraph, Position& start, Position& end)
+VisiblePosition ApplyBlockElementCommand::endOfNextParagraphSplittingTextNodesIfNeeded(VisiblePosition& endOfCurrentParagraph, Position& start, Position& end)
 {
     VisiblePosition endOfNextParagraph = endOfParagraph(endOfCurrentParagraph.next());
     Position position = endOfNextParagraph.deepEquivalent();

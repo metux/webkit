@@ -37,7 +37,7 @@ namespace JSC { namespace DFG {
 
 bool doesGC(Graph& graph, Node* node)
 {
-    if (clobbersWorld(graph, node))
+    if (clobbersHeap(graph, node))
         return true;
     
     // Now consider nodes that don't clobber the world but that still may GC. This includes all
@@ -49,12 +49,12 @@ bool doesGC(Graph& graph, Node* node)
     case Int52Constant:
     case Identity:
     case GetCallee:
+    case GetArgumentCount:
     case GetLocal:
     case SetLocal:
     case MovHint:
     case ZombieHint:
     case Phantom:
-    case HardPhantom:
     case Upsilon:
     case Phi:
     case Flush:
@@ -71,6 +71,7 @@ bool doesGC(Graph& graph, Node* node)
     case UInt32ToNumber:
     case DoubleAsInt32:
     case ArithAdd:
+    case ArithClz32:
     case ArithSub:
     case ArithNegate:
     case ArithMul:
@@ -82,9 +83,11 @@ bool doesGC(Graph& graph, Node* node)
     case ArithMax:
     case ArithPow:
     case ArithSqrt:
+    case ArithRound:
     case ArithFRound:
     case ArithSin:
     case ArithCos:
+    case ArithLog:
     case ValueAdd:
     case GetById:
     case GetByIdFlush:
@@ -97,15 +100,14 @@ bool doesGC(Graph& graph, Node* node)
     case CheckArray:
     case GetScope:
     case SkipScope:
-    case GetClosureRegisters:
     case GetClosureVar:
     case PutClosureVar:
     case GetGlobalVar:
     case PutGlobalVar:
-    case VariableWatchpoint:
     case VarInjectionWatchpoint:
     case CheckCell:
-    case AllocationProfileWatchpoint:
+    case CheckNotEmpty:
+    case CheckIdent:
     case RegExpExec:
     case RegExpTest:
     case CompareLess:
@@ -117,8 +119,11 @@ bool doesGC(Graph& graph, Node* node)
     case CompareStrictEq:
     case Call:
     case Construct:
-    case NativeCall:
-    case NativeConstruct:
+    case CallVarargs:
+    case ConstructVarargs:
+    case LoadVarargs:
+    case CallForwardVarargs:
+    case ConstructForwardVarargs:
     case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
@@ -131,19 +136,14 @@ bool doesGC(Graph& graph, Node* node)
     case IsNumber:
     case IsString:
     case IsObject:
+    case IsObjectOrNull:
     case IsFunction:
     case TypeOf:
     case LogicalNot:
     case ToPrimitive:
     case ToString:
+    case CallStringConstructor:
     case In:
-    case PhantomArguments:
-    case TearOffArguments:
-    case GetMyArgumentsLength:
-    case GetMyArgumentByVal:
-    case GetMyArgumentsLengthSafe:
-    case GetMyArgumentByValSafe:
-    case CheckArgumentsNotCreated:
     case Jump:
     case Branch:
     case Switch:
@@ -158,13 +158,11 @@ bool doesGC(Graph& graph, Node* node)
     case CheckTierUpInLoop:
     case CheckTierUpAtReturn:
     case CheckTierUpAndOSREnter:
+    case CheckTierUpWithNestedTriggerAndOSREnter:
     case LoopHint:
     case StoreBarrier:
-    case StoreBarrierWithNullCheck:
     case InvalidationPoint:
     case NotifyWrite:
-    case FunctionReentryWatchpoint:
-    case TypedArrayWatchpoint:
     case CheckInBounds:
     case ConstantStoragePointer:
     case Check:
@@ -199,15 +197,25 @@ bool doesGC(Graph& graph, Node* node)
     case CheckBadCell:
     case BottomValue:
     case PhantomNewObject:
-    case PutByOffsetHint:
+    case PhantomNewFunction:
+    case PhantomCreateActivation:
+    case PhantomDirectArguments:
+    case PhantomClonedArguments:
+    case GetMyArgumentByVal:
+    case ForwardVarargs:
+    case PutHint:
     case CheckStructureImmediate:
-    case PutStructureHint:
-    case PutLocal:
-    case KillLocal:
+    case PutStack:
+    case KillStack:
+    case GetStack:
+    case GetFromArguments:
+    case PutToArguments:
         return false;
 
     case CreateActivation:
-    case CreateArguments:
+    case CreateDirectArguments:
+    case CreateScopedArguments:
+    case CreateClonedArguments:
     case ToThis:
     case CreateThis:
     case AllocatePropertyStorage:
@@ -221,16 +229,15 @@ bool doesGC(Graph& graph, Node* node)
     case NewRegexp:
     case NewStringObject:
     case MakeRope:
-    case NewFunctionNoCheck:
     case NewFunction:
-    case NewFunctionExpression:
     case NewTypedArray:
     case ThrowReferenceError:
-    case GetStructurePropertyEnumerator:
-    case GetGenericPropertyEnumerator:
-    case GetEnumeratorPname:
+    case GetPropertyEnumerator:
+    case GetEnumeratorStructurePname:
+    case GetEnumeratorGenericPname:
     case ToIndexString:
     case MaterializeNewObject:
+    case MaterializeCreateActivation:
         return true;
         
     case MultiPutByOffset:

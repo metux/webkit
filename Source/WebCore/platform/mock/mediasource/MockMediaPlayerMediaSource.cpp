@@ -33,6 +33,7 @@
 #include "MediaSourcePrivateClient.h"
 #include "MockMediaSourcePrivate.h"
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -40,23 +41,19 @@ namespace WebCore {
 // MediaPlayer Enigne Support
 void MockMediaPlayerMediaSource::registerMediaEngine(MediaEngineRegistrar registrar)
 {
-    registrar(create, getSupportedTypes, supportsType, 0, 0, 0, 0);
+    registrar([](MediaPlayer* player) { return std::make_unique<MockMediaPlayerMediaSource>(player); }, getSupportedTypes,
+        supportsType, 0, 0, 0, 0);
 }
 
-PassOwnPtr<MediaPlayerPrivateInterface> MockMediaPlayerMediaSource::create(MediaPlayer* player)
+static const HashSet<String>& mimeTypeCache()
 {
-    return adoptPtr(new MockMediaPlayerMediaSource(player));
-}
-
-static HashSet<String> mimeTypeCache()
-{
-    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<String>, cache, ());
+    static NeverDestroyed<HashSet<String>> cache;
     static bool isInitialized = false;
 
     if (!isInitialized) {
         isInitialized = true;
-        cache.add(ASCIILiteral("video/mock"));
-        cache.add(ASCIILiteral("audio/mock"));
+        cache.get().add(ASCIILiteral("video/mock"));
+        cache.get().add(ASCIILiteral("audio/mock"));
     }
 
     return cache;
@@ -122,9 +119,9 @@ void MockMediaPlayerMediaSource::pause()
     m_playing = 0;
 }
 
-IntSize MockMediaPlayerMediaSource::naturalSize() const
+FloatSize MockMediaPlayerMediaSource::naturalSize() const
 {
-    return IntSize();
+    return FloatSize();
 }
 
 bool MockMediaPlayerMediaSource::hasVideo() const
@@ -171,7 +168,7 @@ std::unique_ptr<PlatformTimeRanges> MockMediaPlayerMediaSource::buffered() const
     if (m_mediaSourcePrivate)
         return m_mediaSourcePrivate->buffered();
 
-    return PlatformTimeRanges::create();
+    return std::make_unique<PlatformTimeRanges>();
 }
 
 bool MockMediaPlayerMediaSource::didLoadingProgress() const
@@ -183,7 +180,7 @@ void MockMediaPlayerMediaSource::setSize(const IntSize&)
 {
 }
 
-void MockMediaPlayerMediaSource::paint(GraphicsContext*, const IntRect&)
+void MockMediaPlayerMediaSource::paint(GraphicsContext*, const FloatRect&)
 {
 }
 

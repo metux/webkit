@@ -44,16 +44,20 @@ InspectorFrontendAPI = {
 
     setTimelineProfilingEnabled: function(enabled)
     {
-        if (WebInspector.timelineManager.isCapturing() !== enabled)
+        if (WebInspector.timelineManager.isCapturing() === enabled)
             return;
 
         if (enabled) {
-            WebInspector.navigationSidebar.selectedSidebarPanel = WebInspector.timelineSidebarPanel;
-            WebInspector.timelineSidebarPanel.showTimelineOverview();
+            WebInspector.showTimelineTab();
             WebInspector.timelineManager.startCapturing();
         } else {
             WebInspector.timelineManager.stopCapturing();
         }
+    },
+
+    setDockingUnavailable: function(unavailable)
+    {
+        WebInspector.updateDockingAvailability(!unavailable);
     },
 
     setDockSide: function(side)
@@ -63,7 +67,7 @@ InspectorFrontendAPI = {
 
     showConsole: function()
     {
-        WebInspector.showConsoleView();
+        WebInspector.showConsoleTab();
 
         WebInspector.quickConsole.prompt.focus();
 
@@ -84,26 +88,22 @@ InspectorFrontendAPI = {
 
     showResources: function()
     {
-        WebInspector.ignoreLastContentCookie = true;
-        WebInspector.navigationSidebar.selectedSidebarPanel = WebInspector.resourceSidebarPanel;
-        WebInspector.navigationSidebar.collapsed = false;
+        WebInspector.showResourcesTab();
     },
 
     showMainResourceForFrame: function(frameIdentifier)
     {
-        WebInspector.ignoreLastContentCookie = true;
-        WebInspector.navigationSidebar.selectedSidebarPanel = WebInspector.resourceSidebarPanel;
-        WebInspector.resourceSidebarPanel.showSourceCodeForFrame(frameIdentifier, true);
+        WebInspector.showSourceCodeForFrame(frameIdentifier);
     },
 
     contextMenuItemSelected: function(id)
     {
-        WebInspector.contextMenuItemSelected(id);
+        WebInspector.ContextMenu.contextMenuItemSelected(id);
     },
 
     contextMenuCleared: function()
     {
-        WebInspector.contextMenuCleared();
+        WebInspector.ContextMenu.contextMenuCleared();
     },
 
     dispatchMessageAsync: function(messageObject)

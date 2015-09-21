@@ -97,9 +97,7 @@ public:
 
     GraphicsLayer* contentsContainmentLayer() const { return m_contentsContainmentLayer.get(); }
 
-    bool hasContentsLayer() const { return m_foregroundLayer != nullptr; }
     GraphicsLayer* foregroundLayer() const { return m_foregroundLayer.get(); }
-
     GraphicsLayer* backgroundLayer() const { return m_backgroundLayer.get(); }
     bool backgroundLayerPaintsFixedRootBackground() const { return m_backgroundLayerPaintsFixedRootBackground; }
     
@@ -107,36 +105,35 @@ public:
     GraphicsLayer* scrollingLayer() const { return m_scrollingLayer.get(); }
     GraphicsLayer* scrollingContentsLayer() const { return m_scrollingContentsLayer.get(); }
 
-    void detachFromScrollingCoordinator();
+    void detachFromScrollingCoordinator(LayerScrollCoordinationRoles);
     
-    ScrollingNodeID scrollingNodeIDForRole(ScrollingNodeType nodeType) const
+    ScrollingNodeID scrollingNodeIDForRole(LayerScrollCoordinationRole role) const
     {
-        switch (nodeType) {
-        case FrameScrollingNode:
-        case OverflowScrollingNode:
+        switch (role) {
+        case Scrolling:
             return m_scrollingNodeID;
-        case FixedNode:
-        case StickyNode:
+        case ViewportConstrained:
             return m_viewportConstrainedNodeID;
         }
         return 0;
     }
     
-    void setScrollingNodeIDForRole(ScrollingNodeID nodeID, ScrollingNodeType nodeType)
+    void setScrollingNodeIDForRole(ScrollingNodeID nodeID, LayerScrollCoordinationRole role)
     {
-        switch (nodeType) {
-        case FrameScrollingNode:
-        case OverflowScrollingNode:
+        switch (role) {
+        case Scrolling:
             m_scrollingNodeID = nodeID;
             break;
-        case FixedNode:
-        case StickyNode:
+        case ViewportConstrained:
             m_viewportConstrainedNodeID = nodeID;
+            setIsScrollCoordinatedWithViewportConstrainedRole(nodeID);
             break;
         }
     }
     
     ScrollingNodeID scrollingNodeIDForChildren() const { return m_scrollingNodeID ? m_scrollingNodeID : m_viewportConstrainedNodeID; }
+
+    void setIsScrollCoordinatedWithViewportConstrainedRole(bool);
 
     bool hasMaskLayer() const { return m_maskLayer != 0; }
     bool hasChildClippingMaskLayer() const { return m_childClippingMaskLayer != nullptr; }
@@ -266,13 +263,15 @@ private:
     bool updateOverflowControlsLayers(bool needsHorizontalScrollbarLayer, bool needsVerticalScrollbarLayer, bool needsScrollCornerLayer);
     bool updateForegroundLayer(bool needsForegroundLayer);
     bool updateBackgroundLayer(bool needsBackgroundLayer);
-    void updateMaskLayer(bool needsMaskLayer);
+    void updateMaskingLayer(bool hasMask, bool hasClipPath);
     bool requiresHorizontalScrollbarLayer() const;
     bool requiresVerticalScrollbarLayer() const;
     bool requiresScrollCornerLayer() const;
     bool updateScrollingLayers(bool scrollingLayers);
     void updateDrawsContent(bool isSimpleContainer);
     void updateChildClippingStrategy(bool needsDescendantsClippingLayer);
+
+    void updateMaskingLayerGeometry();
     
     void updateRootLayerConfiguration();
 
@@ -289,10 +288,13 @@ private:
     void updateFilters(const RenderStyle&);
 #if ENABLE(FILTERS_LEVEL_2)
     void updateBackdropFilters(const RenderStyle&);
+    void updateBackdropFiltersGeometry();
 #endif
 #if ENABLE(CSS_COMPOSITING)
     void updateBlendMode(const RenderStyle&);
 #endif
+    void updateCustomAppearance(const RenderStyle&);
+
     // Return the opacity value that this layer should use for compositing.
     float compositingOpacity(float rendererOpacity) const;
     
@@ -341,7 +343,7 @@ private:
     std::unique_ptr<GraphicsLayer> m_foregroundLayer; // Only used in cases where we need to draw the foreground separately.
     std::unique_ptr<GraphicsLayer> m_backgroundLayer; // Only used in cases where we need to draw the background separately.
     std::unique_ptr<GraphicsLayer> m_childContainmentLayer; // Only used if we have clipping on a stacking context with compositing children, or if the layer has a tile cache.
-    std::unique_ptr<GraphicsLayer> m_maskLayer; // Only used if we have a mask.
+    std::unique_ptr<GraphicsLayer> m_maskLayer; // Only used if we have a mask and/or clip-path.
     std::unique_ptr<GraphicsLayer> m_childClippingMaskLayer; // Only used if we have to clip child layers or accelerated contents with border radius or clip-path.
 
     std::unique_ptr<GraphicsLayer> m_layerForHorizontalScrollbar;

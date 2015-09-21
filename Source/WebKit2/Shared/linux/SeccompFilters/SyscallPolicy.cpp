@@ -28,7 +28,9 @@
 
 #if ENABLE(SECCOMP_FILTERS)
 
+#include "PluginSearchPath.h"
 #include "WebProcessCreationParameters.h"
+#include "XDGBaseDirectory.h"
 #include <libgen.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -96,21 +98,38 @@ bool SyscallPolicy::hasPermissionForPath(const char* path, Permission permission
     free(basePath);
     free(canonicalPath);
 
-    return (permission & policy->value) == permission;
+    if ((permission & policy->value) == permission)
+        return true;
+
+    // Don't warn if the file doesn't exist at all.
+    if (!access(path, F_OK) || errno != ENOENT)
+        fprintf(stderr, "Blocked impermissible %s access to %s\n", SyscallPolicy::permissionToString(permission), path);
+    return false;
+}
+
+static String canonicalizeFileName(const String& path)
+{
+    char* canonicalizedPath = canonicalize_file_name(path.utf8().data());
+    if (canonicalizedPath) {
+        String result = String::fromUTF8(canonicalizedPath);
+        free(canonicalizedPath);
+        return result;
+    }
+    return path;
 }
 
 void SyscallPolicy::addFilePermission(const String& path, Permission permission)
 {
     ASSERT(!path.isEmpty() && path.startsWith('/')  && !path.endsWith('/') && !path.contains("//"));
 
-    m_filePermission.set(path, permission);
+    m_filePermission.set(canonicalizeFileName(path), permission);
 }
 
 void SyscallPolicy::addDirectoryPermission(const String& path, Permission permission)
 {
     ASSERT(path.startsWith('/') && !path.contains("//") && (path.length() == 1 || !path.endsWith('/')));
 
-    m_directoryPermission.set(path, permission);
+    m_directoryPermission.set(canonicalizeFileName(path), permission);
 }
 
 void SyscallPolicy::addDefaultWebProcessPolicy(const WebProcessCreationParameters& parameters)
@@ -133,17 +152,29 @@ void SyscallPolicy::addDefaultWebProcessPolicy(const WebProcessCreationParameter
     // file unless white listed bellow or by platform.
     addDirectoryPermission(ASCIILiteral("/"), NotAllowed);
 
-    // Shared libraries, plugins and fonts.
+    // System library directories
     addDirectoryPermission(ASCIILiteral("/lib"), Read);
+    addDirectoryPermission(ASCIILiteral("/lib32"), Read);
+    addDirectoryPermission(ASCIILiteral("/lib64"), Read);
     addDirectoryPermission(ASCIILiteral("/usr/lib"), Read);
+    addDirectoryPermission(ASCIILiteral("/usr/lib32"), Read);
+    addDirectoryPermission(ASCIILiteral("/usr/lib64"), Read);
+    addDirectoryPermission(ASCIILiteral("/usr/local/lib"), Read);
+    addDirectoryPermission(ASCIILiteral("/usr/local/lib32"), Read);
+    addDirectoryPermission(ASCIILiteral("/usr/local/lib64"), Read);
+    addDirectoryPermission(ASCIILiteral(LIBDIR), Read);
+
+    // System data directories
     addDirectoryPermission(ASCIILiteral("/usr/share"), Read);
+    addDirectoryPermission(ASCIILiteral("/usr/local/share"), Read);
+    addDirectoryPermission(ASCIILiteral(DATADIR), Read);
+
+    // NPAPI plugins
+    for (String& path : pluginsDirectories())
+        addDirectoryPermission(path, Read);
 
     // SSL Certificates.
     addDirectoryPermission(ASCIILiteral("/etc/ssl/certs"), Read);
-
-    // Fontconfig cache.
-    addDirectoryPermission(ASCIILiteral("/etc/fonts"), Read);
-    addDirectoryPermission(ASCIILiteral("/var/cache/fontconfig"), Read);
 
     // Audio devices, random number generators, etc.
     addDirectoryPermission(ASCIILiteral("/dev"), ReadAndWrite);
@@ -186,13 +217,83 @@ void SyscallPolicy::addDefaultWebProcessPolicy(const WebProcessCreationParameter
     // Needed by D-Bus.
     addFilePermission(ASCIILiteral("/var/lib/dbus/machine-id"), Read);
 
-    char* homeDir = getenv("HOME");
-    if (homeDir) {
-        // X11 connection token.
-        addFilePermission(String::fromUTF8(homeDir) + "/.Xauthority", Read);
-        // MIME type resolution.
-        addDirectoryPermission(String::fromUTF8(homeDir) +  "/.local/share/mime", Read);
+    // Needed by at-spi2.
+    // FIXME This is too permissive: https://bugs.webkit.org/show_bug.cgi?id=143004
+    addDirectoryPermission("/run/user/" + String::number(getuid()), ReadAndWrite);
+
+    // Needed by WebKit's memory pressure handler.
+    addFilePermission(ASCIILiteral("/sys/fs/cgroup/memory/memory.pressure_level"), Read);
+    addFilePermission(ASCIILiteral("/sys/fs/cgroup/memory/cgroup.event_control"), Read);
+
+    // X11 connection token.
+    addFilePermission(userHomeDirectory() + "/.Xauthority", Read);
+
+    // MIME type resolution.
+    addDirectoryPermission(userDataDirectory() + "/mime", Read);
+
+    // Needed by NVIDIA proprietary graphics driver.
+    addDirectoryPermission(userHomeDirectory() + "/.nv", ReadAndWrite);
+
+    // Needed by udev.
+    addDirectoryPermission(ASCIILiteral("/etc/udev"), Read);
+    addDirectoryPermission(ASCIILiteral("/run/udev"), Read);
+    addDirectoryPermission(ASCIILiteral("/sys/bus"), Read);
+    addDirectoryPermission(ASCIILiteral("/sys/class"), Read);
+    addDirectoryPermission(ASCIILiteral("/sys/devices"), Read);
+
+    // PulseAudio
+    addFilePermission(ASCIILiteral("/etc/asound.conf"), Read);
+    addDirectoryPermission(userConfigDirectory() + "/.pulse", Read);
+    addDirectoryPermission(userHomeDirectory() + "/.pulse", Read);
+
+    // Mesa
+    addFilePermission(ASCIILiteral("/etc/drirc"), Read);
+    addFilePermission(userHomeDirectory() + "/.drirc", Read);
+    addFilePermission(ASCIILiteral("/sys/fs/selinux/booleans/allow_execmem"), Read);
+
+    // GStreamer
+    addDirectoryPermission(String::fromUTF8(LIBEXECDIR) + "/gstreamer-1.0", Read);
+    addDirectoryPermission(userDataDirectory() + "/gstreamer-1.0", Read);
+    addDirectoryPermission(userCacheDirectory() + "/gstreamer-1.0", ReadAndWrite);
+    addDirectoryPermission(userHomeDirectory() + "/.frei0r-1", ReadAndWrite);
+    if (char* gstreamerPluginDirectory = getenv("GST_PLUGIN_PATH_1_0"))
+        addDirectoryPermission(gstreamerPluginDirectory, Read);
+    if (char* gstreamerRegistryFile = getenv("GST_REGISTRY_1_0"))
+        addFilePermission(gstreamerRegistryFile, ReadAndWrite);
+
+    // Fontconfig
+    addDirectoryPermission(userCacheDirectory() + "/fontconfig", ReadAndWrite);
+    addDirectoryPermission(userConfigDirectory() + "/fontconfig", Read);
+    addDirectoryPermission(userConfigDirectory() + "/fonts", Read);
+    addDirectoryPermission(userDataDirectory() + "/fonts", Read);
+    addDirectoryPermission(userHomeDirectory() + "/fontconfig", Read);
+    addDirectoryPermission(userHomeDirectory() + "/.fonts", Read);
+    addDirectoryPermission(ASCIILiteral("/etc/fonts"), Read);
+    addDirectoryPermission(ASCIILiteral("/var/cache/fontconfig"), Read);
+
+#if ENABLE(DEVELOPER_MODE) && defined(SOURCE_DIR)
+    // Developers using build-webkit expect some libraries to be loaded
+    // from the build root directory and they also need access to layout test
+    // files.
+    addDirectoryPermission(String::fromUTF8(SOURCE_DIR), SyscallPolicy::ReadAndWrite);
+#endif
+}
+
+const char* SyscallPolicy::permissionToString(Permission permission)
+{
+    switch (permission) {
+    case Read:
+        return "read";
+    case Write:
+        return "write";
+    case ReadAndWrite:
+        return "read/write";
+    case NotAllowed:
+        return "disallowed";
     }
+
+    ASSERT_NOT_REACHED();
+    return "unknown action";
 }
 
 } // namespace WebKit

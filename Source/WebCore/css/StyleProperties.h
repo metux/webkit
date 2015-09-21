@@ -22,6 +22,7 @@
 #ifndef StyleProperties_h
 #define StyleProperties_h
 
+#include "CSSParser.h"
 #include "CSSParserMode.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSProperty.h"
@@ -35,9 +36,8 @@
 
 namespace WebCore {
 
-class CSSRule;
 class CSSStyleDeclaration;
-class ComputedStyleExtractor;
+class CachedResource;
 class ImmutableStyleProperties;
 class URL;
 class MutableStyleProperties;
@@ -86,7 +86,7 @@ public:
     bool isEmpty() const { return !propertyCount(); }
     PropertyReference propertyAt(unsigned) const;
 
-    PassRefPtr<CSSValue> getPropertyCSSValue(CSSPropertyID) const;
+    WEBCORE_EXPORT PassRefPtr<CSSValue> getPropertyCSSValue(CSSPropertyID) const;
     WEBCORE_EXPORT String getPropertyValue(CSSPropertyID) const;
     bool propertyIsImportant(CSSPropertyID) const;
     String getPropertyShorthand(CSSPropertyID) const;
@@ -108,7 +108,7 @@ public:
     bool isMutable() const { return m_isMutable; }
     bool hasCSSOMWrapper() const;
 
-    bool hasFailedOrCanceledSubresources() const;
+    bool traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const;
 
     static unsigned averageSizeInBytes();
 
@@ -182,7 +182,7 @@ inline const StylePropertyMetadata* ImmutableStyleProperties::metadataArray() co
 
 class MutableStyleProperties : public StyleProperties {
 public:
-    static Ref<MutableStyleProperties> create(CSSParserMode = CSSQuirksMode);
+    WEBCORE_EXPORT static Ref<MutableStyleProperties> create(CSSParserMode = CSSQuirksMode);
     static Ref<MutableStyleProperties> create(const CSSProperty* properties, unsigned count);
 
     WEBCORE_EXPORT ~MutableStyleProperties();
@@ -193,8 +193,8 @@ public:
 
     PropertySetCSSStyleDeclaration* cssStyleDeclaration();
 
-    void addParsedProperties(const Vector<CSSProperty>&);
-    void addParsedProperty(const CSSProperty&);
+    bool addParsedProperties(const CSSParser::ParsedPropertyVector&);
+    bool addParsedProperty(const CSSProperty&);
 
     // These expand shorthand properties into multiple properties.
     bool setProperty(CSSPropertyID, const String& value, bool important = false, StyleSheetContents* contextStyleSheet = 0);
@@ -203,11 +203,11 @@ public:
     // These do not. FIXME: This is too messy, we can do better.
     bool setProperty(CSSPropertyID, CSSValueID identifier, bool important = false);
     bool setProperty(CSSPropertyID, CSSPropertyID identifier, bool important = false);
-    void appendPrefixingVariantProperty(const CSSProperty&);
+    bool appendPrefixingVariantProperty(const CSSProperty&);
     void setPrefixingVariantProperty(const CSSProperty&);
-    void setProperty(const CSSProperty&, CSSProperty* slot = 0);
+    bool setProperty(const CSSProperty&, CSSProperty* slot = nullptr);
 
-    bool removeProperty(CSSPropertyID, String* returnText = 0);
+    bool removeProperty(CSSPropertyID, String* returnText = nullptr);
     void removePrefixedOrUnprefixedProperty(CSSPropertyID);
     void removeBlockProperties();
     bool removePropertiesInSet(const CSSPropertyID* set, unsigned length);

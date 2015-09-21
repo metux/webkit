@@ -61,9 +61,9 @@ WebKitNotificationProvider::~WebKitNotificationProvider()
 {
 }
 
-PassRefPtr<WebKitNotificationProvider> WebKitNotificationProvider::create(WebNotificationManagerProxy* notificationManager)
+Ref<WebKitNotificationProvider> WebKitNotificationProvider::create(WebNotificationManagerProxy* notificationManager)
 {
-    return adoptRef(new WebKitNotificationProvider(notificationManager));
+    return adoptRef(*new WebKitNotificationProvider(notificationManager));
 }
 
 WebKitNotificationProvider::WebKitNotificationProvider(WebNotificationManagerProxy* notificationManager)
@@ -72,8 +72,10 @@ WebKitNotificationProvider::WebKitNotificationProvider(WebNotificationManagerPro
     ASSERT(notificationManager);
 
     WKNotificationProviderV0 wkNotificationProvider = {
-        kWKNotificationProviderCurrentVersion,
-        this, // clientInfo,
+        {
+            0, // version
+            this, // clientInfo
+        },
         showCallback,
         cancelCallback,
         0, // didDestroyNotificationCallback,
@@ -89,9 +91,9 @@ WebKitNotificationProvider::WebKitNotificationProvider(WebNotificationManagerPro
 void WebKitNotificationProvider::notificationCloseCallback(WebKitNotification* notification, WebKitNotificationProvider* provider)
 {
     uint64_t notificationID = webkit_notification_get_id(notification);
-    Vector<RefPtr<API::Object>, 1> arrayIDs;
-    arrayIDs.uncheckedAppend(API::UInt64::create(notificationID));
-    provider->m_notificationManager->providerDidCloseNotifications(API::Array::create(WTF::move(arrayIDs)).get());
+    Vector<RefPtr<API::Object>> arrayIDs;
+    arrayIDs.append(API::UInt64::create(notificationID));
+    provider->m_notificationManager->providerDidCloseNotifications(API::Array::create(WTF::move(arrayIDs)).ptr());
     provider->m_notifications.remove(notificationID);
 }
 

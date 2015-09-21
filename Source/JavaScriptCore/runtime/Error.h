@@ -23,10 +23,12 @@
 #ifndef Error_h
 #define Error_h
 
+#include "ErrorInstance.h"
 #include "InternalFunction.h"
 #include "Interpreter.h"
 #include "JSObject.h"
 #include <stdint.h>
+
 
 namespace JSC {
 
@@ -37,28 +39,34 @@ class JSObject;
 class SourceCode;
 class Structure;
 
-// Methods to create a range of internal errors.
-JSObject* createError(JSGlobalObject*, const String&);
-JSObject* createEvalError(JSGlobalObject*, const String&);
-JSObject* createRangeError(JSGlobalObject*, const String&);
-JSObject* createReferenceError(JSGlobalObject*, const String&);
-JSObject* createSyntaxError(JSGlobalObject*, const String&);
-JSObject* createTypeError(JSGlobalObject*, const String&);
-JSObject* createNotEnoughArgumentsError(JSGlobalObject*);
-JSObject* createURIError(JSGlobalObject*, const String&);
 // ExecState wrappers.
+JSObject* createError(ExecState*, const String&, ErrorInstance::SourceAppender);
+JSObject* createEvalError(ExecState*, const String&, ErrorInstance::SourceAppender);
+JSObject* createRangeError(ExecState*, const String&, ErrorInstance::SourceAppender);
+JSObject* createReferenceError(ExecState*, const String&, ErrorInstance::SourceAppender);
+JSObject* createSyntaxError(ExecState*, const String&, ErrorInstance::SourceAppender);
+JSObject* createTypeError(ExecState*, const String&, ErrorInstance::SourceAppender, RuntimeType);
+JSObject* createNotEnoughArgumentsError(ExecState*, ErrorInstance::SourceAppender);
+JSObject* createURIError(ExecState*, const String&, ErrorInstance::SourceAppender);
+JSObject* createOutOfMemoryError(ExecState*, ErrorInstance::SourceAppender);
+
+
 JS_EXPORT_PRIVATE JSObject* createError(ExecState*, const String&);
-JSObject* createEvalError(ExecState*, const String&);
+JS_EXPORT_PRIVATE JSObject* createEvalError(ExecState*, const String&);
 JS_EXPORT_PRIVATE JSObject* createRangeError(ExecState*, const String&);
 JS_EXPORT_PRIVATE JSObject* createReferenceError(ExecState*, const String&);
 JS_EXPORT_PRIVATE JSObject* createSyntaxError(ExecState*, const String&);
+JS_EXPORT_PRIVATE JSObject* createTypeError(ExecState*);
 JS_EXPORT_PRIVATE JSObject* createTypeError(ExecState*, const String&);
 JS_EXPORT_PRIVATE JSObject* createNotEnoughArgumentsError(ExecState*);
-JSObject* createURIError(ExecState*, const String&);
+JS_EXPORT_PRIVATE JSObject* createURIError(ExecState*, const String&);
+JS_EXPORT_PRIVATE JSObject* createOutOfMemoryError(ExecState*);
 
-// Methods to add 
+
+bool addErrorInfoAndGetBytecodeOffset(ExecState*, VM&, JSObject*, bool, CallFrame*&, unsigned&);
+
 bool hasErrorInfo(ExecState*, JSObject* error);
-// ExecState wrappers.
+JS_EXPORT_PRIVATE void addErrorInfo(ExecState*, JSObject*, bool); 
 JSObject* addErrorInfo(ExecState*, JSObject* error, int line, const SourceCode&);
 
 // Methods to throw Errors.
@@ -66,11 +74,14 @@ JSObject* addErrorInfo(ExecState*, JSObject* error, int line, const SourceCode&)
 // Convenience wrappers, create an throw an exception with a default message.
 JS_EXPORT_PRIVATE JSObject* throwTypeError(ExecState*);
 JS_EXPORT_PRIVATE JSObject* throwSyntaxError(ExecState*);
+inline JSObject* throwRangeError(ExecState* state, const String& errorMessage) { return state->vm().throwException(state, createRangeError(state, errorMessage)); }
 
 // Convenience wrappers, wrap result as an EncodedJSValue.
+inline void throwVMError(ExecState* exec, Exception* exception) { exec->vm().throwException(exec, exception); }
 inline EncodedJSValue throwVMError(ExecState* exec, JSValue error) { return JSValue::encode(exec->vm().throwException(exec, error)); }
 inline EncodedJSValue throwVMTypeError(ExecState* exec) { return JSValue::encode(throwTypeError(exec)); }
 inline EncodedJSValue throwVMTypeError(ExecState* exec, const String& errorMessage) { return JSValue::encode(throwTypeError(exec, errorMessage)); }
+inline EncodedJSValue throwVMRangeError(ExecState* state, const String& errorMessage) { return JSValue::encode(throwRangeError(state, errorMessage)); }
 
 class StrictModeTypeErrorFunction : public InternalFunction {
 private:

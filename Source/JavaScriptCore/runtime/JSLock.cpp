@@ -30,21 +30,16 @@
 
 namespace JSC {
 
-std::mutex* GlobalJSLock::s_sharedInstanceMutex;
+StaticLock GlobalJSLock::s_sharedInstanceMutex;
 
 GlobalJSLock::GlobalJSLock()
 {
-    s_sharedInstanceMutex->lock();
+    s_sharedInstanceMutex.lock();
 }
 
 GlobalJSLock::~GlobalJSLock()
 {
-    s_sharedInstanceMutex->unlock();
-}
-
-void GlobalJSLock::initialize()
-{
-    s_sharedInstanceMutex = new std::mutex();
+    s_sharedInstanceMutex.unlock();
 }
 
 JSLockHolder::JSLockHolder(ExecState* exec)
@@ -73,7 +68,7 @@ void JSLockHolder::init()
 JSLockHolder::~JSLockHolder()
 {
     RefPtr<JSLock> apiLock(&m_vm->apiLock());
-    m_vm.clear();
+    m_vm = nullptr;
     apiLock->unlock();
 }
 
@@ -157,10 +152,14 @@ void JSLock::unlock(intptr_t unlockCount)
     RELEASE_ASSERT(currentThreadIsHoldingLock());
     ASSERT(m_lockCount >= unlockCount);
 
+    // Maintain m_lockCount while calling willReleaseLock() so that its callees know that
+    // they still have the lock.
+    if (unlockCount == m_lockCount)
+        willReleaseLock();
+
     m_lockCount -= unlockCount;
 
     if (!m_lockCount) {
-        willReleaseLock();
 
         if (!m_hasExclusiveThread) {
             m_ownerThreadID = std::thread::id();
@@ -172,6 +171,8 @@ void JSLock::unlock(intptr_t unlockCount)
 void JSLock::willReleaseLock()
 {
     if (m_vm) {
+        m_vm->drainMicrotasks();
+
         m_vm->heap.releaseDelayedReleasedObjects();
         m_vm->setStackPointerAtVMEntry(nullptr);
     }
@@ -208,8 +209,6 @@ unsigned JSLock::dropAllLocks(DropAllLocks* dropper)
         return 0;
     }
 
-    // Check if this thread is currently holding the lock.
-    // FIXME: Maybe we want to require this, guard with an ASSERT?
     if (!currentThreadIsHoldingLock())
         return 0;
 
@@ -261,7 +260,7 @@ JSLock::DropAllLocks::DropAllLocks(VM* vm)
     if (!m_vm)
         return;
     wtfThreadData().resetCurrentAtomicStringTable();
-    RELEASE_ASSERT(!m_vm->isCollectorBusy());
+    RELEASE_ASSERT(!m_vm->apiLock().currentThreadIsHoldingLock() || !m_vm->isCollectorBusy());
     m_droppedLockCount = m_vm->apiLock().dropAllLocks(this);
 }
 

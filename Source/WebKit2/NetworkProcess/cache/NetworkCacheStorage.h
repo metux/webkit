@@ -28,181 +28,150 @@
 
 #if ENABLE(NETWORK_CACHE)
 
+#include "NetworkCacheBlobStorage.h"
+#include "NetworkCacheData.h"
 #include "NetworkCacheKey.h"
+#include <WebCore/Timer.h>
 #include <wtf/BloomFilter.h>
 #include <wtf/Deque.h>
 #include <wtf/HashSet.h>
 #include <wtf/Optional.h>
+#include <wtf/WorkQueue.h>
 #include <wtf/text/WTFString.h>
 
-namespace WebCore {
-class SharedBuffer;
-}
-
-namespace IPC {
-class ArgumentEncoder;
-class ArgumentDecoder;
-}
-
 namespace WebKit {
+namespace NetworkCache {
 
-#if PLATFORM(COCOA)
-template <typename T> class DispatchPtr;
-template <typename T> DispatchPtr<T> adoptDispatch(T dispatchObject);
+class IOChannel;
 
-// FIXME: Use OSObjectPtr instead when it works with dispatch_data_t on all platforms.
-template<typename T> class DispatchPtr {
+class Storage {
+    WTF_MAKE_NONCOPYABLE(Storage);
 public:
-    DispatchPtr()
-        : m_ptr(nullptr)
-    {
-    }
-    DispatchPtr(T ptr)
-        : m_ptr(ptr)
-    {
-        if (m_ptr)
-            dispatch_retain(m_ptr);
-    }
-    DispatchPtr(const DispatchPtr& other)
-        : m_ptr(other.m_ptr)
-    {
-        if (m_ptr)
-            dispatch_retain(m_ptr);
-    }
-    ~DispatchPtr()
-    {
-        if (m_ptr)
-            dispatch_release(m_ptr);
-    }
+    static std::unique_ptr<Storage> open(const String& cachePath);
 
-    DispatchPtr& operator=(const DispatchPtr& other)
-    {
-        auto copy = other;
-        std::swap(m_ptr, copy.m_ptr);
-        return *this;
-    }
-
-    T get() const { return m_ptr; }
-    explicit operator bool() const { return m_ptr; }
-
-    friend DispatchPtr adoptDispatch<T>(T);
-
-private:
-    struct Adopt { };
-    DispatchPtr(Adopt, T data)
-        : m_ptr(data)
-    {
-    }
-
-    T m_ptr;
-};
-
-template <typename T> DispatchPtr<T> adoptDispatch(T dispatchObject)
-{
-    return DispatchPtr<T>(typename DispatchPtr<T>::Adopt { }, dispatchObject);
-}
-#endif
-
-class NetworkCacheStorage {
-    WTF_MAKE_NONCOPYABLE(NetworkCacheStorage);
-public:
-    static std::unique_ptr<NetworkCacheStorage> open(const String& cachePath);
-
-    class Data {
+    struct Record {
+        WTF_MAKE_FAST_ALLOCATED;
     public:
-        Data() { }
-        Data(const uint8_t*, size_t);
-
-        enum class Backing { Buffer, Map };
-#if PLATFORM(COCOA)
-        explicit Data(DispatchPtr<dispatch_data_t>, Backing = Backing::Buffer);
-#endif
-        bool isNull() const;
-
-        const uint8_t* data() const;
-        size_t size() const { return m_size; }
-        bool isMap() const { return m_isMap; }
-
-#if PLATFORM(COCOA)
-        dispatch_data_t dispatchData() const { return m_dispatchData.get(); }
-#endif
-    private:
-#if PLATFORM(COCOA)
-        mutable DispatchPtr<dispatch_data_t> m_dispatchData;
-#endif
-        mutable const uint8_t* m_data { nullptr };
-        size_t m_size { 0 };
-        bool m_isMap { false };
-    };
-
-    struct Entry {
-        std::chrono::milliseconds timeStamp;
+        Key key;
+        std::chrono::system_clock::time_point timeStamp;
         Data header;
         Data body;
     };
     // This may call completion handler synchronously on failure.
-    typedef std::function<bool (std::unique_ptr<Entry>)> RetrieveCompletionHandler;
-    void retrieve(const NetworkCacheKey&, unsigned priority, RetrieveCompletionHandler&&);
+    typedef std::function<bool (std::unique_ptr<Record>)> RetrieveCompletionHandler;
+    void retrieve(const Key&, unsigned priority, RetrieveCompletionHandler&&);
 
-    typedef std::function<void (bool success, const Data& mappedBody)> StoreCompletionHandler;
-    void store(const NetworkCacheKey&, const Entry&, StoreCompletionHandler&&);
-    void update(const NetworkCacheKey&, const Entry& updateEntry, const Entry& existingEntry, StoreCompletionHandler&&);
+    typedef std::function<void (const Data& mappedBody)> MappedBodyHandler;
+    void store(const Record&, MappedBodyHandler&&);
 
-    void setMaximumSize(size_t);
-    void clear();
+    void remove(const Key&);
+    void clear(std::chrono::system_clock::time_point modifiedSinceTime, std::function<void ()>&& completionHandler);
 
-    static const unsigned version = 2;
+    struct RecordInfo {
+        size_t bodySize;
+        double worth; // 0-1 where 1 is the most valuable.
+        unsigned bodyShareCount;
+        String bodyHash;
+    };
+    enum TraverseFlag {
+        ComputeWorth = 1 << 0,
+        ShareCount = 1 << 1,
+    };
+    typedef unsigned TraverseFlags;
+    typedef std::function<void (const Record*, const RecordInfo&)> TraverseHandler;
+    // Null record signals end.
+    void traverse(TraverseFlags, TraverseHandler&&);
 
-    const String& directoryPath() const { return m_directoryPath; }
+    void setCapacity(size_t);
+    size_t capacity() const { return m_capacity; }
+    size_t approximateSize() const;
+
+    static const unsigned version = 4;
+
+    String basePath() const;
+    String versionPath() const;
+    String recordsPath() const;
+
+    ~Storage();
 
 private:
-    NetworkCacheStorage(const String& directoryPath);
+    Storage(const String& directoryPath);
 
-    void initialize();
+    String partitionPathForKey(const Key&) const;
+    String recordPathForKey(const Key&) const;
+    String bodyPathForKey(const Key&) const;
+
+    void synchronize();
     void deleteOldVersions();
     void shrinkIfNeeded();
+    void shrink();
 
-    void removeEntry(const NetworkCacheKey&);
-
-    struct ReadOperation {
-        NetworkCacheKey key;
-        RetrieveCompletionHandler completionHandler;
-    };
-    void dispatchReadOperation(const ReadOperation&);
+    struct ReadOperation;
+    void dispatchReadOperation(std::unique_ptr<ReadOperation>);
     void dispatchPendingReadOperations();
+    void finishReadOperation(ReadOperation&);
+    void cancelAllReadOperations();
 
-    struct WriteOperation {
-        NetworkCacheKey key;
-        Entry entry;
-        Optional<Entry> existingEntry;
-        StoreCompletionHandler completionHandler;
-    };
-    void dispatchFullWriteOperation(const WriteOperation&);
-    void dispatchHeaderWriteOperation(const WriteOperation&);
+    struct WriteOperation;
+    void dispatchWriteOperation(std::unique_ptr<WriteOperation>);
     void dispatchPendingWriteOperations();
+    void finishWriteOperation(WriteOperation&);
 
-    const String m_baseDirectoryPath;
-    const String m_directoryPath;
+    Optional<BlobStorage::Blob> storeBodyAsBlob(WriteOperation&);
+    Data encodeRecord(const Record&, Optional<BlobStorage::Blob>);
+    void readRecord(ReadOperation&, const Data&);
 
-    size_t m_maximumSize { std::numeric_limits<size_t>::max() };
+    void updateFileModificationTime(const String& path);
+    bool removeFromPendingWriteOperations(const Key&);
 
-    BloomFilter<20> m_contentsFilter;
-    std::atomic<size_t> m_approximateSize { 0 };
-    std::atomic<bool> m_shrinkInProgress { false };
+    WorkQueue& ioQueue() { return m_ioQueue.get(); }
+    WorkQueue& backgroundIOQueue() { return m_backgroundIOQueue.get(); }
+    WorkQueue& serialBackgroundIOQueue() { return m_serialBackgroundIOQueue.get(); }
+
+    bool mayContain(const Key&) const;
+
+    void addToRecordFilter(const Key&);
+
+    const String m_basePath;
+    const String m_recordsPath;
+
+    size_t m_capacity { std::numeric_limits<size_t>::max() };
+    size_t m_approximateRecordsSize { 0 };
+
+    // 2^18 bit filter can support up to 26000 entries with false positive rate < 1%.
+    using ContentsFilter = BloomFilter<18>;
+    std::unique_ptr<ContentsFilter> m_recordFilter;
+    std::unique_ptr<ContentsFilter> m_bodyFilter;
+
+    bool m_synchronizationInProgress { false };
+    bool m_shrinkInProgress { false };
+
+    Vector<Key::HashType> m_recordFilterHashesAddedDuringSynchronization;
+    Vector<Key::HashType> m_bodyFilterHashesAddedDuringSynchronization;
 
     static const int maximumRetrievePriority = 4;
-    Deque<std::unique_ptr<const ReadOperation>> m_pendingReadOperationsByPriority[maximumRetrievePriority + 1];
-    HashSet<std::unique_ptr<const ReadOperation>> m_activeReadOperations;
+    Deque<std::unique_ptr<ReadOperation>> m_pendingReadOperationsByPriority[maximumRetrievePriority + 1];
+    HashSet<std::unique_ptr<ReadOperation>> m_activeReadOperations;
+    WebCore::Timer m_readOperationTimeoutTimer;
 
-    Deque<std::unique_ptr<const WriteOperation>> m_pendingWriteOperations;
-    HashSet<std::unique_ptr<const WriteOperation>> m_activeWriteOperations;
+    Deque<std::unique_ptr<WriteOperation>> m_pendingWriteOperations;
+    HashSet<std::unique_ptr<WriteOperation>> m_activeWriteOperations;
+    WebCore::Timer m_writeOperationDispatchTimer;
 
-#if PLATFORM(COCOA)
-    mutable DispatchPtr<dispatch_queue_t> m_ioQueue;
-    mutable DispatchPtr<dispatch_queue_t> m_backgroundIOQueue;
-#endif
+    struct TraverseOperation;
+    HashSet<std::unique_ptr<TraverseOperation>> m_activeTraverseOperations;
+
+    Ref<WorkQueue> m_ioQueue;
+    Ref<WorkQueue> m_backgroundIOQueue;
+    Ref<WorkQueue> m_serialBackgroundIOQueue;
+
+    BlobStorage m_blobStorage;
 };
 
+// FIXME: Remove, used by NetworkCacheStatistics only.
+void traverseRecordsFiles(const String& recordsPath, const std::function<void (const String&, const String&)>&);
+
+}
 }
 #endif
 #endif

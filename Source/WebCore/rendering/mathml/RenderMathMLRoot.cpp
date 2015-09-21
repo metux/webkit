@@ -233,7 +233,7 @@ void RenderMathMLRoot::updateStyle()
     auto base = baseWrapper();
     auto baseStyle = RenderStyle::createAnonymousStyleWithDisplay(&style(), FLEX);
     baseStyle.get().setMarginTop(Length(0, Fixed)); // This will be updated in RenderMathMLRoot::layout().
-    baseStyle.get().setAlignItems(AlignBaseline);
+    baseStyle.get().setAlignItemsPosition(ItemPositionBaseline);
     base->setStyle(WTF::move(baseStyle));
     base->setNeedsLayoutAndPrefWidthsRecalc();
 
@@ -244,17 +244,17 @@ void RenderMathMLRoot::updateStyle()
         indexStyle.get().setMarginTop(Length(0, Fixed)); // This will be updated in RenderMathMLRoot::layout().
         indexStyle.get().setMarginStart(Length(kernBeforeDegree, Fixed));
         indexStyle.get().setMarginEnd(Length(kernAfterDegree, Fixed));
-        indexStyle.get().setAlignItems(AlignBaseline);
+        indexStyle.get().setAlignItemsPosition(ItemPositionBaseline);
         index->setStyle(WTF::move(indexStyle));
         index->setNeedsLayoutAndPrefWidthsRecalc();
     }
 }
 
-int RenderMathMLRoot::firstLineBaseline() const
+Optional<int> RenderMathMLRoot::firstLineBaseline() const
 {
     if (!isEmpty()) {
         auto base = baseWrapper();
-        return static_cast<int>(lroundf(base->firstLineBaseline() + base->marginTop()));
+        return static_cast<int>(lroundf(base->firstLineBaseline().valueOr(-1) + base->marginTop()));
     }
 
     return RenderMathMLBlock::firstLineBaseline();
@@ -285,9 +285,7 @@ void RenderMathMLRoot::layout()
     if (radical) {
         // We stretch the radical sign to cover the height of the base wrapper.
         float baseHeight = base->logicalHeight();
-        float baseHeightAboveBaseline = base->firstLineBaseline();
-        if (baseHeightAboveBaseline == -1)
-            baseHeightAboveBaseline = baseHeight;
+        float baseHeightAboveBaseline = base->firstLineBaseline().valueOr(baseHeight);
         float baseDepthBelowBaseline = baseHeight - baseHeightAboveBaseline;
         baseHeightAboveBaseline += m_verticalGap;
         radical->stretchTo(baseHeightAboveBaseline, baseDepthBelowBaseline);

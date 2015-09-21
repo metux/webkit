@@ -188,7 +188,7 @@ inline TriState SlotVisitor::containsOpaqueRootTriState(void* root) const
 {
     if (m_opaqueRoots.contains(root))
         return TrueTriState;
-    std::lock_guard<std::mutex> lock(m_shared.m_opaqueRootsMutex);
+    std::lock_guard<Lock> lock(m_shared.m_opaqueRootsMutex);
     if (m_shared.m_opaqueRoots.contains(root))
         return TrueTriState;
     return MixedTriState;
@@ -239,13 +239,18 @@ inline void SlotVisitor::copyLater(JSCell* owner, CopyToken token, void* ptr, si
     ASSERT(bytes);
     CopiedBlock* block = CopiedSpace::blockFor(ptr);
     if (block->isOversize()) {
+        ASSERT(bytes <= block->size());
+        // FIXME: We should be able to shrink the allocation if bytes went below the block size.
+        // For now, we just make sure that our accounting of how much memory we are actually using
+        // is correct.
+        // https://bugs.webkit.org/show_bug.cgi?id=144749
+        bytes = block->size();
         m_shared.m_copiedSpace->pin(block);
-        return;
     }
 
     ASSERT(heap()->m_storageSpace.contains(block));
 
-    SpinLockHolder locker(&block->workListLock());
+    LockHolder locker(&block->workListLock());
     if (heap()->operationInProgress() == FullCollection || block->shouldReportLiveBytes(locker, owner)) {
         m_bytesCopied += bytes;
         block->reportLiveBytes(locker, owner, token, bytes);

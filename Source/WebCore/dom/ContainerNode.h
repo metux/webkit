@@ -24,15 +24,14 @@
 #ifndef ContainerNode_h
 #define ContainerNode_h
 
+#include "CollectionType.h"
 #include "ExceptionCodePlaceholder.h"
 #include "Node.h"
 
-#include <wtf/OwnPtr.h>
-#include <wtf/Vector.h>
-
 namespace WebCore {
 
-class FloatPoint;
+class HTMLCollection;
+class NodeOrString;
 class QualifiedName;
 class RenderElement;
 
@@ -136,6 +135,10 @@ public:
 
     RenderElement* renderer() const;
 
+    // Return a bounding box in absolute coordinates enclosing this node and all its descendants.
+    // This gives the area within which events may get handled by a hander registered on this node.
+    virtual LayoutRect absoluteEventHandlerBounds(bool& /* includesFixedPositionElements */) { return LayoutRect(); }
+
     Element* querySelector(const String& selectors, ExceptionCode&);
     RefPtr<NodeList> querySelectorAll(const String& selectors, ExceptionCode&);
 
@@ -144,6 +147,14 @@ public:
     RefPtr<NodeList> getElementsByName(const String& elementName);
     RefPtr<NodeList> getElementsByClassName(const AtomicString& classNames);
     RefPtr<RadioNodeList> radioNodeList(const AtomicString&);
+
+    // From the ParentNode interface - https://dom.spec.whatwg.org/#interface-parentnode
+    Ref<HTMLCollection> children();
+    Element* firstElementChild() const;
+    Element* lastElementChild() const;
+    unsigned childElementCount() const;
+    void append(Vector<NodeOrString>&&, ExceptionCode&);
+    void prepend(Vector<NodeOrString>&&, ExceptionCode&);
 
 protected:
     explicit ContainerNode(Document&, ConstructionType = CreateContainer);
@@ -157,6 +168,9 @@ protected:
     void removeDetachedChildren();
     void setFirstChild(Node* child) { m_firstChild = child; }
     void setLastChild(Node* child) { m_lastChild = child; }
+
+    Ref<HTMLCollection> ensureCachedHTMLCollection(CollectionType);
+    HTMLCollection* cachedHTMLCollection(CollectionType);
 
 private:
     void removeBetween(Node* previousChild, Node* nextChild, Node& oldChild);

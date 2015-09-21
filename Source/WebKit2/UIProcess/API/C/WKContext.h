@@ -75,17 +75,6 @@ typedef struct WKContextClientV1 {
     WKContextCopyWebCryptoMasterKeyCallback                             copyWebCryptoMasterKey;
 } WKContextClientV1;
 
-enum { kWKContextClientCurrentVersion WK_ENUM_DEPRECATED("Use an explicit version number instead") = 1 };
-typedef struct WKContextClient {
-    int                                                                 version;
-    const void *                                                        clientInfo;
-
-    // Version 0.
-    WKContextPlugInAutoStartOriginHashesChangedCallback                 plugInAutoStartOriginHashesChanged;
-    WKContextNetworkProcessDidCrashCallback                             networkProcessDidCrash;
-    WKContextPlugInInformationBecameAvailableCallback                   plugInInformationBecameAvailable;
-} WKContextClient WK_C_DEPRECATED("Use an explicit versioned struct instead");
-
 enum {
     kWKProcessModelSharedSecondaryProcess = 0,
     kWKProcessModelMultipleSecondaryProcesses = 1
@@ -117,6 +106,7 @@ WK_EXPORT void WKContextSetInitializationUserDataForInjectedBundle(WKContextRef 
 WK_EXPORT void WKContextPostMessageToInjectedBundle(WKContextRef context, WKStringRef messageName, WKTypeRef messageBody);
 
 WK_EXPORT void WKContextAddVisitedLink(WKContextRef context, WKStringRef visitedURL);
+WK_EXPORT void WKContextClearVisitedLinks(WKContextRef contextRef);
 
 WK_EXPORT void WKContextSetCacheModel(WKContextRef context, WKCacheModel cacheModel);
 WK_EXPORT WKCacheModel WKContextGetCacheModel(WKContextRef context);
@@ -130,6 +120,8 @@ WK_EXPORT unsigned WKContextGetMaximumNumberOfProcesses(WKContextRef context);
 WK_EXPORT void WKContextStartMemorySampler(WKContextRef context, WKDoubleRef interval);
 WK_EXPORT void WKContextStopMemorySampler(WKContextRef context);
 
+WK_EXPORT WKWebsiteDataStoreRef WKContextGetWebsiteDataStore(WKContextRef context);
+
 WK_EXPORT WKApplicationCacheManagerRef WKContextGetApplicationCacheManager(WKContextRef context);
 WK_EXPORT WKBatteryManagerRef WKContextGetBatteryManager(WKContextRef context);
 WK_EXPORT WKCookieManagerRef WKContextGetCookieManager(WKContextRef context);
@@ -138,6 +130,7 @@ WK_EXPORT WKGeolocationManagerRef WKContextGetGeolocationManager(WKContextRef co
 WK_EXPORT WKIconDatabaseRef WKContextGetIconDatabase(WKContextRef context);
 WK_EXPORT WKKeyValueStorageManagerRef WKContextGetKeyValueStorageManager(WKContextRef context);
 WK_EXPORT WKMediaCacheManagerRef WKContextGetMediaCacheManager(WKContextRef context);
+WK_EXPORT WKMediaSessionFocusManagerRef WKContextGetMediaSessionFocusManager(WKContextRef context);
 WK_EXPORT WKNotificationManagerRef WKContextGetNotificationManager(WKContextRef context);
 WK_EXPORT WKPluginSiteDataManagerRef WKContextGetPluginSiteDataManager(WKContextRef context);
 WK_EXPORT WKResourceCacheManagerRef WKContextGetResourceCacheManager(WKContextRef context);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,50 +23,24 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.FontResourceContentView = function(resource)
+WebInspector.FontResourceContentView = class FontResourceContentView extends WebInspector.ResourceContentView
 {
-    WebInspector.ResourceContentView.call(this, resource, WebInspector.FontResourceContentView.StyleClassName);
+    constructor(resource)
+    {
+        super(resource, "font");
 
-    this._styleElement = null;
-    this._previewElement = null;
-};
-
-WebInspector.FontResourceContentView._uniqueFontIdentifier = 0;
-
-WebInspector.FontResourceContentView.StyleClassName = "font";
-WebInspector.FontResourceContentView.PreviewElementStyleClassName = "preview";
-WebInspector.FontResourceContentView.LineElementStyleClassName = "line";
-WebInspector.FontResourceContentView.ContentElementStyleClassName = "content";
-WebInspector.FontResourceContentView.MetricElementStyleClassName = "metric";
-WebInspector.FontResourceContentView.TopMetricElementStyleClassName = "top";
-WebInspector.FontResourceContentView.XHeightMetricElementStyleClassName = "xheight";
-WebInspector.FontResourceContentView.MiddleMetricElementStyleClassName = "middle";
-WebInspector.FontResourceContentView.BaselineMetricElementStyleClassName = "baseline";
-WebInspector.FontResourceContentView.BottomMetricElementStyleClassName = "bottom";
-WebInspector.FontResourceContentView.PreviewLines = ["ABCDEFGHIJKLM", "NOPQRSTUVWXYZ", "abcdefghijklm", "nopqrstuvwxyz", "1234567890"];
-
-WebInspector.FontResourceContentView.MaximumFontSize = 72;
-WebInspector.FontResourceContentView.MinimumFontSize = 12;
-
-WebInspector.FontResourceContentView.prototype = {
-    constructor: WebInspector.FontResourceContentView,
+        this._styleElement = null;
+        this._previewElement = null;
+    }
 
     // Public
-
-    get allowedNavigationSidebarPanels()
-    {
-        return [
-            WebInspector.resourceSidebarPanel.identifier,
-            WebInspector.timelineSidebarPanel.identifier
-        ];
-    },
 
     get previewElement()
     {
         return this._previewElement;
-    },
+    }
 
-    sizeToFit: function()
+    sizeToFit()
     {
         if (!this._previewElement)
             return;
@@ -77,9 +51,9 @@ WebInspector.FontResourceContentView.prototype = {
             if (this._previewElement.offsetWidth <= this.element.offsetWidth)
                 break;
         }
-    },
+    }
 
-    contentAvailable: function(content, base64Encoded)
+    contentAvailable(content, base64Encoded)
     {
         this.element.removeChildren();
 
@@ -104,29 +78,29 @@ WebInspector.FontResourceContentView.prototype = {
             document.head.appendChild(this._styleElement);
 
         this._previewElement = document.createElement("div");
-        this._previewElement.className = WebInspector.FontResourceContentView.PreviewElementStyleClassName;
+        this._previewElement.className = "preview";
         this._previewElement.style.fontFamily = uniqueFontName;
 
         function createMetricElement(className)
         {
             var metricElement = document.createElement("div");
-            metricElement.className = WebInspector.FontResourceContentView.MetricElementStyleClassName + " " + className;
+            metricElement.className = "metric " + className;
             return metricElement;
         }
 
         var lines = WebInspector.FontResourceContentView.PreviewLines;
         for (var i = 0; i < lines.length; ++i) {
             var lineElement = document.createElement("div");
-            lineElement.className = WebInspector.FontResourceContentView.LineElementStyleClassName;
+            lineElement.className = "line";
 
-            lineElement.appendChild(createMetricElement(WebInspector.FontResourceContentView.TopMetricElementStyleClassName));
-            lineElement.appendChild(createMetricElement(WebInspector.FontResourceContentView.XHeightMetricElementStyleClassName));
-            lineElement.appendChild(createMetricElement(WebInspector.FontResourceContentView.MiddleMetricElementStyleClassName));
-            lineElement.appendChild(createMetricElement(WebInspector.FontResourceContentView.BaselineMetricElementStyleClassName));
-            lineElement.appendChild(createMetricElement(WebInspector.FontResourceContentView.BottomMetricElementStyleClassName));
+            lineElement.appendChild(createMetricElement("top"));
+            lineElement.appendChild(createMetricElement("xheight"));
+            lineElement.appendChild(createMetricElement("middle"));
+            lineElement.appendChild(createMetricElement("baseline"));
+            lineElement.appendChild(createMetricElement("bottom"));
 
             var contentElement = document.createElement("div");
-            contentElement.className = WebInspector.FontResourceContentView.ContentElementStyleClassName;
+            contentElement.className = "content";
             contentElement.textContent = lines[i];
             lineElement.appendChild(contentElement);
 
@@ -136,28 +110,28 @@ WebInspector.FontResourceContentView.prototype = {
         this.element.appendChild(this._previewElement);
 
         this.sizeToFit();
-    },
+    }
 
-    updateLayout: function()
+    updateLayout()
     {
         this.sizeToFit();
-    },
+    }
 
-    shown: function()
+    shown()
     {
         // Add the style element since it is removed when hidden.
         if (this._styleElement)
             document.head.appendChild(this._styleElement);
-    },
+    }
 
-    hidden: function()
+    hidden()
     {
         // Remove the style element so it will not stick around when this content view is destroyed.
         if (this._styleElement && this._styleElement.parentNode)
             this._styleElement.parentNode.removeChild(this._styleElement);
-    },
+    }
 
-    closed: function()
+    closed()
     {
         // This is a workaround for the fact that the browser does not send any events
         // when a @font-face resource is loaded. So, we assume it could be needed until
@@ -166,6 +140,11 @@ WebInspector.FontResourceContentView.prototype = {
         if (this._fontObjectURL)
             URL.revokeObjectURL(this._fontObjectURL);
     }
-};
+}
 
-WebInspector.FontResourceContentView.prototype.__proto__ = WebInspector.ResourceContentView.prototype;
+WebInspector.FontResourceContentView._uniqueFontIdentifier = 0;
+
+WebInspector.FontResourceContentView.PreviewLines = ["ABCDEFGHIJKLM", "NOPQRSTUVWXYZ", "abcdefghijklm", "nopqrstuvwxyz", "1234567890"];
+
+WebInspector.FontResourceContentView.MaximumFontSize = 72;
+WebInspector.FontResourceContentView.MinimumFontSize = 12;

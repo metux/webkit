@@ -112,7 +112,7 @@ ResourceLoadScheduler::~ResourceLoadScheduler()
 {
 }
 
-PassRefPtr<SubresourceLoader> ResourceLoadScheduler::scheduleSubresourceLoad(Frame* frame, CachedResource* resource, const ResourceRequest& request, const ResourceLoaderOptions& options)
+RefPtr<SubresourceLoader> ResourceLoadScheduler::scheduleSubresourceLoad(Frame* frame, CachedResource* resource, const ResourceRequest& request, const ResourceLoaderOptions& options)
 {
     RefPtr<SubresourceLoader> loader = SubresourceLoader::create(frame, resource, request, options);
     if (loader)
@@ -126,12 +126,12 @@ PassRefPtr<SubresourceLoader> ResourceLoadScheduler::scheduleSubresourceLoad(Fra
     if (!loader || loader->reachedTerminalState())
         return nullptr;
 #endif
-    return loader.release();
+    return loader;
 }
 
-PassRefPtr<NetscapePlugInStreamLoader> ResourceLoadScheduler::schedulePluginStreamLoad(Frame* frame, NetscapePlugInStreamLoaderClient* client, const ResourceRequest& request)
+RefPtr<NetscapePlugInStreamLoader> ResourceLoadScheduler::schedulePluginStreamLoad(Frame* frame, NetscapePlugInStreamLoaderClient* client, const ResourceRequest& request)
 {
-    PassRefPtr<NetscapePlugInStreamLoader> loader = NetscapePlugInStreamLoader::create(frame, client, request);
+    RefPtr<NetscapePlugInStreamLoader> loader = NetscapePlugInStreamLoader::create(frame, client, request);
     if (loader)
         scheduleLoad(loader.get());
     return loader;
@@ -171,19 +171,19 @@ void ResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader)
     if (ResourceRequest::resourcePrioritiesEnabled() && !isSuspendingPendingRequests()) {
         // Serve all requests at once to keep the pipeline full at the network layer.
         // FIXME: Does this code do anything useful, given that we also set maxRequestsInFlightPerHost to effectively unlimited on these platforms?
-        servePendingRequests(host, ResourceLoadPriorityVeryLow);
+        servePendingRequests(host, ResourceLoadPriority::VeryLow);
         return;
     }
 #endif
 
 #if PLATFORM(IOS)
-    if ((priority > ResourceLoadPriorityLow || !resourceLoader->iOSOriginalRequest().url().protocolIsInHTTPFamily() || (priority == ResourceLoadPriorityLow && !hadRequests)) && !isSuspendingPendingRequests()) {
+    if ((priority > ResourceLoadPriority::Low || !resourceLoader->iOSOriginalRequest().url().protocolIsInHTTPFamily() || (priority == ResourceLoadPriority::Low && !hadRequests)) && !isSuspendingPendingRequests()) {
         // Try to request important resources immediately.
         servePendingRequests(host, priority);
         return;
     }
 #else
-    if (priority > ResourceLoadPriorityLow || !resourceLoader->url().protocolIsInHTTPFamily() || (priority == ResourceLoadPriorityLow && !hadRequests)) {
+    if (priority > ResourceLoadPriority::Low || !resourceLoader->url().protocolIsInHTTPFamily() || (priority == ResourceLoadPriority::Low && !hadRequests)) {
         // Try to request important resources immediately.
         servePendingRequests(host, priority);
         return;
@@ -194,17 +194,6 @@ void ResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader)
     // get scheduled before later high priority ones.
     scheduleServePendingRequests();
 }
-
-#if USE(QUICK_LOOK)
-bool ResourceLoadScheduler::maybeLoadQuickLookResource(ResourceLoader& loader)
-{
-    if (!loader.request().url().protocolIs(QLPreviewProtocol()))
-        return false;
-
-    loader.start();
-    return true;
-}
-#endif
 
 void ResourceLoadScheduler::remove(ResourceLoader* resourceLoader)
 {
@@ -256,14 +245,9 @@ void ResourceLoadScheduler::servePendingRequests(ResourceLoadPriority minimumPri
     servePendingRequests(m_nonHTTPProtocolHost, minimumPriority);
 
     Vector<HostInformation*> hostsToServe;
-    m_hosts.checkConsistency();
-    HostMap::iterator end = m_hosts.end();
-    for (HostMap::iterator iter = m_hosts.begin(); iter != end; ++iter)
-        hostsToServe.append(iter->value);
+    copyValuesToVector(m_hosts, hostsToServe);
 
-    int size = hostsToServe.size();
-    for (int i = 0; i < size; ++i) {
-        HostInformation* host = hostsToServe[i];
+    for (auto* host : hostsToServe) {
         if (host->hasRequests())
             servePendingRequests(host, minimumPriority);
         else
@@ -275,9 +259,9 @@ void ResourceLoadScheduler::servePendingRequests(HostInformation* host, Resource
 {
     LOG(ResourceLoading, "ResourceLoadScheduler::servePendingRequests HostInformation.m_name='%s'", host->name().latin1().data());
 
-    for (int priority = ResourceLoadPriorityHighest; priority >= minimumPriority; --priority) {
-        HostInformation::RequestQueue& requestsPending = host->requestsPending(ResourceLoadPriority(priority));
-
+    auto priority = ResourceLoadPriority::Highest;
+    while (true) {
+        auto& requestsPending = host->requestsPending(priority);
         while (!requestsPending.isEmpty()) {
             RefPtr<ResourceLoader> resourceLoader = requestsPending.first();
 
@@ -286,7 +270,7 @@ void ResourceLoadScheduler::servePendingRequests(HostInformation* host, Resource
             // and we don't know all stylesheets yet.
             Document* document = resourceLoader->frameLoader() ? resourceLoader->frameLoader()->frame().document() : 0;
             bool shouldLimitRequests = !host->name().isNull() || (document && (document->parsing() || !document->haveStylesheetsLoaded()));
-            if (shouldLimitRequests && host->limitRequests(ResourceLoadPriority(priority)))
+            if (shouldLimitRequests && host->limitRequests(priority))
                 return;
 
             requestsPending.removeFirst();
@@ -299,6 +283,9 @@ void ResourceLoadScheduler::servePendingRequests(HostInformation* host, Resource
 #endif
             resourceLoader->start();
         }
+        if (priority == minimumPriority)
+            return;
+        --priority;
     }
 }
 
@@ -338,14 +325,30 @@ ResourceLoadScheduler::HostInformation::HostInformation(const String& name, unsi
 
 ResourceLoadScheduler::HostInformation::~HostInformation()
 {
-    ASSERT(m_requestsLoading.isEmpty());
-    for (unsigned p = 0; p <= ResourceLoadPriorityHighest; p++)
-        ASSERT(m_requestsPending[p].isEmpty());
+    ASSERT(!hasRequests());
 }
-    
+
+unsigned ResourceLoadScheduler::HostInformation::priorityToIndex(ResourceLoadPriority priority)
+{
+    switch (priority) {
+    case ResourceLoadPriority::VeryLow:
+        return 0;
+    case ResourceLoadPriority::Low:
+        return 1;
+    case ResourceLoadPriority::Medium:
+        return 2;
+    case ResourceLoadPriority::High:
+        return 3;
+    case ResourceLoadPriority::VeryHigh:
+        return 4;
+    }
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+
 void ResourceLoadScheduler::HostInformation::schedule(ResourceLoader* resourceLoader, ResourceLoadPriority priority)
 {
-    m_requestsPending[priority].append(resourceLoader);
+    m_requestsPending[priorityToIndex(priority)].append(resourceLoader);
 }
     
 void ResourceLoadScheduler::HostInformation::addLoadInProgress(ResourceLoader* resourceLoader)
@@ -359,11 +362,10 @@ void ResourceLoadScheduler::HostInformation::remove(ResourceLoader* resourceLoad
     if (m_requestsLoading.remove(resourceLoader))
         return;
     
-    for (int priority = ResourceLoadPriorityHighest; priority >= ResourceLoadPriorityLowest; --priority) {  
-        RequestQueue::iterator end = m_requestsPending[priority].end();
-        for (RequestQueue::iterator it = m_requestsPending[priority].begin(); it != end; ++it) {
+    for (auto& requestQueue : m_requestsPending) {
+        for (auto it = requestQueue.begin(), end = requestQueue.end(); it != end; ++it) {
             if (*it == resourceLoader) {
-                m_requestsPending[priority].remove(it);
+                requestQueue.remove(it);
                 return;
             }
         }
@@ -374,8 +376,8 @@ bool ResourceLoadScheduler::HostInformation::hasRequests() const
 {
     if (!m_requestsLoading.isEmpty())
         return true;
-    for (unsigned p = 0; p <= ResourceLoadPriorityHighest; p++) {
-        if (!m_requestsPending[p].isEmpty())
+    for (auto& requestQueue : m_requestsPending) {
+        if (!requestQueue.isEmpty())
             return true;
     }
     return false;
@@ -383,7 +385,7 @@ bool ResourceLoadScheduler::HostInformation::hasRequests() const
 
 bool ResourceLoadScheduler::HostInformation::limitRequests(ResourceLoadPriority priority) const 
 {
-    if (priority == ResourceLoadPriorityVeryLow && !m_requestsLoading.isEmpty())
+    if (priority == ResourceLoadPriority::VeryLow && !m_requestsLoading.isEmpty())
         return true;
     return m_requestsLoading.size() >= (resourceLoadScheduler()->isSerialLoadingEnabled() ? 1 : m_maxRequestsInFlight);
 }

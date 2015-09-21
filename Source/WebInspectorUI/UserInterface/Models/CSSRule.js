@@ -23,54 +23,40 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.CSSRule = function(nodeStyles, ownerStyleSheet, id, type, sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList)
+WebInspector.CSSRule = class CSSRule extends WebInspector.Object
 {
-    WebInspector.Object.call(this);
+    constructor(nodeStyles, ownerStyleSheet, id, type, sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList)
+    {
+        super();
 
-    console.assert(nodeStyles);
-    this._nodeStyles = nodeStyles;
+        console.assert(nodeStyles);
+        this._nodeStyles = nodeStyles;
 
-    this._ownerStyleSheet = ownerStyleSheet || null;
-    this._id = id || null;
-    this._type = type || null;
+        this._ownerStyleSheet = ownerStyleSheet || null;
+        this._id = id || null;
+        this._type = type || null;
 
-    this.update(sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList, true);
-};
-
-WebInspector.Object.addConstructorFunctions(WebInspector.CSSRule);
-
-WebInspector.CSSRule.Event = {
-    Changed: "css-rule-changed"
-};
-
-WebInspector.CSSRule.Type = {
-    Author: "css-rule-type-author",
-    User: "css-rule-type-user",
-    UserAgent: "css-rule-type-user-agent",
-    Inspector: "css-rule-type-inspector"
-};
-
-WebInspector.CSSRule.prototype = {
-    constructor: WebInspector.CSSRule,
+        this.update(sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList, true);
+    }
 
     // Public
 
     get id()
     {
         return this._id;
-    },
+    }
 
     get ownerStyleSheet()
     {
         return this._ownerStyleSheet;
-    },
+    }
 
     get editable()
     {
         return !!this._id && (this._type === WebInspector.CSSRule.Type.Author || this._type === WebInspector.CSSRule.Type.Inspector);
-    },
+    }
 
-    update: function(sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList, dontFireEvents)
+    update(sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList, dontFireEvents)
     {
         sourceCodeLocation = sourceCodeLocation || null;
         selectorText = selectorText || "";
@@ -94,6 +80,7 @@ WebInspector.CSSRule.prototype = {
         this._selectorText = selectorText;
         this._selectors = selectors;
         this._matchedSelectorIndices = matchedSelectorIndices;
+        this._mostSpecificSelector = null;
         this._style = style;
         this._mediaList = mediaList;
 
@@ -105,22 +92,22 @@ WebInspector.CSSRule.prototype = {
 
         if (changed)
             this.dispatchEventToListeners(WebInspector.CSSRule.Event.Changed);
-    },
+    }
 
     get type()
     {
         return this._type;
-    },
+    }
 
     get sourceCodeLocation()
     {
         return this._sourceCodeLocation;
-    },
+    }
 
     get selectorText()
     {
         return this._selectorText;
-    },
+    }
 
     set selectorText(selectorText)
     {
@@ -128,21 +115,23 @@ WebInspector.CSSRule.prototype = {
         if (!this.editable)
             return;
 
-        if (this._selectorText === selectorText)
+        if (this._selectorText === selectorText) {
+            this._selectorResolved(true);
             return;
+        }
 
-        this._nodeStyles.changeRuleSelector(this, selectorText);
-    },
+        this._nodeStyles.changeRuleSelector(this, selectorText).then(this._selectorResolved.bind(this), this._selectorRejected.bind(this));
+    }
 
     get selectors()
     {
         return this._selectors;
-    },
+    }
 
     get matchedSelectorIndices()
     {
         return this._matchedSelectorIndices;
-    },
+    }
 
     get matchedSelectors()
     {
@@ -156,11 +145,11 @@ WebInspector.CSSRule.prototype = {
             return this._matchedSelectors;
 
         this._matchedSelectors = this._selectors.filter(function(element, index) {
-            return this._matchedSelectorIndices.contains(index);
+            return this._matchedSelectorIndices.includes(index);
         }, this);
 
         return this._matchedSelectors;
-    },
+    }
 
     get matchedSelectorText()
     {
@@ -176,25 +165,55 @@ WebInspector.CSSRule.prototype = {
         this._matchedSelectorText = this.matchedSelectors.map(function(x) { return x.text; }).join(", ");
 
         return this._matchedSelectorText;
-    },
+    }
 
     get style()
     {
         return this._style;
-    },
+    }
 
     get mediaList()
     {
         return this._mediaList;
-    },
+    }
 
-    isEqualTo: function(rule)
+    get mediaText()
+    {
+        if (!this._mediaList.length)
+            return;
+
+        let mediaText = "";
+        for (let media of this._mediaList)
+            mediaText += media.text;
+
+        return mediaText;
+    }
+
+    isEqualTo(rule)
     {
         if (!rule)
             return false;
 
         return Object.shallowEqual(this._id, rule.id);
-    },
+    }
+
+    get mostSpecificSelector()
+    {
+        if (!this._mostSpecificSelector)
+            this._mostSpecificSelector = this._determineMostSpecificSelector();
+
+        return this._mostSpecificSelector;
+    }
+
+    selectorIsGreater(otherSelector)
+    {
+        var mostSpecificSelector = this.mostSpecificSelector;
+
+        if (!mostSpecificSelector)
+            return false;
+
+        return mostSpecificSelector.isGreaterThan(otherSelector);
+    }
 
     // Protected
 
@@ -202,6 +221,48 @@ WebInspector.CSSRule.prototype = {
     {
         return this._nodeStyles;
     }
+
+    // Private
+
+    _determineMostSpecificSelector()
+    {
+        if (!this._selectors || !this._selectors.length)
+            return null;
+
+        var selectors = this.matchedSelectors;
+
+        if (!selectors.length)
+            selectors = this._selectors;
+
+        var specificSelector = selectors[0];
+
+        for (var selector of selectors) {
+            if (selector.isGreaterThan(specificSelector))
+                specificSelector = selector;
+        }
+
+        return specificSelector;
+    }
+
+    _selectorRejected(error)
+    {
+        this.dispatchEventToListeners(WebInspector.CSSRule.Event.SelectorChanged, {valid: !error});
+    }
+
+    _selectorResolved(rulePayload)
+    {
+        this.dispatchEventToListeners(WebInspector.CSSRule.Event.SelectorChanged, {valid: !!rulePayload});
+    }
 };
 
-WebInspector.CSSRule.prototype.__proto__ = WebInspector.Object.prototype;
+WebInspector.CSSRule.Event = {
+    Changed: "css-rule-changed",
+    SelectorChanged: "css-rule-invalid-selector"
+};
+
+WebInspector.CSSRule.Type = {
+    Author: "css-rule-type-author",
+    User: "css-rule-type-user",
+    UserAgent: "css-rule-type-user-agent",
+    Inspector: "css-rule-type-inspector"
+};

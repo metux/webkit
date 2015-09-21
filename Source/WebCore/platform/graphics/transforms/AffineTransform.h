@@ -27,6 +27,7 @@
 #ifndef AffineTransform_h
 #define AffineTransform_h
 
+#include "PlatformExportMacros.h"
 #include <array>
 #include <wtf/FastMalloc.h>
 
@@ -98,9 +99,11 @@ public:
     WEBCORE_EXPORT AffineTransform& scale(double);
     AffineTransform& scale(double sx, double sy); 
     AffineTransform& scaleNonUniform(double sx, double sy);
+    AffineTransform& scale(const FloatSize&);
     AffineTransform& rotate(double d);
     AffineTransform& rotateFromVector(double x, double y);
     WEBCORE_EXPORT AffineTransform& translate(double tx, double ty);
+    AffineTransform& translate(const FloatPoint&);
     AffineTransform& shear(double sx, double sy);
     AffineTransform& flipX();
     WEBCORE_EXPORT AffineTransform& flipY();
@@ -172,7 +175,7 @@ public:
     {
         return AffineTransform(1, 0, 0, 1, x, y);
     }
-    
+
     // decompose the matrix into its component parts
     typedef struct {
         double scaleX, scaleY;

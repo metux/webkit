@@ -29,9 +29,9 @@ namespace WebCore {
 
 class PointLightSource : public LightSource {
 public:
-    static PassRefPtr<PointLightSource> create(const FloatPoint3D& position)
+    static Ref<PointLightSource> create(const FloatPoint3D& position)
     {
-        return adoptRef(new PointLightSource(position));
+        return adoptRef(*new PointLightSource(position));
     }
 
     const FloatPoint3D& position() const { return m_position; }
@@ -39,10 +39,10 @@ public:
     virtual bool setY(float) override;
     virtual bool setZ(float) override;
 
-    virtual void initPaintingData(PaintingData&);
-    virtual void updatePaintingData(PaintingData&, int x, int y, float z);
+    virtual void initPaintingData(PaintingData&) override;
+    virtual void updatePaintingData(PaintingData&, int x, int y, float z) override;
 
-    virtual TextStream& externalRepresentation(TextStream&) const;
+    virtual TextStream& externalRepresentation(TextStream&) const override;
 
 private:
     PointLightSource(const FloatPoint3D& position)

@@ -38,7 +38,7 @@ use Digest::MD5 qw(md5_hex);
 use FindBin;
 use File::Basename;
 use File::Find;
-use File::Path qw(mkpath rmtree);
+use File::Path qw(make_path mkpath rmtree);
 use File::Spec;
 use File::stat;
 use List::Util;
@@ -115,7 +115,6 @@ my $isWinCairo;
 my $isWin64;
 my $isEfl;
 my $isInspectorFrontend;
-my $isWK2;
 my $shouldTargetWebProcess;
 my $shouldUseXPCServiceForWebProcess;
 my $shouldUseGuardMalloc;
@@ -125,6 +124,7 @@ my $xcodeVersion;
 my $programFilesPath;
 my $vcBuildPath;
 my $vsInstallDir;
+my $msBuildInstallDir;
 my $vsVersion;
 my $windowsSourceDir;
 my $winVersion;
@@ -144,14 +144,14 @@ sub determineSourceDir
 
     # walks up path checking each directory to see if it is the main WebKit project dir, 
     # defined by containing Sources, WebCore, and WebKit
-    until ((-d "$sourceDir/Source" && -d "$sourceDir/Source/WebCore" && -d "$sourceDir/Source/WebKit") || (-d "$sourceDir/Internal" && -d "$sourceDir/OpenSource"))
+    until ((-d File::Spec->catdir($sourceDir, "Source") && -d File::Spec->catdir($sourceDir, "Source", "WebCore") && -d File::Spec->catdir($sourceDir, "Source", "WebKit")) || (-d File::Spec->catdir($sourceDir, "Internal") && -d File::Spec->catdir($sourceDir, "OpenSource")))
     {
         if ($sourceDir !~ s|/[^/]+$||) {
             die "Could not find top level webkit directory above source directory using FindBin.\n";
         }
     }
 
-    $sourceDir = "$sourceDir/OpenSource" if -d "$sourceDir/OpenSource";
+    $sourceDir = File::Spec->catdir($sourceDir, "OpenSource") if -d File::Spec->catdir($sourceDir, "OpenSource");
 }
 
 sub currentPerlPath()
@@ -291,12 +291,6 @@ sub determineConfiguration
         $configuration = "Debug" if $configuration eq "Development";
     } else {
         $configuration = "Release";
-    }
-
-    if ($configuration && isWinCairo()) {
-        unless ($configuration =~ /_WinCairo$/) {
-            $configuration .= "_WinCairo";
-        }
     }
 }
 
@@ -508,11 +502,24 @@ sub visualStudioInstallDir
         $vsInstallDir = $ENV{'VSINSTALLDIR'};
         $vsInstallDir =~ s|[\\/]$||;
     } else {
-        $vsInstallDir = File::Spec->catdir(programFilesPath(), "Microsoft Visual Studio 12.0");
+        $vsInstallDir = File::Spec->catdir(programFilesPath(), "Microsoft Visual Studio 14.0");
     }
     chomp($vsInstallDir = `cygpath "$vsInstallDir"`) if isCygwin();
 
+    print "Using Visual Studio: $vsInstallDir\n";
     return $vsInstallDir;
+}
+
+sub msBuildInstallDir
+{
+    return $msBuildInstallDir if defined $msBuildInstallDir;
+
+    $msBuildInstallDir = File::Spec->catdir(programFilesPath(), "MSBuild", "14.0", "Bin");
+   
+    chomp($msBuildInstallDir = `cygpath "$msBuildInstallDir"`) if isCygwin();
+
+    print "Using MSBuild: $msBuildInstallDir\n";
+    return $msBuildInstallDir;
 }
 
 sub visualStudioVersion
@@ -521,8 +528,9 @@ sub visualStudioVersion
 
     my $installDir = visualStudioInstallDir();
 
-    $vsVersion = ($installDir =~ /Microsoft Visual Studio ([0-9]+\.[0-9]*)/) ? $1 : "12";
+    $vsVersion = ($installDir =~ /Microsoft Visual Studio ([0-9]+\.[0-9]*)/) ? $1 : "14";
 
+    print "Using Visual Studio $vsVersion\n";
     return $vsVersion;
 }
 
@@ -531,7 +539,7 @@ sub determineConfigurationForVisualStudio
     return if defined $configurationForVisualStudio;
     determineConfiguration();
     # FIXME: We should detect when Debug_All or Production has been chosen.
-    $configurationForVisualStudio = $configuration . (isWin64() ? "|x64" : "|Win32");
+    $configurationForVisualStudio = "/p:Configuration=" . $configuration;
 }
 
 sub usesPerConfigurationBuildDirectory
@@ -664,7 +672,7 @@ sub XcodeOptions
     my @architectureOption = ($architecture ? "ARCHS=$architecture" : ());
     my @asanOption = ($asanIsEnabled ? ("-xcconfig", sourceDir() . "/Tools/asan/asan.xcconfig", "ASAN_IGNORE=" . sourceDir() . "/Tools/asan/webkit-asan-ignore.txt") : ());
 
-    return (@baseProductDirOption, "-configuration", $configuration, @architectureOption, @sdkOption, @asanOption, argumentsForXcode());
+    return ("-UseSanitizedBuildSystemEnvironment=YES", @baseProductDirOption, "-configuration", $configuration, @architectureOption, @sdkOption, @asanOption, argumentsForXcode());
 }
 
 sub XcodeOptionString
@@ -705,8 +713,6 @@ sub determinePassedConfiguration
     } elsif (checkForArgumentAndRemoveFromARGV("--profile") || checkForArgumentAndRemoveFromARGV("--profiling")) {
         $passedConfiguration = "Profiling";
     }
-
-    $passedConfiguration .= "_WinCairo" if (defined($passedConfiguration) && isWinCairo() && isCygwin());
 }
 
 sub passedConfiguration
@@ -963,19 +969,6 @@ sub checkForArgumentAndRemoveFromArrayRef
         splice(@$arrayRef, $index - $removeOffset++, 1);
     }
     return scalar @indicesToRemove > 0;
-}
-
-sub isWK2()
-{
-    if (defined($isWK2)) {
-        return $isWK2;
-    }
-    if (checkForArgumentAndRemoveFromARGV("-2")) {
-        $isWK2 = 1;
-    } else {
-        $isWK2 = 0;
-    }
-    return $isWK2;
 }
 
 sub determineIsEfl()
@@ -1369,7 +1362,7 @@ sub launcherPath()
 {
     my $relativeScriptsPath = relativeScriptsDir();
     if (isGtk() || isEfl()) {
-        return "$relativeScriptsPath/run-launcher";
+        return "$relativeScriptsPath/run-minibrowser";
     } elsif (isAppleWebKit()) {
         return "$relativeScriptsPath/run-safari";
     }
@@ -1436,48 +1429,43 @@ sub windowsSourceDir()
 
 sub windowsSourceSourceDir()
 {
-    return windowsSourceDir() . "\\Source";
+    return File::Spec->catdir(windowsSourceDir(), "Source");
 }
 
 sub windowsLibrariesDir()
 {
-    return windowsSourceDir() . "\\WebKitLibraries\\win";
+    return File::Spec->catdir(windowsSourceDir(), "WebKitLibraries", "win");
 }
 
 sub windowsOutputDir()
 {
-    return windowsSourceDir() . "\\WebKitBuild";
+    return File::Spec->catdir(windowsSourceDir(), "WebKitBuild");
 }
 
 sub fontExists($)
 {
     my $font = shift;
-    my $val = system qw(regtool get), '\\HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts\\' . $font . ' (TrueType)';
-    return 0 == $val;
+    my $cmd = "reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts\\" . $font ."\" 2>&1";
+    my $val = `$cmd`;
+    return $? == 0;
 }
 
 sub checkInstalledTools()
 {
-    # SVN 1.7.10 is known to be compatible with current servers. SVN 1.8.x seems to be missing some authentication
-    # protocols we use for svn.webkit.org:
-    my $svnVersion = `svn --version | grep "\\sversion"`;
-    chomp($svnVersion);
-    if (!$? and $svnVersion =~ /1\.8\./) {
-        print "svn 1.7.10 is known to be compatible with our servers. You are running $svnVersion,\nwhich may not work properly.\n"
-    }
-
     # environment variables. Avoid until this is corrected.
     my $pythonVer = `python --version 2>&1`;
     die "You must have Python installed to build WebKit.\n" if ($?);
 
     # cURL 7.34.0 has a bug that prevents authentication with opensource.apple.com (and other things using SSL3).
-    my $curlVer = `curl --version | grep "curl"`;
-    chomp($curlVer);
-    if (!$? and $curlVer =~ /libcurl\/7\.34\.0/) {
-        print "cURL version 7.34.0 has a bug that prevents authentication with SSL v2 or v3.\n";
-        print "cURL 7.33.0 is known to work. The cURL projects is preparing an update to\n";
-        print "correct this problem.\n\n";
-        die "Please install a working cURL and try again.\n";
+    my $curlVer = `curl --version 2> NUL`;
+    if (!$? and $curlVer =~ "(.*curl.*)") {
+        $curlVer = $1;
+        if ($curlVer =~ /libcurl\/7\.34\.0/) {
+            print "cURL version 7.34.0 has a bug that prevents authentication with SSL v2 or v3.\n";
+            print "cURL 7.33.0 is known to work. The cURL projects is preparing an update to\n";
+            print "correct this problem.\n\n";
+            die "Please install a working cURL and try again.\n";
+        }
     }
 
     # MathML requires fonts that do not ship with Windows (at least through Windows 8). Warn the user if they are missing
@@ -1528,7 +1516,10 @@ sub setupAppleWinEnv()
 
         foreach my $variable (keys %variablesToSet) {
             print "Setting the Environment Variable '" . $variable . "' to '" . $variablesToSet{$variable} . "'\n\n";
-            system qw(regtool -s set), '\\HKEY_CURRENT_USER\\Environment\\' . $variable, $variablesToSet{$variable};
+            my $ret = system "setx", $variable, $variablesToSet{$variable};
+            if ($ret != 0) {
+                system qw(regtool -s set), '\\HKEY_CURRENT_USER\\Environment\\' . $variable, $variablesToSet{$variable};
+            }
             $restartNeeded ||=  $variable eq "WEBKIT_LIBRARIES" || $variable eq "WEBKIT_OUTPUTDIR";
         }
 
@@ -1564,20 +1555,20 @@ sub setupCygwinEnv()
     return if $vcBuildPath;
 
     my $programFilesPath = programFilesPath();
-    $vcBuildPath = File::Spec->catfile(visualStudioInstallDir(), qw(Common7 IDE devenv.com));
-    if (-e $vcBuildPath) {
+    my $visualStudioPath = File::Spec->catfile(visualStudioInstallDir(), qw(Common7 IDE devenv.com));
+    if (-e $visualStudioPath) {
         # Visual Studio is installed;
         if (visualStudioVersion() eq "12") {
-            $vcBuildPath = File::Spec->catfile(visualStudioInstallDir(), qw(Common7 IDE devenv.exe));
+            $visualStudioPath = File::Spec->catfile(visualStudioInstallDir(), qw(Common7 IDE devenv.exe));
         }
     } else {
         # Visual Studio not found, try VC++ Express
-        $vcBuildPath = File::Spec->catfile(visualStudioInstallDir(), qw(Common7 IDE WDExpress.exe));
-        if (! -e $vcBuildPath) {
+        $visualStudioPath = File::Spec->catfile(visualStudioInstallDir(), qw(Common7 IDE WDExpress.exe));
+        if (! -e $visualStudioPath) {
             print "*************************************************************\n";
-            print "Cannot find '$vcBuildPath'\n";
+            print "Cannot find '$visualStudioPath'\n";
             print "Please execute the file 'vcvars32.bat' from\n";
-            print "'$programFilesPath\\Microsoft Visual Studio 12.0\\VC\\bin\\'\n";
+            print "'$programFilesPath\\Microsoft Visual Studio 14.0\\VC\\bin\\'\n";
             print "to setup the necessary environment variables.\n";
             print "*************************************************************\n";
             die;
@@ -1590,6 +1581,18 @@ sub setupCygwinEnv()
     print "WEBKIT_LIBRARIES is set to: ", $ENV{"WEBKIT_LIBRARIES"}, "\n";
     # FIXME (125180): Remove the following temporary 64-bit support once official support is available.
     print "WEBKIT_64_SUPPORT is set to: ", $ENV{"WEBKIT_64_SUPPORT"}, "\n" if isWin64();
+
+    # We will actually use MSBuild to build WebKit, but we need to find the Visual Studio install (above) to make
+    # sure we use the right options.
+    $vcBuildPath = File::Spec->catfile(msBuildInstallDir(), qw(MSBuild.exe));
+    if (! -e $vcBuildPath) {
+        print "*************************************************************\n";
+        print "Cannot find '$vcBuildPath'\n";
+        print "Please make sure execute that the Microsoft .NET Framework SDK\n";
+        print "is installed on this machine.\n";
+        print "*************************************************************\n";
+        die;
+    }
 }
 
 sub dieIfWindowsPlatformSDKNotInstalled
@@ -1655,12 +1658,24 @@ sub buildVisualStudioProject
 
     chomp($project = `cygpath -w "$project"`) if isCygwin();
 
-    my $action = "/build";
+    my $action = "/t:build";
     if ($clean) {
-        $action = "/clean";
+        $action = "/t:clean";
     }
 
-    my @command = ($vcBuildPath, $project, $action, $config);
+    my $platform = "/p:Platform=" . (isWin64() ? "x64" : "Win32");
+    my $logPath = File::Spec->catdir($baseProductDir, $configuration);
+    make_path($logPath) unless -d $logPath or $logPath eq ".";
+
+    my $errorLogFile = File::Spec->catfile($logPath, "webkit_errors.log");
+    chomp($errorLogFile = `cygpath -w "$errorLogFile"`) if isCygwin();
+    my $errorLogging = "/flp:LogFile=" . $errorLogFile . ";ErrorsOnly";
+
+    my $warningLogFile = File::Spec->catfile($logPath, "webkit_warnings.log");
+    chomp($warningLogFile = `cygpath -w "$warningLogFile"`) if isCygwin();
+    my $warningLogging = "/flp1:LogFile=" . $warningLogFile . ";WarningsOnly";
+
+    my @command = ($vcBuildPath, "/verbosity:minimal", $project, $action, $config, $platform, "/fl", $errorLogging, "/fl1", $warningLogging);
 
     print join(" ", @command), "\n";
     return system @command;
@@ -1706,6 +1721,9 @@ sub isCachedArgumentfileOutOfDate($@)
 
 sub jhbuildWrapperPrefixIfNeeded()
 {
+    if (isWindows()) {
+        return ();
+    }
     if (-e getJhbuildPath()) {
         my @prefix = (File::Spec->catfile(sourceDir(), "Tools", "jhbuild", "jhbuild-wrapper"));
         if (isEfl()) {
@@ -1756,6 +1774,11 @@ sub shouldRemoveCMakeCache(@)
 
     my $globalConfiguration = File::Spec->catdir(sourceDir(), "Source", "cmake", "OptionsCommon.cmake");
     if ($cacheFileModifiedTime < stat($globalConfiguration)->mtime) {
+        return 1;
+    }
+
+    my $inspectorUserInterfaceDircetory = File::Spec->catdir(sourceDir(), "Source", "WebInspectorUI", "UserInterface");
+    if ($cacheFileModifiedTime < stat($inspectorUserInterfaceDircetory)->mtime) {
         return 1;
     }
 
@@ -1839,7 +1862,7 @@ sub generateBuildSystemFromCMakeProject
     # Compiler options to keep floating point values consistent
     # between 32-bit and 64-bit architectures.
     determineArchitecture();
-    if ($architecture ne "x86_64" && !isARM() && !isCrossCompilation()) {
+    if ($architecture ne "x86_64" && !isARM() && !isCrossCompilation() && !isWindows()) {
         $ENV{'CXXFLAGS'} = "-march=pentium4 -msse2 -mfpmath=sse " . ($ENV{'CXXFLAGS'} || "");
     }
 
@@ -2091,17 +2114,18 @@ sub relaunchIOSSimulator($)
     my ($simulatedDevice) = @_;
     quitIOSSimulator($simulatedDevice->{UDID});
 
-    chomp(my $developerDirectory = $ENV{DEVELOPER_DIR} || `xcode-select --print-path`);
-    my $iosSimulatorPath = File::Spec->catfile($developerDirectory, "Applications", "iOS Simulator.app");
+    # FIXME: <rdar://problem/20916140> Switch to using CoreSimulator.framework for launching and quitting iOS Simulator
+    my $iosSimulatorBundleID = "com.apple.iphonesimulator";
+    system("open", "-b", $iosSimulatorBundleID, "--args", "-CurrentDeviceUDID", $simulatedDevice->{UDID}) == 0 or die "Failed to open $iosSimulatorBundleID: $!";
 
-    system("open", "-a", $iosSimulatorPath, "--args", "-CurrentDeviceUDID", $simulatedDevice->{UDID}) == 0 or die "Failed to open $iosSimulatorPath: $!";
     waitUntilIOSSimulatorDeviceIsInState($simulatedDevice->{UDID}, SIMULATOR_DEVICE_STATE_BOOTED);
 }
 
 sub quitIOSSimulator(;$)
 {
     my ($waitForShutdownOfSimulatedDeviceUDID) = @_;
-    exitStatus(system {"osascript"} "osascript", "-e", 'tell application "iOS Simulator" to quit') == 0 or die "Failed to quit iOS Simulator: $!";
+    # FIXME: <rdar://problem/20916140> Switch to using CoreSimulator.framework for launching and quitting iOS Simulator
+    exitStatus(system {"osascript"} "osascript", "-e", 'tell application id "com.apple.iphonesimulator" to quit') == 0 or die "Failed to quit iOS Simulator: $!";
     if (!defined($waitForShutdownOfSimulatedDeviceUDID)) {
         return;
     }
@@ -2327,7 +2351,7 @@ sub execMacWebKitAppForDebugging($)
         exec { $debuggerPath } $debuggerPath, @architectureFlags, $argumentsSeparator, $appPath, argumentsForRunAndDebugMacWebKitApp() or die;
     } else {
         if (shouldUseXPCServiceForWebProcess()) {
-            die "Targetting the Web Process is not compatible with using an XPC Service for the Web Process at this time.";
+            die "Targeting the Web Process is not compatible with using an XPC Service for the Web Process at this time.";
         }
         
         my $webProcessShimPath = File::Spec->catfile($productDir, "SecItemShim.dylib");
@@ -2443,9 +2467,10 @@ sub formatBuildTime($)
 sub runSvnUpdateAndResolveChangeLogs(@)
 {
     my @svnOptions = @_;
-    open UPDATE, "-|", "svn", "update", @svnOptions or die;
+    my $openCommand = "svn update " . join(" ", @svnOptions);
+    open my $update, "$openCommand |" or die "cannot execute command $openCommand";
     my @conflictedChangeLogs;
-    while (my $line = <UPDATE>) {
+    while (my $line = <$update>) {
         print $line;
         $line =~ m/^C\s+(.+?)[\r\n]*$/;
         if ($1) {
@@ -2453,7 +2478,7 @@ sub runSvnUpdateAndResolveChangeLogs(@)
           push @conflictedChangeLogs, $filename if basename($filename) eq "ChangeLog";
         }
     }
-    close UPDATE or die;
+    close $update or die;
 
     if (@conflictedChangeLogs) {
         print "Attempting to merge conflicted ChangeLogs.\n";
@@ -2468,7 +2493,7 @@ sub runGitUpdate()
     # Doing a git fetch first allows setups with svn-remote.svn.fetch = trunk:refs/remotes/origin/master
     # to perform the rebase much much faster.
     system("git", "fetch");
-    if (isGitSVN()) {
+    if (isGitSVNDirectory(".")) {
         system("git", "svn", "rebase") == 0 or die;
     } else {
         # This will die if branch.$BRANCHNAME.merge isn't set, which is

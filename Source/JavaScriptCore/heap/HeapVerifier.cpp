@@ -34,16 +34,6 @@
 
 namespace JSC {
 
-LiveObjectData* LiveObjectList::findObject(JSObject* obj)
-{
-    for (size_t i = 0; i < liveObjects.size(); i++) {
-        LiveObjectData& data = liveObjects[i];
-        if (obj == data.obj)
-            return &data;
-    }
-    return nullptr;
-}
-
 HeapVerifier::HeapVerifier(Heap* heap, unsigned numberOfGCCyclesToRecord)
     : m_heap(heap)
     , m_currentCycle(0)
@@ -122,12 +112,18 @@ struct GatherLiveObjFunctor : MarkedBlock::CountFunctor {
         ASSERT(!list.liveObjects.size());
     }
 
-    void operator()(JSCell* cell)
+    inline void visit(JSCell* cell)
     {
         if (!cell->isObject())
             return;        
         LiveObjectData data(asObject(cell));
         m_list.liveObjects.append(data);
+    }
+
+    IterationStatus operator()(JSCell* cell)
+    {
+        visit(cell);
+        return IterationStatus::Continue;
     }
 
     LiveObjectList& m_list;

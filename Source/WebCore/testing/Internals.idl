@@ -29,6 +29,34 @@ enum PageOverlayType {
 "document"
 };
 
+// These map to ResourceRequestCachePolicy.
+enum CachePolicy {
+    "UseProtocolCachePolicy",
+    "ReloadIgnoringCacheData",
+    "ReturnCacheDataElseLoad",
+    "ReturnCacheDataDontLoad"
+};
+
+enum ResourceLoadPriority {
+    "ResourceLoadPriorityVeryLow",
+    "ResourceLoadPriorityLow",
+    "ResourceLoadPriorityMedium",
+    "ResourceLoadPriorityHigh",
+    "ResourceLoadPriorityVeryHigh"
+};
+
+enum MediaSessionInterruptingCategory {
+    "content",
+    "transient",
+    "transient-solo"
+};
+
+enum MediaControlEvent {
+    "play-pause",
+    "next-track",
+    "previous-track"
+};
+
 [
     NoInterfaceObject,
 ] interface Internals {
@@ -43,9 +71,13 @@ enum PageOverlayType {
     boolean isPreloaded(DOMString url);
     boolean isLoadingFromMemoryCache(DOMString url);
     DOMString xhrResponseSource(XMLHttpRequest xhr);
+    boolean isSharingStyleSheetContents(Element linkA, Element linkB);
+    boolean isStyleSheetLoadingSubresources(Element link);
     void clearMemoryCache();
     void pruneMemoryCacheToSize(long size);
     long memoryCacheSize();
+    void setOverrideCachePolicy(CachePolicy policy);
+    void setOverrideResourceLoadPriority(ResourceLoadPriority priority);
 
     void clearPageCache();
     unsigned int pageCacheSize();
@@ -53,6 +85,7 @@ enum PageOverlayType {
     [RaisesException] CSSStyleDeclaration computedStyleIncludingVisitedInfo(Node node);
 
     [RaisesException] Node ensureShadowRoot(Element host);
+    [RaisesException] Node ensureUserAgentShadowRoot(Element host);
     [RaisesException] Node createShadowRoot(Element host);
     [RaisesException] Node shadowRoot(Element host);
 
@@ -104,6 +137,8 @@ enum PageOverlayType {
 
     [RaisesException] void setScrollViewPosition(long x, long y);
 
+    [RaisesException] void setViewBaseBackgroundColor(DOMString colorValue);
+
     [RaisesException] void setPagination(DOMString mode, long gap, optional long pageLength);
 
     [RaisesException] DOMString configurationForViewport(unrestricted float devicePixelRatio,
@@ -116,6 +151,7 @@ enum PageOverlayType {
     [RaisesException] boolean elementShouldAutoComplete(Element inputElement);
     [RaisesException] void setEditingValue(Element inputElement, DOMString value);
     [RaisesException] void setAutofilled(Element inputElement, boolean enabled);
+    [RaisesException] void setShowAutoFillButton(Element inputElement, boolean enabled);
     [RaisesException] unsigned long countMatchesForText(DOMString text, unsigned long findOptions, DOMString markMatches);
 
     [RaisesException] void paintControlTints();
@@ -136,6 +172,9 @@ enum PageOverlayType {
 
     sequence<DOMString> userPreferredLanguages();
     void setUserPreferredLanguages(sequence<DOMString> languages);
+
+    sequence<DOMString> userPreferredAudioCharacteristics();
+    void setUserPreferredAudioCharacteristic(DOMString characteristic);
 
     [RaisesException] unsigned long wheelEventHandlerCount();
     [RaisesException] unsigned long touchEventHandlerCount();
@@ -214,13 +253,16 @@ enum PageOverlayType {
     DOMString counterValue(Element element);
     long pageNumber(Element element, optional unrestricted float pageWidth, optional unrestricted float pageHeight);
     DOMString[] shortcutIconURLs();
-    DOMString[] allIconURLs();
     long numberOfPages(optional unrestricted double pageWidthInPixels, optional unrestricted double pageHeightInPixels);
     [RaisesException] DOMString pageProperty(DOMString propertyName, long pageNumber);
     [RaisesException] DOMString pageSizeAndMarginsInPixels(long pageIndex, long width, long height, long marginTop, long marginRight, long marginBottom, long marginLeft);
 
     [RaisesException] void setPageScaleFactor(unrestricted float scaleFactor, long x, long y);
     [RaisesException] void setPageZoomFactor(unrestricted float zoomFactor);
+    [RaisesException] void setTextZoomFactor(unrestricted float zoomFactor);
+
+    [RaisesException] void setUseFixedLayout(boolean useFixedLayout);
+    [RaisesException] void setFixedLayoutSize(long width, long height);
 
     void setHeaderHeight(unrestricted float height);
     void setFooterHeight(unrestricted float height);
@@ -250,8 +292,20 @@ enum PageOverlayType {
     [RaisesException] void startTrackingRepaints();
     [RaisesException] void stopTrackingRepaints();
 
+    [RaisesException] void startTrackingLayerFlushes();
+    [RaisesException] unsigned long layerFlushCount();
+
     // Query if a timer is currently throttled, to debug timer throttling.
     [RaisesException] boolean isTimerThrottled(long timerHandle);
+
+    boolean isRequestAnimationFrameThrottled();
+    boolean areTimersThrottled();
+
+    [RaisesException] void startTrackingStyleRecalcs();
+    [RaisesException] unsigned long styleRecalcCount();
+
+    [RaisesException] void startTrackingCompositingUpdates();
+    [RaisesException] unsigned long compositingUpdateCount();
 
     // |node| should be Document, HTMLIFrameElement, or unspecified.
     // If |node| is an HTMLIFrameElement, it assumes node.contentDocument is
@@ -269,6 +323,8 @@ enum PageOverlayType {
 
     SerializedScriptValue deserializeBuffer(ArrayBuffer buffer);
     ArrayBuffer serializeObject(SerializedScriptValue obj);
+
+    boolean isFromCurrentWorld(any obj);
 
     void setUsesOverlayScrollbars(boolean enabled);
 
@@ -305,12 +361,20 @@ enum PageOverlayType {
 
     [Conditional=MEDIA_SOURCE] void initializeMockMediaSource();
     [Conditional=MEDIA_SOURCE] DOMString[] bufferedSamplesForTrackID(SourceBuffer buffer, DOMString trackID);
+    [Conditional=MEDIA_SOURCE] void setShouldGenerateTimestamps(SourceBuffer buffer, boolean flag);
 
     [Conditional=VIDEO] void beginMediaSessionInterruption();
     [Conditional=VIDEO] void endMediaSessionInterruption(DOMString flags);
+    [Conditional=MEDIA_SESSION] void sendMediaSessionStartOfInterruptionNotification(MediaSessionInterruptingCategory category);
+    [Conditional=MEDIA_SESSION] void sendMediaSessionEndOfInterruptionNotification(MediaSessionInterruptingCategory category);
+    [Conditional=MEDIA_SESSION] DOMString mediaSessionCurrentState(MediaSession session);
+    [Conditional=MEDIA_SESSION] double mediaElementPlayerVolume(HTMLMediaElement element);
+    [Conditional=MEDIA_SESSION] void sendMediaControlEvent(MediaControlEvent event);
     [Conditional=VIDEO] void applicationWillEnterForeground();
     [Conditional=VIDEO] void applicationWillEnterBackground();
     [Conditional=VIDEO, RaisesException] void setMediaSessionRestrictions(DOMString mediaType, DOMString restrictions);
+    [Conditional=VIDEO, RaisesException] void setMediaElementRestrictions(HTMLMediaElement element, DOMString restrictions);
+    [Conditional=WEB_AUDIO, RaisesException] void setAudioContextRestrictions(AudioContext context, DOMString restrictions);
     [Conditional=VIDEO, RaisesException] void postRemoteControlCommand(DOMString command);
     
     [Conditional=VIDEO] void simulateSystemSleep();
@@ -322,4 +386,16 @@ enum PageOverlayType {
 
     void setPageMuted(boolean muted);
     boolean isPagePlayingAudio();
+    
+    File createFile(DOMString url);
+    void queueMicroTask(long testNumber);
+    boolean testPreloaderSettingViewport();
+
+    [Conditional=CONTENT_FILTERING] readonly attribute MockContentFilterSettings mockContentFilterSettings;
+
+#if defined(ENABLE_CSS_SCROLL_SNAP) && ENABLE_CSS_SCROLL_SNAP
+    [RaisesException] DOMString scrollSnapOffsets(Element element);
+#endif
+
+    [RaisesException] DOMString pathStringWithShrinkWrappedRects(sequence<double> rectComponents, double radius);
 };

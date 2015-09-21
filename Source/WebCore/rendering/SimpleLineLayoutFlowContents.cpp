@@ -28,6 +28,7 @@
 
 #include "RenderBlockFlow.h"
 #include "RenderChildIterator.h"
+#include "RenderLineBreak.h"
 #include "RenderText.h"
 
 namespace WebCore {
@@ -35,12 +36,26 @@ namespace SimpleLineLayout {
 
 static Vector<FlowContents::Segment> initializeSegments(const RenderBlockFlow& flow)
 {
-    Vector<FlowContents::Segment, 8> segments;
+    unsigned numberOfChildren = 0;
+    auto children = childrenOfType<RenderObject>(flow);
+    for (auto it = children.begin(), end = children.end(); it != end; ++it)
+        ++numberOfChildren;
+    Vector<FlowContents::Segment> segments;
+    segments.reserveCapacity(numberOfChildren);
     unsigned startPosition = 0;
-    for (auto& textChild : childrenOfType<RenderText>(flow)) {
-        unsigned textLength = textChild.text()->length();
-        segments.append(FlowContents::Segment { startPosition, startPosition + textLength, textChild.text(), textChild });
-        startPosition += textLength;
+    for (const auto& child : childrenOfType<RenderObject>(flow)) {
+        if (is<RenderText>(child)) {
+            const auto& textChild = downcast<RenderText>(child);
+            unsigned textLength = textChild.text()->length();
+            segments.append(FlowContents::Segment { startPosition, startPosition + textLength, textChild.text(), textChild });
+            startPosition += textLength;
+            continue;
+        }
+        if (is<RenderLineBreak>(child)) {
+            segments.append(FlowContents::Segment { startPosition, startPosition, String(), child });
+            continue;
+        }
+        ASSERT_NOT_REACHED();
     }
     return segments;
 }
@@ -51,25 +66,16 @@ FlowContents::FlowContents(const RenderBlockFlow& flow)
 {
 }
 
-unsigned FlowContents::segmentIndexForPositionSlow(unsigned position) const
+unsigned FlowContents::segmentIndexForRunSlow(unsigned start, unsigned end) const
 {
-    auto it = std::lower_bound(m_segments.begin(), m_segments.end(), position, [](const Segment& segment, unsigned position) {
-        return segment.end <= position;
+    auto it = std::lower_bound(m_segments.begin(), m_segments.end(), start, [](const Segment& segment, unsigned start) {
+        return segment.end <= start;
     });
     ASSERT(it != m_segments.end());
+    ASSERT_UNUSED(end, end <= it->end);
     auto index = it - m_segments.begin();
     m_lastSegmentIndex = index;
     return index;
-}
-
-const FlowContents::Segment& FlowContents::segmentForRenderer(const RenderText& renderer) const
-{
-    for (auto& segment : m_segments) {
-        if (&segment.renderer == &renderer)
-            return segment;
-    }
-    ASSERT_NOT_REACHED();
-    return m_segments.last();
 }
 
 }

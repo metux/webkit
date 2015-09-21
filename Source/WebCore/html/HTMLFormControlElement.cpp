@@ -25,7 +25,6 @@
 #include "config.h"
 #include "HTMLFormControlElement.h"
 
-#include "Attribute.h"
 #include "ControlStates.h"
 #include "ElementAncestorIterator.h"
 #include "Event.h"
@@ -261,8 +260,12 @@ Node::InsertionNotificationRequest HTMLFormControlElement::insertedInto(Containe
     setNeedsWillValidateCheck();
     HTMLElement::insertedInto(insertionPoint);
     FormAssociatedElement::insertedInto(insertionPoint);
+    return InsertionShouldCallFinishedInsertingSubtree;
+}
 
-    return InsertionDone;
+void HTMLFormControlElement::finishedInsertingSubtree()
+{
+    resetFormOwner();
 }
 
 void HTMLFormControlElement::removedFrom(ContainerNode& insertionPoint)

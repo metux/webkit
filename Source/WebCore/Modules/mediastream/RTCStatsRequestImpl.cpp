@@ -36,11 +36,11 @@
 
 namespace WebCore {
 
-PassRefPtr<RTCStatsRequestImpl> RTCStatsRequestImpl::create(ScriptExecutionContext* context, PassRefPtr<RTCStatsCallback> successCallback, PassRefPtr<RTCPeerConnectionErrorCallback> errorCallback, PassRefPtr<MediaStreamTrackPrivate> selector)
+Ref<RTCStatsRequestImpl> RTCStatsRequestImpl::create(ScriptExecutionContext* context, PassRefPtr<RTCStatsCallback> successCallback, PassRefPtr<RTCPeerConnectionErrorCallback> errorCallback, PassRefPtr<MediaStreamTrackPrivate> selector)
 {
-    RefPtr<RTCStatsRequestImpl> request = adoptRef(new RTCStatsRequestImpl(context, successCallback, errorCallback, selector));
+    Ref<RTCStatsRequestImpl> request = adoptRef(*new RTCStatsRequestImpl(context, successCallback, errorCallback, selector));
     request->suspendIfNeeded();
-    return request.release();
+    return request;
 }
 
 RTCStatsRequestImpl::RTCStatsRequestImpl(ScriptExecutionContext* context, PassRefPtr<RTCStatsCallback> successCallback, PassRefPtr<RTCPeerConnectionErrorCallback> errorCallback, PassRefPtr<MediaStreamTrackPrivate> selector)
@@ -91,9 +91,20 @@ void RTCStatsRequestImpl::stop()
     clear();
 }
 
+const char* RTCStatsRequestImpl::activeDOMObjectName() const
+{
+    return "RTCStatsRequestImpl";
+}
+
+bool RTCStatsRequestImpl::canSuspendForPageCache() const
+{
+    // FIXME: We should try and do better here.
+    return false;
+}
+
 void RTCStatsRequestImpl::clear()
 {
-    m_successCallback.clear();
+    m_successCallback = nullptr;
 }
 
 

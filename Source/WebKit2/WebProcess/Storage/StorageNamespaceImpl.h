@@ -49,11 +49,13 @@ public:
     WebCore::SecurityOrigin* topLevelOrigin() const { return m_topLevelOrigin.get(); }
     unsigned quotaInBytes() const { return m_quotaInBytes; }
 
+    void didDestroyStorageAreaMap(StorageAreaMap&);
+
 private:
     explicit StorageNamespaceImpl(WebCore::StorageType, uint64_t storageNamespaceID, WebCore::SecurityOrigin* topLevelOrigin, unsigned quotaInBytes);
 
-    virtual PassRefPtr<WebCore::StorageArea> storageArea(PassRefPtr<WebCore::SecurityOrigin>) override;
-    virtual PassRefPtr<WebCore::StorageNamespace> copy(WebCore::Page*) override;
+    virtual RefPtr<WebCore::StorageArea> storageArea(PassRefPtr<WebCore::SecurityOrigin>) override;
+    virtual RefPtr<WebCore::StorageNamespace> copy(WebCore::Page*) override;
 
     const WebCore::StorageType m_storageType;
     const uint64_t m_storageNamespaceID;
@@ -63,7 +65,7 @@ private:
 
     const unsigned m_quotaInBytes;
 
-    HashMap<RefPtr<WebCore::SecurityOrigin>, RefPtr<StorageAreaMap>> m_storageAreaMaps;
+    HashMap<RefPtr<WebCore::SecurityOrigin>, StorageAreaMap*> m_storageAreaMaps;
 };
 
 } // namespace WebKit

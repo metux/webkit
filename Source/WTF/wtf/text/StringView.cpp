@@ -29,11 +29,80 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <mutex>
 #include <wtf/HashMap.h>
+#include <wtf/Lock.h>
 #include <wtf/NeverDestroyed.h>
-
-#if CHECK_STRINGVIEW_LIFETIME
+#include <wtf/unicode/UTF8.h>
 
 namespace WTF {
+
+using namespace Unicode;
+
+bool StringView::containsIgnoringASCIICase(const StringView& matchString) const
+{
+    return findIgnoringASCIICase(matchString) != notFound;
+}
+
+bool StringView::containsIgnoringASCIICase(const StringView& matchString, unsigned startOffset) const
+{
+    return findIgnoringASCIICase(matchString, startOffset) != notFound;
+}
+
+size_t StringView::findIgnoringASCIICase(const StringView& matchString) const
+{
+    return ::WTF::findIgnoringASCIICase(*this, matchString, 0);
+}
+
+size_t StringView::findIgnoringASCIICase(const StringView& matchString, unsigned startOffset) const
+{
+    return ::WTF::findIgnoringASCIICase(*this, matchString, startOffset);
+}
+
+bool StringView::startsWith(const StringView& prefix) const
+{
+    return ::WTF::startsWith(*this, prefix);
+}
+
+bool StringView::startsWithIgnoringASCIICase(const StringView& prefix) const
+{
+    return ::WTF::startsWithIgnoringASCIICase(*this, prefix);
+}
+
+bool StringView::endsWith(const StringView& suffix) const
+{
+    return ::WTF::endsWith(*this, suffix);
+}
+
+bool StringView::endsWithIgnoringASCIICase(const StringView& suffix) const
+{
+    return ::WTF::endsWithIgnoringASCIICase(*this, suffix);
+}
+
+bool equalIgnoringASCIICase(StringView a, const char* b, unsigned bLength)
+{
+    if (bLength != a.length())
+        return false;
+
+    if (a.is8Bit())
+        return equalIgnoringASCIICase(a.characters8(), b, bLength);
+
+    return equalIgnoringASCIICase(a.characters16(), b, bLength);
+}
+
+CString StringView::utf8(ConversionMode mode) const
+{
+    if (isNull())
+        return CString("", 0);
+    if (is8Bit())
+        return StringImpl::utf8ForCharacters(characters8(), length());
+    return StringImpl::utf8ForCharacters(characters16(), length(), mode);
+}
+
+size_t StringView::find(StringView matchString, unsigned start) const
+{
+    return findCommon(*this, matchString, start);
+}
+
+#if CHECK_STRINGVIEW_LIFETIME
 
 // Manage reference count manually so UnderlyingString does not need to be defined in the header.
 
@@ -49,11 +118,7 @@ StringView::UnderlyingString::UnderlyingString(const StringImpl& string)
 {
 }
 
-static std::mutex& underlyingStringsMutex()
-{
-    static NeverDestroyed<std::mutex> mutex;
-    return mutex;
-}
+static StaticLock underlyingStringsMutex;
 
 static HashMap<const StringImpl*, StringView::UnderlyingString*>& underlyingStrings()
 {
@@ -65,7 +130,7 @@ void StringView::invalidate(const StringImpl& stringToBeDestroyed)
 {
     UnderlyingString* underlyingString;
     {
-        std::lock_guard<std::mutex> lock(underlyingStringsMutex());
+        std::lock_guard<StaticLock> lock(underlyingStringsMutex);
         underlyingString = underlyingStrings().take(&stringToBeDestroyed);
         if (!underlyingString)
             return;
@@ -84,7 +149,7 @@ void StringView::adoptUnderlyingString(UnderlyingString* underlyingString)
     if (m_underlyingString) {
         if (!--m_underlyingString->refCount) {
             if (m_underlyingString->isValid) {
-                std::lock_guard<std::mutex> lock(underlyingStringsMutex());
+                std::lock_guard<StaticLock> lock(underlyingStringsMutex);
                 underlyingStrings().remove(&m_underlyingString->string);
             }
             delete m_underlyingString;
@@ -99,7 +164,7 @@ void StringView::setUnderlyingString(const StringImpl* string)
     if (!string)
         underlyingString = nullptr;
     else {
-        std::lock_guard<std::mutex> lock(underlyingStringsMutex());
+        std::lock_guard<StaticLock> lock(underlyingStringsMutex);
         auto result = underlyingStrings().add(string, nullptr);
         if (result.isNewEntry)
             result.iterator->value = new UnderlyingString(*string);
@@ -118,6 +183,6 @@ void StringView::setUnderlyingString(const StringView& string)
     adoptUnderlyingString(underlyingString);
 }
 
-}
+#endif // CHECK_STRINGVIEW_LIFETIME
 
-#endif
+} // namespace WTF

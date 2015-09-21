@@ -31,6 +31,7 @@
 #include "config.h"
 #include "WorkerRuntimeAgent.h"
 
+#include "DOMWindow.h"
 #include "InstrumentingAgents.h"
 #include "JSDOMWindowBase.h"
 #include "ScriptState.h"
@@ -59,7 +60,7 @@ void WorkerRuntimeAgent::didCreateFrontendAndBackend(Inspector::FrontendChannel*
 
 void WorkerRuntimeAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReason reason)
 {
-    m_backendDispatcher.clear();
+    m_backendDispatcher = nullptr;
 
     InspectorRuntimeAgent::willDestroyFrontendAndBackend(reason);
 }

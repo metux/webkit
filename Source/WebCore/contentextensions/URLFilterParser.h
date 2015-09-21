@@ -28,31 +28,39 @@
 
 #if ENABLE(CONTENT_EXTENSIONS)
 
-#include <wtf/HashMap.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 namespace ContentExtensions {
 
-class NFA;
+class CombinedURLFilters;
 
-typedef uint16_t TrivialAtom;
-
-struct PrefixTreeEntry {
-    unsigned nfaNode;
-    HashMap<TrivialAtom, std::unique_ptr<PrefixTreeEntry>> nextPattern;
-};
-
-
-class URLFilterParser {
+class WEBCORE_EXPORT URLFilterParser {
 public:
-    explicit URLFilterParser(NFA&);
-    String addPattern(const String& pattern, bool patternIsCaseSensitive, uint64_t patternId);
+    enum ParseStatus {
+        Ok,
+        MatchesEverything,
+        NonASCII,
+        UnsupportedCharacterClass,
+        BackReference,
+        MisplacedStartOfLine,
+        WordBoundary,
+        AtomCharacter,
+        Group,
+        Disjunction,
+        MisplacedEndOfLine,
+        EmptyPattern,
+        YarrError,
+        InvalidQuantifier,
+    };
+    static String statusString(ParseStatus);
+    explicit URLFilterParser(CombinedURLFilters&);
+    ~URLFilterParser();
+    ParseStatus addPattern(const String& pattern, bool patternIsCaseSensitive, uint64_t patternId);
 
 private:
-    NFA& m_nfa;
-    PrefixTreeEntry m_prefixTreeRoot;
+    CombinedURLFilters& m_combinedURLFilters;
 };
 
 } // namespace ContentExtensions

@@ -47,6 +47,10 @@
 #include "MediaSourcePrivateClient.h"
 #endif
 
+#if ENABLE(MEDIA_STREAM)
+#include "MediaStreamPrivate.h"
+#endif
+
 #if USE(GSTREAMER)
 #include "MediaPlayerPrivateGStreamer.h"
 #define PlatformMediaEngineClassName MediaPlayerPrivateGStreamer
@@ -79,77 +83,74 @@ const PlatformMedia NoPlatformMedia = { PlatformMedia::None, {0} };
 
 class NullMediaPlayerPrivate : public MediaPlayerPrivateInterface {
 public:
-    NullMediaPlayerPrivate(MediaPlayer*) { }
+    explicit NullMediaPlayerPrivate(MediaPlayer*) { }
 
-    virtual void load(const String&) { }
+    void load(const String&) override { }
 #if ENABLE(MEDIA_SOURCE)
-    virtual void load(const String&, MediaSourcePrivateClient*) { }
+    void load(const String&, MediaSourcePrivateClient*) override { }
 #endif
-    virtual void cancelLoad() { }
+#if ENABLE(MEDIA_STREAM)
+    void load(MediaStreamPrivate&) override { }
+#endif
+    void cancelLoad() override { }
 
-    virtual void prepareToPlay() { }
-    virtual void play() { }
-    virtual void pause() { }    
+    void prepareToPlay() override { }
+    void play() override { }
+    void pause() override { }
 
-    virtual PlatformMedia platformMedia() const { return NoPlatformMedia; }
-    virtual PlatformLayer* platformLayer() const { return 0; }
+    PlatformMedia platformMedia() const override { return NoPlatformMedia; }
+    PlatformLayer* platformLayer() const override { return 0; }
 
-    virtual IntSize naturalSize() const { return IntSize(0, 0); }
+    FloatSize naturalSize() const override { return FloatSize(); }
 
-    virtual bool hasVideo() const { return false; }
-    virtual bool hasAudio() const { return false; }
+    bool hasVideo() const override { return false; }
+    bool hasAudio() const override { return false; }
 
-    virtual void setVisible(bool) { }
+    void setVisible(bool) override { }
 
-    virtual double durationDouble() const { return 0; }
+    double durationDouble() const override { return 0; }
 
-    virtual double currentTimeDouble() const { return 0; }
-    virtual void seekDouble(double) { }
-    virtual bool seeking() const { return false; }
+    double currentTimeDouble() const override { return 0; }
+    void seekDouble(double) override { }
+    bool seeking() const override { return false; }
 
-    virtual void setRateDouble(double) { }
-    virtual void setPreservesPitch(bool) { }
-    virtual bool paused() const { return false; }
+    void setRateDouble(double) override { }
+    void setPreservesPitch(bool) override { }
+    bool paused() const override { return false; }
 
-    virtual void setVolumeDouble(double) { }
+    void setVolumeDouble(double) override { }
 
-    virtual bool supportsMuting() const { return false; }
-    virtual void setMuted(bool) { }
+    bool supportsMuting() const override { return false; }
+    void setMuted(bool) override { }
 
-    virtual bool hasClosedCaptions() const { return false; }
-    virtual void setClosedCaptionsVisible(bool) { };
+    bool hasClosedCaptions() const override { return false; }
+    void setClosedCaptionsVisible(bool) override { };
 
-    virtual MediaPlayer::NetworkState networkState() const { return MediaPlayer::Empty; }
-    virtual MediaPlayer::ReadyState readyState() const { return MediaPlayer::HaveNothing; }
+    MediaPlayer::NetworkState networkState() const override { return MediaPlayer::Empty; }
+    MediaPlayer::ReadyState readyState() const override { return MediaPlayer::HaveNothing; }
 
-    virtual double maxTimeSeekableDouble() const { return 0; }
-    virtual double minTimeSeekable() const { return 0; }
-    virtual std::unique_ptr<PlatformTimeRanges> buffered() const { return PlatformTimeRanges::create(); }
+    float maxTimeSeekable() const override { return 0; }
+    double minTimeSeekable() const override { return 0; }
+    std::unique_ptr<PlatformTimeRanges> buffered() const override { return std::make_unique<PlatformTimeRanges>(); }
 
-    virtual unsigned long long totalBytes() const { return 0; }
-    virtual bool didLoadingProgress() const { return false; }
+    unsigned long long totalBytes() const override { return 0; }
+    bool didLoadingProgress() const override { return false; }
 
-    virtual void setSize(const IntSize&) { }
+    void setSize(const IntSize&) override { }
 
-    virtual void paint(GraphicsContext*, const IntRect&) { }
+    void paint(GraphicsContext*, const FloatRect&) override { }
 
-    virtual bool canLoadPoster() const { return false; }
-    virtual void setPoster(const String&) { }
+    bool canLoadPoster() const override { return false; }
+    void setPoster(const String&) override { }
 
-    virtual bool hasSingleSecurityOrigin() const { return true; }
+    bool hasSingleSecurityOrigin() const override { return true; }
 
 #if ENABLE(ENCRYPTED_MEDIA)
-    virtual MediaPlayer::MediaKeyException generateKeyRequest(const String&, const unsigned char*, unsigned) override { return MediaPlayer::InvalidPlayerState; }
-    virtual MediaPlayer::MediaKeyException addKey(const String&, const unsigned char*, unsigned, const unsigned char*, unsigned, const String&) override { return MediaPlayer::InvalidPlayerState; }
-    virtual MediaPlayer::MediaKeyException cancelKeyRequest(const String&, const String&) override { return MediaPlayer::InvalidPlayerState; }
+    MediaPlayer::MediaKeyException generateKeyRequest(const String&, const unsigned char*, unsigned) override { return MediaPlayer::InvalidPlayerState; }
+    MediaPlayer::MediaKeyException addKey(const String&, const unsigned char*, unsigned, const unsigned char*, unsigned, const String&) override { return MediaPlayer::InvalidPlayerState; }
+    MediaPlayer::MediaKeyException cancelKeyRequest(const String&, const String&) override { return MediaPlayer::InvalidPlayerState; }
 #endif
 };
-
-static PassOwnPtr<MediaPlayerPrivateInterface> createNullMediaPlayer(MediaPlayer* player) 
-{ 
-    return adoptPtr(new NullMediaPlayerPrivate(player)); 
-}
-
 
 // engine support
 
@@ -287,7 +288,7 @@ static const MediaPlayerFactory* nextMediaEngine(const MediaPlayerFactory* curre
 MediaPlayer::MediaPlayer(MediaPlayerClient& client)
     : m_client(client)
     , m_reloadTimer(*this, &MediaPlayer::reloadTimerFired)
-    , m_private(createNullMediaPlayer(this))
+    , m_private(std::make_unique<NullMediaPlayerPrivate>(this))
     , m_currentMediaEngine(0)
     , m_preload(Auto)
     , m_visible(false)
@@ -313,7 +314,10 @@ bool MediaPlayer::load(const URL& url, const ContentType& contentType, const Str
     m_contentMIMETypeWasInferredFromExtension = false;
 
 #if ENABLE(MEDIA_SOURCE)
-    m_mediaSource = 0;
+    m_mediaSource = nullptr;
+#endif
+#if ENABLE(MEDIA_STREAM)
+    m_mediaStream = nullptr;
 #endif
 
     // If the MIME type is missing or is not meaningful, try to figure it out from the URL.
@@ -353,6 +357,19 @@ bool MediaPlayer::load(const URL& url, const ContentType& contentType, MediaSour
 }
 #endif
 
+#if ENABLE(MEDIA_STREAM)
+bool MediaPlayer::load(MediaStreamPrivate* mediaStream)
+{
+    ASSERT(mediaStream);
+    m_mediaStream = mediaStream;
+    m_keySystem = "";
+    m_contentMIMEType = "";
+    m_contentMIMETypeWasInferredFromExtension = false;
+    loadWithNextMediaEngine(0);
+    return m_currentMediaEngine;
+}
+#endif
+
 const MediaPlayerFactory* MediaPlayer::nextBestMediaEngine(const MediaPlayerFactory* current) const
 {
     MediaEngineSupportParameters parameters;
@@ -364,6 +381,9 @@ const MediaPlayerFactory* MediaPlayer::nextBestMediaEngine(const MediaPlayerFact
 #endif
 #if ENABLE(MEDIA_SOURCE)
     parameters.isMediaSource = !!m_mediaSource;
+#endif
+#if ENABLE(MEDIA_STREAM)
+    parameters.isMediaStream = !!m_mediaStream;
 #endif
 
     return bestMediaEngineForSupportParameters(parameters, current);
@@ -402,9 +422,14 @@ void MediaPlayer::loadWithNextMediaEngine(const MediaPlayerFactory* current)
             m_private->load(m_url.string(), m_mediaSource.get());
         else
 #endif
+#if ENABLE(MEDIA_STREAM)
+        if (m_mediaStream)
+            m_private->load(*m_mediaStream);
+        else
+#endif
         m_private->load(m_url.string());
     } else {
-        m_private = createNullMediaPlayer(this);
+        m_private = std::make_unique<NullMediaPlayerPrivate>(this);
         m_client.mediaPlayerEngineUpdated(this);
         m_client.mediaPlayerResourceNotSupported(this);
     }
@@ -510,6 +535,11 @@ MediaTime MediaPlayer::currentTime() const
     return m_private->currentMediaTime();
 }
 
+MediaTime MediaPlayer::getStartDate() const
+{
+    return m_private->getStartDate();
+}
+
 void MediaPlayer::seekWithTolerance(const MediaTime& time, const MediaTime& negativeTolerance, const MediaTime& positiveTolerance)
 {
     m_private->seekWithTolerance(time, negativeTolerance, positiveTolerance);
@@ -550,7 +580,7 @@ bool MediaPlayer::requiresImmediateCompositing() const
     return m_private->requiresImmediateCompositing();
 }
 
-IntSize MediaPlayer::naturalSize()
+FloatSize MediaPlayer::naturalSize()
 {
     return m_private->naturalSize();
 }
@@ -594,6 +624,16 @@ void MediaPlayer::setVideoFullscreenFrame(FloatRect frame)
 void MediaPlayer::setVideoFullscreenGravity(MediaPlayer::VideoGravity gravity)
 {
     m_private->setVideoFullscreenGravity(gravity);
+}
+
+void MediaPlayer::setVideoFullscreenMode(MediaPlayer::VideoFullscreenMode mode)
+{
+    m_private->setVideoFullscreenMode(mode);
+}
+
+MediaPlayer::VideoFullscreenMode MediaPlayer::fullscreenMode() const
+{
+    return m_client.mediaPlayerFullscreenMode();
 }
 
 NSArray* MediaPlayer::timedMetadata() const
@@ -739,12 +779,12 @@ void MediaPlayer::setPreload(MediaPlayer::Preload preload)
     m_private->setPreload(preload);
 }
 
-void MediaPlayer::paint(GraphicsContext* p, const IntRect& r)
+void MediaPlayer::paint(GraphicsContext* p, const FloatRect& r)
 {
     m_private->paint(p, r);
 }
 
-void MediaPlayer::paintCurrentFrameInContext(GraphicsContext* p, const IntRect& r)
+void MediaPlayer::paintCurrentFrameInContext(GraphicsContext* p, const FloatRect& r)
 {
     m_private->paintCurrentFrameInContext(p, r);
 }
@@ -813,7 +853,7 @@ void MediaPlayer::exitFullscreen()
 }
 #endif
 
-#if ENABLE(IOS_AIRPLAY)
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
 bool MediaPlayer::isCurrentPlaybackTargetWireless() const
 {
     return m_private->isCurrentPlaybackTargetWireless();
@@ -829,16 +869,6 @@ MediaPlayer::WirelessPlaybackTargetType MediaPlayer::wirelessPlaybackTargetType(
     return m_private->wirelessPlaybackTargetType();
 }
 
-void MediaPlayer::showPlaybackTargetPicker()
-{
-    m_private->showPlaybackTargetPicker();
-}
-
-bool MediaPlayer::hasWirelessPlaybackTargets() const
-{
-    return m_private->hasWirelessPlaybackTargets();
-}
-
 bool MediaPlayer::wirelessVideoPlaybackDisabled() const
 {
     return m_private->wirelessVideoPlaybackDisabled();
@@ -852,6 +882,21 @@ void MediaPlayer::setWirelessVideoPlaybackDisabled(bool disabled)
 void MediaPlayer::currentPlaybackTargetIsWirelessChanged()
 {
     m_client.mediaPlayerCurrentPlaybackTargetIsWirelessChanged(this);
+}
+
+bool MediaPlayer::canPlayToWirelessPlaybackTarget() const
+{
+    return m_private->canPlayToWirelessPlaybackTarget();
+}
+
+void MediaPlayer::setWirelessPlaybackTarget(Ref<MediaPlaybackTarget>&& device)
+{
+    m_private->setWirelessPlaybackTarget(WTF::move(device));
+}
+
+void MediaPlayer::setShouldPlayToPlaybackTarget(bool shouldPlay)
+{
+    m_private->setShouldPlayToPlaybackTarget(shouldPlay);
 }
 #endif
 
@@ -1197,6 +1242,11 @@ void MediaPlayer::syncTextTrackBounds()
     m_private->syncTextTrackBounds();
 }
 
+void MediaPlayer::tracksChanged()
+{
+    m_private->tracksChanged();
+}
+
 #if ENABLE(AVF_CAPTIONS)
 void MediaPlayer::notifyTrackModeChanged()
 {
@@ -1303,7 +1353,7 @@ bool MediaPlayer::shouldWaitForResponseToAuthenticationChallenge(const Authentic
     return m_client.mediaPlayerShouldWaitForResponseToAuthenticationChallenge(challenge);
 }
 
-void MediaPlayer::handlePlaybackCommand(MediaSession::RemoteControlCommandType command)
+void MediaPlayer::handlePlaybackCommand(PlatformMediaSession::RemoteControlCommandType command)
 {
     m_client.mediaPlayerHandlePlaybackCommand(command);
 }
@@ -1311,6 +1361,11 @@ void MediaPlayer::handlePlaybackCommand(MediaSession::RemoteControlCommandType c
 String MediaPlayer::sourceApplicationIdentifier() const
 {
     return m_client.mediaPlayerSourceApplicationIdentifier();
+}
+
+Vector<String> MediaPlayer::preferredAudioCharacteristics() const
+{
+    return m_client.mediaPlayerPreferredAudioCharacteristics();
 }
 
 void MediaPlayerFactorySupport::callRegisterMediaEngine(MediaEngineRegister registerMediaEngine)

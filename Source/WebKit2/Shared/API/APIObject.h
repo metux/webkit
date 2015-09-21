@@ -81,7 +81,6 @@ public:
         URLRequest,
         URLResponse,
         UserContentURLPattern,
-        UserContentFilter,
         UserScript,
         WebArchive,
         WebArchiveResource,
@@ -141,11 +140,19 @@ public:
         Session,
         TextChecker,
         UserContentController,
+        UserContentExtension,
+        UserContentExtensionStore,
         UserMediaPermissionRequest,
         Vibration,
         ViewportAttributes,
         VisitedLinkProvider,
+        WebsiteDataRecord,
         WebsiteDataStore,
+
+#if ENABLE(MEDIA_SESSION)
+        MediaSessionFocusManager,
+        MediaSessionMetadata,
+#endif
 
         // Bundle types
         Bundle,
@@ -153,6 +160,7 @@ public:
         BundleBackForwardListItem,
         BundleCSSStyleDeclarationHandle,
         BundleDOMWindowExtension,
+        BundleFileHandle,
         BundleFrame,
         BundleHitTestResult,
         BundleInspector,
@@ -205,6 +213,9 @@ public:
     void deref();
 #endif // DELEGATE_REF_COUNTING_TO_COCOA
 
+    static void* wrap(API::Object*);
+    static API::Object* unwrap(void*);
+
 protected:
     Object();
 
@@ -239,9 +250,21 @@ protected:
 
 #if DELEGATE_REF_COUNTING_TO_COCOA
     void* operator new(size_t size) { return newObject(size, APIType); }
-    void* operator new(size_t size, void* value) { return value; }
+    void* operator new(size_t, void* value) { return value; }
 #endif
 };
+
+#if !DELEGATE_REF_COUNTING_TO_COCOA
+inline void* Object::wrap(API::Object* object)
+{
+    return static_cast<void*>(object);
+}
+
+inline API::Object* Object::unwrap(void* object)
+{
+    return static_cast<API::Object*>(object);
+}
+#endif
 
 } // namespace Object
 

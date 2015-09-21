@@ -67,7 +67,7 @@ static inline void updateLogicalHeightForCell(RenderTableSection::RowStruct& row
         Length cRowLogicalHeight = row.logicalHeight;
         switch (logicalHeight.type()) {
         case Percent:
-            if (!cRowLogicalHeight.isPercentNotCalculated() || cRowLogicalHeight.percent() < logicalHeight.percent())
+            if (!cRowLogicalHeight.isPercent() || cRowLogicalHeight.percent() < logicalHeight.percent())
                 row.logicalHeight = logicalHeight;
             break;
         case Fixed:
@@ -316,7 +316,7 @@ int RenderTableSection::calcRowLogicalHeight()
                 // For row spanning cells, |r| is the last row in the span.
                 unsigned cellStartRow = cell->rowIndex();
 
-                if (cell->hasOverrideHeight()) {
+                if (cell->hasOverrideLogicalContentHeight()) {
                     if (!statePusher.didPush()) {
                         // Technically, we should also push state for the row, but since
                         // rows don't push a coordinate transform, that's not necessary.
@@ -425,7 +425,7 @@ void RenderTableSection::distributeExtraLogicalHeightToPercentRows(int& extraLog
     totalPercent = std::min(totalPercent, 100);
     int rowHeight = m_rowPos[1] - m_rowPos[0];
     for (unsigned r = 0; r < totalRows; ++r) {
-        if (totalPercent > 0 && m_grid[r].logicalHeight.isPercentNotCalculated()) {
+        if (totalPercent > 0 && m_grid[r].logicalHeight.isPercent()) {
             int toAdd = std::min<int>(extraLogicalHeight, (totalHeight * m_grid[r].logicalHeight.percent() / 100) - rowHeight);
             // If toAdd is negative, then we don't want to shrink the row (this bug
             // affected Outlook Web Access).
@@ -497,7 +497,7 @@ int RenderTableSection::distributeExtraLogicalHeightToRows(int extraLogicalHeigh
     for (unsigned r = 0; r < totalRows; r++) {
         if (m_grid[r].logicalHeight.isAuto())
             ++autoRowsCount;
-        else if (m_grid[r].logicalHeight.isPercentNotCalculated())
+        else if (m_grid[r].logicalHeight.isPercent())
             totalPercent += m_grid[r].logicalHeight.percent();
     }
 
@@ -568,7 +568,7 @@ void RenderTableSection::layoutRows()
                 || (!table()->style().logicalHeight().isAuto() && rHeight != cell->logicalHeight());
 
             for (RenderObject* renderer = cell->firstChild(); renderer; renderer = renderer->nextSibling()) {
-                if (!is<RenderText>(*renderer) && renderer->style().logicalHeight().isPercent() && (flexAllChildren || ((renderer->isReplaced() || (is<RenderBox>(*renderer) && downcast<RenderBox>(*renderer).scrollsOverflow())) && !is<RenderTextControl>(*renderer)))) {
+                if (!is<RenderText>(*renderer) && renderer->style().logicalHeight().isPercentOrCalculated() && (flexAllChildren || ((renderer->isReplaced() || (is<RenderBox>(*renderer) && downcast<RenderBox>(*renderer).scrollsOverflow())) && !is<RenderTextControl>(*renderer)))) {
                     // Tables with no sections do not flex.
                     if (!is<RenderTable>(*renderer) || downcast<RenderTable>(*renderer).hasSections()) {
                         renderer->setNeedsLayout(MarkOnlyThis);
@@ -677,7 +677,7 @@ void RenderTableSection::computeOverflowFromCells(unsigned totalRows, unsigned n
     clearOverflow();
     m_overflowingCells.clear();
     unsigned totalCellsCount = nEffCols * totalRows;
-    int maxAllowedOverflowingCellsCount = totalCellsCount < gMinTableSizeToUseFastPaintPathWithOverflowingCell ? 0 : gMaxAllowedOverflowingCellRatioForFastPaintPath * totalCellsCount;
+    unsigned maxAllowedOverflowingCellsCount = totalCellsCount < gMinTableSizeToUseFastPaintPathWithOverflowingCell ? 0 : gMaxAllowedOverflowingCellRatioForFastPaintPath * totalCellsCount;
 
 #ifndef NDEBUG
     bool hasOverflowingCell = false;
@@ -908,26 +908,28 @@ void RenderTableSection::recalcOuterBorder()
     m_outerBorderEnd = calcOuterBorderEnd();
 }
 
-int RenderTableSection::firstLineBaseline() const
+Optional<int> RenderTableSection::firstLineBaseline() const
 {
     if (!m_grid.size())
-        return -1;
+        return Optional<int>();
 
     int firstLineBaseline = m_grid[0].baseline;
     if (firstLineBaseline)
         return firstLineBaseline + m_rowPos[0];
 
-    firstLineBaseline = -1;
+    Optional<int> result;
     const Row& firstRow = m_grid[0].row;
     for (size_t i = 0; i < firstRow.size(); ++i) {
         const CellStruct& cs = firstRow.at(i);
         const RenderTableCell* cell = cs.primaryCell();
         // Only cells with content have a baseline
-        if (cell && cell->contentLogicalHeight())
-            firstLineBaseline = std::max<int>(firstLineBaseline, cell->logicalTop() + cell->borderAndPaddingBefore() + cell->contentLogicalHeight());
+        if (cell && cell->contentLogicalHeight()) {
+            int candidate = cell->logicalTop() + cell->borderAndPaddingBefore() + cell->contentLogicalHeight();
+            result = std::max(result.valueOr(candidate), candidate);
+        }
     }
 
-    return firstLineBaseline;
+    return result;
 }
 
 void RenderTableSection::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
@@ -1118,7 +1120,7 @@ void RenderTableSection::paintRowGroupBorder(const PaintInfo& paintInfo, bool an
     rect.intersect(paintInfo.rect);
     if (rect.isEmpty())
         return;
-    drawLineForBoxSide(paintInfo.context, rect.x(), rect.y(), rect.x() + rect.width(), rect.y() + rect.height(), side, style().visitedDependentColor(borderColor), borderStyle, 0, 0, antialias);
+    drawLineForBoxSide(*paintInfo.context, rect, side, style().visitedDependentColor(borderColor), borderStyle, 0, 0, antialias);
 }
 
 int RenderTableSection::offsetLeftForRowGroupBorder(RenderTableCell* cell, const LayoutRect& rowGroupRect, unsigned row)

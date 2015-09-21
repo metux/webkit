@@ -125,32 +125,26 @@ public:
         return insertConstantForUse(index, origin, jsUndefined(), useKind);
     }
     
-    Node* insertOutOfOrder(const Insertion& insertion)
+    Node* insertCheck(size_t index, NodeOrigin origin, AdjacencyList children)
     {
-        size_t targetIndex = insertion.index();
-        size_t entry = m_insertions.size();
-        while (entry) {
-            entry--;
-            if (m_insertions[entry].index() <= targetIndex) {
-                entry++;
-                break;
-            }
-        }
-        m_insertions.insert(entry, insertion);
-        return insertion.element();
+        children = children.justChecks();
+        if (children.isEmpty())
+            return nullptr;
+        return insertNode(index, SpecNone, Check, origin, children);
     }
     
-    Node* insertOutOfOrder(size_t index, Node* element)
+    Node* insertCheck(size_t index, Node* node)
     {
-        return insertOutOfOrder(Insertion(index, element));
+        return insertCheck(index, node->origin, node->children);
     }
-
-    template<typename... Params>
-    Node* insertOutOfOrderNode(size_t index, SpeculatedType type, Params... params)
+    
+    Node* insertCheck(size_t index, NodeOrigin origin, Edge edge)
     {
-        return insertOutOfOrder(index, m_graph.addNode(type, params...));
+        if (edge.willHaveCheck())
+            return insertNode(index, SpecNone, Check, origin, edge);
+        return nullptr;
     }
-
+    
     void execute(BasicBlock* block)
     {
         executeInsertions(*block, m_insertions);

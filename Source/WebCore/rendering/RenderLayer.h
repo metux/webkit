@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2009, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2009, 2012, 2015 Apple Inc. All rights reserved.
  *
  * Portions are Copyright (C) 1998 Netscape Communications Corporation.
  *
@@ -103,6 +103,12 @@ enum ShouldApplyRootOffsetToFragments {
     ApplyRootOffsetToFragments,
     IgnoreRootOffsetForFragments
 };
+
+enum LayerScrollCoordinationRole {
+    ViewportConstrained = 1 << 0,
+    Scrolling           = 1 << 1
+};
+typedef unsigned LayerScrollCoordinationRoles;
 
 class RenderLayer final : public ScrollableArea {
     WTF_MAKE_FAST_ALLOCATED;
@@ -241,6 +247,9 @@ public:
     bool hasAcceleratedTouchScrolling() const;
     // Returns true when there is actually scrollable overflow (requires layout to be up-to-date).
     bool hasTouchScrollableOverflow() const;
+#else
+    bool hasAcceleratedTouchScrolling() const { return false; }
+    bool hasTouchScrollableOverflow() const { return false; }
 #endif
 
     int verticalScrollbarWidth(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
@@ -395,7 +404,7 @@ public:
     RenderLayer* enclosingAncestorForPosition(EPosition) const;
 
     // Returns the nearest enclosing layer that is scrollable.
-    RenderLayer* enclosingScrollableLayer() const;
+    RenderLayer* enclosingScrollableLayer(LayoutRect* = nullptr) const;
 
     // The layer relative to which clipping rects for this layer are computed.
     RenderLayer* clippingRootForPainting() const;
@@ -428,20 +437,21 @@ public:
     int zIndex() const { return renderer().style().zIndex(); }
 
     enum PaintLayerFlag {
-        PaintLayerHaveTransparency = 1,
-        PaintLayerAppliedTransform = 1 << 1,
-        PaintLayerTemporaryClipRects = 1 << 2,
-        PaintLayerPaintingReflection = 1 << 3,
-        PaintLayerPaintingOverlayScrollbars = 1 << 4,
-        PaintLayerPaintingCompositingBackgroundPhase = 1 << 5,
-        PaintLayerPaintingCompositingForegroundPhase = 1 << 6,
-        PaintLayerPaintingCompositingMaskPhase = 1 << 7,
-        PaintLayerPaintingCompositingScrollingPhase = 1 << 8,
-        PaintLayerPaintingOverflowContents = 1 << 9,
-        PaintLayerPaintingRootBackgroundOnly = 1 << 10,
-        PaintLayerPaintingSkipRootBackground = 1 << 11,
-        PaintLayerPaintingChildClippingMaskPhase = 1 << 12,
-        PaintLayerPaintingCompositingAllPhases = (PaintLayerPaintingCompositingBackgroundPhase | PaintLayerPaintingCompositingForegroundPhase | PaintLayerPaintingCompositingMaskPhase)
+        PaintLayerHaveTransparency                      = 1 << 0,
+        PaintLayerAppliedTransform                      = 1 << 1,
+        PaintLayerTemporaryClipRects                    = 1 << 2,
+        PaintLayerPaintingReflection                    = 1 << 3,
+        PaintLayerPaintingOverlayScrollbars             = 1 << 4,
+        PaintLayerPaintingCompositingBackgroundPhase    = 1 << 5,
+        PaintLayerPaintingCompositingForegroundPhase    = 1 << 6,
+        PaintLayerPaintingCompositingMaskPhase          = 1 << 7,
+        PaintLayerPaintingCompositingClipPathPhase      = 1 << 8,
+        PaintLayerPaintingCompositingScrollingPhase     = 1 << 9,
+        PaintLayerPaintingOverflowContents              = 1 << 10,
+        PaintLayerPaintingRootBackgroundOnly            = 1 << 11,
+        PaintLayerPaintingSkipRootBackground            = 1 << 12,
+        PaintLayerPaintingChildClippingMaskPhase        = 1 << 13,
+        PaintLayerPaintingCompositingAllPhases          = PaintLayerPaintingCompositingBackgroundPhase | PaintLayerPaintingCompositingForegroundPhase
     };
     
     typedef unsigned PaintLayerFlags;
@@ -486,15 +496,15 @@ public:
     bool intersectsDamageRect(const LayoutRect& layerBounds, const LayoutRect& damageRect, const RenderLayer* rootLayer, const LayoutSize& offsetFromRoot, const LayoutRect* cachedBoundingBox = nullptr) const;
 
     enum CalculateLayerBoundsFlag {
-        IncludeSelfTransform = 1 << 0,
-        UseLocalClipRectIfPossible = 1 << 1,
-        IncludeLayerFilterOutsets = 1 << 2,
-        ExcludeHiddenDescendants = 1 << 3,
-        DontConstrainForMask = 1 << 4,
-        IncludeCompositedDescendants = 1 << 5,
-        UseFragmentBoxesExcludingCompositing = 1 << 6,
-        UseFragmentBoxesIncludingCompositing = 1 << 7,
-        DefaultCalculateLayerBoundsFlags =  IncludeSelfTransform | UseLocalClipRectIfPossible | IncludeLayerFilterOutsets | UseFragmentBoxesExcludingCompositing
+        IncludeSelfTransform                    = 1 << 0,
+        UseLocalClipRectIfPossible              = 1 << 1,
+        IncludeLayerFilterOutsets               = 1 << 2,
+        ExcludeHiddenDescendants                = 1 << 3,
+        DontConstrainForMask                    = 1 << 4,
+        IncludeCompositedDescendants            = 1 << 5,
+        UseFragmentBoxesExcludingCompositing    = 1 << 6,
+        UseFragmentBoxesIncludingCompositing    = 1 << 7,
+        DefaultCalculateLayerBoundsFlags        = IncludeSelfTransform | UseLocalClipRectIfPossible | IncludeLayerFilterOutsets | UseFragmentBoxesExcludingCompositing
     };
     typedef unsigned CalculateLayerBoundsFlags;
 
@@ -509,6 +519,10 @@ public:
 
     // Bounds used for layer overlap testing in RenderLayerCompositor.
     LayoutRect overlapBounds() const { return overlapBoundsIncludeChildren() ? calculateLayerBounds(this, LayoutSize()) : localBoundingBox(); }
+    
+    // Takes transform animations into account, returning true if they could be cheaply computed.
+    // Unlike overlapBounds, these bounds include descendant layers.
+    bool getOverlapBoundsIncludingChildrenAccountingForTransformAnimations(LayoutRect&) const;
 
     // If true, this layer's children are included in its bounds for overlap testing.
     // We can't rely on the children's positions if this layer has a filter that could have moved the children's pixels around.
@@ -596,6 +610,7 @@ public:
     virtual GraphicsLayer* layerForVerticalScrollbar() const override;
     virtual GraphicsLayer* layerForScrollCorner() const override;
     virtual bool usesCompositedScrolling() const override;
+    virtual bool usesAsyncScrolling() const override;
     WEBCORE_EXPORT bool needsCompositedScrolling() const;
 
     bool paintsWithTransparency(PaintBehavior paintBehavior) const
@@ -604,6 +619,8 @@ public:
     }
 
     bool paintsWithTransform(PaintBehavior) const;
+    bool shouldPaintMask(PaintBehavior, PaintLayerFlags) const;
+    bool shouldApplyClipPath(PaintBehavior, PaintLayerFlags) const;
 
     // Returns true if background phase is painted opaque in the given rect.
     // The query rect is given in local coordinates.
@@ -685,7 +702,7 @@ private:
 
     // Non-auto z-index always implies stacking context here, because StyleResolver::adjustRenderStyle already adjusts z-index
     // based on positioning and other criteria.
-    bool isStackingContext(const RenderStyle* style) const { return !style->hasAutoZIndex() || isRootLayer(); }
+    bool isStackingContext(const RenderStyle* style) const { return !style->hasAutoZIndex() || isRootLayer() || m_forcedStackingContext; }
 
     bool isDirtyStackingContainer() const { return m_zOrderListsDirty && isStackingContainer(); }
 
@@ -752,6 +769,9 @@ private:
     void updateCompositingAndLayerListsIfNeeded();
 
     bool setupFontSubpixelQuantization(GraphicsContext*, bool& didQuantizeFonts);
+
+    Path computeClipPath(const LayoutSize& offsetFromRoot, LayoutRect& rootRelativeBounds, WindRule&) const;
+
     bool setupClipPath(GraphicsContext*, const LayerPaintingInfo&, const LayoutSize& offsetFromRoot, LayoutRect& rootRelativeBounds, bool& rootRelativeBoundsComputed);
 
     bool hasFilterThatIsPainting(GraphicsContext*, PaintLayerFlags) const;
@@ -857,6 +877,9 @@ private:
     virtual bool isRubberBandInProgress() const override;
     virtual bool updatesScrollLayerPositionOnMainThread() const override { return true; }
     virtual bool forceUpdateScrollbarsOnMainThreadForPerformanceTesting() const override;
+#if ENABLE(CSS_SCROLL_SNAP)
+    bool isScrollSnapInProgress() const override;
+#endif
 
 #if PLATFORM(IOS)
     void registerAsTouchEventListenerForScrolling();
@@ -897,8 +920,6 @@ private:
 
     void updateOrRemoveFilterClients();
     void updateOrRemoveFilterEffectRenderer();
-
-    void updateOrRemoveMaskImageClients(const RenderStyle* oldStyle);
 
 #if ENABLE(CSS_COMPOSITING)
     void updateAncestorChainHasBlendingDescendants();
@@ -969,6 +990,9 @@ private:
 private:
     // The bitfields are up here so they will fall into the padding from ScrollableArea on 64-bit.
 
+    const bool m_isRootLayer : 1;
+    const bool m_forcedStackingContext : 1;
+
     // Keeps track of whether the layer is currently resizing, so events can cause resizing to start and stop.
     bool m_inResizeMode : 1;
 
@@ -996,8 +1020,6 @@ private:
     // descendants in stacking order. This is one of the requirements of being
     // able to safely become a stacking context.
     bool m_descendantsAreContiguousInStackingOrder : 1;
-
-    const bool m_isRootLayer : 1;
 
     bool m_usedTransparency : 1; // Tracks whether we need to close a transparent layer, i.e., whether
                                  // we ended up painting this layer or any descendants (and therefore need to
@@ -1039,7 +1061,6 @@ private:
 #endif
 
     bool m_hasFilterInfo : 1;
-    unsigned m_hasMaskImageInfo : 1;
 
 #if ENABLE(CSS_COMPOSITING)
     unsigned m_blendMode : 5;
@@ -1116,7 +1137,6 @@ private:
     std::unique_ptr<RenderLayerBacking> m_backing;
 
     class FilterInfo;
-    class MaskImageInfo;
 };
 
 inline void RenderLayer::clearZOrderLists()
@@ -1164,9 +1184,11 @@ private:
 
 void makeMatrixRenderable(TransformationMatrix&, bool has3DRendering);
 
+bool compositedWithOwnBackingStore(const RenderLayer*);
+
 } // namespace WebCore
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 // Outside the WebCore namespace for ease of invocation from gdb.
 void showLayerTree(const WebCore::RenderLayer*);
 void showLayerTree(const WebCore::RenderObject*);

@@ -23,7 +23,7 @@
 
 #include <gst/gststructure.h>
 #include <gst/pbutils/install-plugins.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GUniquePtr.h>
 
 namespace WTF {
 

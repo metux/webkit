@@ -25,7 +25,7 @@
 
 #include "config.h"
 
-#if USE(3D_GRAPHICS)
+#if ENABLE(GRAPHICS_CONTEXT_3D)
 
 #include "Extensions3DOpenGL.h"
 
@@ -33,10 +33,8 @@
 #include <wtf/Vector.h>
 
 #if PLATFORM(IOS)
-#include <ANGLE/ShaderLang.h>
 #include <OpenGLES/ES2/glext.h>
 #elif PLATFORM(MAC)
-#include <ANGLE/ShaderLang.h>
 #include <OpenGL/gl.h>
 #elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN)
 #include "OpenGLShims.h"
@@ -308,4 +306,4 @@ bool Extensions3DOpenGL::isVertexArrayObjectSupported()
 
 } // namespace WebCore
 
-#endif // USE(3D_GRAPHICS)
+#endif // ENABLE(GRAPHICS_CONTEXT_3D)

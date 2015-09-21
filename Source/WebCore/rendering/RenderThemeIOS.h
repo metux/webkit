@@ -37,7 +37,7 @@ class GraphicsContext;
     
 class RenderThemeIOS final : public RenderTheme {
 public:
-    static PassRefPtr<RenderTheme> create();
+    static Ref<RenderTheme> create();
 
     virtual int popupInternalPaddingRight(RenderStyle&) const override;
 
@@ -50,7 +50,7 @@ public:
 protected:
     virtual FontDescription& cachedSystemFontDescription(CSSValueID systemFontID) const override;
     virtual void updateCachedSystemFontDescription(CSSValueID, FontDescription&) const override;
-    virtual int baselinePosition(const RenderObject&) const override;
+    virtual int baselinePosition(const RenderBox&) const override;
 
     virtual bool isControlStyled(const RenderStyle&, const BorderData&, const FillLayer& background, const Color& backgroundColor) const override;
 
@@ -72,7 +72,7 @@ protected:
     virtual bool paintTextAreaDecorations(const RenderObject&, const PaintInfo&, const FloatRect&) override;
 
     virtual void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
-    virtual bool paintMenuListButtonDecorations(const RenderObject&, const PaintInfo&, const FloatRect&) override;
+    virtual bool paintMenuListButtonDecorations(const RenderBox&, const PaintInfo&, const FloatRect&) override;
 
     virtual void adjustSliderTrackStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintSliderTrack(const RenderObject&, const PaintInfo&, const IntRect&) override;
@@ -102,8 +102,8 @@ protected:
     virtual Color platformTapHighlightColor() const override { return 0x4D1A1A1A; }
 #endif
 
-    virtual bool shouldShowPlaceholderWhenFocused() const override;
     virtual bool shouldHaveSpinButton(HTMLInputElement&) const override;
+    virtual bool shouldHaveCapsLockIndicator(HTMLInputElement&) const override;
 
 #if ENABLE(VIDEO)
     virtual String mediaControlsStyleSheet() override;
@@ -117,8 +117,12 @@ private:
     const Color& shadowColor() const;
     FloatRect addRoundedBorderClip(const RenderObject& box, GraphicsContext*, const IntRect&);
 
+    virtual Color systemColor(CSSValueID) const override;
+
     String m_mediaControlsScript;
     String m_mediaControlsStyleSheet;
+
+    mutable HashMap<int, Color> m_systemColorCache;
 };
 
 }

@@ -30,12 +30,12 @@
 #define PageConsoleClient_h
 
 #include <inspector/ScriptCallStack.h>
+#include <profiler/Profile.h>
 #include <runtime/ConsoleClient.h>
 #include <wtf/Forward.h>
 
 namespace JSC {
 class ExecState;
-class Profile;
 }
 
 namespace WebCore {
@@ -51,8 +51,8 @@ public:
     explicit PageConsoleClient(Page&);
     virtual ~PageConsoleClient();
 
-    WEBCORE_EXPORT static bool shouldPrintExceptions();
-    WEBCORE_EXPORT static void setShouldPrintExceptions(bool);
+    static bool shouldPrintExceptions();
+    static void setShouldPrintExceptions(bool);
 
     static void mute();
     static void unmute();

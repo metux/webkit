@@ -99,9 +99,6 @@ DatabaseContext::DatabaseContext(ScriptExecutionContext* context)
     , m_hasOpenDatabases(false)
     , m_isRegistered(true) // will register on construction below.
     , m_hasRequestedTermination(false)
-#if PLATFORM(IOS)
-    , m_paused(false)
-#endif
 {
     // ActiveDOMObject expects this to be called to set internal flags.
     suspendIfNeeded();
@@ -110,9 +107,10 @@ DatabaseContext::DatabaseContext(ScriptExecutionContext* context)
 
     // For debug accounting only. We must do this before we register the
     // instance. The assertions assume this.
-    DatabaseManager::manager().didConstructDatabaseContext();
+    auto& databaseManager = DatabaseManager::singleton();
+    databaseManager.didConstructDatabaseContext();
 
-    DatabaseManager::manager().registerDatabaseContext(this);
+    databaseManager.registerDatabaseContext(this);
 }
 
 DatabaseContext::~DatabaseContext()
@@ -122,7 +120,7 @@ DatabaseContext::~DatabaseContext()
 
     // For debug accounting only. We must call this last. The assertions assume
     // this.
-    DatabaseManager::manager().didDestructDatabaseContext();
+    DatabaseManager::singleton().didDestructDatabaseContext();
 }
 
 // This is called if the associated ScriptExecutionContext is destroyed while
@@ -144,12 +142,17 @@ void DatabaseContext::stop()
     stopDatabases();
 }
 
+bool DatabaseContext::canSuspendForPageCache() const
+{
+    if (!hasOpenDatabases() || !m_databaseThread)
+        return true;
+
+    return !m_databaseThread->hasPendingDatabaseActivity();
+}
+
 DatabaseThread* DatabaseContext::databaseThread()
 {
     if (!m_databaseThread && !m_hasOpenDatabases) {
-#if PLATFORM(IOS)
-        MutexLocker lock(m_databaseThreadMutex);
-#endif
         // It's OK to ask for the m_databaseThread after we've requested
         // termination because we're still using it to execute the closing
         // of the database. However, it is NOT OK to create a new thread
@@ -161,31 +164,15 @@ DatabaseThread* DatabaseContext::databaseThread()
         m_databaseThread = DatabaseThread::create();
         if (!m_databaseThread->start())
             m_databaseThread = nullptr;
-
-#if PLATFORM(IOS)
-        if (m_databaseThread)
-            m_databaseThread->setPaused(m_paused);
-#endif
     }
 
     return m_databaseThread.get();
 }
 
-#if PLATFORM(IOS)
-void DatabaseContext::setPaused(bool paused)
-{
-    MutexLocker lock(m_databaseThreadMutex);
-
-    m_paused = paused;
-    if (m_databaseThread)
-        m_databaseThread->setPaused(m_paused);
-}
-#endif // PLATFORM(IOS)
-
 bool DatabaseContext::stopDatabases(DatabaseTaskSynchronizer* synchronizer)
 {
     if (m_isRegistered) {
-        DatabaseManager::manager().unregisterDatabaseContext(this);
+        DatabaseManager::singleton().unregisterDatabaseContext(this);
         m_isRegistered = false;
     }
 
@@ -231,7 +218,7 @@ void DatabaseContext::databaseExceededQuota(const String& name, DatabaseDetails 
     ASSERT(m_scriptExecutionContext->isWorkerGlobalScope());
     // FIXME: This needs a real implementation; this is a temporary solution for testing.
     const unsigned long long defaultQuota = 5 * 1024 * 1024;
-    DatabaseManager::manager().setQuota(m_scriptExecutionContext->securityOrigin(), defaultQuota);
+    DatabaseManager::singleton().setQuota(m_scriptExecutionContext->securityOrigin(), defaultQuota);
 }
 
 SecurityOrigin* DatabaseContext::securityOrigin() const

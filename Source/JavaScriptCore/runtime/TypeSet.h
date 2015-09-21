@@ -26,6 +26,7 @@
 #ifndef TypeSet_h
 #define TypeSet_h
 
+#include "RuntimeType.h"
 #include "StructureSet.h"
 #include <wtf/HashSet.h>
 #include <wtf/RefCounted.h>
@@ -46,30 +47,16 @@ class TypeSet;
 
 namespace JSC {
 
-class JSValue;
-
-enum RuntimeType : uint8_t {
-    TypeNothing            = 0x0,
-    TypeFunction           = 0x1,
-    TypeUndefined          = 0x2,
-    TypeNull               = 0x4,
-    TypeBoolean            = 0x8,
-    TypeMachineInt         = 0x10,
-    TypeNumber             = 0x20,
-    TypeString             = 0x40,
-    TypeObject             = 0x80
-};
-
 class StructureShape : public RefCounted<StructureShape> {
     friend class TypeSet;
 
 public:
     StructureShape();
 
-    static PassRefPtr<StructureShape> create() { return adoptRef(new StructureShape); }
+    static Ref<StructureShape> create() { return adoptRef(*new StructureShape); }
     String propertyHash();
     void markAsFinal();
-    void addProperty(RefPtr<StringImpl>);
+    void addProperty(UniquedStringImpl&);
     String stringRepresentation();
     String toJSONString() const;
     Ref<Inspector::Protocol::Runtime::StructureDescription> inspectorRepresentation();
@@ -83,8 +70,8 @@ private:
     static PassRefPtr<StructureShape> merge(const PassRefPtr<StructureShape>, const PassRefPtr<StructureShape>);
     bool hasSamePrototypeChain(PassRefPtr<StructureShape>);
 
-    HashSet<RefPtr<StringImpl>> m_fields;
-    HashSet<RefPtr<StringImpl>> m_optionalFields;
+    HashSet<RefPtr<UniquedStringImpl>, IdentifierRepHash> m_fields;
+    HashSet<RefPtr<UniquedStringImpl>, IdentifierRepHash> m_optionalFields;
     RefPtr<StructureShape> m_proto;
     std::unique_ptr<String> m_propertyHash;
     String m_constructorName;
@@ -95,10 +82,9 @@ private:
 class TypeSet : public RefCounted<TypeSet> {
 
 public:
-    static PassRefPtr<TypeSet> create() { return adoptRef(new TypeSet); }
+    static Ref<TypeSet> create() { return adoptRef(*new TypeSet); }
     TypeSet();
     void addTypeInformation(RuntimeType, PassRefPtr<StructureShape>, Structure*);
-    static RuntimeType getRuntimeTypeForValue(JSValue);
     void invalidateCache();
     String dumpTypes() const;
     String displayName() const;
@@ -108,12 +94,12 @@ public:
     String leastCommonAncestor() const;
     Ref<Inspector::Protocol::Runtime::TypeSet> inspectorTypeSet() const;
     bool isEmpty() const { return m_seenTypes == TypeNothing; }
-    bool doesTypeConformTo(uint8_t test) const;
-    uint8_t seenTypes() const { return m_seenTypes; }
+    bool doesTypeConformTo(RuntimeTypeMask test) const;
+    RuntimeTypeMask seenTypes() const { return m_seenTypes; }
     StructureSet structureSet() const { return m_structureSet; };
 
 private:
-    uint8_t m_seenTypes;
+    RuntimeTypeMask m_seenTypes;
     bool m_isOverflown;
     Vector<RefPtr<StructureShape>> m_structureHistory;
     StructureSet m_structureSet;

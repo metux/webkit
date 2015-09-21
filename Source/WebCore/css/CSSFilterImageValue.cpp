@@ -60,8 +60,12 @@ String CSSFilterImageValue::customCSSText() const
 
 FloatSize CSSFilterImageValue::fixedSize(const RenderElement* renderer)
 {
+    // FIXME: Skip Content Security Policy check when filter is applied to an element in a user agent shadow tree.
+    // See <https://bugs.webkit.org/show_bug.cgi?id=146663>.
+    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+
     CachedResourceLoader& cachedResourceLoader = renderer->document().cachedResourceLoader();
-    CachedImage* cachedImage = cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader);
+    CachedImage* cachedImage = cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader, options);
 
     if (!cachedImage)
         return FloatSize();
@@ -79,11 +83,11 @@ bool CSSFilterImageValue::knownToBeOpaque(const RenderElement*) const
     return false;
 }
 
-void CSSFilterImageValue::loadSubimages(CachedResourceLoader& cachedResourceLoader)
+void CSSFilterImageValue::loadSubimages(CachedResourceLoader& cachedResourceLoader, const ResourceLoaderOptions& options)
 {
     CachedResourceHandle<CachedImage> oldCachedImage = m_cachedImage;
 
-    m_cachedImage = CSSImageGeneratorValue::cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader);
+    m_cachedImage = CSSImageGeneratorValue::cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader, options);
 
     if (m_cachedImage != oldCachedImage) {
         if (oldCachedImage)
@@ -95,13 +99,17 @@ void CSSFilterImageValue::loadSubimages(CachedResourceLoader& cachedResourceLoad
     m_filterSubimageObserver.setReady(true);
 }
 
-PassRefPtr<Image> CSSFilterImageValue::image(RenderElement* renderer, const FloatSize& size)
+RefPtr<Image> CSSFilterImageValue::image(RenderElement* renderer, const FloatSize& size)
 {
     if (size.isEmpty())
         return nullptr;
 
+    // FIXME: Skip Content Security Policy check when filter is applied to an element in a user agent shadow tree.
+    // See <https://bugs.webkit.org/show_bug.cgi?id=146663>.
+    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+
     CachedResourceLoader& cachedResourceLoader = renderer->document().cachedResourceLoader();
-    CachedImage* cachedImage = cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader);
+    CachedImage* cachedImage = cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader, options);
 
     if (!cachedImage)
         return Image::nullImage();
@@ -149,11 +157,11 @@ void CSSFilterImageValue::FilterSubimageObserverProxy::imageChanged(CachedImage*
         m_ownerValue->filterImageChanged(*rect);
 }
 
-bool CSSFilterImageValue::hasFailedOrCanceledSubresources() const
+bool CSSFilterImageValue::traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const
 {
-    if (m_cachedImage && m_cachedImage->loadFailedOrCanceled())
-        return true;
-    return false;
+    if (!m_cachedImage)
+        return false;
+    return handler(*m_cachedImage);
 }
 
 bool CSSFilterImageValue::equals(const CSSFilterImageValue& other) const

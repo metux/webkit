@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015 University of Washington.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,72 +24,55 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.TimelineView = function(representedObject)
+WebInspector.TimelineView = class TimelineView extends WebInspector.ContentView
 {
-    if (this.constructor === WebInspector.TimelineView) {
-        // When instantiated directly return an instance of a type-based concrete subclass.
+    constructor(representedObject, extraArguments)
+    {
+        console.assert(extraArguments);
+        console.assert(extraArguments.timelineSidebarPanel instanceof WebInspector.TimelineSidebarPanel);
 
-        console.assert(representedObject && representedObject instanceof WebInspector.Timeline);
+        super(representedObject);
 
-        var timelineType = representedObject.type;
-        if (timelineType === WebInspector.TimelineRecord.Type.Network)
-            return new WebInspector.NetworkTimelineView(representedObject);
+        // This class should not be instantiated directly. Create a concrete subclass instead.
+        console.assert(this.constructor !== WebInspector.TimelineView && this instanceof WebInspector.TimelineView);
 
-        if (timelineType === WebInspector.TimelineRecord.Type.Layout)
-            return new WebInspector.LayoutTimelineView(representedObject);
+        this._timelineSidebarPanel = extraArguments.timelineSidebarPanel;
 
-        if (timelineType === WebInspector.TimelineRecord.Type.Script)
-            return new WebInspector.ScriptTimelineView(representedObject);
+        this._contentTreeOutline = this._timelineSidebarPanel.createContentTreeOutline();
+        this._contentTreeOutline.onselect = this.treeElementSelected.bind(this);
+        this._contentTreeOutline.ondeselect = this.treeElementDeselected.bind(this);
+        this._contentTreeOutline.__canShowContentViewForTreeElement = this.canShowContentViewForTreeElement.bind(this);
 
-        throw Error("Can't make a Timeline for an unknown representedObject.");
+        this.element.classList.add("timeline-view");
+
+        this._zeroTime = 0;
+        this._startTime = 0;
+        this._endTime = 5;
+        this._currentTime = 0;
     }
 
-    // Concrete object instantiation.
-    console.assert(this.constructor !== WebInspector.TimelineView && this instanceof WebInspector.TimelineView);
-
-    WebInspector.Object.call(this);
-
-    console.assert(representedObject instanceof WebInspector.Timeline || representedObject instanceof WebInspector.TimelineRecording);
-    this._representedObject = representedObject;
-
-    this._contentTreeOutline = WebInspector.timelineSidebarPanel.createContentTreeOutline();
-
-    this.element = document.createElement("div");
-    this.element.classList.add(WebInspector.TimelineView.StyleClassName);
-
-    this._zeroTime = 0;
-    this._startTime = 0;
-    this._endTime = 5;
-    this._currentTime = 0;
-};
-
-WebInspector.TimelineView.StyleClassName = "timeline-view";
-
-WebInspector.TimelineView.Event = {
-    SelectionPathComponentsDidChange: "timeline-view-selection-path-components-did-change"
-};
-
-WebInspector.TimelineView.prototype = {
-    constructor: WebInspector.TimelineView,
-    __proto__: WebInspector.Object.prototype,
-
     // Public
-
-    get representedObject()
-    {
-        return this._representedObject;
-    },
 
     get navigationSidebarTreeOutline()
     {
         return this._contentTreeOutline;
-    },
+    }
 
     get navigationSidebarTreeOutlineLabel()
     {
         // Implemented by sub-classes if needed.
         return null;
-    },
+    }
+
+    get navigationSidebarTreeOutlineScopeBar()
+    {
+        return this._scopeBar;
+    }
+
+    get timelineSidebarPanel()
+    {
+        return this._timelineSidebarPanel;
+    }
 
     get selectionPathComponents()
     {
@@ -98,12 +82,12 @@ WebInspector.TimelineView.prototype = {
         var pathComponent = new WebInspector.GeneralTreeElementPathComponent(this._contentTreeOutline.selectedTreeElement);
         pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this.treeElementPathComponentSelected, this);
         return [pathComponent];
-    },
+    }
 
     get zeroTime()
     {
         return this._zeroTime;
-    },
+    }
 
     set zeroTime(x)
     {
@@ -113,12 +97,12 @@ WebInspector.TimelineView.prototype = {
         this._zeroTime = x || 0;
 
         this.needsLayout();
-    },
+    }
 
     get startTime()
     {
         return this._startTime;
-    },
+    }
 
     set startTime(x)
     {
@@ -128,12 +112,12 @@ WebInspector.TimelineView.prototype = {
         this._startTime = x || 0;
 
         this.needsLayout();
-    },
+    }
 
     get endTime()
     {
         return this._endTime;
-    },
+    }
 
     set endTime(x)
     {
@@ -143,12 +127,12 @@ WebInspector.TimelineView.prototype = {
         this._endTime = x || 0;
 
         this.needsLayout();
-    },
+    }
 
     get currentTime()
     {
         return this._currentTime;
-    },
+    }
 
     set currentTime(x)
     {
@@ -168,75 +152,105 @@ WebInspector.TimelineView.prototype = {
 
         if (checkIfLayoutIsNeeded.call(this, oldCurrentTime) || checkIfLayoutIsNeeded.call(this, this._currentTime))
             this.needsLayout();
-    },
+    }
 
-    get visible()
-    {
-        return this._visible;
-    },
-
-    reset: function()
+    reset()
     {
         this._contentTreeOutline.removeChildren();
-    },
+        this._timelineSidebarPanel.hideEmptyContentPlaceholder();
+    }
 
-    shown: function()
-    {
-        this._visible = true;
 
-        // Implemented by sub-classes if needed.
-    },
-
-    hidden: function()
+    filterDidChange()
     {
         // Implemented by sub-classes if needed.
+    }
 
-        this._visible = false;
-    },
-
-    filterDidChange: function()
-    {
-        // Implemented by sub-classes if needed.
-    },
-
-    matchTreeElementAgainstCustomFilters: function(treeElement)
+    matchTreeElementAgainstCustomFilters(treeElement)
     {
         // Implemented by sub-classes if needed.
         return true;
-    },
+    }
 
-    updateLayout: function()
+    updateLayout()
     {
         if (this._scheduledLayoutUpdateIdentifier) {
             cancelAnimationFrame(this._scheduledLayoutUpdateIdentifier);
-            delete this._scheduledLayoutUpdateIdentifier;
+            this._scheduledLayoutUpdateIdentifier = undefined;
         }
 
         // Implemented by sub-classes if needed.
-    },
+    }
 
-    updateLayoutIfNeeded: function()
+    updateLayoutIfNeeded()
     {
         if (!this._scheduledLayoutUpdateIdentifier)
             return;
         this.updateLayout();
-    },
+    }
 
-    filterUpdated: function()
+    filterUpdated()
     {
-        this.dispatchEventToListeners(WebInspector.TimelineView.Event.SelectionPathComponentsDidChange);
-    },
+        this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
+    }
 
     // Protected
 
-    treeElementPathComponentSelected: function(event)
+    canShowContentViewForTreeElement(treeElement)
     {
         // Implemented by sub-classes if needed.
-    },
 
-    needsLayout: function()
+        if (treeElement instanceof WebInspector.TimelineRecordTreeElement)
+            return !!treeElement.sourceCodeLocation;
+        return false;
+    }
+
+    showContentViewForTreeElement(treeElement)
     {
-        if (!this._visible)
+        // Implemented by sub-classes if needed.
+
+        if (!(treeElement instanceof WebInspector.TimelineRecordTreeElement)) {
+            console.error("Unknown tree element selected.", treeElement);
+            return;
+        }
+
+        var sourceCodeLocation = treeElement.sourceCodeLocation;
+        if (!sourceCodeLocation) {
+            this._timelineSidebarPanel.showTimelineViewForTimeline(this.representedObject);
+            return;
+        }
+
+        WebInspector.showOriginalOrFormattedSourceCodeLocation(sourceCodeLocation);
+    }
+
+    treeElementPathComponentSelected(event)
+    {
+        // Implemented by sub-classes if needed.
+    }
+
+    treeElementDeselected(treeElement)
+    {
+        // Implemented by sub-classes if needed.
+    }
+
+    treeElementSelected(treeElement, selectedByUser)
+    {
+        // Implemented by sub-classes if needed.
+
+        this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
+
+        if (!this._timelineSidebarPanel.canShowDifferentContentView())
+            return;
+
+        if (treeElement instanceof WebInspector.FolderTreeElement)
+            return;
+
+        this.showContentViewForTreeElement(treeElement);
+    }
+
+    needsLayout()
+    {
+        if (!this.visible)
             return;
 
         if (this._scheduledLayoutUpdateIdentifier)

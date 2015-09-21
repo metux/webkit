@@ -28,10 +28,13 @@
 #define MemoryPressureHandler_h
 
 #include <atomic>
-#include <time.h>
+#include <ctime>
+#include <functional>
 #include <wtf/FastMalloc.h>
+#include <wtf/Forward.h>
 
 #if PLATFORM(IOS)
+#include <wtf/Lock.h>
 #include <wtf/ThreadingPrimitives.h>
 #elif OS(LINUX)
 #include "Timer.h"
@@ -47,12 +50,16 @@ enum MemoryPressureReason {
 };
 #endif
 
-typedef void (*LowMemoryHandler)(bool critical);
+enum class Critical { No, Yes };
+enum class Synchronous { No, Yes };
+
+typedef std::function<void(Critical, Synchronous)> LowMemoryHandler;
 
 class MemoryPressureHandler {
     WTF_MAKE_FAST_ALLOCATED;
+    friend class WTF::NeverDestroyed<MemoryPressureHandler>;
 public:
-    friend MemoryPressureHandler& memoryPressureHandler();
+    WEBCORE_EXPORT static MemoryPressureHandler& singleton();
 
     WEBCORE_EXPORT void install();
 
@@ -101,24 +108,24 @@ public:
         const char* m_logString;
         size_t m_initialMemory;
 
-        static bool s_loggingEnabled;
+        WEBCORE_EXPORT static bool s_loggingEnabled;
     };
 
-    WEBCORE_EXPORT static void releaseMemory(bool critical);
+    WEBCORE_EXPORT void releaseMemory(Critical, Synchronous = Synchronous::No);
 
 private:
-    static void releaseNoncriticalMemory();
-    static void releaseCriticalMemory();
+    void releaseNoncriticalMemory();
+    void releaseCriticalMemory(Synchronous);
 
     void uninstall();
 
     void holdOff(unsigned);
 
     MemoryPressureHandler();
-    ~MemoryPressureHandler();
+    ~MemoryPressureHandler() = delete;
 
-    void respondToMemoryPressure(bool critical);
-    static void platformReleaseMemory(bool critical);
+    void respondToMemoryPressure(Critical, Synchronous = Synchronous::No);
+    void platformReleaseMemory(Critical);
 
     bool m_installed;
     time_t m_lastRespondTime;
@@ -131,7 +138,7 @@ private:
     bool m_clearPressureOnMemoryRelease;
     void (^m_releaseMemoryBlock)();
     CFRunLoopObserverRef m_observer;
-    Mutex m_observerMutex;
+    Lock m_observerMutex;
 #elif OS(LINUX)
     int m_eventFD;
     int m_pressureLevelFD;
@@ -141,9 +148,6 @@ private:
     void logErrorAndCloseFDs(const char* error);
 #endif
 };
-
-// Function to obtain the global memory pressure object.
-WEBCORE_EXPORT MemoryPressureHandler& memoryPressureHandler();
 
 } // namespace WebCore
 

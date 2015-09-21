@@ -45,10 +45,6 @@
 #include <windows.h>
 #endif
 
-namespace JSC {
-WTF_IMPORT extern const struct HashTable globalObjectTable;
-}
-
 const int MaxLineLength = 100 * 1024;
 
 using namespace JSC;
@@ -137,7 +133,7 @@ protected:
     }
 };
 
-const ClassInfo GlobalObject::s_info = { "global", &JSGlobalObject::s_info, &globalObjectTable, CREATE_METHOD_TABLE(GlobalObject) };
+const ClassInfo GlobalObject::s_info = { "global", &JSGlobalObject::s_info, nullptr, CREATE_METHOD_TABLE(GlobalObject) };
 
 GlobalObject::GlobalObject(VM& vm, Structure* structure, const Vector<String>& arguments)
     : JSGlobalObject(vm, structure)
@@ -519,7 +515,7 @@ static void parseArguments(int argc, char** argv, CommandLine& options)
 
 int realMain(int argc, char** argv)
 {
-    VM* vm = VM::create(LargeHeap).leakRef();
+    VM* vm = &VM::create(LargeHeap).leakRef();
     JSLockHolder locker(vm);
 
     CommandLine options;

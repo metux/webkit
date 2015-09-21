@@ -35,10 +35,11 @@
 #include <wtf/Ref.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
+#include <wtf/text/StringHash.h>
 
 namespace API {
 class Array;
-class UserContentFilter;
+class UserContentExtension;
 class UserScript;
 }
 
@@ -55,6 +56,7 @@ namespace WebKit {
 
 class WebProcessProxy;
 class WebScriptMessageHandler;
+struct SecurityOriginData;
 
 class WebUserContentControllerProxy : public API::ObjectImpl<API::Object::Type::UserContentController>, private IPC::MessageReceiver {
 public:
@@ -82,15 +84,16 @@ public:
     void removeUserMessageHandlerForName(const String&);
 
 #if ENABLE(CONTENT_EXTENSIONS)
-    void addUserContentFilter(API::UserContentFilter&);
-    void removeAllUserContentFilters();
+    void addUserContentExtension(API::UserContentExtension&);
+    void removeUserContentExtension(const String&);
+    void removeAllUserContentExtensions();
 #endif
 
 private:
     // IPC::MessageReceiver.
     virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
 
-    void didPostMessage(IPC::Connection&, uint64_t pageID, uint64_t frameID, uint64_t messageHandlerID, const IPC::DataReference&);
+    void didPostMessage(IPC::Connection&, uint64_t pageID, uint64_t frameID, const SecurityOriginData&, uint64_t messageHandlerID, const IPC::DataReference&);
 
     uint64_t m_identifier;
     HashSet<WebProcessProxy*> m_processes;    
@@ -99,7 +102,7 @@ private:
     HashMap<uint64_t, RefPtr<WebScriptMessageHandler>> m_scriptMessageHandlers;
 
 #if ENABLE(CONTENT_EXTENSIONS)
-    Ref<API::Array> m_userContentFilters;
+    HashMap<String, RefPtr<API::UserContentExtension>> m_userContentExtensions;
 #endif
 };
 

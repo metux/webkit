@@ -30,7 +30,6 @@
 
 #include "ColorChooser.h"
 #include "DatabaseProvider.h"
-#include "DateTimeChooser.h"
 #include "DocumentLoader.h"
 #include "FileChooser.h"
 #include "FormState.h"
@@ -64,11 +63,12 @@ class EmptyStorageNamespaceProvider final : public StorageNamespaceProvider {
         virtual bool canAccessStorage(Frame*) override { return false; }
         virtual StorageType storageType() const override { return LocalStorage; }
         virtual size_t memoryBytesUsedByCache() override { return 0; }
+        SecurityOrigin& securityOrigin() override { return SecurityOrigin::createUnique(); }
     };
 
     struct EmptyStorageNamespace final : public StorageNamespace {
-        virtual PassRefPtr<StorageArea> storageArea(PassRefPtr<SecurityOrigin>) override { return adoptRef(new EmptyStorageArea); }
-        virtual PassRefPtr<StorageNamespace> copy(Page*) override { return adoptRef(new EmptyStorageNamespace); }
+        virtual RefPtr<StorageArea> storageArea(PassRefPtr<SecurityOrigin>) override { return adoptRef(new EmptyStorageArea); }
+        virtual RefPtr<StorageNamespace> copy(Page*) override { return adoptRef(new EmptyStorageNamespace); }
     };
 
     virtual RefPtr<StorageNamespace> createSessionStorageNamespace(Page&, unsigned) override
@@ -146,25 +146,18 @@ private:
     RefPtr<EmptyPopupMenu> m_popup;
 };
 
-PassRefPtr<PopupMenu> EmptyChromeClient::createPopupMenu(PopupMenuClient*) const
+RefPtr<PopupMenu> EmptyChromeClient::createPopupMenu(PopupMenuClient*) const
 {
     return adoptRef(new EmptyPopupMenu());
 }
 
-PassRefPtr<SearchPopupMenu> EmptyChromeClient::createSearchPopupMenu(PopupMenuClient*) const
+RefPtr<SearchPopupMenu> EmptyChromeClient::createSearchPopupMenu(PopupMenuClient*) const
 {
     return adoptRef(new EmptySearchPopupMenu());
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
 std::unique_ptr<ColorChooser> EmptyChromeClient::createColorChooser(ColorChooserClient*, const Color&)
-{
-    return nullptr;
-}
-#endif
-
-#if ENABLE(DATE_AND_TIME_INPUT_TYPES) && !PLATFORM(IOS)
-PassRefPtr<DateTimeChooser> EmptyChromeClient::openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&)
 {
     return nullptr;
 }
@@ -190,19 +183,19 @@ void EmptyFrameLoaderClient::dispatchWillSubmitForm(PassRefPtr<FormState>, Frame
 {
 }
 
-PassRefPtr<DocumentLoader> EmptyFrameLoaderClient::createDocumentLoader(const ResourceRequest& request, const SubstituteData& substituteData)
+Ref<DocumentLoader> EmptyFrameLoaderClient::createDocumentLoader(const ResourceRequest& request, const SubstituteData& substituteData)
 {
     return DocumentLoader::create(request, substituteData);
 }
 
-PassRefPtr<Frame> EmptyFrameLoaderClient::createFrame(const URL&, const String&, HTMLFrameOwnerElement*, const String&, bool, int, int)
+RefPtr<Frame> EmptyFrameLoaderClient::createFrame(const URL&, const String&, HTMLFrameOwnerElement*, const String&, bool, int, int)
 {
-    return 0;
+    return nullptr;
 }
 
-PassRefPtr<Widget> EmptyFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugInElement*, const URL&, const Vector<String>&, const Vector<String>&, const String&, bool)
+RefPtr<Widget> EmptyFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugInElement*, const URL&, const Vector<String>&, const Vector<String>&, const String&, bool)
 {
-    return 0;
+    return nullptr;
 }
 
 void EmptyFrameLoaderClient::recreatePlugin(Widget*)

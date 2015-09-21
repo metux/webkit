@@ -28,6 +28,8 @@
 #define SQLiteDatabase_h
 
 #include <functional>
+#include <sqlite3.h>
+#include <wtf/Lock.h>
 #include <wtf/Threading.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
@@ -44,15 +46,6 @@ class DatabaseAuthorizer;
 class SQLiteStatement;
 class SQLiteTransaction;
 
-extern const int SQLResultDone;
-extern const int SQLResultError;
-extern const int SQLResultOk;
-extern const int SQLResultRow;
-extern const int SQLResultSchema;
-extern const int SQLResultFull;
-extern const int SQLResultInterrupt;
-extern const int SQLResultConstraint;
-
 class SQLiteDatabase {
     WTF_MAKE_NONCOPYABLE(SQLiteDatabase);
     friend class SQLiteTransaction;
@@ -63,8 +56,6 @@ public:
     WEBCORE_EXPORT bool open(const String& filename, bool forWebSQLDatabase = false);
     bool isOpen() const { return m_db; }
     WEBCORE_EXPORT void close();
-    void interrupt();
-    bool isInterrupted();
 
     void updateLastChangesCount();
 
@@ -116,7 +107,7 @@ public:
     
     void setAuthorizer(PassRefPtr<DatabaseAuthorizer>);
 
-    Mutex& databaseMutex() { return m_lockingMutex; }
+    Lock& databaseMutex() { return m_lockingMutex; }
     bool isAutoCommitOn() const;
 
     // The SQLite AUTO_VACUUM pragma can be either NONE, FULL, or INCREMENTAL.
@@ -157,14 +148,13 @@ private:
     bool m_transactionInProgress;
     bool m_sharable;
     
-    Mutex m_authorizerLock;
+    Lock m_authorizerLock;
     RefPtr<DatabaseAuthorizer> m_authorizer;
 
-    Mutex m_lockingMutex;
+    Lock m_lockingMutex;
     ThreadIdentifier m_openingThread;
 
-    Mutex m_databaseClosingMutex;
-    bool m_interrupted;
+    Lock m_databaseClosingMutex;
 
     int m_openError;
     CString m_openErrorMessage;

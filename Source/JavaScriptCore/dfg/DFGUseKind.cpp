@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -55,6 +55,9 @@ void printInternal(PrintStream& out, UseKind useKind)
     case NumberUse:
         out.print("Number");
         return;
+    case RealNumberUse:
+        out.print("RealNumber");
+        return;
     case DoubleRepUse:
         out.print("DoubleRep");
         return;
@@ -66,6 +69,9 @@ void printInternal(PrintStream& out, UseKind useKind)
         return;
     case BooleanUse:
         out.print("Boolean");
+        return;
+    case KnownBooleanUse:
+        out.print("KnownBoolean");
         return;
     case CellUse:
         out.print("Cell");
@@ -93,6 +99,9 @@ void printInternal(PrintStream& out, UseKind useKind)
         return;
     case KnownStringUse:
         out.print("KnownString");
+        return;
+    case SymbolUse:
+        out.print("Symbol");
         return;
     case StringObjectUse:
         out.print("StringObject");

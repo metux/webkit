@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2004, 2005, 2007, 2008, 2009, 2012 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2004, 2005, 2007, 2008, 2009, 2012, 2015 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -23,9 +23,11 @@
 #ifndef JSCJSValue_h
 #define JSCJSValue_h
 
-#include <math.h>
+#include "JSExportMacros.h"
 #include "PureNaN.h"
-#include <stddef.h> // for size_t
+#include <functional>
+#include <math.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <wtf/Assertions.h>
 #include <wtf/Forward.h>
@@ -125,8 +127,15 @@ inline uint32_t toUInt32(double number)
 int64_t tryConvertToInt52(double);
 bool isInt52(double);
 
+enum class SourceCodeRepresentation {
+    Other,
+    Integer,
+    Double
+};
+
 class JSValue {
     friend struct EncodedJSValueHashTraits;
+    friend struct EncodedJSValueWithRepresentationHashTraits;
     friend class AssemblyHelpers;
     friend class JIT;
     friend class JITSlowPathCall;
@@ -188,8 +197,7 @@ public:
     explicit JSValue(long long);
     explicit JSValue(unsigned long long);
 
-    typedef void* (JSValue::*UnspecifiedBoolType);
-    operator UnspecifiedBoolType*() const;
+    explicit operator bool() const;
     bool operator==(const JSValue& other) const;
     bool operator!=(const JSValue& other) const;
 
@@ -246,7 +254,6 @@ public:
     JSString* toString(ExecState*) const;
     Identifier toPropertyKey(ExecState*) const;
     WTF::String toWTFString(ExecState*) const;
-    WTF::String toWTFStringInline(ExecState*) const;
     JSObject* toObject(ExecState*) const;
     JSObject* toObject(ExecState*, JSGlobalObject*) const;
 
@@ -256,8 +263,8 @@ public:
     int32_t toInt32(ExecState*) const;
     uint32_t toUInt32(ExecState*) const;
 
-    // Floating point conversions (this is a convenience method for webcore;
-    // signle precision float is not a representation used in JS or JSC).
+    // Floating point conversions (this is a convenience function for WebCore;
+    // single precision float is not a representation used in JS or JSC).
     float toFloat(ExecState* exec) const { return static_cast<float>(toNumber(exec)); }
 
     // Object operations, with the toObject operation included.
@@ -286,7 +293,7 @@ public:
     bool isCell() const;
     JSCell* asCell() const;
     JS_EXPORT_PRIVATE bool isValidCallee();
-        
+
     JSValue structureOrUndefined() const;
 
     JS_EXPORT_PRIVATE void dump(PrintStream&) const;
@@ -295,6 +302,7 @@ public:
     void dumpForBacktrace(PrintStream&) const;
 
     JS_EXPORT_PRIVATE JSObject* synthesizePrototype(ExecState*) const;
+    bool requireObjectCoercible(ExecState*) const;
 
     // Constants used for Int52. Int52 isn't part of JSValue right now, but JSValues may be
     // converted to Int52s and back again.
@@ -449,7 +457,26 @@ struct EncodedJSValueHashTraits : HashTraits<EncodedJSValue> {
 };
 #endif
 
-typedef HashMap<EncodedJSValue, unsigned, EncodedJSValueHash, EncodedJSValueHashTraits> JSValueMap;
+typedef std::pair<EncodedJSValue, SourceCodeRepresentation> EncodedJSValueWithRepresentation;
+
+struct EncodedJSValueWithRepresentationHashTraits : HashTraits<EncodedJSValueWithRepresentation> {
+    static const bool emptyValueIsZero = false;
+    static EncodedJSValueWithRepresentation emptyValue() { return std::make_pair(JSValue::encode(JSValue()), SourceCodeRepresentation::Other); }
+    static void constructDeletedValue(EncodedJSValueWithRepresentation& slot) { slot = std::make_pair(JSValue::encode(JSValue(JSValue::HashTableDeletedValue)), SourceCodeRepresentation::Other); }
+    static bool isDeletedValue(EncodedJSValueWithRepresentation value) { return value == std::make_pair(JSValue::encode(JSValue(JSValue::HashTableDeletedValue)), SourceCodeRepresentation::Other); }
+};
+
+struct EncodedJSValueWithRepresentationHash {
+    static unsigned hash(const EncodedJSValueWithRepresentation& value)
+    {
+        return WTF::pairIntHash(EncodedJSValueHash::hash(value.first), IntHash<SourceCodeRepresentation>::hash(value.second));
+    }
+    static bool equal(const EncodedJSValueWithRepresentation& a, const EncodedJSValueWithRepresentation& b)
+    {
+        return a == b;
+    }
+    static const bool safeToCompareToEmptyOrDeleted = true;
+};
 
 // Stand-alone helper functions.
 inline JSValue jsNull()
@@ -460,6 +487,11 @@ inline JSValue jsNull()
 inline JSValue jsUndefined()
 {
     return JSValue(JSValue::JSUndefined);
+}
+
+inline JSValue jsTDZValue()
+{
+    return JSValue();
 }
 
 inline JSValue jsBoolean(bool b)

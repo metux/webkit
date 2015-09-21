@@ -428,17 +428,15 @@ double DOMTimer::intervalClampedToMinimum() const
 
 double DOMTimer::alignedFireTime(double fireTime) const
 {
-    double alignmentInterval = scriptExecutionContext()->timerAlignmentInterval();
-    if (alignmentInterval) {
-        double currentTime = monotonicallyIncreasingTime();
-        if (fireTime <= currentTime)
-            return fireTime;
-
-        double alignedTime = ceil(fireTime / alignmentInterval) * alignmentInterval;
-        return alignedTime;
-    }
+    if (double alignmentInterval = scriptExecutionContext()->timerAlignmentInterval(m_nestingLevel >= maxTimerNestingLevel))
+        return ceil(fireTime / alignmentInterval) * alignmentInterval;
 
     return fireTime;
+}
+
+const char* DOMTimer::activeDOMObjectName() const
+{
+    return "DOMTimer";
 }
 
 } // namespace WebCore

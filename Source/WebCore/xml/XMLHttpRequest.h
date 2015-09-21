@@ -53,7 +53,7 @@ class XMLHttpRequest final : public ScriptWrappable, public RefCounted<XMLHttpRe
     WTF_MAKE_FAST_ALLOCATED;
 public:
     static Ref<XMLHttpRequest> create(ScriptExecutionContext&);
-    ~XMLHttpRequest();
+    WEBCORE_EXPORT ~XMLHttpRequest();
 
     // These exact numeric values are important because JS expects them.
     enum State {
@@ -114,8 +114,8 @@ public:
     Blob* responseBlob();
     Blob* optionalResponseBlob() const { return m_responseBlob.get(); }
 #if ENABLE(XHR_TIMEOUT)
-    unsigned long timeout() const { return m_timeoutMilliseconds; }
-    void setTimeout(unsigned long timeout, ExceptionCode&);
+    unsigned timeout() const { return m_timeoutMilliseconds; }
+    void setTimeout(unsigned timeout, ExceptionCode&);
 #endif
 
     bool responseCacheIsValid() const { return m_responseCacheIsValid; }
@@ -144,17 +144,6 @@ public:
 
     const ResourceResponse& resourceResponse() const { return m_response; }
 
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(readystatechange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(load);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadend);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(progress);
-#if ENABLE(XHR_TIMEOUT)
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(timeout);
-#endif
-
     using RefCounted<XMLHttpRequest>::ref;
     using RefCounted<XMLHttpRequest>::deref;
 
@@ -162,12 +151,12 @@ private:
     explicit XMLHttpRequest(ScriptExecutionContext&);
 
     // ActiveDOMObject
-    virtual void contextDestroyed() override;
-    virtual bool canSuspend() const override;
-    virtual void suspend(ReasonForSuspension) override;
-    virtual void resume() override;
-    virtual void stop() override;
-    virtual const char* activeDOMObjectName() const override { return "XMLHttpRequest"; }
+    void contextDestroyed() override;
+    bool canSuspendForPageCache() const override;
+    void suspend(ReasonForSuspension) override;
+    void resume() override;
+    void stop() override;
+    const char* activeDOMObjectName() const override;
 
     virtual void refEventTarget() override { ref(); }
     virtual void derefEventTarget() override { deref(); }
@@ -216,6 +205,8 @@ private:
 
     void dispatchErrorEvents(const AtomicString&);
 
+    void resumeTimerFired();
+
     std::unique_ptr<XMLHttpRequestUpload> m_upload;
 
     URL m_url;
@@ -225,9 +216,6 @@ private:
     String m_mimeTypeOverride;
     bool m_async;
     bool m_includeCredentials;
-#if ENABLE(XHR_TIMEOUT)
-    unsigned long m_timeoutMilliseconds;
-#endif
     RefPtr<Blob> m_responseBlob;
 
     RefPtr<ThreadableLoader> m_loader;
@@ -265,6 +253,15 @@ private:
     // An enum corresponding to the allowed string values for the responseType attribute.
     ResponseTypeCode m_responseTypeCode;
     bool m_responseCacheIsValid;
+
+    Timer m_resumeTimer;
+    bool m_dispatchErrorOnResuming;
+
+#if ENABLE(XHR_TIMEOUT)
+    unsigned m_timeoutMilliseconds { 0 };
+    std::chrono::steady_clock::time_point m_sendingTime;
+    Timer m_timeoutTimer;
+#endif
 };
 
 } // namespace WebCore

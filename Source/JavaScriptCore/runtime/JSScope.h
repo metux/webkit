@@ -27,11 +27,12 @@
 #define JSScope_h
 
 #include "JSObject.h"
+#include "VariableEnvironment.h"
 
 namespace JSC {
 
 class ScopeChainIterator;
-class VariableWatchpointSet;
+class WatchpointSet;
 
 enum ResolveMode {
     ThrowIfNotFound,
@@ -102,7 +103,7 @@ inline bool needsVarInjectionChecks(ResolveType type)
 }
 
 struct ResolveOp {
-    ResolveOp(ResolveType type, size_t depth, Structure* structure, JSLexicalEnvironment* lexicalEnvironment, VariableWatchpointSet* watchpointSet, uintptr_t operand)
+    ResolveOp(ResolveType type, size_t depth, Structure* structure, JSLexicalEnvironment* lexicalEnvironment, WatchpointSet* watchpointSet, uintptr_t operand)
         : type(type)
         , depth(depth)
         , structure(structure)
@@ -116,7 +117,7 @@ struct ResolveOp {
     size_t depth;
     Structure* structure;
     JSLexicalEnvironment* lexicalEnvironment;
-    VariableWatchpointSet* watchpointSet;
+    WatchpointSet* watchpointSet;
     uintptr_t operand;
 };
 
@@ -149,6 +150,7 @@ enum GetOrPut { Get, Put };
 class JSScope : public JSNonFinalObject {
 public:
     typedef JSNonFinalObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags;
 
     friend class LLIntOffsetsExtractor;
     static size_t offsetOfNext();
@@ -156,14 +158,19 @@ public:
     static JSObject* objectAtScope(JSScope*);
 
     static JSValue resolve(ExecState*, JSScope*, const Identifier&);
-    static ResolveOp abstractResolve(ExecState*, bool hasTopActivation, JSScope*, const Identifier&, GetOrPut, ResolveType);
+    static ResolveOp abstractResolve(ExecState*, size_t depthOffset, JSScope*, const Identifier&, GetOrPut, ResolveType);
+
+    static void collectVariablesUnderTDZ(JSScope*, VariableEnvironment& result);
 
     static void visitChildren(JSCell*, SlotVisitor&);
+
+    bool isLexicalScope();
+    bool isCatchScope();
+    bool isFunctionNameScopeObject();
 
     ScopeChainIterator begin();
     ScopeChainIterator end();
     JSScope* next();
-    int depth();
 
     JSGlobalObject* globalObject();
     VM* vm();
@@ -191,6 +198,7 @@ public:
 
     JSObject* get() const { return JSScope::objectAtScope(m_node); }
     JSObject* operator->() const { return JSScope::objectAtScope(m_node); }
+    JSScope* scope() const { return m_node; }
 
     ScopeChainIterator& operator++() { m_node = m_node->next(); return *this; }
 

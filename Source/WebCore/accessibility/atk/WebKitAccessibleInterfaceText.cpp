@@ -51,7 +51,7 @@
 #include "WebKitAccessibleUtil.h"
 #include "WebKitAccessibleWrapperAtk.h"
 #include "htmlediting.h"
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
 
 using namespace WebCore;
@@ -86,7 +86,7 @@ static AtkAttributeSet* getAttributeSetForAccessibilityObject(const Accessibilit
     RenderObject* renderer = object->renderer();
     RenderStyle* style = &renderer->style();
 
-    AtkAttributeSet* result = 0;
+    AtkAttributeSet* result = nullptr;
     GUniquePtr<gchar> buffer(g_strdup_printf("%i", style->fontSize()));
     result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_SIZE), buffer.get());
 
@@ -231,7 +231,7 @@ static AtkAttributeSet* attributeSetDifference(AtkAttributeSet* attributeSet1, A
 
     AtkAttributeSet* currentSet = attributeSet1;
     AtkAttributeSet* found;
-    AtkAttributeSet* toDelete = 0;
+    AtkAttributeSet* toDelete = nullptr;
 
     while (currentSet) {
         found = g_slist_find_custom(attributeSet2, currentSet->data, (GCompareFunc)compareAttribute);

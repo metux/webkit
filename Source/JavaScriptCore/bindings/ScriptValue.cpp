@@ -136,8 +136,8 @@ static RefPtr<InspectorValue> jsToInspectorValue(ExecState* scriptState, JSValue
         }
         Ref<InspectorObject> inspectorObject = InspectorObject::create();
         JSObject* object = value.getObject();
-        PropertyNameArray propertyNames(scriptState);
-        object->methodTable()->getOwnPropertyNames(object, scriptState, propertyNames, ExcludeDontEnumProperties);
+        PropertyNameArray propertyNames(scriptState, PropertyNameMode::Strings);
+        object->methodTable()->getOwnPropertyNames(object, scriptState, propertyNames, EnumerationMode());
         for (size_t i = 0; i < propertyNames.size(); i++) {
             const Identifier& name = propertyNames[i];
             JSValue propertyValue = object->get(scriptState, name);

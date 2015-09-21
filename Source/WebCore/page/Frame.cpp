@@ -214,7 +214,7 @@ Ref<Frame> Frame::create(Page* page, HTMLFrameOwnerElement* ownerElement, FrameL
 
 Frame::~Frame()
 {
-    setView(0);
+    setView(nullptr);
     loader().cancelAndClear();
 
     // FIXME: We should not be doing all this work inside the destructor
@@ -284,6 +284,8 @@ void Frame::setDocument(RefPtr<Document>&& newDocument)
     // that the document is not destroyed during this function call.
     if (newDocument)
         newDocument->didBecomeCurrentDocumentInFrame();
+
+    InspectorInstrumentation::frameDocumentUpdated(this);
 }
 
 #if ENABLE(ORIENTATION_EVENTS)
@@ -293,9 +295,9 @@ void Frame::orientationChanged()
     for (Frame* frame = this; frame; frame = frame->tree().traverseNext())
         frames.append(*frame);
 
-    for (unsigned i = 0; i < frames.size(); i++) {
-        if (Document* doc = frames[i]->document())
-            doc->dispatchWindowEvent(Event::create(eventNames().orientationchangeEvent, false, false));
+    for (auto& frame : frames) {
+        if (Document* document = frame->document())
+            document->dispatchWindowEvent(Event::create(eventNames().orientationchangeEvent, false, false));
     }
 }
 
@@ -380,7 +382,7 @@ String Frame::searchForLabelsBeforeElement(const Vector<String>& labels, Element
     // charsSearchedThreshold, to make it more likely that we'll search whole nodes.
     const unsigned int maxCharsSearched = 600;
     // If the starting element is within a table, the cell that contains it
-    HTMLTableCellElement* startingTableCell = 0;
+    HTMLTableCellElement* startingTableCell = nullptr;
     bool searchedCellAbove = false;
 
     if (resultDistance)
@@ -499,7 +501,7 @@ void Frame::scrollOverflowLayer(RenderLayer* layer, const IntRect& visibleRect, 
     int x = layer->scrollXOffset();
     int exposeLeft = exposeRect.x();
     int exposeRight = exposeLeft + exposeRect.width();
-    int clientWidth = box->clientWidth();
+    int clientWidth = roundToInt(box->clientWidth());
     if (exposeLeft <= 0)
         x = std::max(0, x + exposeLeft - clientWidth / 2);
     else if (exposeRight >= clientWidth)
@@ -508,7 +510,7 @@ void Frame::scrollOverflowLayer(RenderLayer* layer, const IntRect& visibleRect, 
     int y = layer->scrollYOffset();
     int exposeTop = exposeRect.y();
     int exposeBottom = exposeTop + exposeRect.height();
-    int clientHeight = box->clientHeight();
+    int clientHeight = roundToInt(box->clientHeight());
     if (exposeTop <= 0)
         y = std::max(0, y + exposeTop - clientHeight / 2);
     else if (exposeBottom >= clientHeight)
@@ -717,10 +719,7 @@ void Frame::injectUserScriptsForWorld(DOMWrapperWorld& world, const UserScriptVe
     if (!doc)
         return;
 
-    Vector<ScriptSourceCode> sourceCode;
-    unsigned count = userScripts.size();
-    for (unsigned i = 0; i < count; ++i) {
-        UserScript* script = userScripts[i].get();
+    for (auto& script : userScripts) {
         if (script->injectedFrames() == InjectInTopFrameOnly && ownerElement())
             continue;
 
@@ -788,10 +787,10 @@ void Frame::willDetachPage()
     // FIXME: It's unclear as to why this is called more than once, but it is,
     // so page() could be NULL.
     if (page() && page()->focusController().focusedFrame() == this)
-        page()->focusController().setFocusedFrame(0);
+        page()->focusController().setFocusedFrame(nullptr);
 
     if (page() && page()->scrollingCoordinator() && m_view)
-        page()->scrollingCoordinator()->willDestroyScrollableArea(m_view.get());
+        page()->scrollingCoordinator()->willDestroyScrollableArea(*m_view);
 
 #if PLATFORM(IOS)
     if (WebThreadCountOfObservedContentModifiers() > 0 && m_page)
@@ -817,7 +816,7 @@ String Frame::displayStringModifiedByEncoding(const String& str) const
     return document() ? document()->displayStringModifiedByEncoding(str) : str;
 }
 
-VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint)
+VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint) const
 {
     HitTestResult result = eventHandler().hitTestResultAtPoint(framePoint, HitTestRequest::ReadOnly | HitTestRequest::Active);
     Node* node = result.innerNonSharedNode();
@@ -887,13 +886,13 @@ void Frame::createView(const IntSize& viewportSize, const Color& backgroundColor
     if (isMainFrame && view())
         view()->setParentVisible(false);
 
-    setView(0);
+    setView(nullptr);
 
     RefPtr<FrameView> frameView;
     if (isMainFrame) {
         frameView = FrameView::create(*this, viewportSize);
         frameView->setFixedLayoutSize(fixedLayoutSize);
-#if USE(TILED_BACKING_STORE)
+#if USE(COORDINATED_GRAPHICS)
         frameView->setFixedVisibleContentRect(fixedVisibleContentRect);
 #else
         UNUSED_PARAM(fixedVisibleContentRect);

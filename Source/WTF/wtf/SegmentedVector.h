@@ -91,6 +91,7 @@ namespace WTF {
     class SegmentedVector {
         friend class SegmentedVectorIterator<T, SegmentSize>;
         WTF_MAKE_NONCOPYABLE(SegmentedVector);
+        WTF_MAKE_FAST_ALLOCATED;
 
     public:
         typedef SegmentedVectorIterator<T, SegmentSize> Iterator;
@@ -186,7 +187,14 @@ namespace WTF {
 
     private:
         struct Segment {
+#if COMPILER(MSVC)
+#pragma warning(push)
+#pragma warning(disable: 4200)
+#endif
             T entries[0];
+#if COMPILER(MSVC)
+#pragma warning(pop)
+#endif
         };
 
         void deleteAllSegments()

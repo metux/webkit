@@ -70,13 +70,13 @@ CSSFontSelector::CSSFontSelector(Document& document)
     // seem to be any such guarantee.
 
     ASSERT(m_document);
-    fontCache().addClient(this);
+    FontCache::singleton().addClient(this);
 }
 
 CSSFontSelector::~CSSFontSelector()
 {
     clearDocument();
-    fontCache().removeClient(this);
+    FontCache::singleton().removeClient(this);
 }
 
 bool CSSFontSelector::isEmpty() const
@@ -84,7 +84,7 @@ bool CSSFontSelector::isEmpty() const
     return m_fonts.isEmpty();
 }
 
-void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
+void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule, bool isInitiatingElementInUserAgentShadowTree)
 {
     // Obtain the font-family property and the src property.  Both must be defined.
     const StyleProperties& style = fontFaceRule->properties();
@@ -212,7 +212,7 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
             Settings* settings = m_document ? m_document->frame() ? &m_document->frame()->settings() : 0 : 0;
             bool allowDownloading = foundSVGFont || (settings && settings->downloadableBinaryFontsEnabled());
             if (allowDownloading && item.isSupportedFormat() && m_document) {
-                CachedFont* cachedFont = item.cachedFont(m_document, foundSVGFont);
+                CachedFont* cachedFont = item.cachedFont(m_document, foundSVGFont, isInitiatingElementInUserAgentShadowTree);
                 if (cachedFont) {
                     source = std::make_unique<CSSFontFaceSource>(item.resource(), cachedFont);
 #if ENABLE(SVG_FONTS)
@@ -299,7 +299,7 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
             ASSERT(!m_locallyInstalledFontFaces.contains(familyName));
 
             Vector<unsigned> locallyInstalledFontsTraitsMasks;
-            fontCache().getTraitsInFamily(familyName, locallyInstalledFontsTraitsMasks);
+            FontCache::singleton().getTraitsInFamily(familyName, locallyInstalledFontsTraitsMasks);
             if (unsigned numLocallyInstalledFaces = locallyInstalledFontsTraitsMasks.size()) {
                 auto familyLocallyInstalledFaces = std::make_unique<Vector<RefPtr<CSSFontFace>>>();
 
@@ -320,14 +320,14 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
     }
 }
 
-void CSSFontSelector::registerForInvalidationCallbacks(FontSelectorClient* client)
+void CSSFontSelector::registerForInvalidationCallbacks(FontSelectorClient& client)
 {
-    m_clients.add(client);
+    m_clients.add(&client);
 }
 
-void CSSFontSelector::unregisterForInvalidationCallbacks(FontSelectorClient* client)
+void CSSFontSelector::unregisterForInvalidationCallbacks(FontSelectorClient& client)
 {
-    m_clients.remove(client);
+    m_clients.remove(&client);
 }
 
 void CSSFontSelector::dispatchInvalidationCallbacks()
@@ -337,7 +337,7 @@ void CSSFontSelector::dispatchInvalidationCallbacks()
     Vector<FontSelectorClient*> clients;
     copyToVector(m_clients, clients);
     for (size_t i = 0; i < clients.size(); ++i)
-        clients[i]->fontsNeedUpdate(this);
+        clients[i]->fontsNeedUpdate(*this);
 }
 
 void CSSFontSelector::fontLoaded()
@@ -468,7 +468,7 @@ FontRanges CSSFontSelector::fontRangesForFamily(const FontDescription& fontDescr
     if (!face) {
         if (!resolveGenericFamilyFirst)
             familyForLookup = resolveGenericFamily(m_document, fontDescription, familyName);
-        return FontRanges(fontCache().fontForFamily(fontDescription, familyForLookup));
+        return FontRanges(FontCache::singleton().fontForFamily(fontDescription, familyForLookup));
     }
 
     return face->fontRanges(fontDescription);
@@ -593,10 +593,9 @@ bool CSSFontSelector::resolvesFamilyFor(const FontDescription& description) cons
             continue;
         if (m_fontFaces.contains(familyName))
             return true;
-        DEPRECATED_DEFINE_STATIC_LOCAL(String, webkitPrefix, ("-webkit-"));
-        if (familyName.startsWith(webkitPrefix))
+        static NeverDestroyed<String> webkitPrefix("-webkit-");
+        if (familyName.startsWith(webkitPrefix.get()))
             return true;
-            
     }
     return false;
 }
@@ -617,13 +616,13 @@ PassRefPtr<Font> CSSFontSelector::fallbackFontAt(const FontDescription& fontDesc
     ASSERT_UNUSED(index, !index);
 
     if (!m_document)
-        return 0;
+        return nullptr;
 
     Settings* settings = m_document->settings();
     if (!settings || !settings->fontFallbackPrefersPictographs())
-        return 0;
+        return nullptr;
 
-    return fontCache().fontForFamily(fontDescription, settings->pictographFontFamily());
+    return FontCache::singleton().fontForFamily(fontDescription, settings->pictographFontFamily());
 }
 
 }

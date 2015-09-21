@@ -31,7 +31,7 @@
 #include "TextIterator.h"
 #include "WebKitAccessibleWrapperAtk.h"
 #include <wtf/NeverDestroyed.h>
-#include <wtf/gobject/GRefPtr.h>
+#include <wtf/glib/GRefPtr.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
@@ -153,7 +153,7 @@ static void notifyChildrenSelectionChange(AccessibilityObject* object)
 
     AccessibilityObject* listObject = getListObject(object);
     if (!listObject) {
-        oldListObject.get() = 0;
+        oldListObject.get() = nullptr;
         return;
     }
 
@@ -166,10 +166,10 @@ static void notifyChildrenSelectionChange(AccessibilityObject* object)
     // further comparisons make sense. Otherwise, just reset
     // oldFocusedObject so it won't be taken into account.
     if (oldListObject.get() != listObject)
-        oldFocusedObject.get() = 0;
+        oldFocusedObject.get() = nullptr;
 
-    AtkObject* axItem = item ? item->wrapper() : 0;
-    AtkObject* axOldFocusedObject = oldFocusedObject.get() ? oldFocusedObject.get()->wrapper() : 0;
+    AtkObject* axItem = item ? item->wrapper() : nullptr;
+    AtkObject* axOldFocusedObject = oldFocusedObject.get() ? oldFocusedObject.get()->wrapper() : nullptr;
 
     // Old focused object just lost focus, so emit the events.
     if (axOldFocusedObject && axItem != axOldFocusedObject) {
@@ -268,11 +268,14 @@ void AXObjectCache::nodeTextChangePlatformNotification(AccessibilityObject* obje
     // Select the right signal to be emitted
     CString detail;
     switch (textChange) {
-    case AXObjectCache::AXTextInserted:
+    case AXTextInserted:
         detail = "text-insert";
         break;
-    case AXObjectCache::AXTextDeleted:
+    case AXTextDeleted:
         detail = "text-remove";
+        break;
+    case AXTextAttributesChanged:
+        detail = "text-attributes-changed";
         break;
     }
 

@@ -239,7 +239,7 @@ void RenderWidget::paintContents(PaintInfo& paintInfo, const LayoutPoint& paintO
 
     if (is<FrameView>(*m_widget)) {
         FrameView& frameView = downcast<FrameView>(*m_widget);
-        bool runOverlapTests = !frameView.useSlowRepaintsIfNotOverlapped() || frameView.hasCompositedContentIncludingDescendants();
+        bool runOverlapTests = !frameView.useSlowRepaintsIfNotOverlapped();
         if (paintInfo.overlapTestRequests && runOverlapTests) {
             ASSERT(!paintInfo.overlapTestRequests->contains(this));
             paintInfo.overlapTestRequests->set(this, m_widget->frameRect());
@@ -306,12 +306,12 @@ void RenderWidget::setOverlapTestResult(bool isOverlapped)
 RenderWidget::ChildWidgetState RenderWidget::updateWidgetPosition()
 {
     if (!m_widget)
-        return ChildWidgetState::ChildWidgetIsDestroyed;
+        return ChildWidgetState::Destroyed;
 
     WeakPtr<RenderWidget> weakThis = createWeakPtr();
     bool widgetSizeChanged = updateWidgetGeometry();
     if (!weakThis || !m_widget)
-        return ChildWidgetState::ChildWidgetIsDestroyed;
+        return ChildWidgetState::Destroyed;
 
     // if the frame size got changed, or if view needs layout (possibly indicating
     // content size is wrong) we have to do a layout to set the right widget size.
@@ -321,7 +321,7 @@ RenderWidget::ChildWidgetState RenderWidget::updateWidgetPosition()
         if ((widgetSizeChanged || frameView.needsLayout()) && frameView.frame().page())
             frameView.layout();
     }
-    return ChildWidgetState::ChildWidgetIsValid;
+    return ChildWidgetState::Valid;
 }
 
 IntRect RenderWidget::windowClipRect() const

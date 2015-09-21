@@ -48,12 +48,10 @@ typedef uint64_t ResourceLoadIdentifier;
 
 class NetworkConnectionToWebProcess : public RefCounted<NetworkConnectionToWebProcess>, IPC::Connection::Client {
 public:
-    static PassRefPtr<NetworkConnectionToWebProcess> create(IPC::Connection::Identifier);
+    static Ref<NetworkConnectionToWebProcess> create(IPC::Connection::Identifier);
     virtual ~NetworkConnectionToWebProcess();
 
     IPC::Connection* connection() const { return m_connection.get(); }
-
-    bool isSerialLoadingEnabled() const { return m_serialLoadingEnabled; }
 
     void didCleanupResourceLoader(NetworkResourceLoader&);
 
@@ -74,12 +72,12 @@ private:
     
     void scheduleResourceLoad(const NetworkResourceLoadParameters&);
     void performSynchronousLoad(const NetworkResourceLoadParameters&, PassRefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply>);
+    void loadPing(const NetworkResourceLoadParameters&);
+    void prefetchDNS(const String&);
 
     void removeLoadIdentifier(ResourceLoadIdentifier);
     void setDefersLoading(ResourceLoadIdentifier, bool);
     void crossOriginRedirectReceived(ResourceLoadIdentifier, const WebCore::URL& redirectURL);
-    void servePendingRequests(uint32_t resourceLoadPriority);
-    void setSerialLoadingEnabled(bool);
     void startDownload(WebCore::SessionID, uint64_t downloadID, const WebCore::ResourceRequest&);
     void convertMainResourceLoadToDownload(uint64_t mainResourceLoadIdentifier, uint64_t downloadID, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
 
@@ -100,8 +98,6 @@ private:
     RefPtr<IPC::Connection> m_connection;
 
     HashMap<ResourceLoadIdentifier, RefPtr<NetworkResourceLoader>> m_networkResourceLoaders;
-
-    bool m_serialLoadingEnabled;
 };
 
 } // namespace WebKit

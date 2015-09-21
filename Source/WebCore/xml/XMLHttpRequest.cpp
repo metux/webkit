@@ -24,6 +24,7 @@
 #include "XMLHttpRequest.h"
 
 #include "Blob.h"
+#include "CachedResourceRequestInitiators.h"
 #include "ContentSecurityPolicy.h"
 #include "CrossOriginAccessControl.h"
 #include "DOMFormData.h"
@@ -63,10 +64,6 @@
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
-
-#if ENABLE(RESOURCE_TIMING)
-#include "CachedResourceRequestInitiators.h"
-#endif
 
 namespace WebCore {
 
@@ -123,9 +120,6 @@ XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext& context)
     : ActiveDOMObject(&context)
     , m_async(true)
     , m_includeCredentials(false)
-#if ENABLE(XHR_TIMEOUT)
-    , m_timeoutMilliseconds(0)
-#endif
     , m_state(UNSENT)
     , m_createdDocument(false)
     , m_error(false)
@@ -139,6 +133,11 @@ XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext& context)
     , m_progressEventThrottle(this)
     , m_responseTypeCode(ResponseTypeDefault)
     , m_responseCacheIsValid(false)
+    , m_resumeTimer(*this, &XMLHttpRequest::resumeTimerFired)
+    , m_dispatchErrorOnResuming(false)
+#if ENABLE(XHR_TIMEOUT)
+    , m_timeoutTimer(*this, &XMLHttpRequest::didTimeout)
+#endif
 {
 #ifndef NDEBUG
     xmlHttpRequestCounter.increment();
@@ -214,7 +213,7 @@ Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
         if ((m_response.isHTTP() && !responseIsXML() && !isHTML)
             || (isHTML && m_responseTypeCode == ResponseTypeDefault)
             || scriptExecutionContext()->isWorkerGlobalScope()) {
-            m_responseDocument = 0;
+            m_responseDocument = nullptr;
         } else {
             if (isHTML)
                 m_responseDocument = HTMLDocument::create(0, m_url);
@@ -226,7 +225,7 @@ Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
             m_responseDocument->overrideMIMEType(mimeType);
 
             if (!m_responseDocument->wellFormed())
-                m_responseDocument = 0;
+                m_responseDocument = nullptr;
         }
         m_createdDocument = true;
     }
@@ -246,7 +245,7 @@ Blob* XMLHttpRequest::responseBlob()
             data.append(m_binaryResponseBuilder->data(), m_binaryResponseBuilder->size());
             String normalizedContentType = Blob::normalizedContentType(responseMIMEType()); // responseMIMEType defaults to text/xml which may be incorrect.
             m_responseBlob = Blob::create(WTF::move(data), normalizedContentType);
-            m_binaryResponseBuilder.clear();
+            m_binaryResponseBuilder = nullptr;
         } else {
             // If we errored out or got no data, we still return a blob, just an empty one.
             m_responseBlob = Blob::create();
@@ -266,23 +265,29 @@ ArrayBuffer* XMLHttpRequest::responseArrayBuffer()
             m_responseArrayBuffer = m_binaryResponseBuilder->createArrayBuffer();
         else
             m_responseArrayBuffer = ArrayBuffer::create(nullptr, 0);
-        m_binaryResponseBuilder.clear();
+        m_binaryResponseBuilder = nullptr;
     }
 
     return m_responseArrayBuffer.get();
 }
 
 #if ENABLE(XHR_TIMEOUT)
-void XMLHttpRequest::setTimeout(unsigned long timeout, ExceptionCode& ec)
+void XMLHttpRequest::setTimeout(unsigned timeout, ExceptionCode& ec)
 {
-    // FIXME: Need to trigger or update the timeout Timer here, if needed. http://webkit.org/b/98156
-    // XHR2 spec, 4.7.3. "This implies that the timeout attribute can be set while fetching is in progress. If that occurs it will still be measured relative to the start of fetching."
     if (scriptExecutionContext()->isDocument() && !m_async) {
         logConsoleError(scriptExecutionContext(), "XMLHttpRequest.timeout cannot be set for synchronous HTTP(S) requests made from the window context.");
         ec = INVALID_ACCESS_ERR;
         return;
     }
     m_timeoutMilliseconds = timeout;
+    if (!m_timeoutTimer.isActive())
+        return;
+    if (!m_timeoutMilliseconds) {
+        m_timeoutTimer.stop();
+        return;
+    }
+    std::chrono::duration<double> interval = std::chrono::milliseconds { m_timeoutMilliseconds } - (std::chrono::steady_clock::now() - m_sendingTime);
+    m_timeoutTimer.startOneShot(std::max(0.0, interval.count()));
 }
 #endif
 
@@ -406,12 +411,12 @@ bool XMLHttpRequest::isAllowedHTTPMethod(const String& method)
 String XMLHttpRequest::uppercaseKnownHTTPMethod(const String& method)
 {
     const char* const methods[] = { "DELETE", "GET", "HEAD", "OPTIONS", "POST", "PUT" };
-    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(methods); ++i) {
-        if (equalIgnoringCase(method, methods[i])) {
+    for (auto* value : methods) {
+        if (equalIgnoringCase(method, value)) {
             // Don't bother allocating a new string if it's already all uppercase.
-            if (method == methods[i])
+            if (method == value)
                 break;
-            return ASCIILiteral(methods[i]);
+            return ASCIILiteral(value);
         }
     }
     return method;
@@ -505,7 +510,7 @@ void XMLHttpRequest::open(const String& method, const URL& url, bool async, Exce
         if (document.frame())
             shouldBypassMainWorldContentSecurityPolicy = document.frame()->script().shouldBypassMainWorldContentSecurityPolicy();
     }
-    if (!shouldBypassMainWorldContentSecurityPolicy && !scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url)) {
+    if (!scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url, shouldBypassMainWorldContentSecurityPolicy)) {
         // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
         return;
@@ -746,6 +751,7 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
     m_uploadEventsAllowed = m_sameOriginRequest || uploadEvents || !isSimpleCrossOriginAccessRequest(m_method, m_requestHeaders);
 
     ResourceRequest request(m_url);
+    request.setRequester(ResourceRequest::Requester::XHR);
     request.setHTTPMethod(m_method);
 
     if (m_requestEntityBody) {
@@ -764,13 +770,17 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
     options.setAllowCredentials((m_sameOriginRequest || m_includeCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials);
     options.crossOriginRequestPolicy = UseAccessControl;
     options.securityOrigin = securityOrigin();
-#if ENABLE(RESOURCE_TIMING)
     options.initiator = cachedResourceRequestInitiators().xmlhttprequest;
-#endif
 
 #if ENABLE(XHR_TIMEOUT)
-    if (m_timeoutMilliseconds)
-        request.setTimeoutInterval(m_timeoutMilliseconds / 1000.0);
+    if (m_timeoutMilliseconds) {
+        if (!m_async)
+            request.setTimeoutInterval(m_timeoutMilliseconds / 1000.0);
+        else {
+            m_sendingTime = std::chrono::steady_clock::now();
+            m_timeoutTimer.startOneShot(std::chrono::milliseconds { m_timeoutMilliseconds });
+        }
+    }
 #endif
 
     m_exceptionCode = 0;
@@ -835,7 +845,12 @@ bool XMLHttpRequest::internalAbort()
     // FIXME: when we add the support for multi-part XHR, we will have to think be careful with this initialization.
     m_receivedLength = 0;
 
-    m_decoder = 0;
+    m_decoder = nullptr;
+
+#if ENABLE(XHR_TIMEOUT)
+    if (m_timeoutTimer.isActive())
+        m_timeoutTimer.stop();
+#endif
 
     if (!m_loader)
         return true;
@@ -868,17 +883,17 @@ void XMLHttpRequest::clearResponseBuffers()
     m_responseBuilder.clear();
     m_responseEncoding = String();
     m_createdDocument = false;
-    m_responseDocument = 0;
-    m_responseBlob = 0;
-    m_binaryResponseBuilder.clear();
-    m_responseArrayBuffer.clear();
+    m_responseDocument = nullptr;
+    m_responseBlob = nullptr;
+    m_binaryResponseBuilder = nullptr;
+    m_responseArrayBuffer = nullptr;
     m_responseCacheIsValid = false;
 }
 
 void XMLHttpRequest::clearRequest()
 {
     m_requestHeaders.clear();
-    m_requestEntityBody = 0;
+    m_requestEntityBody = nullptr;
 }
 
 void XMLHttpRequest::genericError()
@@ -942,7 +957,8 @@ void XMLHttpRequest::setRequestHeader(const String& name, const String& value, E
         return;
     }
 
-    if (!isValidHTTPToken(name) || !isValidHTTPHeaderValue(value)) {
+    String normalizedValue = stripLeadingAndTrailingHTTPSpaces(value);
+    if (!isValidHTTPToken(name) || !isValidHTTPHeaderValue(normalizedValue)) {
         ec = SYNTAX_ERR;
         return;
     }
@@ -953,7 +969,7 @@ void XMLHttpRequest::setRequestHeader(const String& name, const String& value, E
         return;
     }
 
-    setRequestHeaderInternal(name, value);
+    setRequestHeaderInternal(name, normalizedValue);
 }
 
 void XMLHttpRequest::setRequestHeaderInternal(const String& name, const String& value)
@@ -1079,6 +1095,7 @@ void XMLHttpRequest::didFail(const ResourceError& error)
     }
 
 #if ENABLE(XHR_TIMEOUT)
+    // In case of worker sync timeouts.
     if (error.isTimeout()) {
         didTimeout();
         return;
@@ -1114,11 +1131,16 @@ void XMLHttpRequest::didFinishLoading(unsigned long identifier, double)
     InspectorInstrumentation::didFinishXHRLoading(scriptExecutionContext(), this, identifier, m_responseBuilder.toStringPreserveCapacity(), m_url, m_lastSendURL, m_lastSendLineNumber, m_lastSendColumnNumber);
 
     bool hadLoader = m_loader;
-    m_loader = 0;
+    m_loader = nullptr;
 
     changeState(DONE);
     m_responseEncoding = String();
-    m_decoder = 0;
+    m_decoder = nullptr;
+
+#if ENABLE(XHR_TIMEOUT)
+    if (m_timeoutTimer.isActive())
+        m_timeoutTimer.stop();
+#endif
 
     if (hadLoader)
         dropProtection();
@@ -1253,19 +1275,54 @@ void XMLHttpRequest::didTimeout()
 }
 #endif
 
-bool XMLHttpRequest::canSuspend() const
+bool XMLHttpRequest::canSuspendForPageCache() const
 {
-    return !m_loader;
+    // If the load event has not fired yet, cancelling the load in suspend() may cause
+    // the load event to be fired and arbitrary JS execution, which would be unsafe.
+    // Therefore, we prevent suspending in this case.
+    return document()->loadEventFinished();
 }
 
-void XMLHttpRequest::suspend(ReasonForSuspension)
+const char* XMLHttpRequest::activeDOMObjectName() const
+{
+    return "XMLHttpRequest";
+}
+
+void XMLHttpRequest::suspend(ReasonForSuspension reason)
 {
     m_progressEventThrottle.suspend();
+
+    if (m_resumeTimer.isActive()) {
+        m_resumeTimer.stop();
+        m_dispatchErrorOnResuming = true;
+    }
+
+    if (reason == ActiveDOMObject::PageCache && m_loader) {
+        // Going into PageCache, abort the request and dispatch a network error on resuming.
+        genericError();
+        m_dispatchErrorOnResuming = true;
+        bool aborted = internalAbort();
+        // It should not be possible to restart the load when aborting in suspend() because
+        // we are not allowed to execute in JS in suspend().
+        ASSERT_UNUSED(aborted, aborted);
+    }
 }
 
 void XMLHttpRequest::resume()
 {
     m_progressEventThrottle.resume();
+
+    // We are not allowed to execute arbitrary JS in resume() so dispatch
+    // the error event in a timer.
+    if (m_dispatchErrorOnResuming && !m_resumeTimer.isActive())
+        m_resumeTimer.startOneShot(0);
+}
+
+void XMLHttpRequest::resumeTimerFired()
+{
+    ASSERT(m_dispatchErrorOnResuming);
+    m_dispatchErrorOnResuming = false;
+    dispatchErrorEvents(eventNames().errorEvent);
 }
 
 void XMLHttpRequest::stop()

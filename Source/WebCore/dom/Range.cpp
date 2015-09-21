@@ -28,6 +28,7 @@
 #include "ClientRect.h"
 #include "ClientRectList.h"
 #include "DocumentFragment.h"
+#include "Event.h"
 #include "Frame.h"
 #include "FrameView.h"
 #include "HTMLElement.h"
@@ -1919,7 +1920,7 @@ void Range::collectSelectionRects(Vector<SelectionRect>& rects)
 }
 #endif
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 void Range::formatForDebugger(char* buffer, unsigned length) const
 {
     StringBuilder result;
@@ -2251,7 +2252,7 @@ FloatRect Range::boundingRect() const
 
 } // namespace WebCore
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 
 void showTree(const WebCore::Range* range)
 {

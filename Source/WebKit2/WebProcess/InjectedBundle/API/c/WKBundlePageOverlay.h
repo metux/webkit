@@ -50,9 +50,9 @@ typedef bool (*WKBundlePageOverlayMouseMovedCallback)(WKBundlePageOverlayRef pag
 typedef bool (*WKBundlePageOverlayMouseDraggedCallback)(WKBundlePageOverlayRef pageOverlay, WKPoint position, WKEventMouseButton mouseButton, const void* clientInfo);
 
 typedef void* (*WKBundlePageOverlayActionContextForResultAtPointCallback)(WKBundlePageOverlayRef pageOverlay, WKPoint position, WKBundleRangeHandleRef* rangeHandle, const void* clientInfo);
-typedef void (*WKBundlePageOverlayDatadetectorsDidPresentUI)(WKBundlePageOverlayRef pageOverlay, const void* clientInfo);
-typedef void (*WKBundlePageOverlayDatadetectorsDidChangeUI)(WKBundlePageOverlayRef pageOverlay, const void* clientInfo);
-typedef void (*WKBundlePageOverlayDatadetectorsDidHideUI)(WKBundlePageOverlayRef pageOverlay, const void* clientInfo);
+typedef void (*WKBundlePageOverlayDataDetectorsDidPresentUI)(WKBundlePageOverlayRef pageOverlay, const void* clientInfo);
+typedef void (*WKBundlePageOverlayDataDetectorsDidChangeUI)(WKBundlePageOverlayRef pageOverlay, const void* clientInfo);
+typedef void (*WKBundlePageOverlayDataDetectorsDidHideUI)(WKBundlePageOverlayRef pageOverlay, const void* clientInfo);
 
 typedef struct WKBundlePageOverlayClientBase {
     int                                                                 version;
@@ -83,24 +83,10 @@ typedef struct WKBundlePageOverlayClientV1 {
     WKBundlePageOverlayMouseDraggedCallback                             mouseDragged;
 
     WKBundlePageOverlayActionContextForResultAtPointCallback            actionContextForResultAtPoint;
-    WKBundlePageOverlayDatadetectorsDidPresentUI                         dataDetectorsDidPresentUI;
-    WKBundlePageOverlayDatadetectorsDidChangeUI                           dataDetectorsDidChangeUI;
-    WKBundlePageOverlayDatadetectorsDidHideUI                               dataDetectorsDidHideUI;
+    WKBundlePageOverlayDataDetectorsDidPresentUI                        dataDetectorsDidPresentUI;
+    WKBundlePageOverlayDataDetectorsDidChangeUI                         dataDetectorsDidChangeUI;
+    WKBundlePageOverlayDataDetectorsDidHideUI                           dataDetectorsDidHideUI;
 } WKBundlePageOverlayClientV1;
-
-enum { kWKBundlePageOverlayClientCurrentVersion WK_ENUM_DEPRECATED("Use an explicit version number instead") = 0 };
-typedef struct WKBundlePageOverlayClient {
-    int                                                                 version;
-    const void *                                                        clientInfo;
-
-    WKBundlePageOverlayWillMoveToPageCallback                           willMoveToPage;
-    WKBundlePageOverlayDidMoveToPageCallback                            didMoveToPage;
-    WKBundlePageOverlayDrawRectCallback                                 drawRect;
-    WKBundlePageOverlayMouseDownCallback                                mouseDown;
-    WKBundlePageOverlayMouseUpCallback                                  mouseUp;
-    WKBundlePageOverlayMouseMovedCallback                               mouseMoved;
-    WKBundlePageOverlayMouseDraggedCallback                             mouseDragged;
-} WKBundlePageOverlayClient WK_C_DEPRECATED("Use an explicit versioned struct instead");
 
 typedef WKTypeRef (*WKAccessibilityAttributeValueCallback)(WKBundlePageOverlayRef pageOverlay, WKStringRef attribute, WKTypeRef parameter, const void* clientInfo);
 typedef WKArrayRef (*WKAccessibilityAttributeNamesCallback)(WKBundlePageOverlayRef pageOverlay, bool parameterizedNames, const void* clientInfo);
@@ -117,16 +103,6 @@ typedef struct WKBundlePageOverlayAccessibilityClientV0 {
     WKAccessibilityAttributeValueCallback                               copyAccessibilityAttributeValue;
     WKAccessibilityAttributeNamesCallback                               copyAccessibilityAttributeNames;
 } WKBundlePageOverlayAccessibilityClientV0;
-
-enum { kWKBundlePageOverlayAccessibilityClientCurrentVersion WK_ENUM_DEPRECATED("Use an explicit version number instead") = 0 };
-typedef struct WKBundlePageOverlayAccessibilityClient {
-    int                                                                 version;
-    const void *                                                        clientInfo;
-
-    // Version 0.
-    WKAccessibilityAttributeValueCallback                               copyAccessibilityAttributeValue;
-    WKAccessibilityAttributeNamesCallback                               copyAccessibilityAttributeNames;
-} WKBundlePageOverlayAccessibilityClient WK_C_DEPRECATED("Use an explicit versioned struct instead");
 
 WK_EXPORT WKTypeID WKBundlePageOverlayGetTypeID();
 

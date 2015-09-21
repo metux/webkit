@@ -48,9 +48,9 @@ static const char* const defaultFontFamily = "sans-serif";
 
 class LoadFontCallback : public CSSSegmentedFontFace::LoadFontCallback {
 public:
-    static PassRefPtr<LoadFontCallback> create(int numLoading, FontLoader& fontLoader, PassRefPtr<VoidCallback> loadCallback, PassRefPtr<VoidCallback> errorCallback)
+    static Ref<LoadFontCallback> create(int numLoading, FontLoader& fontLoader, PassRefPtr<VoidCallback> loadCallback, PassRefPtr<VoidCallback> errorCallback)
     {
-        return adoptRef<LoadFontCallback>(new LoadFontCallback(numLoading, fontLoader, loadCallback, errorCallback));
+        return adoptRef(*new LoadFontCallback(numLoading, fontLoader, loadCallback, errorCallback));
     }
 
     static PassRefPtr<LoadFontCallback> createFromParams(const Dictionary& params, FontLoader& fontLoader, const FontCascade& font)
@@ -122,7 +122,7 @@ FontLoader::FontLoader(Document* document)
     , m_document(document)
     , m_numLoadingFromCSS(0)
     , m_numLoadingFromJS(0)
-    , m_pendingEventsTimer(*this, &FontLoader::pendingEventsTimerFired)
+    , m_pendingEventsTimer(*this, &FontLoader::firePendingEvents)
 {
     suspendIfNeeded();
 }
@@ -154,6 +154,16 @@ ScriptExecutionContext* FontLoader::scriptExecutionContext() const
 void FontLoader::didLayout()
 {
     loadingDone();
+}
+
+const char* FontLoader::activeDOMObjectName() const
+{
+    return "FontLoader";
+}
+
+bool FontLoader::canSuspendForPageCache() const
+{
+    return !m_numLoadingFromCSS && !m_numLoadingFromJS;
 }
 
 void FontLoader::scheduleEvent(PassRefPtr<Event> event)
@@ -285,7 +295,7 @@ bool FontLoader::resolveFontStyle(const String& fontString, FontCascade& font)
 {
     // Interpret fontString in the same way as the 'font' attribute of CanvasRenderingContext2D.
     RefPtr<MutableStyleProperties> parsedStyle = MutableStyleProperties::create();
-    CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, fontString, true, CSSStrictMode, 0);
+    CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, fontString, true, CSSStrictMode, nullptr);
     if (parsedStyle->isEmpty())
         return false;
     

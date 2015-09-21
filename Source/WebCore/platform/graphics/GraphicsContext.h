@@ -73,7 +73,6 @@ namespace WebCore {
     const int cMisspellingLinePatternGapWidth = 1;
 
     class AffineTransform;
-    class DrawingBuffer;
     class FloatRoundedRect;
     class Gradient;
     class GraphicsContextPlatformPrivate;
@@ -115,6 +114,7 @@ namespace WebCore {
         GraphicsContextState()
             : shouldAntialias(true)
             , shouldSmoothFonts(true)
+            , antialiasedFontDilationEnabled(true)
             , shouldSubpixelQuantizeFonts(true)
             , paintingDisabled(false)
             , shadowsIgnoreTransforms(false)
@@ -157,6 +157,7 @@ namespace WebCore {
 
         bool shouldAntialias : 1;
         bool shouldSmoothFonts : 1;
+        bool antialiasedFontDilationEnabled : 1;
         bool shouldSubpixelQuantizeFonts : 1;
         bool paintingDisabled : 1;
         bool shadowsIgnoreTransforms : 1;
@@ -240,6 +241,9 @@ namespace WebCore {
         WEBCORE_EXPORT void setShouldAntialias(bool);
         bool shouldAntialias() const { return m_state.shouldAntialias; }
 
+        WEBCORE_EXPORT void setAntialiasedFontDilationEnabled(bool);
+        bool antialiasedFontDilationEnabled() const { return m_state.antialiasedFontDilationEnabled; }
+
         WEBCORE_EXPORT void setShouldSmoothFonts(bool);
         bool shouldSmoothFonts() const { return m_state.shouldSmoothFonts; }
 
@@ -303,7 +307,7 @@ namespace WebCore {
         WEBCORE_EXPORT void strokeRect(const FloatRect&, float lineWidth);
 
         WEBCORE_EXPORT void drawImage(Image*, ColorSpace, const FloatPoint& destination, const ImagePaintingOptions& = ImagePaintingOptions());
-        void drawImage(Image*, ColorSpace, const FloatRect& destination, const ImagePaintingOptions& = ImagePaintingOptions());
+        WEBCORE_EXPORT void drawImage(Image*, ColorSpace, const FloatRect& destination, const ImagePaintingOptions& = ImagePaintingOptions());
         void drawImage(Image*, ColorSpace, const FloatRect& destination, const FloatRect& source, const ImagePaintingOptions& = ImagePaintingOptions());
 
         void drawTiledImage(Image*, ColorSpace, const FloatRect& destination, const FloatPoint& source, const FloatSize& tileSize,
@@ -427,7 +431,7 @@ namespace WebCore {
         enum IncludeDeviceScale { DefinitelyIncludeDeviceScale, PossiblyIncludeDeviceScale };
         AffineTransform getCTM(IncludeDeviceScale includeScale = PossiblyIncludeDeviceScale) const;
 
-#if ENABLE(3D_RENDERING) && USE(TEXTURE_MAPPER)
+#if ENABLE(3D_TRANSFORMS) && USE(TEXTURE_MAPPER)
         // This is needed when using accelerated-compositing in software mode, like in TextureMapper.
         void concat3DTransform(const TransformationMatrix&);
         void set3DTransform(const TransformationMatrix&);

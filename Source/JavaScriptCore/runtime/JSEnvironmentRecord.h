@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,30 +45,72 @@ class JSEnvironmentRecord : public JSSymbolTableObject {
 
 public:
     typedef JSSymbolTableObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags;
 
-    WriteBarrierBase<Unknown>* registers() { return m_registers; }
-    WriteBarrierBase<Unknown>& registerAt(int index) const { return m_registers[index]; }
+    WriteBarrierBase<Unknown>* variables()
+    {
+        return bitwise_cast<WriteBarrierBase<Unknown>*>(bitwise_cast<char*>(this) + offsetOfVariables());
+    }
+    
+    bool isValid(ScopeOffset offset)
+    {
+        return !!offset && offset.offset() < symbolTable()->scopeSize();
+    }
+    
+    WriteBarrierBase<Unknown>& variableAt(ScopeOffset offset)
+    {
+        ASSERT(isValid(offset));
+        return variables()[offset.offset()];
+    }
 
-    WriteBarrierBase<Unknown>* const * addressOfRegisters() const { return &m_registers; }
-    static size_t offsetOfRegisters() { return OBJECT_OFFSETOF(JSEnvironmentRecord, m_registers); }
+    static size_t offsetOfVariables()
+    {
+        return WTF::roundUpToMultipleOf<sizeof(WriteBarrier<Unknown>)>(sizeof(JSEnvironmentRecord));
+    }
+    
+    static ptrdiff_t offsetOfVariable(ScopeOffset offset)
+    {
+        return offsetOfVariables() + offset.offset() * sizeof(WriteBarrier<Unknown>);
+    }
 
     DECLARE_INFO;
 
+    static size_t allocationSizeForScopeSize(unsigned scopeSize)
+    {
+        return offsetOfVariables() + scopeSize * sizeof(WriteBarrier<Unknown>);
+    }
+    
+    static size_t allocationSize(SymbolTable* symbolTable)
+    {
+        return allocationSizeForScopeSize(symbolTable->scopeSize());
+    }
+    
 protected:
-    static const unsigned StructureFlags = Base::StructureFlags;
-
     JSEnvironmentRecord(
         VM& vm,
         Structure* structure,
-        Register* registers,
         JSScope* scope,
-        SymbolTable* symbolTable = 0)
+        SymbolTable* symbolTable)
         : Base(vm, structure, scope, symbolTable)
-        , m_registers(reinterpret_cast<WriteBarrierBase<Unknown>*>(registers))
     {
     }
+    
+    void finishCreationUninitialized(VM& vm)
+    {
+        Base::finishCreation(vm);
+    }
+    
+    void finishCreation(VM& vm, JSValue value)
+    {
+        finishCreationUninitialized(vm);
+        ASSERT(value == jsUndefined() || value == jsTDZValue());
+        for (unsigned i = symbolTable()->scopeSize(); i--;) {
+            // Filling this with undefined/TDZEmptyValue is useful because that's what variables start out as.
+            variableAt(ScopeOffset(i)).setStartingValue(value);
+        }
+    }
 
-    WriteBarrierBase<Unknown>* m_registers; // "r" in the stack.
+    static void visitChildren(JSCell*, SlotVisitor&);
 };
 
 } // namespace JSC

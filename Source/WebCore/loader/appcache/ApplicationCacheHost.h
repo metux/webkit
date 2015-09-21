@@ -31,6 +31,7 @@
 #ifndef ApplicationCacheHost_h
 #define ApplicationCacheHost_h
 
+#include "PlatformExportMacros.h"
 #include "URL.h"
 #include <wtf/Deque.h>
 #include <wtf/PassRefPtr.h>
@@ -41,10 +42,11 @@ namespace WebCore {
     class DOMApplicationCache;
     class DocumentLoader;
     class Frame;
-    class ResourceLoader;
     class ResourceError;
+    class ResourceLoader;
     class ResourceRequest;
     class ResourceResponse;
+    class SharedBuffer;
     class SubstituteData;
     class ApplicationCache;
     class ApplicationCacheGroup;
@@ -110,6 +112,8 @@ namespace WebCore {
         explicit ApplicationCacheHost(DocumentLoader&);
         ~ApplicationCacheHost();
 
+        static URL createFileURL(const String&);
+
         void selectCacheWithoutManifest();
         void selectCacheWithManifest(const URL& manifestURL);
 
@@ -125,8 +129,8 @@ namespace WebCore {
         WEBCORE_EXPORT bool maybeLoadFallbackForResponse(ResourceLoader*, const ResourceResponse&);
         WEBCORE_EXPORT bool maybeLoadFallbackForError(ResourceLoader*, const ResourceError&);
 
-        bool maybeLoadSynchronously(ResourceRequest&, ResourceError&, ResourceResponse&, Vector<char>& data);
-        void maybeLoadFallbackSynchronously(const ResourceRequest&, ResourceError&, ResourceResponse&, Vector<char>& data);
+        bool maybeLoadSynchronously(ResourceRequest&, ResourceError&, ResourceResponse&, RefPtr<SharedBuffer>&);
+        void maybeLoadFallbackSynchronously(const ResourceRequest&, ResourceError&, ResourceResponse&, RefPtr<SharedBuffer>&);
 
         bool canCacheInPageCache();
 
@@ -176,7 +180,6 @@ namespace WebCore {
         ApplicationCache* applicationCache() const { return m_applicationCache.get(); }
         ApplicationCache* mainResourceApplicationCache() const { return m_mainResourceApplicationCache.get(); }
         bool maybeLoadFallbackForMainError(const ResourceRequest&, const ResourceError&);
-
 
         // The application cache that the document loader is associated with (if any).
         RefPtr<ApplicationCache> m_applicationCache;

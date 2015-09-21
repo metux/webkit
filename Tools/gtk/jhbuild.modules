@@ -7,6 +7,7 @@
     <dependencies>
       <dep package="cairo"/>
       <dep package="fonts"/>
+      <dep package="dicts"/>
       <dep package="fontconfig"/>
       <dep package="freetype6"/>
       <dep package="harfbuzz"/>
@@ -30,6 +31,8 @@
       <dep package="gst-libav"/>
       <dep package="xserver"/>
       <dep package="mesa"/>
+      <dep package="openwebrtc"/>
+      <dep package="libseccomp"/>
     </dependencies>
   </metamodule>
 
@@ -57,22 +60,20 @@
       href="http://gstreamer.freedesktop.org/src/"/>
   <repository type="tarball" name="savannah.gnu.org"
       href="http://download.savannah.gnu.org/releases/"/>
-
+  <repository type="git" name="freedesktop-git"
+      href="http://anongit.freedesktop.org/git"/>
 
   <autotools id="cairo"
-             autogenargs="--enable-gl=yes --enable-egl=yes --enable-glx=yes ac_cv_func_rsvg_pixbuf_from_file=no --disable-lto"
+             autogenargs="--enable-gl=yes --enable-egl=yes --enable-glx=yes ac_cv_func_rsvg_pixbuf_from_file=no"
              makeargs="">
     <dependencies>
       <dep package="fontconfig"/>
       <dep package="pixman"/>
       <dep package="glib"/>
     </dependencies>
-    <branch module="releases/cairo-1.12.8.tar.xz" version="1.12.8"
+    <branch module="releases/cairo-1.14.2.tar.xz" version="1.14.2"
             repo="cairographics.org"
-            hash="sha256:8fbb6fc66117ab4100bad830cb4479497e53c6f3facb98bf05c8d298554ebdd9"
-            md5sum="8b3dcade859c44fb7e56fc68edfe9a45">
-      <patch file="cairo-1.12.8-add_disable-lto.patch" strip="1"/>
-    </branch>
+            hash="sha1:c8da68aa66ca0855b5d0ff552766d3e8679e1d24"/>
   </autotools>
 
   <autotools id="pixman" autogen-sh="configure"
@@ -87,6 +88,11 @@
   <autotools id="fonts"
              skip-autogen="true">
     <branch repo="github.com" module="mrobinson/webkitgtk-test-fonts.git" checkoutdir="webkitgtk-test-fonts" tag="0.0.5"/>
+  </autotools>
+
+  <autotools id="dicts"
+             skip-autogen="true">
+    <branch repo="github.com" module="mrobinson/webkitgtk-test-dicts.git" checkoutdir="webkitgtk-test-dicts" tag="0.0.1"/>
   </autotools>
 
   <autotools id="freetype6" autogen-sh="configure">
@@ -114,15 +120,18 @@
              md5sum="f5898b29bbfd70502831a212d9249d10"/>
   </autotools>
 
+  <autotools id="libseccomp" autogen-sh="./autogen.sh; ./configure">
+    <branch repo="github.com" module="seccomp/libseccomp.git" tag="v2.2.3"/>
+  </autotools>
+
   <autotools id="gdk-pixbuf" autogen-sh="configure"
              autogenargs="--disable-introspection">
     <dependencies>
       <dep package="glib"/>
     </dependencies>
-    <branch module="/pub/GNOME/sources/gdk-pixbuf/2.26/gdk-pixbuf-2.26.5.tar.xz" version="2.26.5"
+    <branch module="/pub/GNOME/sources/gdk-pixbuf/2.30/gdk-pixbuf-2.30.8.tar.xz" version="2.30.8"
             repo="ftp.gnome.org"
-            hash="sha256:77696fd163bca95a130a1883dbd78d0ae4d782de2fc85a9a38556d13681f5c84"
-            md5sum="339329e6d619ee3e1cb93979111b04c0"/>
+            hash="sha256:4853830616113db4435837992c0aebd94cbb993c44dc55063cee7f72a7bef8be"/>
   </autotools>
 
   <autotools id="librsvg" autogen-sh="configure"
@@ -147,12 +156,11 @@
       <dep package="cairo"/>
       <dep package="at-spi2-atk"/>
       <dep package="gdk-pixbuf"/>
+      <dep package="pango"/>
     </dependencies>
-    <branch module="/pub/GNOME/sources/gtk+/3.6/gtk+-3.6.0.tar.xz" version="3.6.0"
+    <branch module="/pub/GNOME/sources/gtk+/3.16/gtk+-3.16.4.tar.xz" version="3.16.4"
             repo="ftp.gnome.org"
-            hash="sha256:e13f45225a795ebe9e4047486fa57b3232e6a21539983775db6cd4ae9046b049">
-      <patch file="gtk-3.6-do-not-shutdown-accessibility.patch" strip="1"/>
-    </branch>
+            hash="sha256:1ee5dbd7a4cb81a91eaa1b7ae64ba5a3eab6a3c0a764155583ab96524590fc8e"/>
   </autotools>
 
   <autotools id="glib"
@@ -161,10 +169,11 @@
     <dependencies>
       <dep package="libffi"/>
     </dependencies>
-    <branch module="/pub/GNOME/sources/glib/2.41/glib-2.41.2.tar.xz" version="2.41.2"
+    <branch module="/pub/GNOME/sources/glib/2.44/glib-2.44.1.tar.xz" version="2.44.1"
             repo="ftp.gnome.org"
-            hash="sha256:da1f7258655f0e196b9304cb9515784634f3797437923e236bb3466348811c96"
-            md5sum="9636f60e99b98fd0fdb5239f905ac008"/>
+            hash="sha256:8811deacaf8a503d0a9b701777ea079ca6a4277be10e3d730d2112735d5eca07">
+      <patch file="glib-warning-fix.patch" strip="1"/>
+    </branch>
   </autotools>
 
   <autotools id="glib-networking">
@@ -182,9 +191,9 @@
     <dependencies>
       <dep package="glib-networking"/>
     </dependencies>
-    <branch module="libsoup" version="2.49.91"
+    <branch module="libsoup" version="2.49.91.1"
             repo="git.gnome.org"
-            tag="933de304ffde0257b18f04bf34a653fcc356833c"/>
+            tag="f7292448160128b3cb4b7cd06c2447f81fd8c6c9"/>
   </autotools>
 
   <autotools id="fontconfig" 
@@ -290,6 +299,7 @@
             repo="gstreamer"
             hash="sha256:49cd9e8f23c416b1607b43837a09833fa03e0106929d81ead2ddfde6c0ade44b"
             md5sum="0c42eca8f9e4efd56d2ce8e9249ce4a1">
+      <patch file="gst-plugins-base-rtp-rtcpbuffer-fix-typo-in-enum.patch" strip="1"/>
     </branch>
   </autotools>
 
@@ -352,11 +362,52 @@
   <autotools id="mesa" autogenargs="--enable-xlib-glx --disable-dri --with-gallium-drivers=swrast" skip-install="true">
     <!--- WARNING: At jhbuildrc, when we define the path to the Gallium llvmpipe software rasterizer (needed by XvfbDriver),
           we assume that the directory is named "Mesa". So, don't change the checkoutdir name even if you update the version.  -->
-    <branch module="/pub/mesa/10.2.1/MesaLib-10.2.1.tar.bz2" version="10.2.1"
+    <branch module="/pub/mesa/10.5.4/mesa-10.5.4.tar.xz" version="10.5.4"
             checkoutdir="Mesa"
             repo="ftp.freedesktop.org"
-            hash="sha256:461277909207da689d8152cfbf9e182ea6f70e1e672ab64c67df83725c8d2b54">
-      <patch file="mesa-gallivm-Fix-build-after-LLVM-commit-211259.patch" strip="1"/>
+            hash="sha256:b51e723f3a20d842c88a92d809435b229fc4744ca0dbec0317d9d4a3ac4c6803">
+    </branch>
+  </autotools>
+
+  <autotools id="libusrsctp" autogen-sh="./bootstrap; ./configure">
+    <branch repo="github.com" module="ossy-szeged/sctp-refimpl.git" checkoutdir="libusrsctp" tag="libusrsctp-r9168c"/>
+   </autotools>
+
+   <autotools id="gst-plugins-openwebrtc" supports-parallel-builds="no" autogen-sh="./autogen.sh; ./configure">
+     <dependencies>
+       <dep package="gst-plugins-base"/>
+       <dep package="libusrsctp"/>
+     </dependencies>
+    <branch repo="github.com" module="EricssonResearch/openwebrtc-gst-plugins.git" checkoutdir="gst-plugins-openwebrtc" tag="e359b67484af90f416ea35e301205d2b53c77a14"/>
+   </autotools>
+
+   <autotools id="libnice">
+    <dependencies>
+      <dep package="gstreamer"/>
+    </dependencies>
+    <branch repo="freedesktop-git" module="libnice/libnice.git" tag="0.1.10" checkoutdir="libnice"/>
+  </autotools>
+
+  <autotools id="openwebrtc" autogenargs="--enable-bridge=no --enable-owr-gst=yes">
+    <dependencies>
+      <dep package="gst-plugins-openwebrtc"/>
+      <dep package="libnice"/>
+     </dependencies>
+    <branch repo="github.com" module="EricssonResearch/openwebrtc.git" checkoutdir="openwebrtc" tag="13516c7f79a0c48bb411464f7613d4b426c70f5b"/>
+  </autotools>
+
+  <!-- Dependencies listed below this point are not thought to affect test results, and are only
+       included because they themselves depend on other dependencies built by jhbuild. -->
+
+  <autotools id="pango" autogen-sh="configure"
+             autogenargs="--enable-cairo">
+    <dependencies>
+      <dep package="cairo"/>
+      <dep package="fontconfig"/>
+    </dependencies>
+    <branch module="/pub/GNOME/sources/pango/1.36/pango-1.36.8.tar.xz" version="1.36.8"
+            repo="ftp.gnome.org"
+            hash="sha256:18dbb51b8ae12bae0ab7a958e7cf3317c9acfc8a1e1103ec2f147164a0fc2d07">
     </branch>
   </autotools>
 

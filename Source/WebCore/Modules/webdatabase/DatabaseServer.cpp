@@ -27,7 +27,6 @@
 #include "DatabaseServer.h"
 
 #include "Database.h"
-#include "DatabaseBackend.h"
 #include "DatabaseContext.h"
 #include "DatabaseTracker.h"
 
@@ -108,15 +107,15 @@ bool DatabaseServer::deleteDatabase(SecurityOrigin* origin, const String& name)
     return DatabaseTracker::tracker().deleteDatabase(origin, name);
 }
 
-void DatabaseServer::interruptAllDatabasesForContext(const DatabaseContext* context)
+void DatabaseServer::closeAllDatabases()
 {
-    DatabaseTracker::tracker().interruptAllDatabasesForContext(context);
+    DatabaseTracker::tracker().closeAllDatabases();
 }
 
-PassRefPtr<DatabaseBackendBase> DatabaseServer::openDatabase(RefPtr<DatabaseContext>& backendContext, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, bool setVersionInNewDatabase, DatabaseError &error, String& errorMessage,
+RefPtr<Database> DatabaseServer::openDatabase(RefPtr<DatabaseContext>& backendContext, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, bool setVersionInNewDatabase, DatabaseError &error, String& errorMessage,
     OpenAttempt attempt)
 {
-    RefPtr<DatabaseBackendBase> database;
+    RefPtr<Database> database;
     bool success = false; // Make some older compilers happy.
     
     switch (attempt) {
@@ -129,18 +128,18 @@ PassRefPtr<DatabaseBackendBase> DatabaseServer::openDatabase(RefPtr<DatabaseCont
 
     if (success)
         database = createDatabase(backendContext, name, expectedVersion, displayName, estimatedSize, setVersionInNewDatabase, error, errorMessage);
-    return database.release();
+    return database;
 }
 
-PassRefPtr<DatabaseBackendBase> DatabaseServer::createDatabase(RefPtr<DatabaseContext>& backendContext, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, bool setVersionInNewDatabase, DatabaseError& error, String& errorMessage)
+RefPtr<Database> DatabaseServer::createDatabase(RefPtr<DatabaseContext>& backendContext, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, bool setVersionInNewDatabase, DatabaseError& error, String& errorMessage)
 {
     RefPtr<Database> database = adoptRef(new Database(backendContext, name, expectedVersion, displayName, estimatedSize));
 
     if (!database->openAndVerifyVersion(setVersionInNewDatabase, error, errorMessage))
-        return 0;
+        return nullptr;
 
     DatabaseTracker::tracker().setDatabaseDetails(backendContext->securityOrigin(), name, displayName, estimatedSize);
-    return database.release();
+    return database;
 }
 
 } // namespace WebCore

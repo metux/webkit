@@ -43,6 +43,7 @@
 #include "JSCInlines.h"
 #include "JSVirtualMachineInternal.h"
 #include "RecursiveAllocationScope.h"
+#include "RegExpCache.h"
 #include "Tracing.h"
 #include "TypeProfilerLog.h"
 #include "UnlinkedCodeBlock.h"
@@ -80,115 +81,125 @@ static type name arguments;
 
 struct GCTimer {
     GCTimer(const char* name)
-        : m_name(name)
+        : name(name)
     {
     }
     ~GCTimer()
     {
-        logData(m_allCollectionData, "(All)");
-        logData(m_edenCollectionData, "(Eden)");
-        logData(m_fullCollectionData, "(Full)");
+        logData(allCollectionData, "(All)");
+        logData(edenCollectionData, "(Eden)");
+        logData(fullCollectionData, "(Full)");
     }
 
     struct TimeRecord {
         TimeRecord()
-            : m_time(0)
-            , m_min(std::numeric_limits<double>::infinity())
-            , m_max(0)
-            , m_count(0)
+            : time(0)
+            , min(std::numeric_limits<double>::infinity())
+            , max(0)
+            , count(0)
         {
         }
 
-        double m_time;
-        double m_min;
-        double m_max;
-        size_t m_count;
+        double time;
+        double min;
+        double max;
+        size_t count;
     };
 
     void logData(const TimeRecord& data, const char* extra)
     {
-        dataLogF("[%d] %s %s: %.2lfms (avg. %.2lf, min. %.2lf, max. %.2lf, count %lu)\n", 
+        dataLogF("[%d] %s (Parent: %s) %s: %.2lfms (avg. %.2lf, min. %.2lf, max. %.2lf, count %lu)\n", 
             getCurrentProcessID(),
-            m_name, extra, 
-            data.m_time * 1000, 
-            data.m_time * 1000 / data.m_count, 
-            data.m_min * 1000, 
-            data.m_max * 1000,
-            data.m_count);
+            name,
+            parent ? parent->name : "nullptr",
+            extra, 
+            data.time * 1000, 
+            data.time * 1000 / data.count, 
+            data.min * 1000, 
+            data.max * 1000,
+            data.count);
     }
 
     void updateData(TimeRecord& data, double duration)
     {
-        if (duration < data.m_min)
-            data.m_min = duration;
-        if (duration > data.m_max)
-            data.m_max = duration;
-        data.m_count++;
-        data.m_time += duration;
+        if (duration < data.min)
+            data.min = duration;
+        if (duration > data.max)
+            data.max = duration;
+        data.count++;
+        data.time += duration;
     }
 
     void didFinishPhase(HeapOperation collectionType, double duration)
     {
-        TimeRecord& data = collectionType == EdenCollection ? m_edenCollectionData : m_fullCollectionData;
+        TimeRecord& data = collectionType == EdenCollection ? edenCollectionData : fullCollectionData;
         updateData(data, duration);
-        updateData(m_allCollectionData, duration);
+        updateData(allCollectionData, duration);
     }
 
-    TimeRecord m_allCollectionData;
-    TimeRecord m_fullCollectionData;
-    TimeRecord m_edenCollectionData;
-    const char* m_name;
+    static GCTimer* s_currentGlobalTimer;
+
+    TimeRecord allCollectionData;
+    TimeRecord fullCollectionData;
+    TimeRecord edenCollectionData;
+    const char* name;
+    GCTimer* parent { nullptr };
 };
 
+GCTimer* GCTimer::s_currentGlobalTimer = nullptr;
+
 struct GCTimerScope {
-    GCTimerScope(GCTimer* timer, HeapOperation collectionType)
-        : m_timer(timer)
-        , m_start(WTF::monotonicallyIncreasingTime())
-        , m_collectionType(collectionType)
+    GCTimerScope(GCTimer& timer, HeapOperation collectionType)
+        : timer(timer)
+        , start(WTF::monotonicallyIncreasingTime())
+        , collectionType(collectionType)
     {
+        timer.parent = GCTimer::s_currentGlobalTimer;
+        GCTimer::s_currentGlobalTimer = &timer;
     }
     ~GCTimerScope()
     {
-        double delta = WTF::monotonicallyIncreasingTime() - m_start;
-        m_timer->didFinishPhase(m_collectionType, delta);
+        double delta = WTF::monotonicallyIncreasingTime() - start;
+        timer.didFinishPhase(collectionType, delta);
+        GCTimer::s_currentGlobalTimer = timer.parent;
     }
-    GCTimer* m_timer;
-    double m_start;
-    HeapOperation m_collectionType;
+    GCTimer& timer;
+    double start;
+    HeapOperation collectionType;
 };
 
 struct GCCounter {
     GCCounter(const char* name)
-        : m_name(name)
-        , m_count(0)
-        , m_total(0)
-        , m_min(10000000)
-        , m_max(0)
+        : name(name)
+        , count(0)
+        , total(0)
+        , min(10000000)
+        , max(0)
     {
     }
     
-    void count(size_t amount)
+    void add(size_t amount)
     {
-        m_count++;
-        m_total += amount;
-        if (amount < m_min)
-            m_min = amount;
-        if (amount > m_max)
-            m_max = amount;
+        count++;
+        total += amount;
+        if (amount < min)
+            min = amount;
+        if (amount > max)
+            max = amount;
     }
     ~GCCounter()
     {
-        dataLogF("[%d] %s: %zu values (avg. %zu, min. %zu, max. %zu)\n", getCurrentProcessID(), m_name, m_total, m_total / m_count, m_min, m_max);
+        dataLogF("[%d] %s: %zu values (avg. %zu, min. %zu, max. %zu)\n", getCurrentProcessID(), name, total, total / count, min, max);
     }
-    const char* m_name;
-    size_t m_count;
-    size_t m_total;
-    size_t m_min;
-    size_t m_max;
+    const char* name;
+    size_t count;
+    size_t total;
+    size_t min;
+    size_t max;
 };
 
-#define GCPHASE(name) DEFINE_GC_LOGGING_GLOBAL(GCTimer, name##Timer, (#name)); GCTimerScope name##TimerScope(&name##Timer, m_operationInProgress)
-#define GCCOUNTER(name, value) do { DEFINE_GC_LOGGING_GLOBAL(GCCounter, name##Counter, (#name)); name##Counter.count(value); } while (false)
+#define GCPHASE(name) DEFINE_GC_LOGGING_GLOBAL(GCTimer, name##Timer, (#name)); GCTimerScope name##TimerScope(name##Timer, m_operationInProgress)
+#define GCCOUNTER(name, value) do { DEFINE_GC_LOGGING_GLOBAL(GCCounter, name##Counter, (#name)); name##Counter.add(value); } while (false)
     
 #else
 
@@ -230,11 +241,16 @@ static inline bool isValidThreadState(VM* vm)
 }
 
 struct MarkObject : public MarkedBlock::VoidFunctor {
-    void operator()(JSCell* cell)
+    inline void visit(JSCell* cell)
     {
         if (cell->isZapped())
             return;
         Heap::heap(cell)->setMarked(cell);
+    }
+    IterationStatus operator()(JSCell* cell)
+    {
+        visit(cell);
+        return IterationStatus::Continue;
     }
 };
 
@@ -243,12 +259,18 @@ struct Count : public MarkedBlock::CountFunctor {
 };
 
 struct CountIfGlobalObject : MarkedBlock::CountFunctor {
-    void operator()(JSCell* cell) {
+    inline void visit(JSCell* cell)
+    {
         if (!cell->isObject())
             return;
         if (!asObject(cell)->isGlobalObject())
             return;
         count(1);
+    }
+    IterationStatus operator()(JSCell* cell)
+    {
+        visit(cell);
+        return IterationStatus::Continue;
     }
 };
 
@@ -257,7 +279,7 @@ public:
     typedef std::unique_ptr<TypeCountSet> ReturnType;
 
     RecordType();
-    void operator()(JSCell*);
+    IterationStatus operator()(JSCell*);
     ReturnType returnValue();
 
 private:
@@ -278,9 +300,10 @@ inline const char* RecordType::typeName(JSCell* cell)
     return info->className;
 }
 
-inline void RecordType::operator()(JSCell* cell)
+inline IterationStatus RecordType::operator()(JSCell* cell)
 {
     m_typeCountSet->add(typeName(cell));
+    return IterationStatus::Continue;
 }
 
 inline std::unique_ptr<TypeCountSet> RecordType::returnValue()
@@ -292,7 +315,7 @@ inline std::unique_ptr<TypeCountSet> RecordType::returnValue()
 
 Heap::Heap(VM* vm, HeapType heapType)
     : m_heapType(heapType)
-    , m_ramSize(ramSize())
+    , m_ramSize(Options::forceRAMSize() ? Options::forceRAMSize() : ramSize())
     , m_minBytesPerCycle(minHeapSize(m_heapType, m_ramSize))
     , m_sizeAfterLastCollect(0)
     , m_sizeAfterLastFullCollect(0)
@@ -307,7 +330,6 @@ Heap::Heap(VM* vm, HeapType heapType)
     , m_totalBytesVisited(0)
     , m_totalBytesCopied(0)
     , m_operationInProgress(NoOperation)
-    , m_blockAllocator()
     , m_objectSpace(this)
     , m_storageSpace(this)
     , m_extraMemorySize(0)
@@ -348,6 +370,8 @@ Heap::Heap(VM* vm, HeapType heapType)
 
 Heap::~Heap()
 {
+    for (WeakBlock* block : m_logicallyEmptyWeakBlocks)
+        WeakBlock::destroy(block);
 }
 
 bool Heap::isPagedOut(double deadline)
@@ -364,15 +388,32 @@ void Heap::lastChanceToFinalize()
 
     m_objectSpace.lastChanceToFinalize();
     releaseDelayedReleasedObjects();
+
+    sweepAllLogicallyEmptyWeakBlocks();
 }
 
 void Heap::releaseDelayedReleasedObjects()
 {
 #if USE(CF)
+    // We need to guard against the case that releasing an object can create more objects due to the
+    // release calling into JS. When those JS call(s) exit and all locks are being dropped we end up
+    // back here and could try to recursively release objects. We guard that with a recursive entry
+    // count. Only the initial call will release objects, recursive calls simple return and let the
+    // the initial call to the function take care of any objects created during release time.
+    // This also means that we need to loop until there are no objects in m_delayedReleaseObjects
+    // and use a temp Vector for the actual releasing.
     if (!m_delayedReleaseRecursionCount++) {
         while (!m_delayedReleaseObjects.isEmpty()) {
-            RetainPtr<CFTypeRef> objectToRelease = m_delayedReleaseObjects.takeLast();
-            objectToRelease.clear();
+            ASSERT(m_vm->currentThreadIsHoldingAPILock());
+
+            Vector<RetainPtr<CFTypeRef>> objectsToRelease = WTF::move(m_delayedReleaseObjects);
+
+            {
+                // We need to drop locks before calling out to arbitrary code.
+                JSLock::DropAllLocks dropAllLocks(m_vm);
+
+                objectsToRelease.clear();
+            }
         }
     }
     m_delayedReleaseRecursionCount--;
@@ -441,17 +482,6 @@ void Heap::addReference(JSCell* cell, ArrayBuffer* buffer)
         collectIfNecessaryOrDefer();
         didAllocate(buffer->gcSizeEstimateInBytes());
     }
-}
-
-void Heap::pushTempSortVector(Vector<ValueStringPair, 0, UnsafeVectorOverflow>* tempVector)
-{
-    m_tempSortingVectors.append(tempVector);
-}
-
-void Heap::popTempSortVector(Vector<ValueStringPair, 0, UnsafeVectorOverflow>* tempVector)
-{
-    ASSERT_UNUSED(tempVector, tempVector == m_tempSortingVectors.last());
-    m_tempSortingVectors.removeLast();
 }
 
 void Heap::harvestWeakReferences()
@@ -533,7 +563,6 @@ void Heap::markRoots(double gcStartTime, void* stackOrigin, void* stackTop, Mach
         visitSmallStrings();
         visitConservativeRoots(conservativeRoots);
         visitProtectedObjects(heapRootVisitor);
-        visitTempSortVectors(heapRootVisitor);
         visitArgumentBuffers(heapRootVisitor);
         visitException(heapRootVisitor);
         visitStrongHandles(heapRootVisitor);
@@ -672,23 +701,6 @@ void Heap::visitProtectedObjects(HeapRootVisitor& heapRootVisitor)
     m_slotVisitor.donateAndDrain();
 }
 
-void Heap::visitTempSortVectors(HeapRootVisitor& heapRootVisitor)
-{
-    GCPHASE(VisitTempSortVectors);
-
-    for (auto* vector : m_tempSortingVectors) {
-        for (auto& valueStringPair : *vector) {
-            if (valueStringPair.first)
-                heapRootVisitor.visit(&valueStringPair.first);
-        }
-    }
-
-    if (Options::logGC() == GCLogging::Verbose)
-        dataLog("Temp Sort Vectors:\n", m_slotVisitor);
-
-    m_slotVisitor.donateAndDrain();
-}
-
 void Heap::visitArgumentBuffers(HeapRootVisitor& visitor)
 {
     GCPHASE(MarkingArgumentBuffers);
@@ -706,10 +718,11 @@ void Heap::visitArgumentBuffers(HeapRootVisitor& visitor)
 void Heap::visitException(HeapRootVisitor& visitor)
 {
     GCPHASE(MarkingException);
-    if (!m_vm->exception())
+    if (!m_vm->exception() && !m_vm->lastException())
         return;
 
     visitor.visit(m_vm->addressOfException());
+    visitor.visit(m_vm->addressOfLastException());
 
     if (Options::logGC() == GCLogging::Verbose)
         dataLog("Exceptions:\n", m_slotVisitor);
@@ -787,10 +800,8 @@ void Heap::clearRememberedSet(Vector<const JSCell*>& rememberedSet)
 {
 #if ENABLE(GGC)
     GCPHASE(ClearRememberedSet);
-    for (auto* cell : rememberedSet) {
-        MarkedBlock::blockFor(cell)->clearRemembered(cell);
+    for (auto* cell : rememberedSet)
         const_cast<JSCell*>(cell)->setRemembered(false);
-    }
 #else
     UNUSED_PARAM(rememberedSet);
 #endif
@@ -807,15 +818,18 @@ void Heap::updateObjectCounts(double gcStartTime)
 #endif
         dataLogF("\nNumber of live Objects after GC %lu, took %.6f secs\n", static_cast<unsigned long>(visitCount), WTF::monotonicallyIncreasingTime() - gcStartTime);
     }
-
-    if (m_operationInProgress == EdenCollection) {
-        m_totalBytesVisited += m_slotVisitor.bytesVisited();
-        m_totalBytesCopied += m_slotVisitor.bytesCopied();
-    } else {
-        ASSERT(m_operationInProgress == FullCollection);
-        m_totalBytesVisited = m_slotVisitor.bytesVisited();
-        m_totalBytesCopied = m_slotVisitor.bytesCopied();
-    }
+    
+    size_t bytesRemovedFromOldSpaceDueToReallocation =
+        m_storageSpace.takeBytesRemovedFromOldSpaceDueToReallocation();
+    
+    if (m_operationInProgress == FullCollection) {
+        m_totalBytesVisited = 0;
+        m_totalBytesCopied = 0;
+    } else
+        m_totalBytesCopied -= bytesRemovedFromOldSpaceDueToReallocation;
+    
+    m_totalBytesVisited += m_slotVisitor.bytesVisited();
+    m_totalBytesCopied += m_slotVisitor.bytesCopied();
 #if ENABLE(PARALLEL_GC)
     m_totalBytesVisited += m_sharedData.childBytesVisited();
     m_totalBytesCopied += m_sharedData.childBytesCopied();
@@ -890,8 +904,8 @@ std::unique_ptr<TypeCountSet> Heap::objectTypeCounts()
 
 void Heap::deleteAllCompiledCode()
 {
-    // If JavaScript is running, it's not safe to delete code, since we'll end
-    // up deleting code that is live on the stack.
+    // If JavaScript is running, it's not safe to delete JavaScript code, since
+    // we'll end up returning to deleted code.
     if (m_vm->entryScope)
         return;
     
@@ -914,7 +928,7 @@ void Heap::deleteAllCompiledCode()
     for (ExecutableBase* current : m_compiledCode) {
         if (!current->isFunctionExecutable())
             continue;
-        static_cast<FunctionExecutable*>(current)->clearCodeIfNotCompiling();
+        static_cast<FunctionExecutable*>(current)->clearCode();
     }
 
     ASSERT(m_operationInProgress == FullCollection || m_operationInProgress == NoOperation);
@@ -927,7 +941,7 @@ void Heap::deleteAllUnlinkedFunctionCode()
     for (ExecutableBase* current : m_compiledCode) {
         if (!current->isFunctionExecutable())
             continue;
-        static_cast<FunctionExecutable*>(current)->clearUnlinkedCodeForRecompilationIfNotCompiling();
+        static_cast<FunctionExecutable*>(current)->clearUnlinkedCodeForRecompilation();
     }
 }
 
@@ -961,23 +975,24 @@ void Heap::addToRememberedSet(const JSCell* cell)
     ASSERT(!Options::enableConcurrentJIT() || !isCompilationThread());
     if (isRemembered(cell))
         return;
-    MarkedBlock::blockFor(cell)->setRemembered(cell);
     const_cast<JSCell*>(cell)->setRemembered(true);
     m_slotVisitor.unconditionallyAppend(const_cast<JSCell*>(cell));
 }
 
-void Heap::collectAllGarbage()
+void Heap::collectAndSweep(HeapOperation collectionType)
 {
     if (!m_isSafeToCollect)
         return;
 
-    collect(FullCollection);
+    collect(collectionType);
 
     SamplingRegion samplingRegion("Garbage Collection: Sweeping");
 
     DeferGCForAWhile deferGC(*this);
     m_objectSpace.sweep();
     m_objectSpace.shrink();
+
+    sweepAllLogicallyEmptyWeakBlocks();
 }
 
 static double minute = 60.0;
@@ -1129,6 +1144,7 @@ void Heap::deleteOldCode(double gcStartTime)
 
     GCPHASE(DeleteOldCode);
     if (gcStartTime - m_lastCodeDiscardTime > minute) {
+        m_vm->regExpCache()->deleteAllCode();
         deleteAllCompiledCode();
         m_lastCodeDiscardTime = WTF::monotonicallyIncreasingTime();
     }
@@ -1195,12 +1211,17 @@ struct MarkedBlockSnapshotFunctor : public MarkedBlock::VoidFunctor {
 void Heap::snapshotMarkedSpace()
 {
     GCPHASE(SnapshotMarkedSpace);
-    if (m_operationInProgress != FullCollection)
-        return;
 
-    m_blockSnapshot.resize(m_objectSpace.blocks().set().size());
-    MarkedBlockSnapshotFunctor functor(m_blockSnapshot);
-    m_objectSpace.forEachBlock(functor);
+    if (m_operationInProgress == EdenCollection) {
+        m_blockSnapshot.appendVector(m_objectSpace.blocksWithNewObjects());
+        // Sort and deduplicate the block snapshot since we might be appending to an unfinished work list.
+        std::sort(m_blockSnapshot.begin(), m_blockSnapshot.end());
+        m_blockSnapshot.shrink(std::unique(m_blockSnapshot.begin(), m_blockSnapshot.end()) - m_blockSnapshot.begin());
+    } else {
+        m_blockSnapshot.resizeToFit(m_objectSpace.blocks().set().size());
+        MarkedBlockSnapshotFunctor functor(m_blockSnapshot);
+        m_objectSpace.forEachBlock(functor);
+    }
 }
 
 void Heap::deleteSourceProviderCaches()
@@ -1212,9 +1233,13 @@ void Heap::deleteSourceProviderCaches()
 void Heap::notifyIncrementalSweeper()
 {
     GCPHASE(NotifyIncrementalSweeper);
-    if (m_operationInProgress != FullCollection)
-        return;
-    m_sweeper->startSweeping(m_blockSnapshot);
+
+    if (m_operationInProgress == FullCollection) {
+        if (!m_logicallyEmptyWeakBlocks.isEmpty())
+            m_indexOfNextLogicallyEmptyWeakBlockToSweep = 0;
+    }
+
+    m_sweeper->startSweeping();
 }
 
 void Heap::rememberCurrentlyExecutingCodeBlocks()
@@ -1386,9 +1411,26 @@ void Heap::addCompiledCode(ExecutableBase* executable)
     m_compiledCode.append(executable);
 }
 
+void Heap::collectAllGarbageIfNotDoneRecently()
+{
+    if (!m_fullActivityCallback) {
+        collectAllGarbage();
+        return;
+    }
+
+    if (m_fullActivityCallback->didSyncGCRecently()) {
+        // A synchronous GC was already requested recently so we merely accelerate next collection.
+        reportAbandonedObjectGraph();
+        return;
+    }
+
+    m_fullActivityCallback->setDidSyncGCRecently();
+    collectAllGarbage();
+}
+
 class Zombify : public MarkedBlock::VoidFunctor {
 public:
-    void operator()(JSCell* cell)
+    inline void visit(JSCell* cell)
     {
         void** current = reinterpret_cast<void**>(cell);
 
@@ -1400,6 +1442,11 @@ public:
         void* limit = static_cast<void*>(reinterpret_cast<char*>(cell) + MarkedBlock::blockFor(cell)->cellSize());
         for (; current < limit; current++)
             *current = zombifiedBits;
+    }
+    IterationStatus operator()(JSCell* cell)
+    {
+        visit(cell);
+        return IterationStatus::Continue;
     }
 };
 
@@ -1447,6 +1494,43 @@ bool Heap::shouldDoFullCollection(HeapOperation requestedCollectionType) const
     UNUSED_PARAM(requestedCollectionType);
     return true;
 #endif
+}
+
+void Heap::addLogicallyEmptyWeakBlock(WeakBlock* block)
+{
+    m_logicallyEmptyWeakBlocks.append(block);
+}
+
+void Heap::sweepAllLogicallyEmptyWeakBlocks()
+{
+    if (m_logicallyEmptyWeakBlocks.isEmpty())
+        return;
+
+    m_indexOfNextLogicallyEmptyWeakBlockToSweep = 0;
+    while (sweepNextLogicallyEmptyWeakBlock()) { }
+}
+
+bool Heap::sweepNextLogicallyEmptyWeakBlock()
+{
+    if (m_indexOfNextLogicallyEmptyWeakBlockToSweep == WTF::notFound)
+        return false;
+
+    WeakBlock* block = m_logicallyEmptyWeakBlocks[m_indexOfNextLogicallyEmptyWeakBlockToSweep];
+
+    block->sweep();
+    if (block->isEmpty()) {
+        std::swap(m_logicallyEmptyWeakBlocks[m_indexOfNextLogicallyEmptyWeakBlockToSweep], m_logicallyEmptyWeakBlocks.last());
+        m_logicallyEmptyWeakBlocks.removeLast();
+        WeakBlock::destroy(block);
+    } else
+        m_indexOfNextLogicallyEmptyWeakBlockToSweep++;
+
+    if (m_indexOfNextLogicallyEmptyWeakBlockToSweep >= m_logicallyEmptyWeakBlocks.size()) {
+        m_indexOfNextLogicallyEmptyWeakBlockToSweep = WTF::notFound;
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace JSC

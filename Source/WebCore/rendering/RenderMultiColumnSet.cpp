@@ -42,6 +42,7 @@ RenderMultiColumnSet::RenderMultiColumnSet(RenderFlowThread& flowThread, Ref<Ren
     , m_computedColumnWidth(0)
     , m_computedColumnHeight(0)
     , m_availableColumnHeight(0)
+    , m_columnHeightComputed(false)
     , m_maxColumnHeight(RenderFlowThread::maxLogicalHeight())
     , m_minSpaceShortage(RenderFlowThread::maxLogicalHeight())
     , m_minimumColumnHeight(0)
@@ -168,6 +169,9 @@ void RenderMultiColumnSet::setAndConstrainColumnHeight(LayoutUnit newHeight)
         if (pageLength)
             m_computedColumnHeight = pageLength;
     }
+    
+    m_columnHeightComputed = true;
+
     // FIXME: the height may also be affected by the enclosing pagination context, if any.
 }
 
@@ -341,6 +345,7 @@ void RenderMultiColumnSet::prepareForLayout(bool initial)
         if (initial) {
             m_computedColumnHeight = 0;
             m_availableColumnHeight = 0;
+            m_columnHeightComputed = false;
         }
     } else
         setAndConstrainColumnHeight(heightAdjustedForSetOffset(multiColumnFlowThread()->columnHeightAvailable()));
@@ -410,7 +415,7 @@ LayoutUnit RenderMultiColumnSet::calculateMaxColumnHeight() const
     LayoutUnit availableHeight = multiColumnFlowThread()->columnHeightAvailable();
     LayoutUnit maxColumnHeight = availableHeight ? availableHeight : RenderFlowThread::maxLogicalHeight();
     if (!multicolStyle.logicalMaxHeight().isUndefined()) {
-        LayoutUnit logicalMaxHeight = multicolBlock->computeContentLogicalHeight(multicolStyle.logicalMaxHeight());
+        LayoutUnit logicalMaxHeight = multicolBlock->computeContentLogicalHeight(multicolStyle.logicalMaxHeight(), -1);
         if (logicalMaxHeight != -1 && maxColumnHeight > logicalMaxHeight)
             maxColumnHeight = logicalMaxHeight;
     }
@@ -615,7 +620,7 @@ void RenderMultiColumnSet::paintColumnRules(PaintInfo& paintInfo, const LayoutPo
                 LayoutUnit ruleTop = isHorizontalWritingMode() ? paintOffset.y() + borderTop() + paddingTop() : paintOffset.y() + ruleLogicalLeft - ruleThickness / 2 + ruleAdd;
                 LayoutUnit ruleBottom = isHorizontalWritingMode() ? ruleTop + contentHeight() : ruleTop + ruleThickness;
                 IntRect pixelSnappedRuleRect = snappedIntRect(ruleLeft, ruleTop, ruleRight - ruleLeft, ruleBottom - ruleTop);
-                drawLineForBoxSide(paintInfo.context, pixelSnappedRuleRect.x(), pixelSnappedRuleRect.y(), pixelSnappedRuleRect.maxX(), pixelSnappedRuleRect.maxY(), boxSide, ruleColor, ruleStyle, 0, 0, antialias);
+                drawLineForBoxSide(*paintInfo.context, pixelSnappedRuleRect, boxSide, ruleColor, ruleStyle, 0, 0, antialias);
             }
             
             ruleLogicalLeft = currLogicalLeftOffset;
@@ -646,7 +651,7 @@ void RenderMultiColumnSet::paintColumnRules(PaintInfo& paintInfo, const LayoutPo
         for (unsigned i = 1; i < colCount; i++) {
             ruleRect.move(step);
             IntRect pixelSnappedRuleRect = snappedIntRect(ruleRect);
-            drawLineForBoxSide(paintInfo.context, pixelSnappedRuleRect.x(), pixelSnappedRuleRect.y(), pixelSnappedRuleRect.maxX(), pixelSnappedRuleRect.maxY(), boxSide, ruleColor, ruleStyle, 0, 0, antialias);
+            drawLineForBoxSide(*paintInfo.context, pixelSnappedRuleRect, boxSide, ruleColor, ruleStyle, 0, 0, antialias);
         }
     }
 }
@@ -794,7 +799,7 @@ void RenderMultiColumnSet::collectLayerFragments(LayerFragments& fragments, cons
             else
                 blockOffset -= i * (computedColumnHeight() + colGap);
         }
-        if (isFlippedBlocksWritingMode(style().writingMode()))
+        if (isFlippedWritingMode(style().writingMode()))
             blockOffset = -blockOffset;
         translationOffset.setHeight(blockOffset);
         if (!isHorizontalWritingMode())
@@ -846,7 +851,7 @@ LayoutPoint RenderMultiColumnSet::columnTranslationForOffset(const LayoutUnit& o
         else
             blockOffset -= startColumn * (computedColumnHeight() + colGap);
     }
-    if (isFlippedBlocksWritingMode(style().writingMode()))
+    if (isFlippedWritingMode(style().writingMode()))
         blockOffset = -blockOffset;
     translationOffset.setY(blockOffset);
     

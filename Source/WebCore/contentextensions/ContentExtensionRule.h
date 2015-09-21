@@ -28,32 +28,154 @@
 
 #if ENABLE(CONTENT_EXTENSIONS)
 
+#include "ContentExtensionActions.h"
+#include "ResourceLoadInfo.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 namespace ContentExtensions {
 
-enum class ExtensionActionType {
-    BlockLoad,
-    IgnorePreviousRules
-};
-
 // A ContentExtensionRule is the smallest unit in a ContentExtension.
 //
 // It is composed of a trigger and an action. The trigger defines on what kind of content this extension should apply.
 // The action defines what to perform on that content.
+
+struct Trigger {
+    String urlFilter;
+    bool urlFilterIsCaseSensitive { false };
+    ResourceFlags flags { 0 };
+    Vector<String> domains;
+    enum class DomainCondition {
+        None,
+        IfDomain,
+        UnlessDomain,
+    } domainCondition { DomainCondition::None };
+
+    ~Trigger()
+    {
+        ASSERT(domains.isEmpty() == (domainCondition == DomainCondition::None));
+    }
+
+    bool isEmpty() const
+    {
+        return urlFilter.isEmpty()
+            && !urlFilterIsCaseSensitive
+            && !flags
+            && domains.isEmpty()
+            && domainCondition == DomainCondition::None;
+    }
+
+    bool operator==(const Trigger& other) const
+    {
+        return urlFilter == other.urlFilter
+            && urlFilterIsCaseSensitive == other.urlFilterIsCaseSensitive
+            && flags == other.flags
+            && domains == other.domains
+            && domainCondition == other.domainCondition;
+    }
+};
+
+struct TriggerHash {
+    static unsigned hash(const Trigger& trigger)
+    {
+        unsigned hash = trigger.urlFilterIsCaseSensitive ? 10619863 : 40960001;
+        if (!trigger.urlFilter.isNull())
+            hash ^= StringHash::hash(trigger.urlFilter);
+        hash = WTF::pairIntHash(hash, DefaultHash<ResourceFlags>::Hash::hash(trigger.flags));
+
+        for (const String& domain : trigger.domains)
+            hash ^= StringHash::hash(domain);
+
+        if (trigger.domainCondition == Trigger::DomainCondition::IfDomain)
+            hash |= 1 << 16;
+        else if (trigger.domainCondition == Trigger::DomainCondition::IfDomain)
+            hash |= 1 << 31;
+        return hash;
+    }
+
+    static bool equal(const Trigger& a, const Trigger& b)
+    {
+        return a == b;
+    }
+
+    static const bool safeToCompareToEmptyOrDeleted = false;
+};
+
+struct TriggerHashTraits : public WTF::CustomHashTraits<Trigger> {
+    static const bool emptyValueIsZero = false;
+    static const bool hasIsEmptyValueFunction = true;
+
+    static void constructDeletedValue(Trigger& trigger)
+    {
+        new (NotNull, std::addressof(trigger.urlFilter)) String(WTF::HashTableDeletedValue);
+    }
+
+    static bool isDeletedValue(const Trigger& trigger)
+    {
+        return trigger.urlFilter.isHashTableDeletedValue();
+    }
+
+    static Trigger emptyValue()
+    {
+        return Trigger();
+    }
+
+    static bool isEmptyValue(const Trigger& trigger)
+    {
+        return trigger.isEmpty();
+    }
+};
+
+struct Action {
+    Action()
+        : m_type(ActionType::InvalidAction)
+        , m_actionID(std::numeric_limits<uint32_t>::max())
+    {
+    }
+
+    Action(ActionType type, const String& stringArgument, uint32_t actionID = std::numeric_limits<uint32_t>::max())
+        : m_type(type)
+        , m_actionID(actionID)
+        , m_stringArgument(stringArgument)
+    {
+        ASSERT(type == ActionType::CSSDisplayNoneSelector || type == ActionType::CSSDisplayNoneStyleSheet);
+    }
+
+    Action(ActionType type, uint32_t actionID = std::numeric_limits<uint32_t>::max())
+        : m_type(type)
+        , m_actionID(actionID)
+    {
+        ASSERT(type != ActionType::CSSDisplayNoneSelector && type != ActionType::CSSDisplayNoneStyleSheet);
+    }
+
+    bool operator==(const Action& other) const
+    {
+        return m_type == other.m_type
+            && m_extensionIdentifier == other.m_extensionIdentifier
+            && m_actionID == other.m_actionID
+            && m_stringArgument == other.m_stringArgument;
+    }
+
+    static Action deserialize(const SerializedActionByte* actions, const uint32_t actionsLength, uint32_t location);
+    static ActionType deserializeType(const SerializedActionByte* actions, const uint32_t actionsLength, uint32_t location);
+    static uint32_t serializedLength(const SerializedActionByte* actions, const uint32_t actionsLength, uint32_t location);
+
+    void setExtensionIdentifier(const String& extensionIdentifier) { m_extensionIdentifier = extensionIdentifier; }
+    const String& extensionIdentifier() const { return m_extensionIdentifier; }
+    ActionType type() const { return m_type; }
+    uint32_t actionID() const { return m_actionID; }
+    const String& stringArgument() const { return m_stringArgument; }
+
+private:
+    String m_extensionIdentifier;
+    ActionType m_type;
+    uint32_t m_actionID;
+    String m_stringArgument;
+};
+    
 class ContentExtensionRule {
 public:
-    struct Trigger {
-        String urlFilter;
-        bool urlFilterIsCaseSensitive = false;
-    };
-
-    struct Action {
-        ExtensionActionType type;
-    };
-
     ContentExtensionRule(const Trigger&, const Action&);
 
     const Trigger& trigger() const { return m_trigger; }

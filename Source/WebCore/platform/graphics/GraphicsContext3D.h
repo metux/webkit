@@ -84,7 +84,6 @@ const PlatformGraphicsContext3D NullPlatformGraphicsContext3D = 0;
 const Platform3DObject NullPlatform3DObject = 0;
 
 namespace WebCore {
-class DrawingBuffer;
 class Extensions3D;
 #if USE(OPENGL_ES_2)
 class Extensions3DOpenGLES;
@@ -98,6 +97,7 @@ class ImageSource;
 class ImageData;
 class IntRect;
 class IntSize;
+class WebGLRenderingContextBase;
 #if USE(CAIRO)
 class PlatformContextCairo;
 #endif
@@ -780,6 +780,7 @@ public:
 #endif
 
     bool makeContextCurrent();
+    void setWebGLContext(WebGLRenderingContextBase* base) { m_webglContext = base; }
 
     // With multisampling on, blit from multisampleFBO to regular FBO.
     void prepareTexture();
@@ -1117,6 +1118,12 @@ public:
     void drawElementsInstanced(GC3Denum mode, GC3Dsizei count, GC3Denum type, GC3Dintptr offset, GC3Dsizei primcount);
     void vertexAttribDivisor(GC3Duint index, GC3Duint divisor);
 
+    // VertexArrayOject calls
+    Platform3DObject createVertexArray();
+    void deleteVertexArray(Platform3DObject);
+    GC3Dboolean isVertexArray(Platform3DObject);
+    void bindVertexArray(Platform3DObject);
+
 #if PLATFORM(GTK) || PLATFORM(EFL) || USE(CAIRO)
     void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
                        int canvasWidth, int canvasHeight, PlatformContextCairo* context);
@@ -1128,9 +1135,10 @@ public:
     void markContextChanged();
     void markLayerComposited();
     bool layerComposited() const;
+    void forceContextLost();
 
-    void paintRenderingResultsToCanvas(ImageBuffer*, DrawingBuffer*);
-    PassRefPtr<ImageData> paintRenderingResultsToImageData(DrawingBuffer*);
+    void paintRenderingResultsToCanvas(ImageBuffer*);
+    PassRefPtr<ImageData> paintRenderingResultsToImageData();
     bool paintCompositedResultsToCanvas(ImageBuffer*);
 
 #if PLATFORM(IOS)
@@ -1256,6 +1264,7 @@ public:
 private:
     GraphicsContext3D(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
     static int numActiveContexts;
+    static int GPUCheckCounter;
 
     // Helper for packImageData/extractImageData/extractTextureData which implement packing of pixel
     // data into the specified OpenGL destination format and type.
@@ -1270,6 +1279,9 @@ private:
     // implementation.
     void validateDepthStencil(const char* packedDepthStencilExtension);
     void validateAttributes();
+    
+    // Call to make during draw calls to check on the GPU's status.
+    void checkGPUStatusIfNecessary();
 
     // Read rendering results into a pixel array with the same format as the
     // backbuffer.
@@ -1302,12 +1314,12 @@ private:
         SymbolInfo()
             : type(0)
             , size(0)
-            , precision(SH_PRECISION_UNDEFINED)
+            , precision(GL_NONE) // Invalid precision.
             , staticUse(0)
         {
         }
 
-        SymbolInfo(GC3Denum type, int size, const String& mappedName, ShPrecisionType precision, int staticUse)
+        SymbolInfo(GC3Denum type, int size, const String& mappedName, sh::GLenum precision, int staticUse)
             : type(type)
             , size(size)
             , mappedName(mappedName)
@@ -1324,7 +1336,7 @@ private:
         GC3Denum type;
         int size;
         String mappedName;
-        ShPrecisionType precision;
+        sh::GLenum precision;
         int staticUse;
     };
 
@@ -1438,6 +1450,8 @@ private:
 
     friend class GraphicsContext3DPrivate;
     std::unique_ptr<GraphicsContext3DPrivate> m_private;
+    
+    WebGLRenderingContextBase* m_webglContext;
 };
 
 } // namespace WebCore

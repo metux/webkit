@@ -41,18 +41,17 @@
 #include <WebCore/IntSize.h>
 #include <WebCore/PageOverlay.h>
 #include <WebCore/Timer.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/RunLoop.h>
 #include <wtf/Threading.h>
 
 namespace WebCore {
-class CoordinatedGraphicsLayerState;
-class CoordinatedGraphicsState;
 class CoordinatedSurface;
 class GraphicsContext;
 class GraphicsLayer;
 class GraphicsLayerFactory;
 class GraphicsLayerFactory;
+struct CoordinatedGraphicsLayerState;
+struct CoordinatedGraphicsState;
 }
 
 namespace WebKit {
@@ -62,7 +61,7 @@ class WebPage;
 class ThreadedCoordinatedLayerTreeHost : public LayerTreeHost, public WebCore::CompositingCoordinator::Client, public ThreadedCompositor::Client {
     WTF_MAKE_NONCOPYABLE(ThreadedCoordinatedLayerTreeHost); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<ThreadedCoordinatedLayerTreeHost> create(WebPage*);
+    static Ref<ThreadedCoordinatedLayerTreeHost> create(WebPage*);
     virtual ~ThreadedCoordinatedLayerTreeHost();
 
     virtual const LayerTreeContext& layerTreeContext() override { return m_layerTreeContext; };

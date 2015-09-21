@@ -22,7 +22,6 @@
 #include "config.h"
 #include "SVGMarkerElement.h"
 
-#include "Attribute.h"
 #include "RenderSVGResourceMarker.h"
 #include "SVGFitToViewBox.h"
 #include "SVGNames.h"
@@ -125,15 +124,26 @@ bool SVGMarkerElement::isSupportedAttribute(const QualifiedName& attrName)
 
 void SVGMarkerElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    SVGParsingError parseError = NoError;
-
-    if (!isSupportedAttribute(name))
-        SVGElement::parseAttribute(name, value);
-    else if (name == SVGNames::markerUnitsAttr) {
-        SVGMarkerUnitsType propertyValue = SVGPropertyTraits<SVGMarkerUnitsType>::fromString(value);
+    if (name == SVGNames::markerUnitsAttr) {
+        auto propertyValue = SVGPropertyTraits<SVGMarkerUnitsType>::fromString(value);
         if (propertyValue > 0)
             setMarkerUnitsBaseValue(propertyValue);
-    } else if (name == SVGNames::refXAttr)
+        return;
+    }
+
+    if (name == SVGNames::orientAttr) {
+        SVGAngle angle;
+        auto orientType = SVGPropertyTraits<SVGMarkerOrientType>::fromString(value, angle);
+        if (orientType > 0)
+            setOrientTypeBaseValue(orientType);
+        if (orientType == SVGMarkerOrientAngle)
+            setOrientAngleBaseValue(angle);
+        return;
+    }
+
+    SVGParsingError parseError = NoError;
+
+    if (name == SVGNames::refXAttr)
         setRefXBaseValue(SVGLength::construct(LengthModeWidth, value, parseError));
     else if (name == SVGNames::refYAttr)
         setRefYBaseValue(SVGLength::construct(LengthModeHeight, value, parseError));
@@ -141,20 +151,12 @@ void SVGMarkerElement::parseAttribute(const QualifiedName& name, const AtomicStr
         setMarkerWidthBaseValue(SVGLength::construct(LengthModeWidth, value, parseError));
     else if (name == SVGNames::markerHeightAttr)
         setMarkerHeightBaseValue(SVGLength::construct(LengthModeHeight, value, parseError));
-    else if (name == SVGNames::orientAttr) {
-        SVGAngle angle;
-        SVGMarkerOrientType orientType = SVGPropertyTraits<SVGMarkerOrientType>::fromString(value, angle);
-        if (orientType > 0)
-            setOrientTypeBaseValue(orientType);
-        if (orientType == SVGMarkerOrientAngle)
-            setOrientAngleBaseValue(angle);
-    } else if (SVGLangSpace::parseAttribute(name, value)
-             || SVGExternalResourcesRequired::parseAttribute(name, value)
-             || SVGFitToViewBox::parseAttribute(this, name, value)) {
-    } else
-        ASSERT_NOT_REACHED();
 
     reportAttributeParsingError(parseError, name, value);
+
+    SVGElement::parseAttribute(name, value);
+    SVGExternalResourcesRequired::parseAttribute(name, value);
+    SVGFitToViewBox::parseAttribute(this, name, value);
 }
 
 void SVGMarkerElement::svgAttributeChanged(const QualifiedName& attrName)
@@ -211,7 +213,7 @@ void SVGMarkerElement::setOrientToAngle(const SVGAngle& angle)
     svgAttributeChanged(orientAnglePropertyInfo()->attributeName);
 }
 
-RenderPtr<RenderElement> SVGMarkerElement::createElementRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> SVGMarkerElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderSVGResourceMarker>(*this, WTF::move(style));
 }
@@ -239,7 +241,7 @@ void SVGMarkerElement::synchronizeOrientType(SVGElement* contextElement)
     ownerType.m_orientType.synchronize(&ownerType, orientTypePropertyInfo()->attributeName, autoString);
 }
 
-PassRefPtr<SVGAnimatedProperty> SVGMarkerElement::lookupOrCreateOrientTypeWrapper(SVGElement* contextElement)
+Ref<SVGAnimatedProperty> SVGMarkerElement::lookupOrCreateOrientTypeWrapper(SVGElement* contextElement)
 {
     ASSERT(contextElement);
     SVGMarkerElement& ownerType = downcast<SVGMarkerElement>(*contextElement);
@@ -258,10 +260,10 @@ SVGMarkerOrientType& SVGMarkerElement::orientType() const
     return m_orientType.value;
 }
 
-PassRefPtr<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType>> SVGMarkerElement::orientTypeAnimated()
+Ref<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType>> SVGMarkerElement::orientTypeAnimated()
 {
     m_orientType.shouldSynchronize = true;
-    return static_pointer_cast<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType>>(lookupOrCreateOrientTypeWrapper(this));
+    return static_reference_cast<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType>>(lookupOrCreateOrientTypeWrapper(this));
 }
 
 }

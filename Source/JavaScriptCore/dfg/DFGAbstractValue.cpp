@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@
 
 #include "DFGGraph.h"
 #include "JSCInlines.h"
+#include "TrackedReferences.h"
 
 namespace JSC { namespace DFG {
 
@@ -47,32 +48,10 @@ void AbstractValue::observeTransitions(const TransitionVector& vector)
     checkConsistency();
 }
 
-void AbstractValue::setOSREntryValue(Graph& graph, const FrozenValue& value)
-{
-    if (!!value && value.value().isCell()) {
-        Structure* structure = value.structure();
-        graph.registerStructure(structure);
-        m_structure = structure;
-        m_arrayModes = asArrayModes(structure->indexingType());
-    } else {
-        m_structure.clear();
-        m_arrayModes = 0;
-    }
-        
-    m_type = speculationFromValue(value.value());
-    m_value = value.value();
-        
-    checkConsistency();
-    assertIsRegistered(graph);
-}
-
 void AbstractValue::set(Graph& graph, const FrozenValue& value, StructureClobberState clobberState)
 {
     if (!!value && value.value().isCell()) {
         Structure* structure = value.structure();
-        // FIXME: This check may not be necessary since any frozen value should have its structure
-        // watched already.
-        // https://bugs.webkit.org/show_bug.cgi?id=136055
         if (graph.registerStructure(structure) == StructureRegisteredAndWatched) {
             m_structure = structure;
             if (clobberState == StructuresAreClobbered) {
@@ -118,7 +97,27 @@ void AbstractValue::set(Graph& graph, const StructureSet& set)
     assertIsRegistered(graph);
 }
 
-void AbstractValue::fixTypeForRepresentation(NodeFlags representation)
+void AbstractValue::setType(Graph& graph, SpeculatedType type)
+{
+    SpeculatedType cellType = type & SpecCell;
+    if (cellType) {
+        if (!(cellType & ~SpecString))
+            m_structure = graph.m_vm.stringStructure.get();
+        else if (isSymbolSpeculation(cellType))
+            m_structure = graph.m_vm.symbolStructure.get();
+        else
+            m_structure.makeTop();
+        m_arrayModes = ALL_ARRAY_MODES;
+    } else {
+        m_structure.clear();
+        m_arrayModes = 0;
+    }
+    m_type = type;
+    m_value = JSValue();
+    checkConsistency();
+}
+
+void AbstractValue::fixTypeForRepresentation(Graph& graph, NodeFlags representation, Node* node)
 {
     if (representation == NodeResultDouble) {
         if (m_value) {
@@ -130,39 +129,64 @@ void AbstractValue::fixTypeForRepresentation(NodeFlags representation)
             m_type &= ~SpecMachineInt;
             m_type |= SpecInt52AsDouble;
         }
-        if (m_type & ~SpecFullDouble) {
-            startCrashing();
-            dataLog("Abstract value ", *this, " for double node has type outside SpecFullDouble.\n");
-            CRASH();
-        }
+        if (m_type & ~SpecFullDouble)
+            DFG_CRASH(graph, node, toCString("Abstract value ", *this, " for double node has type outside SpecFullDouble.\n").data());
     } else if (representation == NodeResultInt52) {
         if (m_type & SpecInt52AsDouble) {
             m_type &= ~SpecInt52AsDouble;
             m_type |= SpecInt52;
         }
-        if (m_type & ~SpecMachineInt) {
-            startCrashing();
-            dataLog("Abstract value ", *this, " for int52 node has type outside SpecMachineInt.\n");
-            CRASH();
-        }
+        if (m_type & ~SpecMachineInt)
+            DFG_CRASH(graph, node, toCString("Abstract value ", *this, " for int52 node has type outside SpecMachineInt.\n").data());
     } else {
         if (m_type & SpecInt52) {
             m_type &= ~SpecInt52;
             m_type |= SpecInt52AsDouble;
         }
-        if (m_type & ~SpecBytecodeTop) {
-            startCrashing();
-            dataLog("Abstract value ", *this, " for value node has type outside SpecBytecodeTop.\n");
-            CRASH();
-        }
+        if (m_type & ~SpecBytecodeTop)
+            DFG_CRASH(graph, node, toCString("Abstract value ", *this, " for value node has type outside SpecBytecodeTop.\n").data());
     }
     
     checkConsistency();
 }
 
-void AbstractValue::fixTypeForRepresentation(Node* node)
+void AbstractValue::fixTypeForRepresentation(Graph& graph, Node* node)
 {
-    fixTypeForRepresentation(node->result());
+    fixTypeForRepresentation(graph, node->result(), node);
+}
+
+bool AbstractValue::mergeOSREntryValue(Graph& graph, JSValue value)
+{
+    AbstractValue oldMe = *this;
+    
+    if (isClear()) {
+        FrozenValue* frozenValue = graph.freeze(value);
+        if (frozenValue->pointsToHeap()) {
+            m_structure = frozenValue->structure();
+            m_arrayModes = asArrayModes(frozenValue->structure()->indexingType());
+        } else {
+            m_structure.clear();
+            m_arrayModes = 0;
+        }
+        
+        m_type = speculationFromValue(value);
+        m_value = value;
+    } else {
+        mergeSpeculation(m_type, speculationFromValue(value));
+        if (!!value && value.isCell()) {
+            Structure* structure = value.asCell()->structure();
+            graph.registerStructure(structure);
+            mergeArrayModes(m_arrayModes, asArrayModes(structure->indexingType()));
+            m_structure.merge(StructureSet(structure));
+        }
+        if (m_value != value)
+            m_value = JSValue();
+    }
+    
+    checkConsistency();
+    assertIsRegistered(graph);
+    
+    return oldMe != *this;
 }
 
 FiltrationResult AbstractValue::filter(Graph& graph, const StructureSet& other)
@@ -415,6 +439,12 @@ void AbstractValue::dumpInContext(PrintStream& out, DumpContext* context) const
     if (!!m_value)
         out.print(", ", inContext(m_value, context));
     out.print(")");
+}
+
+void AbstractValue::validateReferences(const TrackedReferences& trackedReferences)
+{
+    trackedReferences.check(m_value);
+    m_structure.validateReferences(trackedReferences);
 }
 
 } } // namespace JSC::DFG

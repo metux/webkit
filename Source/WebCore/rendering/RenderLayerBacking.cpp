@@ -149,9 +149,9 @@ RenderLayerBacking::~RenderLayerBacking()
     updateOverflowControlsLayers(false, false, false);
     updateForegroundLayer(false);
     updateBackgroundLayer(false);
-    updateMaskLayer(false);
+    updateMaskingLayer(false, false);
     updateScrollingLayers(false);
-    detachFromScrollingCoordinator();
+    detachFromScrollingCoordinator(Scrolling | ViewportConstrained);
     destroyGraphicsLayers();
 }
 
@@ -169,7 +169,7 @@ std::unique_ptr<GraphicsLayer> RenderLayerBacking::createGraphicsLayer(const Str
 
     std::unique_ptr<GraphicsLayer> graphicsLayer = GraphicsLayer::create(graphicsLayerFactory, *this, layerType);
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
     graphicsLayer->setName(name);
 #else
     UNUSED_PARAM(name);
@@ -275,7 +275,7 @@ void RenderLayerBacking::updateDebugIndicators(bool showBorder, bool showRepaint
 void RenderLayerBacking::createPrimaryGraphicsLayer()
 {
     String layerName;
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
     layerName = m_owningLayer.name();
 #endif
     
@@ -311,6 +311,7 @@ void RenderLayerBacking::createPrimaryGraphicsLayer()
 #if ENABLE(CSS_COMPOSITING)
     updateBlendMode(renderer().style());
 #endif
+    updateCustomAppearance(renderer().style());
 }
 
 #if PLATFORM(IOS)
@@ -389,6 +390,23 @@ void RenderLayerBacking::updateBackdropFilters(const RenderStyle& style)
 {
     m_canCompositeBackdropFilters = m_graphicsLayer->setBackdropFilters(style.backdropFilter());
 }
+
+void RenderLayerBacking::updateBackdropFiltersGeometry()
+{
+    if (!m_canCompositeBackdropFilters)
+        return;
+
+    if (!is<RenderBox>(renderer()))
+        return;
+
+    RenderBox& renderer = downcast<RenderBox>(this->renderer());
+    LayoutRect backdropFiltersRect = renderer.borderBoxRect();
+    if (renderer.hasClip())
+        backdropFiltersRect.intersect(renderer.clipRect(LayoutPoint(), nullptr));
+
+    backdropFiltersRect.move(contentOffsetInCompostingLayer());
+    m_graphicsLayer->setBackdropFiltersRect(snapRectToDevicePixels(backdropFiltersRect, deviceScaleFactor()));
+}
 #endif
 
 #if ENABLE(CSS_COMPOSITING)
@@ -402,6 +420,17 @@ void RenderLayerBacking::updateBlendMode(const RenderStyle& style)
         m_graphicsLayer->setBlendMode(style.blendMode());
 }
 #endif
+
+void RenderLayerBacking::updateCustomAppearance(const RenderStyle& style)
+{
+    ControlPart appearance = style.appearance();
+    if (appearance == MediaControlsLightBarBackgroundPart)
+        m_graphicsLayer->setCustomAppearance(GraphicsLayer::LightBackdropAppearance);
+    else if (appearance == MediaControlsDarkBarBackgroundPart)
+        m_graphicsLayer->setCustomAppearance(GraphicsLayer::DarkBackdropAppearance);
+    else
+        m_graphicsLayer->setCustomAppearance(GraphicsLayer::NoCustomAppearance);
+}
 
 // FIXME: the hasAcceleratedTouchScrolling()/needsCompositedScrolling() concepts need to be merged.
 static bool layerOrAncestorIsTransformedOrUsingCompositedScrolling(RenderLayer& layer)
@@ -570,7 +599,7 @@ bool RenderLayerBacking::updateConfiguration()
             m_graphicsLayer->addChild(flatteningLayer);
     }
 
-    updateMaskLayer(renderer().hasMask());
+    updateMaskingLayer(renderer().hasMask(), renderer().hasClipPath());
 
     updateChildClippingStrategy(needsDescendantsClippingLayer);
 
@@ -605,7 +634,7 @@ bool RenderLayerBacking::updateConfiguration()
 #endif
     }
 #if ENABLE(VIDEO)
-    else if (renderer().isVideo()) {
+    else if (is<RenderVideo>(renderer()) && downcast<RenderVideo>(renderer()).shouldDisplayVideo()) {
         HTMLMediaElement* mediaElement = downcast<HTMLMediaElement>(renderer().element());
         m_graphicsLayer->setContentsToPlatformLayer(mediaElement->platformLayer(), GraphicsLayer::ContentsLayerForMedia);
     }
@@ -669,11 +698,11 @@ void RenderLayerBacking::updateGeometry()
 
     // Set transform property, if it is not animating. We have to do this here because the transform
     // is affected by the layer dimensions.
-    if (!renderer().animation().isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyWebkitTransform, AnimationBase::Running | AnimationBase::Paused | AnimationBase::FillingFowards))
+    if (!renderer().animation().isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyTransform, AnimationBase::Running | AnimationBase::Paused))
         updateTransform(style);
 
     // Set opacity, if it is not animating.
-    if (!renderer().animation().isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyOpacity, AnimationBase::Running | AnimationBase::Paused | AnimationBase::FillingFowards))
+    if (!renderer().animation().isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyOpacity, AnimationBase::Running | AnimationBase::Paused))
         updateOpacity(style);
 
     updateFilters(style);
@@ -834,11 +863,8 @@ void RenderLayerBacking::updateGeometry()
         }
     }
     
-    if (m_maskLayer) {
-        m_maskLayer->setSize(m_graphicsLayer->size());
-        m_maskLayer->setPosition(FloatPoint());
-        m_maskLayer->setOffsetFromRenderer(m_graphicsLayer->offsetFromRenderer());
-    }
+    if (m_maskLayer)
+        updateMaskingLayerGeometry();
     
     if (m_owningLayer.renderer().hasTransformRelatedProperty()) {
         // Update properties that depend on layer dimensions.
@@ -899,7 +925,7 @@ void RenderLayerBacking::updateGeometry()
         if (backgroundLayerPaintsFixedRootBackground()) {
             const FrameView& frameView = renderer().view().frameView();
             backgroundPosition = toLayoutPoint(frameView.scrollOffsetForFixedPosition());
-            backgroundSize = frameView.visibleContentRect().size();
+            backgroundSize = frameView.layoutSize();
         }
         m_backgroundLayer->setPosition(backgroundPosition);
         m_backgroundLayer->setSize(backgroundSize);
@@ -989,7 +1015,9 @@ void RenderLayerBacking::updateGeometry()
 
     // If this layer was created just for clipping or to apply perspective, it doesn't need its own backing store.
     setRequiresOwnBackingStore(compositor().requiresOwnBackingStore(m_owningLayer, compAncestor, enclosingRelativeCompositingBounds, ancestorCompositingBounds));
-
+#if ENABLE(FILTERS_LEVEL_2)
+    updateBackdropFiltersGeometry();
+#endif
     updateAfterWidgetResize();
 
     if (devicePixelFractionGapFromRendererChanged(oldDevicePixelFractionFromRenderer, m_devicePixelFractionFromRenderer, deviceScaleFactor) && canIssueSetNeedsDisplay())
@@ -1013,6 +1041,34 @@ void RenderLayerBacking::updateAfterDescendants()
     updateDrawsContent(isSimpleContainer);
 
     m_graphicsLayer->setContentsVisible(m_owningLayer.hasVisibleContent() || isPaintDestinationForDescendantLayers());
+}
+
+// FIXME: Avoid repaints when clip path changes.
+void RenderLayerBacking::updateMaskingLayerGeometry()
+{
+    m_maskLayer->setSize(m_graphicsLayer->size());
+    m_maskLayer->setPosition(FloatPoint());
+    m_maskLayer->setOffsetFromRenderer(m_graphicsLayer->offsetFromRenderer());
+    
+    if (!m_maskLayer->drawsContent()) {
+        if (renderer().hasClipPath()) {
+            ASSERT(renderer().style().clipPath()->type() != ClipPathOperation::Reference);
+
+            WindRule windRule;
+            // FIXME: Use correct reference box for inlines: https://bugs.webkit.org/show_bug.cgi?id=129047
+            LayoutRect boundingBox = m_owningLayer.boundingBox(&m_owningLayer);
+            LayoutRect referenceBoxForClippedInline = LayoutRect(snapRectToDevicePixels(boundingBox, deviceScaleFactor()));
+            LayoutSize offset = LayoutSize(snapSizeToDevicePixel(m_devicePixelFractionFromRenderer, LayoutPoint(), deviceScaleFactor()));
+            Path clipPath = m_owningLayer.computeClipPath(offset, referenceBoxForClippedInline, windRule);
+
+            FloatSize pathOffset = m_maskLayer->offsetFromRenderer();
+            if (!pathOffset.isZero())
+                clipPath.translate(-pathOffset);
+            
+            m_maskLayer->setShapeLayerPath(clipPath);
+            m_maskLayer->setShapeLayerWindRule(windRule);
+        }
+    }
 }
 
 void RenderLayerBacking::adjustAncestorCompositingBoundsForFlowThread(LayoutRect& ancestorCompositingBounds, const RenderLayer* compositingAncestor) const
@@ -1132,7 +1188,7 @@ void RenderLayerBacking::resetContentsRect()
     }
 
     m_graphicsLayer->setContentsTileSize(IntSize());
-    m_graphicsLayer->setContentsTilePhase(IntPoint());
+    m_graphicsLayer->setContentsTilePhase(IntSize());
 }
 
 void RenderLayerBacking::updateDrawsContent()
@@ -1274,9 +1330,9 @@ bool RenderLayerBacking::updateOverflowControlsLayers(bool needsHorizontalScroll
 
     if (ScrollingCoordinator* scrollingCoordinator = scrollingCoordinatorFromLayer(m_owningLayer)) {
         if (horizontalScrollbarLayerChanged)
-            scrollingCoordinator->scrollableAreaScrollbarLayerDidChange(&m_owningLayer, HorizontalScrollbar);
+            scrollingCoordinator->scrollableAreaScrollbarLayerDidChange(m_owningLayer, HorizontalScrollbar);
         if (verticalScrollbarLayerChanged)
-            scrollingCoordinator->scrollableAreaScrollbarLayerDidChange(&m_owningLayer, VerticalScrollbar);
+            scrollingCoordinator->scrollableAreaScrollbarLayerDidChange(m_owningLayer, VerticalScrollbar);
     }
 
     return horizontalScrollbarLayerChanged || verticalScrollbarLayerChanged || scrollCornerLayerChanged;
@@ -1345,7 +1401,7 @@ bool RenderLayerBacking::updateForegroundLayer(bool needsForegroundLayer)
     if (needsForegroundLayer) {
         if (!m_foregroundLayer) {
             String layerName;
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
             layerName = m_owningLayer.name() + " (foreground)";
 #endif
             m_foregroundLayer = createGraphicsLayer(layerName);
@@ -1374,7 +1430,7 @@ bool RenderLayerBacking::updateBackgroundLayer(bool needsBackgroundLayer)
     if (needsBackgroundLayer) {
         if (!m_backgroundLayer) {
             String layerName;
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
             layerName = m_owningLayer.name() + " (background)";
 #endif
             m_backgroundLayer = createGraphicsLayer(layerName);
@@ -1386,7 +1442,7 @@ bool RenderLayerBacking::updateBackgroundLayer(bool needsBackgroundLayer)
         
         if (!m_contentsContainmentLayer) {
             String layerName;
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
             layerName = m_owningLayer.name() + " (contents containment)";
 #endif
             m_contentsContainmentLayer = createGraphicsLayer(layerName);
@@ -1419,14 +1475,33 @@ bool RenderLayerBacking::updateBackgroundLayer(bool needsBackgroundLayer)
     return layerChanged;
 }
 
-void RenderLayerBacking::updateMaskLayer(bool needsMaskLayer)
+// Masking layer is used for masks or clip-path.
+void RenderLayerBacking::updateMaskingLayer(bool hasMask, bool hasClipPath)
 {
     bool layerChanged = false;
-    if (needsMaskLayer) {
+    if (hasMask || hasClipPath) {
+        GraphicsLayerPaintingPhase maskPhases = 0;
+        if (hasMask)
+            maskPhases = GraphicsLayerPaintMask;
+        
+        if (hasClipPath) {
+            // If we have a mask, we need to paint the combined clip-path and mask into the mask layer.
+            if (hasMask || renderer().style().clipPath()->type() == ClipPathOperation::Reference || !GraphicsLayer::supportsLayerType(GraphicsLayer::Type::Shape))
+                maskPhases |= GraphicsLayerPaintClipPath;
+        }
+
+        bool paintsContent = maskPhases;
+        GraphicsLayer::Type requiredLayerType = paintsContent ? GraphicsLayer::Type::Normal : GraphicsLayer::Type::Shape;
+        if (m_maskLayer && m_maskLayer->type() != requiredLayerType) {
+            m_graphicsLayer->setMaskLayer(nullptr);
+            willDestroyLayer(m_maskLayer.get());
+            m_maskLayer = nullptr;
+        }
+
         if (!m_maskLayer) {
-            m_maskLayer = createGraphicsLayer("Mask");
-            m_maskLayer->setDrawsContent(true);
-            m_maskLayer->setPaintingPhase(GraphicsLayerPaintMask);
+            m_maskLayer = createGraphicsLayer("Mask", requiredLayerType);
+            m_maskLayer->setDrawsContent(paintsContent);
+            m_maskLayer->setPaintingPhase(maskPhases);
             layerChanged = true;
             m_graphicsLayer->setMaskLayer(m_maskLayer.get());
         }
@@ -1511,7 +1586,7 @@ bool RenderLayerBacking::updateScrollingLayers(bool needsScrollingLayers)
     return true;
 }
 
-void RenderLayerBacking::detachFromScrollingCoordinator()
+void RenderLayerBacking::detachFromScrollingCoordinator(LayerScrollCoordinationRoles roles)
 {
     if (!m_scrollingNodeID && !m_viewportConstrainedNodeID)
         return;
@@ -1520,14 +1595,20 @@ void RenderLayerBacking::detachFromScrollingCoordinator()
     if (!scrollingCoordinator)
         return;
 
-    if (m_scrollingNodeID)
+    if ((roles & Scrolling) && m_scrollingNodeID) {
         scrollingCoordinator->detachFromStateTree(m_scrollingNodeID);
-
-    if (m_viewportConstrainedNodeID)
+        m_scrollingNodeID = 0;
+    }
+    
+    if ((roles & ViewportConstrained) && m_viewportConstrainedNodeID) {
         scrollingCoordinator->detachFromStateTree(m_viewportConstrainedNodeID);
+        m_viewportConstrainedNodeID = 0;
+    }
+}
 
-    m_scrollingNodeID = 0;
-    m_viewportConstrainedNodeID = 0;
+void RenderLayerBacking::setIsScrollCoordinatedWithViewportConstrainedRole(bool viewportCoordinated)
+{
+    m_graphicsLayer->setIsViewportConstrained(viewportCoordinated);
 }
 
 GraphicsLayerPaintingPhase RenderLayerBacking::paintingPhaseForPrimaryLayer() const
@@ -1537,8 +1618,6 @@ GraphicsLayerPaintingPhase RenderLayerBacking::paintingPhaseForPrimaryLayer() co
         phase |= GraphicsLayerPaintBackground;
     if (!m_foregroundLayer)
         phase |= GraphicsLayerPaintForeground;
-    if (!m_maskLayer)
-        phase |= GraphicsLayerPaintMask;
 
     if (m_scrollingContentsLayer) {
         phase &= ~GraphicsLayerPaintForeground;
@@ -1662,11 +1741,12 @@ void RenderLayerBacking::updateDirectlyCompositedBackgroundImage(bool isSimpleCo
     }
 
     FloatRect destRect = backgroundBoxForPainting();
-    FloatPoint phase;
+    FloatSize phase;
     FloatSize tileSize;
 
     RefPtr<Image> image = style.backgroundLayers()->image()->cachedImage()->image();
-    downcast<RenderBox>(renderer()).getGeometryForBackgroundImage(&renderer(), destRect, phase, tileSize);
+    // FIXME: absolute paint location is required here.
+    downcast<RenderBox>(renderer()).getGeometryForBackgroundImage(&renderer(), LayoutPoint(), destRect, phase, tileSize);
     m_graphicsLayer->setContentsTileSize(tileSize);
     m_graphicsLayer->setContentsTilePhase(phase);
     m_graphicsLayer->setContentsRect(destRect);
@@ -1810,11 +1890,6 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
     return true;
 }
 
-static bool compositedWithOwnBackingStore(const RenderLayer* layer)
-{
-    return layer->isComposited() && !layer->backing()->paintsIntoCompositedAncestor();
-}
-
 static bool descendantLayerPaintsIntoAncestor(RenderLayer& parent)
 {
     // FIXME: We shouldn't be called with a stale z-order lists. See bug 85512.
@@ -1881,7 +1956,7 @@ bool RenderLayerBacking::containsPaintedContent(bool isSimpleContainer) const
     // and set background color on the layer in that case, instead of allocating backing store and painting.
 #if ENABLE(VIDEO)
     if (is<RenderVideo>(renderer()) && downcast<RenderVideo>(renderer()).shouldDisplayVideo())
-        return m_owningLayer.hasBoxDecorationsOrBackground();
+        return m_owningLayer.hasBoxDecorationsOrBackground() || (!(downcast<RenderVideo>(renderer()).supportsAcceleratedRendering()) && m_requiresOwnBackingStore);
 #endif
 
 #if ENABLE(WEBGL) || ENABLE(ACCELERATED_2D_CANVAS)
@@ -1930,7 +2005,7 @@ void RenderLayerBacking::contentChanged(ContentChangeType changeType)
     }
 
     if ((changeType == BackgroundImageChanged) && canCreateTiledImage(renderer().style()))
-        updateAfterLayout(NeedsFullRepaint | IsUpdateRoot);
+        updateGeometry();
 
     if ((changeType == MaskImageChanged) && m_maskLayer) {
         // The composited layer bounds relies on box->maskClipRect(), which changes
@@ -2205,6 +2280,8 @@ void RenderLayerBacking::paintIntoLayer(const GraphicsLayer* graphicsLayer, Grap
         paintFlags |= RenderLayer::PaintLayerPaintingCompositingForegroundPhase;
     if (paintingPhase & GraphicsLayerPaintMask)
         paintFlags |= RenderLayer::PaintLayerPaintingCompositingMaskPhase;
+    if (paintingPhase & GraphicsLayerPaintClipPath)
+        paintFlags |= RenderLayer::PaintLayerPaintingCompositingClipPathPhase;
     if (paintingPhase & GraphicsLayerPaintChildClippingMask)
         paintFlags |= RenderLayer::PaintLayerPaintingChildClippingMaskPhase;
     if (paintingPhase & GraphicsLayerPaintOverflowContents)
@@ -2238,20 +2315,6 @@ void RenderLayerBacking::paintIntoLayer(const GraphicsLayer* graphicsLayer, Grap
     compositor().didPaintBacking(this);
 
     ASSERT(!m_owningLayer.m_usedTransparency);
-}
-
-static void paintScrollbar(Scrollbar* scrollbar, GraphicsContext& context, const IntRect& clip)
-{
-    if (!scrollbar)
-        return;
-
-    context.save();
-    const IntRect& scrollbarRect = scrollbar->frameRect();
-    context.translate(-scrollbarRect.x(), -scrollbarRect.y());
-    IntRect transformedClip = clip;
-    transformedClip.moveBy(scrollbarRect.location());
-    scrollbar->paint(&context, transformedClip);
-    context.restore();
 }
 
 // Up-call from compositing layer drawing callback.
@@ -2350,8 +2413,11 @@ bool RenderLayerBacking::isTrackingRepaints() const
     return static_cast<GraphicsLayerClient&>(compositor()).isTrackingRepaints();
 }
 
-bool RenderLayerBacking::shouldSkipLayerInDump(const GraphicsLayer* layer, LayerTreeAsTextBehavior) const
+bool RenderLayerBacking::shouldSkipLayerInDump(const GraphicsLayer* layer, LayerTreeAsTextBehavior behavior) const
 {
+    if (behavior & LayerTreeAsTextDebug)
+        return false;
+
     // Skip the root tile cache's flattening layer.
     return m_isMainFrameRenderViewLayer && layer && layer == m_childContainmentLayer.get();
 }
@@ -2406,15 +2472,23 @@ void RenderLayerBacking::verifyNotPainting()
 bool RenderLayerBacking::startAnimation(double timeOffset, const Animation* anim, const KeyframeList& keyframes)
 {
     bool hasOpacity = keyframes.containsProperty(CSSPropertyOpacity);
-    bool hasTransform = renderer().isBox() && keyframes.containsProperty(CSSPropertyWebkitTransform);
+    bool hasTransform = renderer().isBox() && keyframes.containsProperty(CSSPropertyTransform);
     bool hasFilter = keyframes.containsProperty(CSSPropertyWebkitFilter);
 
-    if (!hasOpacity && !hasTransform && !hasFilter)
+    bool hasBackdropFilter = false;
+#if ENABLE(FILTERS_LEVEL_2)
+    hasBackdropFilter = keyframes.containsProperty(CSSPropertyWebkitBackdropFilter);
+#endif
+
+    if (!hasOpacity && !hasTransform && !hasFilter && !hasBackdropFilter)
         return false;
-    
-    KeyframeValueList transformVector(AnimatedPropertyWebkitTransform);
+
+    KeyframeValueList transformVector(AnimatedPropertyTransform);
     KeyframeValueList opacityVector(AnimatedPropertyOpacity);
     KeyframeValueList filterVector(AnimatedPropertyWebkitFilter);
+#if ENABLE(FILTERS_LEVEL_2)
+    KeyframeValueList backdropFilterVector(AnimatedPropertyWebkitBackdropFilter);
+#endif
 
     size_t numKeyframes = keyframes.size();
     for (size_t i = 0; i < numKeyframes; ++i) {
@@ -2428,7 +2502,7 @@ bool RenderLayerBacking::startAnimation(double timeOffset, const Animation* anim
         TimingFunction* tf = currentKeyframe.timingFunction(keyframes.animationName());
         
         bool isFirstOrLastKeyframe = key == 0 || key == 1;
-        if ((hasTransform && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyWebkitTransform))
+        if ((hasTransform && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyTransform))
             transformVector.insert(std::make_unique<TransformAnimationValue>(key, keyframeStyle->transform(), tf));
 
         if ((hasOpacity && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyOpacity))
@@ -2436,6 +2510,11 @@ bool RenderLayerBacking::startAnimation(double timeOffset, const Animation* anim
 
         if ((hasFilter && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyWebkitFilter))
             filterVector.insert(std::make_unique<FilterAnimationValue>(key, keyframeStyle->filter(), tf));
+
+#if ENABLE(FILTERS_LEVEL_2)
+        if ((hasBackdropFilter && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyWebkitBackdropFilter))
+            backdropFilterVector.insert(std::make_unique<FilterAnimationValue>(key, keyframeStyle->backdropFilter(), tf));
+#endif
     }
 
     if (renderer().frame().page() && !renderer().frame().page()->settings().acceleratedCompositedAnimationsEnabled())
@@ -2451,6 +2530,11 @@ bool RenderLayerBacking::startAnimation(double timeOffset, const Animation* anim
 
     if (hasFilter && m_graphicsLayer->addAnimation(filterVector, IntSize(), anim, keyframes.animationName(), timeOffset))
         didAnimate = true;
+
+#if ENABLE(FILTERS_LEVEL_2)
+    if (hasBackdropFilter && m_graphicsLayer->addAnimation(backdropFilterVector, IntSize(), anim, keyframes.animationName(), timeOffset))
+        didAnimate = true;
+#endif
 
     return didAnimate;
 }
@@ -2486,13 +2570,13 @@ bool RenderLayerBacking::startTransition(double timeOffset, CSSPropertyID proper
         }
     }
 
-    if (property == CSSPropertyWebkitTransform && m_owningLayer.hasTransform()) {
-        const Animation* transformAnim = toStyle->transitionForProperty(CSSPropertyWebkitTransform);
+    if (property == CSSPropertyTransform && m_owningLayer.hasTransform()) {
+        const Animation* transformAnim = toStyle->transitionForProperty(CSSPropertyTransform);
         if (transformAnim && !transformAnim->isEmptyOrZeroDuration()) {
-            KeyframeValueList transformVector(AnimatedPropertyWebkitTransform);
+            KeyframeValueList transformVector(AnimatedPropertyTransform);
             transformVector.insert(std::make_unique<TransformAnimationValue>(0, fromStyle->transform()));
             transformVector.insert(std::make_unique<TransformAnimationValue>(1, toStyle->transform()));
-            if (m_graphicsLayer->addAnimation(transformVector, downcast<RenderBox>(renderer()).pixelSnappedBorderBoxRect().size(), transformAnim, GraphicsLayer::animationNameForTransition(AnimatedPropertyWebkitTransform), timeOffset)) {
+            if (m_graphicsLayer->addAnimation(transformVector, downcast<RenderBox>(renderer()).pixelSnappedBorderBoxRect().size(), transformAnim, GraphicsLayer::animationNameForTransition(AnimatedPropertyTransform), timeOffset)) {
                 // To ensure that the correct transform is visible when the animation ends, also set the final transform.
                 updateTransform(*toStyle);
                 didAnimate = true;
@@ -2513,6 +2597,22 @@ bool RenderLayerBacking::startTransition(double timeOffset, CSSPropertyID proper
             }
         }
     }
+
+#if ENABLE(FILTERS_LEVEL_2)
+    if (property == CSSPropertyWebkitBackdropFilter && m_owningLayer.hasBackdropFilter()) {
+        const Animation* backdropFilterAnim = toStyle->transitionForProperty(CSSPropertyWebkitBackdropFilter);
+        if (backdropFilterAnim && !backdropFilterAnim->isEmptyOrZeroDuration()) {
+            KeyframeValueList backdropFilterVector(AnimatedPropertyWebkitBackdropFilter);
+            backdropFilterVector.insert(std::make_unique<FilterAnimationValue>(0, fromStyle->backdropFilter()));
+            backdropFilterVector.insert(std::make_unique<FilterAnimationValue>(1, toStyle->backdropFilter()));
+            if (m_graphicsLayer->addAnimation(backdropFilterVector, FloatSize(), backdropFilterAnim, GraphicsLayer::animationNameForTransition(AnimatedPropertyWebkitBackdropFilter), timeOffset)) {
+                // To ensure that the correct backdrop filter is visible when the animation ends, also set the final backdrop filter.
+                updateBackdropFilters(*toStyle);
+                didAnimate = true;
+            }
+        }
+    }
+#endif
 
     return didAnimate;
 }
@@ -2589,20 +2689,25 @@ CSSPropertyID RenderLayerBacking::graphicsLayerToCSSProperty(AnimatedPropertyID 
 {
     CSSPropertyID cssProperty = CSSPropertyInvalid;
     switch (property) {
-        case AnimatedPropertyWebkitTransform:
-            cssProperty = CSSPropertyWebkitTransform;
-            break;
-        case AnimatedPropertyOpacity:
-            cssProperty = CSSPropertyOpacity;
-            break;
-        case AnimatedPropertyBackgroundColor:
-            cssProperty = CSSPropertyBackgroundColor;
-            break;
-        case AnimatedPropertyWebkitFilter:
-            cssProperty = CSSPropertyWebkitFilter;
-            break;
-        case AnimatedPropertyInvalid:
-            ASSERT_NOT_REACHED();
+    case AnimatedPropertyTransform:
+        cssProperty = CSSPropertyTransform;
+        break;
+    case AnimatedPropertyOpacity:
+        cssProperty = CSSPropertyOpacity;
+        break;
+    case AnimatedPropertyBackgroundColor:
+        cssProperty = CSSPropertyBackgroundColor;
+        break;
+    case AnimatedPropertyWebkitFilter:
+        cssProperty = CSSPropertyWebkitFilter;
+        break;
+#if ENABLE(FILTERS_LEVEL_2)
+    case AnimatedPropertyWebkitBackdropFilter:
+        cssProperty = CSSPropertyWebkitBackdropFilter;
+        break;
+#endif
+    case AnimatedPropertyInvalid:
+        ASSERT_NOT_REACHED();
     }
     return cssProperty;
 }
@@ -2610,17 +2715,21 @@ CSSPropertyID RenderLayerBacking::graphicsLayerToCSSProperty(AnimatedPropertyID 
 AnimatedPropertyID RenderLayerBacking::cssToGraphicsLayerProperty(CSSPropertyID cssProperty)
 {
     switch (cssProperty) {
-        case CSSPropertyWebkitTransform:
-            return AnimatedPropertyWebkitTransform;
-        case CSSPropertyOpacity:
-            return AnimatedPropertyOpacity;
-        case CSSPropertyBackgroundColor:
-            return AnimatedPropertyBackgroundColor;
-        case CSSPropertyWebkitFilter:
-            return AnimatedPropertyWebkitFilter;
-        default:
-            // It's fine if we see other css properties here; they are just not accelerated.
-            break;
+    case CSSPropertyTransform:
+        return AnimatedPropertyTransform;
+    case CSSPropertyOpacity:
+        return AnimatedPropertyOpacity;
+    case CSSPropertyBackgroundColor:
+        return AnimatedPropertyBackgroundColor;
+    case CSSPropertyWebkitFilter:
+        return AnimatedPropertyWebkitFilter;
+#if ENABLE(FILTERS_LEVEL_2)
+    case CSSPropertyWebkitBackdropFilter:
+        return AnimatedPropertyWebkitBackdropFilter;
+#endif
+    default:
+        // It's fine if we see other css properties here; they are just not accelerated.
+        break;
     }
     return AnimatedPropertyInvalid;
 }

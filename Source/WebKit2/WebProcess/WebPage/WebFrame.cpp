@@ -28,6 +28,7 @@
 
 #include "APIArray.h"
 #include "DownloadManager.h"
+#include "InjectedBundleFileHandle.h"
 #include "InjectedBundleHitTestResult.h"
 #include "InjectedBundleNodeHandle.h"
 #include "InjectedBundleRangeHandle.h"
@@ -49,6 +50,7 @@
 #include <WebCore/Chrome.h>
 #include <WebCore/DocumentLoader.h>
 #include <WebCore/EventHandler.h>
+#include <WebCore/File.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameSnapshotting.h>
 #include <WebCore/FrameView.h>
@@ -60,6 +62,7 @@
 #include <WebCore/ImageBuffer.h>
 #include <WebCore/JSCSSStyleDeclaration.h>
 #include <WebCore/JSElement.h>
+#include <WebCore/JSFile.h>
 #include <WebCore/JSRange.h>
 #include <WebCore/MainFrame.h>
 #include <WebCore/NetworkingContext.h>
@@ -152,6 +155,9 @@ WebFrame::WebFrame(std::unique_ptr<WebFrameLoaderClient> frameLoaderClient)
     , m_frameLoaderClient(WTF::move(frameLoaderClient))
     , m_loadListener(0)
     , m_frameID(generateFrameID())
+#if PLATFORM(IOS)
+    , m_firstLayerTreeTransactionIDAfterDidCommitLoad(0)
+#endif
 {
     m_frameLoaderClient->setWebFrame(this);
     WebProcess::singleton().addWebFrame(m_frameID, this);
@@ -442,7 +448,7 @@ WebFrame* WebFrame::parentFrame() const
     return WebFrame::fromCoreFrame(*m_coreFrame->ownerElement()->document().frame());
 }
 
-PassRefPtr<API::Array> WebFrame::childFrames()
+Ref<API::Array> WebFrame::childFrames()
 {
     if (!m_coreFrame)
         return API::Array::create();
@@ -505,6 +511,25 @@ bool WebFrame::handlesPageScaleGesture() const
     PluginDocument* pluginDocument = static_cast<PluginDocument*>(m_coreFrame->document());
     PluginView* pluginView = static_cast<PluginView*>(pluginDocument->pluginWidget());
     return pluginView && pluginView->handlesPageScaleFactor();
+}
+
+void WebFrame::setAccessibleName(const String& accessibleName)
+{
+    if (!AXObjectCache::accessibilityEnabled())
+        return;
+    
+    if (!m_coreFrame)
+        return;
+
+    auto* document = m_coreFrame->document();
+    if (!document)
+        return;
+    
+    auto* rootObject = document->axObjectCache()->rootObject();
+    if (!rootObject)
+        return;
+
+    rootObject->setAccessibleName(accessibleName);
 }
 
 IntRect WebFrame::contentBounds() const
@@ -683,6 +708,18 @@ JSValueRef WebFrame::jsWrapperForWorld(InjectedBundleRangeHandle* rangeHandle, I
 
     JSLockHolder lock(exec);
     return toRef(exec, toJS(exec, globalObject, rangeHandle->coreRange()));
+}
+
+JSValueRef WebFrame::jsWrapperForWorld(InjectedBundleFileHandle* fileHandle, InjectedBundleScriptWorld* world)
+{
+    if (!m_coreFrame)
+        return nullptr;
+
+    JSDOMWindow* globalObject = m_coreFrame->script().globalObject(world->coreWorld());
+    ExecState* exec = globalObject->globalExec();
+
+    JSLockHolder lock(exec);
+    return toRef(exec, toJS(exec, globalObject, fileHandle->coreFile()));
 }
 
 String WebFrame::counterValue(JSObjectRef element)

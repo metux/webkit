@@ -147,41 +147,51 @@ set(WebKit2_INCLUDE_DIRECTORIES
     "${CMAKE_SOURCE_DIR}/Source"
 )
 
-if (WTF_USE_3D_GRAPHICS)
+set(WebKit2_SYSTEM_INCLUDE_DIRECTORIES "")
+
+if (ENABLE_GRAPHICS_CONTEXT_3D)
     list(APPEND WebKit2_INCLUDE_DIRECTORIES
         "${THIRDPARTY_DIR}/ANGLE"
         "${THIRDPARTY_DIR}/ANGLE/include/KHR"
     )
 endif ()
 
-set(WebKit2_SOURCES
-    DatabaseProcess/DatabaseToWebProcessConnection.cpp
-    DatabaseProcess/DatabaseProcess.cpp
-    DatabaseProcess/IndexedDB/DatabaseProcessIDBConnection.cpp
-    DatabaseProcess/IndexedDB/IDBSerialization.cpp
-    DatabaseProcess/IndexedDB/UniqueIDBDatabase.cpp
-    DatabaseProcess/IndexedDB/UniqueIDBDatabaseIdentifier.cpp
-    DatabaseProcess/IndexedDB/sqlite/SQLiteIDBCursor.cpp
-    DatabaseProcess/IndexedDB/sqlite/SQLiteIDBTransaction.cpp
-    DatabaseProcess/IndexedDB/sqlite/UniqueIDBDatabaseBackingStoreSQLite.cpp
-
+set(NetworkProcess_COMMON_SOURCES
     NetworkProcess/NetworkConnectionToWebProcess.cpp
     NetworkProcess/NetworkProcess.cpp
     NetworkProcess/NetworkProcessPlatformStrategies.cpp
-    NetworkProcess/NetworkResourceLoadScheduler.cpp
     NetworkProcess/NetworkResourceLoader.cpp
 
     NetworkProcess/FileAPI/NetworkBlobRegistry.cpp
 
     NetworkProcess/cache/NetworkCache.cpp
+    NetworkProcess/cache/NetworkCacheBlobStorage.cpp
     NetworkProcess/cache/NetworkCacheCoders.cpp
-    NetworkProcess/cache/NetworkCacheEncoder.cpp
+    NetworkProcess/cache/NetworkCacheData.cpp
     NetworkProcess/cache/NetworkCacheDecoder.cpp
+    NetworkProcess/cache/NetworkCacheEncoder.cpp
+    NetworkProcess/cache/NetworkCacheEntry.cpp
+    NetworkProcess/cache/NetworkCacheFileSystem.cpp
     NetworkProcess/cache/NetworkCacheKey.cpp
+    NetworkProcess/cache/NetworkCacheStatistics.cpp
+    NetworkProcess/cache/NetworkCacheStorage.cpp
+)
+
+set(WebKit2_SOURCES
+    DatabaseProcess/DatabaseProcess.cpp
+    DatabaseProcess/DatabaseToWebProcessConnection.cpp
+
+    DatabaseProcess/IndexedDB/DatabaseProcessIDBConnection.cpp
+    DatabaseProcess/IndexedDB/IDBSerialization.cpp
+    DatabaseProcess/IndexedDB/UniqueIDBDatabase.cpp
+    DatabaseProcess/IndexedDB/UniqueIDBDatabaseIdentifier.cpp
+
+    DatabaseProcess/IndexedDB/sqlite/SQLiteIDBCursor.cpp
+    DatabaseProcess/IndexedDB/sqlite/SQLiteIDBTransaction.cpp
+    DatabaseProcess/IndexedDB/sqlite/UniqueIDBDatabaseBackingStoreSQLite.cpp
 
     Platform/Logging.cpp
     Platform/Module.cpp
-    Platform/WorkQueue.cpp
 
     Platform/IPC/ArgumentCoders.cpp
     Platform/IPC/ArgumentDecoder.cpp
@@ -200,25 +210,12 @@ set(WebKit2_SOURCES
     PluginProcess/PluginProcess.cpp
     PluginProcess/WebProcessConnection.cpp
 
-    Shared/API/APIArray.cpp
-    Shared/API/APIData.cpp
-    Shared/API/APIDictionary.cpp
-    Shared/API/APIError.cpp
-    Shared/API/APIFrameHandle.cpp
-    Shared/API/APIGeometry.cpp
-    Shared/API/APIPageGroupHandle.cpp
-    Shared/API/APIPageHandle.cpp
-    Shared/API/APIObject.cpp
-    Shared/API/APIURLRequest.cpp
-    Shared/API/APIURLResponse.cpp
-
     Shared/ActivityAssertion.cpp
     Shared/AsyncRequest.cpp
     Shared/BlobDataFileReferenceWithSandboxExtension.cpp
     Shared/CacheModel.cpp
     Shared/ChildProcess.cpp
     Shared/ChildProcessProxy.cpp
-    Shared/ConnectionStack.cpp
     Shared/ContextMenuContextData.cpp
     Shared/DictionaryPopupInfo.cpp
     Shared/EditorState.cpp
@@ -239,6 +236,8 @@ set(WebKit2_SOURCES
     Shared/VisitedLinkTable.cpp
     Shared/WebBackForwardListItem.cpp
     Shared/WebBatteryStatus.cpp
+    Shared/WebCompiledContentExtension.cpp
+    Shared/WebCompiledContentExtensionData.cpp
     Shared/WebConnection.cpp
     Shared/WebConnectionClient.cpp
     Shared/WebContextMenuItem.cpp
@@ -252,6 +251,7 @@ set(WebKit2_SOURCES
     Shared/WebImage.cpp
     Shared/WebKeyboardEvent.cpp
     Shared/WebKit2Initialize.cpp
+    Shared/WebMediaSessionMetadata.cpp
     Shared/WebMemorySampler.cpp
     Shared/WebMouseEvent.cpp
     Shared/WebOpenPanelParameters.cpp
@@ -266,6 +266,18 @@ set(WebKit2_SOURCES
     Shared/WebRenderObject.cpp
     Shared/WebTouchEvent.cpp
     Shared/WebWheelEvent.cpp
+
+    Shared/API/APIArray.cpp
+    Shared/API/APIData.cpp
+    Shared/API/APIDictionary.cpp
+    Shared/API/APIError.cpp
+    Shared/API/APIFrameHandle.cpp
+    Shared/API/APIGeometry.cpp
+    Shared/API/APIObject.cpp
+    Shared/API/APIPageGroupHandle.cpp
+    Shared/API/APIPageHandle.cpp
+    Shared/API/APIURLRequest.cpp
+    Shared/API/APIURLResponse.cpp
 
     Shared/API/c/WKArray.cpp
     Shared/API/c/WKCertificateInfo.cpp
@@ -283,7 +295,7 @@ set(WebKit2_SOURCES
     Shared/API/c/WKPluginInformation.cpp
     Shared/API/c/WKRenderLayer.cpp
     Shared/API/c/WKRenderObject.cpp
-    Shared/API/c/WKSecurityOrigin.cpp
+    Shared/API/c/WKSecurityOriginRef.cpp
     Shared/API/c/WKSerializedScriptValue.cpp
     Shared/API/c/WKString.cpp
     Shared/API/c/WKType.cpp
@@ -295,6 +307,7 @@ set(WebKit2_SOURCES
     Shared/Authentication/AuthenticationManager.cpp
 
     Shared/Databases/DatabaseProcessCreationParameters.cpp
+
     Shared/Databases/IndexedDB/IDBUtilities.cpp
 
     Shared/Downloads/Download.cpp
@@ -315,10 +328,8 @@ set(WebKit2_SOURCES
     Shared/Plugins/Netscape/NetscapePluginModuleNone.cpp
     Shared/Plugins/Netscape/PluginInformation.cpp
 
-    UIProcess/API/APINavigationData.cpp
-    UIProcess/API/APIProcessPoolConfiguration.cpp
-    UIProcess/API/APISession.cpp
-    UIProcess/BackingStore.cpp
+    Shared/WebsiteData/WebsiteData.cpp
+
     UIProcess/DrawingAreaProxy.cpp
     UIProcess/FrameLoadState.cpp
     UIProcess/GeolocationPermissionRequestManagerProxy.cpp
@@ -333,15 +344,11 @@ set(WebKit2_SOURCES
     UIProcess/UserMediaPermissionRequestManagerProxy.cpp
     UIProcess/UserMediaPermissionRequestProxy.cpp
     UIProcess/VisitedLinkProvider.cpp
-    UIProcess/WebApplicationCacheManagerProxy.cpp
     UIProcess/WebBackForwardList.cpp
     UIProcess/WebBatteryManagerProxy.cpp
     UIProcess/WebBatteryProvider.cpp
     UIProcess/WebColorPicker.cpp
     UIProcess/WebConnectionToWebProcess.cpp
-    UIProcess/WebProcessLifetimeObserver.cpp
-    UIProcess/WebProcessLifetimeTracker.cpp
-    UIProcess/WebProcessPool.cpp
     UIProcess/WebContextClient.cpp
     UIProcess/WebContextConnectionClient.cpp
     UIProcess/WebContextInjectedBundleClient.cpp
@@ -364,18 +371,19 @@ set(WebKit2_SOURCES
     UIProcess/WebIconDatabase.cpp
     UIProcess/WebIconDatabaseClient.cpp
     UIProcess/WebInspectorProxy.cpp
-    UIProcess/WebKeyValueStorageManager.cpp
-    UIProcess/WebNavigationState.cpp
     UIProcess/WebMediaCacheManagerProxy.cpp
+    UIProcess/WebNavigationState.cpp
     UIProcess/WebOpenPanelResultListenerProxy.cpp
-    UIProcess/WebOriginDataManagerProxy.cpp
     UIProcess/WebPageDiagnosticLoggingClient.cpp
     UIProcess/WebPageGroup.cpp
+    UIProcess/WebPageInjectedBundleClient.cpp
     UIProcess/WebPageProxy.cpp
     UIProcess/WebPasteboardProxy.cpp
     UIProcess/WebPreferences.cpp
+    UIProcess/WebProcessLifetimeObserver.cpp
+    UIProcess/WebProcessLifetimeTracker.cpp
+    UIProcess/WebProcessPool.cpp
     UIProcess/WebProcessProxy.cpp
-    UIProcess/WebResourceCacheManagerProxy.cpp
     UIProcess/WebTextChecker.cpp
     UIProcess/WebTextCheckerClient.cpp
     UIProcess/WebVibrationProvider.cpp
@@ -384,15 +392,20 @@ set(WebKit2_SOURCES
 
     UIProcess/API/APIFrameInfo.cpp
     UIProcess/API/APINavigation.cpp
+    UIProcess/API/APINavigationData.cpp
+    UIProcess/API/APIPageConfiguration.cpp
+    UIProcess/API/APIProcessPoolConfiguration.cpp
+    UIProcess/API/APISession.cpp
     UIProcess/API/APISessionState.cpp
+    UIProcess/API/APIUserContentExtension.cpp
+    UIProcess/API/APIUserContentExtensionStore.cpp
     UIProcess/API/APIWebsiteDataStore.cpp
-    UIProcess/API/APIUserContentFilter.cpp
 
     UIProcess/API/C/WKApplicationCacheManager.cpp
     UIProcess/API/C/WKAuthenticationChallenge.cpp
     UIProcess/API/C/WKAuthenticationDecisionListener.cpp
-    UIProcess/API/C/WKBackForwardListRef.cpp
     UIProcess/API/C/WKBackForwardListItemRef.cpp
+    UIProcess/API/C/WKBackForwardListRef.cpp
     UIProcess/API/C/WKBatteryManager.cpp
     UIProcess/API/C/WKBatteryStatus.cpp
     UIProcess/API/C/WKContext.cpp
@@ -414,6 +427,7 @@ set(WebKit2_SOURCES
     UIProcess/API/C/WKInspector.cpp
     UIProcess/API/C/WKKeyValueStorageManager.cpp
     UIProcess/API/C/WKMediaCacheManager.cpp
+    UIProcess/API/C/WKMediaSessionMetadata.cpp
     UIProcess/API/C/WKNavigationActionRef.cpp
     UIProcess/API/C/WKNavigationDataRef.cpp
     UIProcess/API/C/WKNavigationRef.cpp
@@ -465,7 +479,6 @@ set(WebKit2_SOURCES
     UIProcess/Plugins/PluginInfoStore.cpp
     UIProcess/Plugins/PluginProcessManager.cpp
     UIProcess/Plugins/PluginProcessProxy.cpp
-    UIProcess/Plugins/WebPluginSiteDataManager.cpp
 
     UIProcess/Storage/LocalStorageDatabase.cpp
     UIProcess/Storage/LocalStorageDatabaseTracker.cpp
@@ -473,21 +486,23 @@ set(WebKit2_SOURCES
     UIProcess/UserContent/WebScriptMessageHandler.cpp
     UIProcess/UserContent/WebUserContentControllerProxy.cpp
 
+    UIProcess/WebsiteData/WebsiteDataRecord.cpp
     UIProcess/WebsiteData/WebsiteDataStore.cpp
+
+    UIProcess/WebsiteData/unix/WebsiteDataStoreUnix.cpp
 
     WebProcess/WebConnectionToUIProcess.cpp
     WebProcess/WebProcess.cpp
-
-    WebProcess/ApplicationCache/WebApplicationCacheManager.cpp
 
     WebProcess/Battery/WebBatteryManager.cpp
 
     WebProcess/Cookies/WebCookieManager.cpp
 
     WebProcess/Databases/WebDatabaseProvider.cpp
+    WebProcess/Databases/WebToDatabaseProcessConnection.cpp
+
     WebProcess/Databases/IndexedDB/WebIDBFactoryBackend.cpp
     WebProcess/Databases/IndexedDB/WebIDBServerConnection.cpp
-    WebProcess/Databases/WebToDatabaseProcessConnection.cpp
 
     WebProcess/FileAPI/BlobRegistryProxy.cpp
 
@@ -532,6 +547,7 @@ set(WebKit2_SOURCES
     WebProcess/InjectedBundle/API/c/WKBundleScriptWorld.cpp
 
     WebProcess/InjectedBundle/DOM/InjectedBundleCSSStyleDeclarationHandle.cpp
+    WebProcess/InjectedBundle/DOM/InjectedBundleFileHandle.cpp
     WebProcess/InjectedBundle/DOM/InjectedBundleNodeHandle.cpp
     WebProcess/InjectedBundle/DOM/InjectedBundleRangeHandle.cpp
 
@@ -545,8 +561,6 @@ set(WebKit2_SOURCES
 
     WebProcess/Notifications/NotificationPermissionRequestManager.cpp
     WebProcess/Notifications/WebNotificationManager.cpp
-
-    WebProcess/OriginData/WebOriginDataManager.cpp
 
     WebProcess/Plugins/Plugin.cpp
     WebProcess/Plugins/PluginProcessConnection.cpp
@@ -563,8 +577,6 @@ set(WebKit2_SOURCES
     WebProcess/Plugins/Netscape/NetscapePlugin.cpp
     WebProcess/Plugins/Netscape/NetscapePluginNone.cpp
     WebProcess/Plugins/Netscape/NetscapePluginStream.cpp
-
-    WebProcess/ResourceCache/WebResourceCacheManager.cpp
 
     WebProcess/Storage/StorageAreaImpl.cpp
     WebProcess/Storage/StorageAreaMap.cpp
@@ -600,6 +612,7 @@ set(WebKit2_SOURCES
     WebProcess/WebPage/FindController.cpp
     WebProcess/WebPage/LayerTreeHost.cpp
     WebProcess/WebPage/PageBanner.cpp
+    WebProcess/WebPage/VisitedLinkTableController.cpp
     WebProcess/WebPage/WebBackForwardListProxy.cpp
     WebProcess/WebPage/WebContextMenu.cpp
     WebProcess/WebPage/WebDocumentLoader.cpp
@@ -610,13 +623,17 @@ set(WebKit2_SOURCES
     WebProcess/WebPage/WebPage.cpp
     WebProcess/WebPage/WebPageGroupProxy.cpp
     WebProcess/WebPage/WebPageOverlay.cpp
-    WebProcess/WebPage/VisitedLinkTableController.cpp
     WebProcess/WebPage/WebUndoStep.cpp
+
+
+
+    ${NetworkProcess_COMMON_SOURCES}
 )
 
 set(WebKit2_MESSAGES_IN_FILES
-    DatabaseProcess/DatabaseToWebProcessConnection.messages.in
     DatabaseProcess/DatabaseProcess.messages.in
+    DatabaseProcess/DatabaseToWebProcessConnection.messages.in
+
     DatabaseProcess/IndexedDB/DatabaseProcessIDBConnection.messages.in
 
     NetworkProcess/NetworkConnectionToWebProcess.messages.in
@@ -627,19 +644,18 @@ set(WebKit2_MESSAGES_IN_FILES
     PluginProcess/PluginProcess.messages.in
     PluginProcess/WebProcessConnection.messages.in
 
+    Shared/ChildProcess.messages.in
     Shared/WebConnection.messages.in
 
     Shared/Authentication/AuthenticationManager.messages.in
 
-    Shared/Plugins/NPObjectMessageReceiver.messages.in
-
     Shared/Network/CustomProtocols/CustomProtocolManager.messages.in
+
+    Shared/Plugins/NPObjectMessageReceiver.messages.in
 
     UIProcess/DrawingAreaProxy.messages.in
     UIProcess/VisitedLinkProvider.messages.in
-    UIProcess/WebApplicationCacheManagerProxy.messages.in
     UIProcess/WebBatteryManagerProxy.messages.in
-    UIProcess/WebProcessPool.messages.in
     UIProcess/WebCookieManagerProxy.messages.in
     UIProcess/WebDatabaseManagerProxy.messages.in
     UIProcess/WebFullScreenManagerProxy.messages.in
@@ -647,11 +663,10 @@ set(WebKit2_MESSAGES_IN_FILES
     UIProcess/WebIconDatabase.messages.in
     UIProcess/WebInspectorProxy.messages.in
     UIProcess/WebMediaCacheManagerProxy.messages.in
-    UIProcess/WebOriginDataManagerProxy.messages.in
     UIProcess/WebPageProxy.messages.in
     UIProcess/WebPasteboardProxy.messages.in
+    UIProcess/WebProcessPool.messages.in
     UIProcess/WebProcessProxy.messages.in
-    UIProcess/WebResourceCacheManagerProxy.messages.in
     UIProcess/WebVibrationProxy.messages.in
 
     UIProcess/Databases/DatabaseProcessProxy.messages.in
@@ -669,8 +684,6 @@ set(WebKit2_MESSAGES_IN_FILES
     UIProcess/UserContent/WebUserContentControllerProxy.messages.in
 
     WebProcess/WebProcess.messages.in
-
-    WebProcess/ApplicationCache/WebApplicationCacheManager.messages.in
 
     WebProcess/Battery/WebBatteryManager.messages.in
 
@@ -691,13 +704,9 @@ set(WebKit2_MESSAGES_IN_FILES
 
     WebProcess/Notifications/WebNotificationManager.messages.in
 
-    WebProcess/OriginData/WebOriginDataManager.messages.in
-
     WebProcess/Plugins/PluginProcessConnection.messages.in
     WebProcess/Plugins/PluginProcessConnectionManager.messages.in
     WebProcess/Plugins/PluginProxy.messages.in
-
-    WebProcess/ResourceCache/WebResourceCacheManager.messages.in
 
     WebProcess/Storage/StorageAreaMap.messages.in
 
@@ -756,15 +765,17 @@ WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 GENERATE_WEBKIT2_MESSAGE_SOURCES(WebKit2_DERIVED_SOURCES "${WebKit2_MESSAGES_IN_FILES}")
 
-add_definitions(-DBUILDING_WEBKIT)
 include_directories(${WebKit2_INCLUDE_DIRECTORIES})
+include_directories(SYSTEM ${WebKit2_SYSTEM_INCLUDE_DIRECTORIES})
 add_library(WebKit2 ${WebKit2_LIBRARY_TYPE} ${WebKit2_SOURCES} ${WebKit2_DERIVED_SOURCES})
 
-add_dependencies(WebKit2 WebCore)
-add_dependencies(WebKit2 ${WEBKIT2_EXTRA_DEPENDENCIES})
+add_dependencies(WebKit2 WebCore ${WEBKIT2_EXTRA_DEPENDENCIES})
 add_webkit2_prefix_header(WebKit2)
 target_link_libraries(WebKit2 ${WebKit2_LIBRARIES})
 set_target_properties(WebKit2 PROPERTIES FOLDER "WebKit")
+
+# Suppress unused parameter warnings for sources in WebKit2.
+ADD_TARGET_PROPERTIES(WebKit2 COMPILE_FLAGS "-Wno-unused-parameter")
 
 if (WebKit2_VERSION_SCRIPT)
     ADD_TARGET_PROPERTIES(WebKit2 LINK_FLAGS "${WebKit2_VERSION_SCRIPT}")
@@ -824,5 +835,7 @@ endif ()
 POPULATE_LIBRARY_VERSION(WEBKIT2)
 set_target_properties(WebKit2 PROPERTIES VERSION ${WEBKIT2_VERSION} SOVERSION ${WEBKIT2_VERSION_MAJOR})
 
-install(TARGETS WebKit2 DESTINATION "${LIB_INSTALL_DIR}")
-install(TARGETS WebProcess DESTINATION "${LIBEXEC_INSTALL_DIR}")
+install(TARGETS WebKit2 WebProcess
+        LIBRARY DESTINATION "${LIB_INSTALL_DIR}"
+        RUNTIME DESTINATION "${LIBEXEC_INSTALL_DIR}"
+)

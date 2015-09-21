@@ -158,6 +158,8 @@ public:
 
     SubresourceLoader* loader() { return m_loader.get(); }
 
+    bool areAllClientsXMLHttpRequests() const;
+
     bool isImage() const { return type() == ImageResource; }
     // FIXME: CachedRawResource could be either a main resource or a raw XHR resource.
     bool isMainOrRawResource() const { return type() == MainResource || type() == RawResource; }
@@ -192,7 +194,7 @@ public:
 
     SharedBuffer* resourceBuffer() const { return m_data.get(); }
 
-    virtual void willSendRequest(ResourceRequest&, const ResourceResponse&);
+    virtual void redirectReceived(ResourceRequest&, const ResourceResponse&);
     virtual void responseReceived(const ResourceResponse&);
     void setResponse(const ResourceResponse& response) { m_response = response; }
     const ResourceResponse& response() const { return m_response; }
@@ -212,7 +214,7 @@ public:
     void cancelLoad();
     bool wasCanceled() const { return m_error.isCancellation(); }
     bool errorOccurred() const { return m_status == LoadError || m_status == DecodeError; }
-    bool loadFailedOrCanceled() { return !m_error.isNull(); }
+    bool loadFailedOrCanceled() const { return !m_error.isNull(); }
 
     bool shouldSendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks() == SendCallbacks; }
     DataBufferingPolicy dataBufferingPolicy() const { return m_options.dataBufferingPolicy(); }
@@ -230,7 +232,8 @@ public:
     
     bool canUseCacheValidator() const;
 
-    virtual bool mustRevalidateDueToCacheHeaders(const CachedResourceLoader&, CachePolicy) const;
+    enum class RevalidationDecision { No, YesDueToCachePolicy, YesDueToNoStore, YesDueToNoCache, YesDueToExpired };
+    virtual RevalidationDecision makeRevalidationDecision(CachePolicy) const;
     bool redirectChainAllowsReuse(ReuseExpiredRedirectionOrNot) const;
 
     bool isCacheValidator() const { return m_resourceToRevalidate; }
@@ -241,7 +244,9 @@ public:
     virtual void switchClientsToRevalidatedResource();
     void clearResourceToRevalidate();
     void updateResponseAfterRevalidation(const ResourceResponse& validatingResponse);
-    
+    bool validationInProgress() const { return m_proxyResource; }
+    bool validationCompleting() const { return m_proxyResource && m_proxyResource->m_switchingClientsToRevalidatedResource; }
+
     virtual void didSendData(unsigned long long /* bytesSent */, unsigned long long /* totalBytesToBeSent */) { }
 
     void setLoadFinishTime(double finishTime) { m_loadFinishTime = finishTime; }
@@ -249,7 +254,7 @@ public:
 
     virtual bool canReuse(const ResourceRequest&) const { return true; }
 
-#if USE(FOUNDATION)
+#if USE(FOUNDATION) || USE(SOUP)
     WEBCORE_EXPORT void tryReplaceEncodedData(SharedBuffer&);
 #endif
 
@@ -284,7 +289,7 @@ private:
     virtual void checkNotify();
     virtual bool mayTryReplaceEncodedData() const { return false; }
 
-    double freshnessLifetime(const ResourceResponse&) const;
+    std::chrono::microseconds freshnessLifetime(const ResourceResponse&) const;
 
     void addAdditionalRequestHeaders(CachedResourceLoader&);
     void failBeforeStarting();
@@ -293,7 +298,7 @@ private:
     SessionID m_sessionID;
     String m_accept;
     ResourceLoadPriority m_loadPriority;
-    double m_responseTimestamp;
+    std::chrono::system_clock::time_point m_responseTimestamp;
 
     String m_fragmentIdentifierForRequest;
 
@@ -345,6 +350,9 @@ private:
 };
 
 class CachedResource::Callback {
+#if !COMPILER(MSVC)
+    WTF_MAKE_FAST_ALLOCATED;
+#endif
 public:
     Callback(CachedResource&, CachedResourceClient&);
 

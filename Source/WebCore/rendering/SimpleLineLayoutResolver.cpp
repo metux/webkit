@@ -27,25 +27,20 @@
 #include "SimpleLineLayoutResolver.h"
 
 #include "RenderBlockFlow.h"
-#include "RenderText.h"
+#include "RenderObject.h"
 #include "SimpleLineLayoutFunctions.h"
 
 namespace WebCore {
 namespace SimpleLineLayout {
 
-static float baselinePosition(float lineHeight, float baseline, int lineIndex)
+static FloatPoint linePosition(float logicalLeft, float logicalTop)
 {
-    return lineHeight * lineIndex + baseline;
+    return FloatPoint(logicalLeft, roundf(logicalTop));
 }
 
-static LayoutPoint linePosition(float logicalLeft, float logicalTop)
+static FloatSize lineSize(float logicalLeft, float logicalRight, float height)
 {
-    return LayoutPoint(LayoutUnit::fromFloatFloor(logicalLeft), roundToInt(logicalTop));
-}
-
-static LayoutSize lineSize(float logicalLeft, float logicalRight, float height)
-{
-    return LayoutSize(LayoutUnit::fromFloatCeil(logicalRight) - LayoutUnit::fromFloatFloor(logicalLeft), height);
+    return FloatSize(logicalRight - logicalLeft, height);
 }
 
 RunResolver::Run::Run(const Iterator& iterator)
@@ -53,31 +48,31 @@ RunResolver::Run::Run(const Iterator& iterator)
 {
 }
 
-LayoutRect RunResolver::Run::rect() const
+FloatRect RunResolver::Run::rect() const
 {
     auto& run = m_iterator.simpleRun();
     auto& resolver = m_iterator.resolver();
-    float baseline = baselinePosition(resolver.m_lineHeight, resolver.m_baseline, m_iterator.lineIndex());
-    LayoutPoint position = linePosition(run.logicalLeft, baseline - resolver.m_ascent + resolver.m_borderAndPaddingBefore);
-    LayoutSize size = lineSize(run.logicalLeft, run.logicalRight, resolver.m_ascent + resolver.m_descent);
-    return LayoutRect(position, size);
-}
-
-FloatPoint RunResolver::Run::baseline() const
-{
-    auto& resolver = m_iterator.resolver();
-    auto& run = m_iterator.simpleRun();
-
-    float baseline = baselinePosition(resolver.m_lineHeight, resolver.m_baseline, m_iterator.lineIndex());
-    return FloatPoint(run.logicalLeft, roundToInt(baseline + resolver.m_borderAndPaddingBefore));
+    float baseline = computeBaselinePosition();
+    FloatPoint position = linePosition(run.logicalLeft, baseline - resolver.m_ascent);
+    FloatSize size = lineSize(run.logicalLeft, run.logicalRight, resolver.m_ascent + resolver.m_descent);
+    bool moveLineBreakToBaseline = false;
+    if (run.start == run.end && m_iterator != resolver.begin() && m_iterator.inQuirksMode()) {
+        auto previousRun = m_iterator;
+        --previousRun;
+        moveLineBreakToBaseline = !previousRun.simpleRun().isEndOfLine;
+    }
+    if (moveLineBreakToBaseline)
+        return FloatRect(FloatPoint(position.x(), baseline), FloatSize(size.width(), std::max<float>(0, resolver.m_ascent - resolver.m_baseline.toFloat())));
+    return FloatRect(position, size);
 }
 
 StringView RunResolver::Run::text() const
 {
     auto& resolver = m_iterator.resolver();
     auto& run = m_iterator.simpleRun();
-    auto& segment = resolver.m_flowContents.segmentForPosition(run.start);
-    // We currently split runs on segment boundaries (different RenderText).
+    ASSERT(run.start < run.end);
+    auto& segment = resolver.m_flowContents.segmentForRun(run.start, run.end);
+    // We currently split runs on segment boundaries (different RenderObject).
     ASSERT(run.end <= segment.end);
     if (segment.text.is8Bit())
         return StringView(segment.text.characters8(), segment.text.length()).substring(run.start - segment.start, run.end - run.start);
@@ -115,13 +110,15 @@ RunResolver::Iterator& RunResolver::Iterator::advanceLines(unsigned lineCount)
 }
 
 RunResolver::RunResolver(const RenderBlockFlow& flow, const Layout& layout)
-    : m_layout(layout)
+    : m_flowRenderer(flow)
+    , m_layout(layout)
     , m_flowContents(flow)
     , m_lineHeight(lineHeightFromFlow(flow))
     , m_baseline(baselineFromFlow(flow))
     , m_borderAndPaddingBefore(flow.borderAndPaddingBefore())
     , m_ascent(flow.style().fontCascade().fontMetrics().ascent())
     , m_descent(flow.style().fontCascade().fontMetrics().descent())
+    , m_inQuirksMode(flow.document().inQuirksMode())
 {
 }
 
@@ -155,17 +152,37 @@ Range<RunResolver::Iterator> RunResolver::rangeForRect(const LayoutRect& rect) c
     return Range<Iterator>(rangeBegin, rangeEnd);
 }
 
-Range<RunResolver::Iterator> RunResolver::rangeForRenderer(const RenderText& renderer) const
+Range<RunResolver::Iterator> RunResolver::rangeForRenderer(const RenderObject& renderer) const
 {
-    auto& segment = m_flowContents.segmentForRenderer(renderer);
+    if (begin() == end())
+        return Range<Iterator>(end(), end());
+    FlowContents::Iterator segment = m_flowContents.begin();
+    auto run = begin();
+    ASSERT(segment->start <= (*run).start());
+    // Move run to the beginning of the segment.
+    while (&segment->renderer != &renderer && run != end()) {
+        if ((*run).start() == segment->start && (*run).end() == segment->end) {
+            ++run;
+            ++segment;
+        } else if ((*run).start() < segment->end)
+            ++run;
+        else
+            ++segment;
+        ASSERT(segment != m_flowContents.end());
+    }
+    // Do we actually have a run for this renderer?
+    // Collapsed whitespace with dedicated renderer could end up with no run at all.
+    if (run == end() || (segment->start != segment->end && segment->end <= (*run).start()))
+        return Range<Iterator>(end(), end());
 
-    auto rangeBegin = begin();
-    for (;rangeBegin != end() && (*rangeBegin).start() < segment.start; ++rangeBegin) { }
-
-    auto rangeEnd = rangeBegin;
-    for (;rangeEnd != end() && (*rangeEnd).end() <= segment.end; ++rangeEnd) { }
-
-    return Range<Iterator>(rangeBegin, rangeEnd);
+    auto rangeBegin = run;
+    // Move beyond the end of the segment.
+    while (run != end() && (*run).start() < segment->end)
+        ++run;
+    // Special case when segment == run.
+    if (run == rangeBegin)
+        ++run;
+    return Range<Iterator>(rangeBegin, run);
 }
 
 LineResolver::Iterator::Iterator(RunResolver::Iterator runIterator)
@@ -173,14 +190,13 @@ LineResolver::Iterator::Iterator(RunResolver::Iterator runIterator)
 {
 }
 
-const LayoutRect LineResolver::Iterator::operator*() const
+const FloatRect LineResolver::Iterator::operator*() const
 {
     unsigned currentLine = m_runIterator.lineIndex();
     auto it = m_runIterator;
-    LayoutRect rect = (*it).rect();
+    FloatRect rect = (*it).rect();
     while (it.advance().lineIndex() == currentLine)
         rect.unite((*it).rect());
-
     return rect;
 }
 

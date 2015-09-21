@@ -28,7 +28,7 @@
 
 #include "CSSFontFaceRule.h"
 #include "CSSFontFaceSource.h"
-#include "FontTraitsMask.h"
+#include "TextFlags.h"
 #include <memory>
 #include <wtf/Forward.h>
 #include <wtf/HashSet.h>
@@ -44,7 +44,7 @@ class Font;
 
 class CSSFontFace : public RefCounted<CSSFontFace> {
 public:
-    static PassRefPtr<CSSFontFace> create(FontTraitsMask traitsMask, PassRefPtr<CSSFontFaceRule> rule, bool isLocalFallback = false) { return adoptRef(new CSSFontFace(traitsMask, rule, isLocalFallback)); }
+    static Ref<CSSFontFace> create(FontTraitsMask traitsMask, PassRefPtr<CSSFontFaceRule> rule, bool isLocalFallback = false) { return adoptRef(*new CSSFontFace(traitsMask, rule, isLocalFallback)); }
 
     FontTraitsMask traitsMask() const { return m_traitsMask; }
 

@@ -61,14 +61,14 @@ class SandboxExtension;
 
 class NetworkResourceLoader : public RefCounted<NetworkResourceLoader>, public WebCore::ResourceHandleClient, public IPC::MessageSender {
 public:
-    static RefPtr<NetworkResourceLoader> create(const NetworkResourceLoadParameters& parameters, NetworkConnectionToWebProcess* connection)
+    static Ref<NetworkResourceLoader> create(const NetworkResourceLoadParameters& parameters, NetworkConnectionToWebProcess* connection)
     {
-        return adoptRef(new NetworkResourceLoader(parameters, connection, nullptr));
+        return adoptRef(*new NetworkResourceLoader(parameters, connection, nullptr));
     }
     
-    static RefPtr<NetworkResourceLoader> create(const NetworkResourceLoadParameters& parameters, NetworkConnectionToWebProcess* connection, PassRefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply> reply)
+    static Ref<NetworkResourceLoader> create(const NetworkResourceLoadParameters& parameters, NetworkConnectionToWebProcess* connection, PassRefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply> reply)
     {
-        return adoptRef(new NetworkResourceLoader(parameters, connection, reply));
+        return adoptRef(*new NetworkResourceLoader(parameters, connection, reply));
     }    
     ~NetworkResourceLoader();
 
@@ -132,6 +132,8 @@ private:
     virtual void didCancelAuthenticationChallenge(WebCore::ResourceHandle*, const WebCore::AuthenticationChallenge&) override;
     virtual void receivedCancellation(WebCore::ResourceHandle*, const WebCore::AuthenticationChallenge&) override;
     virtual bool usesAsyncCallbacks() override { return true; }
+    virtual bool loadingSynchronousXHR() override { return isSynchronous(); }
+
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
     virtual void canAuthenticateAgainstProtectionSpaceAsync(WebCore::ResourceHandle*, const WebCore::ProtectionSpace&) override;
 #endif
@@ -161,7 +163,7 @@ private:
 
     void startBufferingTimerIfNeeded();
     void bufferingTimerFired();
-    bool sendBufferMaybeAborting(WebCore::SharedBuffer&, size_t encodedDataLength);
+    bool sendBufferMaybeAborting(const WebCore::SharedBuffer&, size_t encodedDataLength);
 
     bool isSynchronous() const;
 

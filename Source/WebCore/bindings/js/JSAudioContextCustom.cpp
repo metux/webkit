@@ -33,6 +33,7 @@
 #include "JSAudioBuffer.h"
 #include "JSAudioContext.h"
 #include "JSDOMBinding.h"
+#include "JSDOMPromise.h"
 #include "JSOfflineAudioContext.h"
 #include "OfflineAudioContext.h"
 #include <runtime/ArrayBuffer.h>

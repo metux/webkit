@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2013 University of Szeged. All rights reserved.
  * Copyright (C) 2013 Samsung Electronics. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,16 +42,11 @@ Options::Options()
     , forceComplexText(false)
     , shouldUseAcceleratedDrawing(false)
     , shouldUseRemoteLayerTree(false)
+    , shouldShowWebView(false)
 {
 }
 
 bool handleOptionNoTimeout(Options& options, const char*, const char*)
-{
-    options.useWaitToDumpWatchdogTimer = false;
-    return true;
-}
-
-bool handleOptionNoTimeoutAtAll(Options& options, const char*, const char*)
 {
     options.useWaitToDumpWatchdogTimer = false;
     options.forceNoTimeout = true;
@@ -99,6 +95,18 @@ bool handleOptionRemoteLayerTree(Options& options, const char*, const char*)
     return true;
 }
 
+bool handleOptionShowWebView(Options& options, const char*, const char*)
+{
+    options.shouldShowWebView = true;
+    return true;
+}
+
+bool handleOptionAllowedHost(Options& options, const char*, const char* host)
+{
+    options.allowedHosts.push_back(host);
+    return true;
+}
+
 bool handleOptionUnmatched(Options& options, const char* option, const char*)
 {
     if (option[0] && option[1] && option[0] == '-' && option[1] == '-')
@@ -110,8 +118,7 @@ bool handleOptionUnmatched(Options& options, const char* option, const char*)
 OptionsHandler::OptionsHandler(Options& o)
     : options(o)
 {
-    optionList.append(Option("--no-timeout", "Disables waitUntilDone timeout.", handleOptionNoTimeout));
-    optionList.append(Option("--no-timeout-at-all", "Disables all timeouts.", handleOptionNoTimeoutAtAll));
+    optionList.append(Option("--no-timeout", "Disables all timeouts.", handleOptionNoTimeout));
     optionList.append(Option("--verbose", "Turns on messages.", handleOptionVerbose));
     optionList.append(Option("--gc-between-tests", "Garbage collection between tests.", handleOptionGcBetweenTests));
     optionList.append(Option("--pixel-tests", "Check pixels.", handleOptionPixelTests));
@@ -120,6 +127,9 @@ OptionsHandler::OptionsHandler(Options& o)
     optionList.append(Option("--complex-text", "Force complex tests.", handleOptionComplexText));
     optionList.append(Option("--accelerated-drawing", "Use accelerated drawing.", handleOptionAcceleratedDrawing));
     optionList.append(Option("--remote-layer-tree", "Use remote layer tree.", handleOptionRemoteLayerTree));
+    optionList.append(Option("--allowed-host", "Allows access to the specified host from tests.", handleOptionAllowedHost, true));
+    optionList.append(Option("--show-webview", "Show the WebView during test runs (for Debugging)", handleOptionShowWebView));
+
     optionList.append(Option(0, 0, handleOptionUnmatched));
 }
 

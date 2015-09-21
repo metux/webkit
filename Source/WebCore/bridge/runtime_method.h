@@ -32,9 +32,10 @@
 
 namespace JSC {
 
-class RuntimeMethod : public InternalFunction {
+class WEBCORE_EXPORT RuntimeMethod : public InternalFunction {
 public:
     typedef InternalFunction Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot | TypeOfShouldCallGetCallData;
 
     static RuntimeMethod* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, const String& name, Bindings::Method* method)
     {
@@ -58,12 +59,11 @@ public:
     }
 
 protected:
-    WEBCORE_EXPORT RuntimeMethod(JSGlobalObject*, Structure*, Bindings::Method*);
-    WEBCORE_EXPORT void finishCreation(VM&, const String&);
-    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InternalFunction::StructureFlags;
-    WEBCORE_EXPORT static CallType getCallData(JSCell*, CallData&);
+    RuntimeMethod(JSGlobalObject*, Structure*, Bindings::Method*);
+    void finishCreation(VM&, const String&);
+    static CallType getCallData(JSCell*, CallData&);
 
-    WEBCORE_EXPORT static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
 
 private:
     static EncodedJSValue lengthGetter(ExecState*, JSObject*, EncodedJSValue, PropertyName);

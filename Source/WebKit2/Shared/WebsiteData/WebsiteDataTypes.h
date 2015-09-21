@@ -31,7 +31,20 @@ namespace WebKit {
 enum WebsiteDataTypes {
     WebsiteDataTypeCookies = 1 << 0,
     WebsiteDataTypeDiskCache = 1 << 1,
-    WebsiteDataTypeLocalStorage = 1 << 2,
+    WebsiteDataTypeMemoryCache = 1 << 2,
+    WebsiteDataTypeOfflineWebApplicationCache = 1 << 3,
+    WebsiteDataTypeSessionStorage = 1 << 4,
+    WebsiteDataTypeLocalStorage = 1 << 5,
+    WebsiteDataTypeWebSQLDatabases = 1 << 6,
+    WebsiteDataTypeIndexedDBDatabases = 1 << 7,
+    WebsiteDataTypeMediaKeys = 1 << 8,
+    WebsiteDataTypeHSTSCache = 1 << 9,
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    WebsiteDataTypePlugInData = 1 << 10,
+#endif
+#if ENABLE(MEDIA_STREAM)
+    WebsiteDataTypeMediaDeviceIdentifier = 1 << 11,
+#endif
 };
 
 };

@@ -37,9 +37,9 @@
 
 using namespace WebCore;
 
-PassRefPtr<MediaController> MediaController::create(ScriptExecutionContext& context)
+Ref<MediaController> MediaController::create(ScriptExecutionContext& context)
 {
-    return adoptRef(new MediaController(context));
+    return adoptRef(*new MediaController(context));
 }
 
 MediaController::MediaController(ScriptExecutionContext& context)
@@ -55,7 +55,7 @@ MediaController::MediaController(ScriptExecutionContext& context)
     , m_closedCaptionsVisible(false)
     , m_clock(Clock::create())
     , m_scriptExecutionContext(context)
-    , m_timeupdateTimer(*this, &MediaController::timeupdateTimerFired)
+    , m_timeupdateTimer(*this, &MediaController::scheduleTimeupdateEvent)
     , m_previousTimeupdateTime(0)
 {
 }
@@ -670,11 +670,6 @@ void MediaController::startTimeupdateTimer()
         return;
 
     m_timeupdateTimer.startRepeating(maxTimeupdateEventFrequency);
-}
-
-void MediaController::timeupdateTimerFired()
-{
-    scheduleTimeupdateEvent();
 }
 
 void MediaController::scheduleTimeupdateEvent()

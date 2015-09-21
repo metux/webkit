@@ -30,7 +30,7 @@
 #include "RenderLineBreak.h"
 #include "RootInlineBox.h"
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 #include <stdio.h>
 #endif
 
@@ -84,7 +84,7 @@ void InlineBox::removeFromParent()
         parent()->removeChild(this);
 }
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 
 const char* InlineBox::boxName() const
 {
@@ -116,10 +116,10 @@ void InlineBox::showLineBox(bool mark, int depth) const
     }
     while (++printedCharacters <= depth * 2)
         fputc(' ', stderr);
-    fprintf(stderr, "%s  (%.2f, %.2f) (%.2f, %.2f) (%p)\n", boxName(), x(), y(), width(), height(), this);
+    fprintf(stderr, "%s  (%.2f, %.2f) (%.2f, %.2f) (%p) renderer->(%p)\n", boxName(), x(), y(), width(), height(), this, &renderer());
 }
 
-#endif
+#endif // ENABLE(TREE_DEBUGGING)
 
 float InlineBox::logicalHeight() const
 {
@@ -253,7 +253,7 @@ InlineBox* InlineBox::prevLeafChildIgnoringLineBreak() const
 {
     InlineBox* leaf = prevLeafChild();
     if (leaf && leaf->isLineBreak())
-        return 0;
+        return nullptr;
     return leaf;
 }
 
@@ -328,7 +328,7 @@ LayoutPoint InlineBox::flipForWritingMode(const LayoutPoint& point)
 
 } // namespace WebCore
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 
 void showNodeTree(const WebCore::InlineBox* inlineBox)
 {

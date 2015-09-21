@@ -37,6 +37,7 @@ WebInspector.loaded = function()
     // The initialization order should match the same in Main.js.
     InspectorBackend.registerInspectorDispatcher(new WebInspector.InspectorObserver);
     InspectorBackend.registerPageDispatcher(new WebInspector.PageObserver);
+    InspectorBackend.registerConsoleDispatcher(new WebInspector.ConsoleObserver);
     InspectorBackend.registerDOMDispatcher(new WebInspector.DOMObserver);
     InspectorBackend.registerNetworkDispatcher(new WebInspector.NetworkObserver);
     InspectorBackend.registerDebuggerDispatcher(new WebInspector.DebuggerObserver);
@@ -50,6 +51,8 @@ WebInspector.loaded = function()
     this.frameResourceManager = new WebInspector.FrameResourceManager;
     this.domTreeManager = new WebInspector.DOMTreeManager;
     this.cssStyleManager = new WebInspector.CSSStyleManager;
+    this.logManager = new WebInspector.LogManager;
+    this.issueManager = new WebInspector.IssueManager;
     this.runtimeManager = new WebInspector.RuntimeManager;
     this.timelineManager = new WebInspector.TimelineManager;
     this.debuggerManager = new WebInspector.DebuggerManager;
@@ -63,9 +66,10 @@ WebInspector.loaded = function()
 
     // Enable agents.
     InspectorAgent.enable();
+    ConsoleAgent.enable();
 
     // Perform one-time tasks.
-    WebInspector.CSSCompletions.requestCSSNameCompletions();
+    WebInspector.CSSCompletions.requestCSSCompletions();
 
     // Global settings.
     this.showShadowDOMSetting = new WebInspector.Setting("show-shadow-dom", true);
@@ -87,9 +91,8 @@ WebInspector.UIString = function(string)
 }
 
 // Add stubs that are called by the frontend API.
-WebInspector.updateDockedState = function()
-{
-}
+WebInspector.updateDockedState = function() {};
+WebInspector.updateDockingAvailability = function() {};
 
 // InspectorTest contains extra methods that are only available to test code running
 // in the Web Inspector page. They rely on equivalents in the actual test page
@@ -101,23 +104,16 @@ InspectorTest.dumpMessagesToConsole = false;
 
 // This is a workaround for the fact that it would be hard to set up a constructor,
 // prototype, and prototype chain for the singleton InspectorTest.
-InspectorTest.EventDispatcher = function()
+InspectorTest.EventDispatcher = class EventDispatcher extends WebInspector.Object
 {
-    WebInspector.Object.call(this);
+    dispatchEvent(event)
+    {
+        this.dispatchEventToListeners(event);
+    }
 };
 
 InspectorTest.EventDispatcher.Event = {
     TestPageDidLoad: "inspector-test-test-page-did-load"
-};
-
-InspectorTest.EventDispatcher.prototype = {
-    __proto__: WebInspector.Object.prototype,
-    constructor: InspectorTest.EventDispatcher,
-
-    dispatchEvent: function(event)
-    {
-        this.dispatchEventToListeners(event);
-    }
 };
 
 InspectorTest.eventDispatcher = new InspectorTest.EventDispatcher;
@@ -159,28 +155,36 @@ InspectorTest.debugLog = function(message)
     this.evaluateInPage("InspectorTestProxy.debugLog(unescape('" + escape(JSON.stringify(message)) + "'))");
 }
 
+// Appends a message in the test document if there was an error, and attempts to complete the test.
+InspectorTest.expectNoError = function(error)
+{
+    if (error) {
+        InspectorTest.log("PROTOCOL ERROR: " + error);
+        InspectorTest.completeTest();
+        throw "PROTOCOL ERROR";
+    }
+}
+
 InspectorTest.completeTest = function()
 {
     if (InspectorTest.dumpMessagesToConsole)
         InspectorFrontendHost.unbufferedLog("InspectorTest.completeTest()");
 
-    function signalCompletionToTestPage() {
-        InspectorBackend.runAfterPendingDispatches(this.evaluateInPage.bind(this, "InspectorTestProxy.completeTest()"));
-    }
-
     // Wait for results to be resent before requesting completeTest(). Otherwise, messages will be
     // queued after pending dispatches run to zero and the test page will quit before processing them.
-    if (this._shouldResendResults)
-        this._resendResults(signalCompletionToTestPage.bind(this));
-    else
-        signalCompletionToTestPage.call(this);
+    if (this._testPageIsReloading) {
+        this._completeTestAfterReload = true;
+        return;
+    }
+
+    InspectorBackend.runAfterPendingDispatches(this.evaluateInPage.bind(this, "InspectorTestProxy.completeTest()"));
 }
 
 InspectorTest.evaluateInPage = function(codeString, callback)
 {
     // If we load this page outside of the inspector, or hit an early error when loading
     // the test frontend, then defer evaluating the commands (indefinitely in the former case).
-    if (!RuntimeAgent) {
+    if (!window.RuntimeAgent) {
         this._originalConsoleMethods["error"]("Tried to evaluate in test page, but connection not yet established:", codeString);
         return;
     }
@@ -199,21 +203,13 @@ InspectorTest.addResult = function(text)
         this.evaluateInPage("InspectorTestProxy.addResult(unescape('" + escape(text) + "'))");
 }
 
-InspectorTest._resendResults = function(callback)
+InspectorTest._resendResults = function()
 {
     console.assert(this._shouldResendResults);
-    delete this._shouldResendResults;
+    this._shouldResendResults = false;
 
-    var pendingResponseCount = 1 + this._results.length;
-    function decrementPendingResponseCount() {
-        pendingResponseCount--;
-        if (!pendingResponseCount && typeof callback === "function")
-            callback();
-    }
-
-    this.evaluateInPage("InspectorTestProxy.clearResults()", decrementPendingResponseCount);
     for (var result of this._results)
-        this.evaluateInPage("InspectorTestProxy.addResult(unescape('" + escape(result) + "'))", decrementPendingResponseCount);
+        this.evaluateInPage("InspectorTestProxy.addResult(unescape('" + escape(result) + "'))");
 }
 
 InspectorTest.testPageDidLoad = function()
@@ -222,14 +218,22 @@ InspectorTest.testPageDidLoad = function()
     this._resendResults();
 
     this.eventDispatcher.dispatchEvent(InspectorTest.EventDispatcher.Event.TestPageDidLoad);
+
+    if (this._completeTestAfterReload)
+        InspectorTest.completeTest();
 }
 
 InspectorTest.reloadPage = function(shouldIgnoreCache)
 {
-    return PageAgent.reload.promise(!!shouldIgnoreCache)
+    console.assert(!this._testPageIsReloading);
+    console.assert(!this._testPageReloadedOnce);
+
+    this._testPageIsReloading = true;
+
+    return PageAgent.reload(!!shouldIgnoreCache)
         .then(function() {
             this._shouldResendResults = true;
-            this._testPageIsReloading = true;
+            this._testPageReloadedOnce = true;
 
             return Promise.resolve(null);
         }.bind(this));
@@ -260,10 +264,16 @@ InspectorTest._originalConsoleMethods = {};
 // Catch syntax errors, type errors, and other exceptions.
 window.onerror = InspectorTest.reportUncaughtException.bind(InspectorTest);
 
-for (var logType of ["log", "error", "info"]) {
-    // Redirect console methods to log messages into the test page's DOM.
-    InspectorTest._originalConsoleMethods[logType] = console[logType].bind(console);
-    console[logType] = function() {
-        InspectorTest.addResult(logType.toUpperCase() + ": " + Array.prototype.slice.call(arguments).toString());
-    };
-}
+// Redirect frontend console methods to log messages into the test result.
+(function() {
+    function createProxyConsoleHandler(type) {
+        return function() {
+            InspectorTest.addResult(type + ": " + Array.from(arguments).join(" "));
+        };
+    }
+
+    for (var type of ["log", "error", "info"]) {
+        InspectorTest._originalConsoleMethods[type] = console[type].bind(console);
+        console[type] = createProxyConsoleHandler(type.toUpperCase());
+    }
+})();
