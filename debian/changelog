@@ -12,6 +12,8 @@ webkit2gtk (2.10.0+dfsg1-1) UNRELEASED; urgency=medium
     + Add build dependency on libhyphen-dev.
   * debian/libwebkit2gtk-4.0-37.symbols:
     + Update.
+  * debian/copyright:
+    + Remove files that no longer exist from the list.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 21 Sep 2015 15:21:03 +0300
 

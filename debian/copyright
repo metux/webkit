@@ -147,9 +147,7 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/ThirdParty/gtest/xcode/Samples/FrameworkSample/*
        Source/ThirdParty/gtest/xcode/Scripts/*
        Source/WTF/wtf/ASCIICType.h
-       Source/WTF/wtf/AVLTree.h
        Source/WTF/wtf/AutodrainedPool.h
-       Source/WTF/wtf/BoundsCheckedPointer.h
        Source/WTF/wtf/ByteOrder.h
        Source/WTF/wtf/CurrentTime.cpp
        Source/WTF/wtf/CurrentTime.h
@@ -178,11 +176,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WTF/wtf/SegmentedVector.h
        Source/WTF/wtf/SizeLimits.cpp
        Source/WTF/wtf/StreamBuffer.h
-       Source/WTF/wtf/TCPackedCache.h
-       Source/WTF/wtf/TCPageMap.h
-       Source/WTF/wtf/TCSpinLock.h
-       Source/WTF/wtf/TCSystemAlloc.cpp
-       Source/WTF/wtf/TCSystemAlloc.h
        Source/WTF/wtf/ThreadFunctionInvocation.h
        Source/WTF/wtf/ThreadIdentifierDataPthreads.cpp
        Source/WTF/wtf/ThreadIdentifierDataPthreads.h
@@ -191,7 +184,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WTF/wtf/ThreadingPthreads.cpp
        Source/WTF/wtf/ThreadingWin.cpp
        Source/WTF/wtf/dtoa/*
-       Source/WTF/wtf/gtk/MainThreadGtk.cpp
        Source/WTF/wtf/text/AtomicStringHash.h
        Source/WTF/wtf/text/StringBuffer.h
        Source/WTF/wtf/unicode/Collator.h
@@ -204,7 +196,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/Modules/indexeddb/IDBEventDispatcher.h
        Source/WebCore/Modules/indexeddb/IDBFactory.cpp
        Source/WebCore/Modules/indexeddb/IDBFactory.h
-       Source/WebCore/Modules/indexeddb/IDBFactoryBackendInterface.cpp
        Source/WebCore/Modules/indexeddb/IDBFactoryBackendInterface.h
        Source/WebCore/Modules/indexeddb/IDBIndexMetadata.h
        Source/WebCore/Modules/indexeddb/IDBObjectStoreMetadata.h
@@ -281,8 +272,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/bindings/js/JSPopStateEventCustom.cpp
        Source/WebCore/bindings/js/JSSQLResultSetRowListCustom.cpp
        Source/WebCore/bindings/js/JSSQLTransactionCustom.cpp
-       Source/WebCore/bindings/js/JSSQLTransactionSyncCustom.cpp
-       Source/WebCore/bindings/js/JSSharedWorkerCustom.cpp
        Source/WebCore/bindings/js/JSXMLHttpRequestCustom.cpp
        Source/WebCore/bindings/js/JSXSLTProcessorCustom.cpp
        Source/WebCore/bindings/js/ScriptCachedFrameData.cpp
@@ -320,7 +309,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/dom/ChildListMutationScope.h
        Source/WebCore/dom/ClassNodeList.cpp
        Source/WebCore/dom/ClassNodeList.h
-       Source/WebCore/dom/CrossThreadTask.h
        Source/WebCore/dom/CurrentScriptIncrementer.h
        Source/WebCore/dom/DOMCoreException.cpp
        Source/WebCore/dom/DOMCoreException.h
@@ -340,7 +328,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/dom/ExceptionBase.h
        Source/WebCore/dom/ExceptionCodePlaceholder.cpp
        Source/WebCore/dom/ExceptionCodePlaceholder.h
-       Source/WebCore/dom/IconURL.cpp
        Source/WebCore/dom/IconURL.h
        Source/WebCore/dom/MessagePortChannel.cpp
        Source/WebCore/dom/MessagePortChannel.h
@@ -495,7 +482,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/loader/archive/*
        Source/WebCore/loader/archive/mhtml/*
        Source/WebCore/loader/icon/*
-       Source/WebCore/make-file-arrays.py
        Source/WebCore/page/BarProp.cpp
        Source/WebCore/page/BarProp.h
        Source/WebCore/page/ContextMenuProvider.h
@@ -505,8 +491,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/page/DOMSelection.h
        Source/WebCore/page/EventSource.cpp
        Source/WebCore/page/EventSource.h
-       Source/WebCore/page/GestureTapHighlighter.cpp
-       Source/WebCore/page/GestureTapHighlighter.h
        Source/WebCore/page/Location.cpp
        Source/WebCore/page/Location.h
        Source/WebCore/page/OriginAccessEntry.cpp
@@ -558,8 +542,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/platform/FileSystem.h
        Source/WebCore/platform/FloatConversion.h
        Source/WebCore/platform/LayoutUnit.h
-       Source/WebCore/platform/LengthBox.cpp
-       Source/WebCore/platform/MainThreadTask.h
        Source/WebCore/platform/ReferrerPolicy.h
        Source/WebCore/platform/ScrollAnimator.cpp
        Source/WebCore/platform/ScrollAnimator.h
@@ -576,22 +558,16 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/platform/graphics/FontCache.cpp
        Source/WebCore/platform/graphics/FontCache.h
        Source/WebCore/platform/graphics/FontDescription.cpp
-       Source/WebCore/platform/graphics/FontGlyphs.cpp
        Source/WebCore/platform/graphics/GeneratedImage.cpp
        Source/WebCore/platform/graphics/Glyph.h
        Source/WebCore/platform/graphics/GlyphBuffer.h
        Source/WebCore/platform/graphics/GlyphMetricsMap.h
        Source/WebCore/platform/graphics/GlyphPage.h
-       Source/WebCore/platform/graphics/GlyphPageTreeNode.cpp
-       Source/WebCore/platform/graphics/GlyphPageTreeNode.h
-       Source/WebCore/platform/graphics/LayoutBoxExtent.cpp
-       Source/WebCore/platform/graphics/LayoutBoxExtent.h
        Source/WebCore/platform/graphics/LayoutPoint.h
        Source/WebCore/platform/graphics/LayoutRect.cpp
        Source/WebCore/platform/graphics/LayoutRect.h
        Source/WebCore/platform/graphics/LayoutSize.h
        Source/WebCore/platform/graphics/MediaSourcePrivate.h
-       Source/WebCore/platform/graphics/SimpleFontData.cpp
        Source/WebCore/platform/graphics/SourceBufferPrivate.h
        Source/WebCore/platform/graphics/StringTruncator.cpp
        Source/WebCore/platform/graphics/StringTruncator.h
@@ -609,7 +585,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/platform/image-decoders/webp/*
        Source/WebCore/platform/image-encoders/PNGImageEncoder.cpp
        Source/WebCore/platform/mediastream/*
-       Source/WebCore/platform/mediastream/gstreamer/*
        Source/WebCore/platform/mock/GeolocationClientMock.cpp
        Source/WebCore/platform/mock/GeolocationClientMock.h
        Source/WebCore/platform/network/BlobData.cpp
@@ -657,7 +632,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/platform/text/TextEncodingDetectorICU.cpp
        Source/WebCore/platform/text/TextEncodingDetectorNone.cpp
        Source/WebCore/platform/text/WritingMode.h
-       Source/WebCore/plugins/PluginQuirkSet.h
        Source/WebCore/plugins/npruntime.h
        Source/WebCore/rendering/OrderIterator.cpp
        Source/WebCore/rendering/OrderIterator.h
@@ -691,7 +665,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/rendering/svg/RenderSVGModelObject.h
        Source/WebCore/storage/StorageEventDispatcher.h
        Source/WebCore/svg/SVGException.cpp
-       Source/WebCore/svg/graphics/SVGImageChromeClient.h
        Source/WebCore/testing/MemoryInfo.h
        Source/WebCore/workers/*
        Source/WebCore/xml/XMLHttpRequestException.cpp
@@ -701,7 +674,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/WebCore/xml/XSLTUnicodeSort.cpp
        Source/WebCore/xml/XSLTUnicodeSort.h
        Source/WebKit/scripts/*
-       Source/WebKit2/Shared/APIObject.cpp
        Source/WebKit2/UIProcess/API/gtk/WebKitSettings.cpp
        Source/WebKit2/UIProcess/API/gtk/WebKitSettings.h
        Source/WebKit2/UIProcess/InspectorServer/HTTPRequest.h
@@ -779,15 +751,12 @@ Files: Documentation/*
        Source/JavaScriptCore/parser/Lexer.cpp
        Source/JavaScriptCore/parser/Lexer.h
        Source/JavaScriptCore/parser/NodeConstructors.h
-       Source/JavaScriptCore/parser/NodeInfo.h
        Source/JavaScriptCore/parser/Nodes.cpp
        Source/JavaScriptCore/parser/Nodes.h
        Source/JavaScriptCore/parser/Parser.cpp
        Source/JavaScriptCore/parser/Parser.h
        Source/JavaScriptCore/runtime/ArgList.cpp
        Source/JavaScriptCore/runtime/ArgList.h
-       Source/JavaScriptCore/runtime/Arguments.cpp
-       Source/JavaScriptCore/runtime/Arguments.h
        Source/JavaScriptCore/runtime/ArrayConstructor.cpp
        Source/JavaScriptCore/runtime/ArrayConstructor.h
        Source/JavaScriptCore/runtime/ArrayConventions.h
@@ -871,7 +840,6 @@ Files: Documentation/*
        Source/JavaScriptCore/runtime/Operations.cpp
        Source/JavaScriptCore/runtime/Operations.h
        Source/JavaScriptCore/runtime/PropertyMapHashTable.h
-       Source/JavaScriptCore/runtime/PropertyNameArray.cpp
        Source/JavaScriptCore/runtime/PropertyNameArray.h
        Source/JavaScriptCore/runtime/PropertySlot.cpp
        Source/JavaScriptCore/runtime/PropertySlot.h
@@ -909,14 +877,12 @@ Files: Documentation/*
        Source/WTF/wtf/ListHashSet.h
        Source/WTF/wtf/Noncopyable.h
        Source/WTF/wtf/NumberOfCores.h
-       Source/WTF/wtf/OwnPtr.h
        Source/WTF/wtf/PassRef.h
        Source/WTF/wtf/PassRefPtr.h
        Source/WTF/wtf/RefCounted.h
        Source/WTF/wtf/RefCountedLeakCounter.cpp
        Source/WTF/wtf/RefCountedLeakCounter.h
        Source/WTF/wtf/RefPtr.h
-       Source/WTF/wtf/RefPtrHashMap.h
        Source/WTF/wtf/RetainPtr.h
        Source/WTF/wtf/StackBounds.cpp
        Source/WTF/wtf/StaticConstructors.h
@@ -925,14 +891,11 @@ Files: Documentation/*
        Source/WTF/wtf/Vector.h
        Source/WTF/wtf/VectorTraits.h
        Source/WTF/wtf/dtoa.h
-       Source/WTF/wtf/gobject/*
        Source/WTF/wtf/text/*
        Source/WebCore/*
        Source/WebCore/Modules/battery/*
        Source/WebCore/Modules/geolocation/NavigatorGeolocation.cpp
        Source/WebCore/Modules/geolocation/NavigatorGeolocation.h
-       Source/WebCore/Modules/mediastream/NavigatorUserMedia.cpp
-       Source/WebCore/Modules/mediastream/NavigatorUserMedia.h
        Source/WebCore/Modules/proximity/DeviceProximityEvent.cpp
        Source/WebCore/Modules/proximity/DeviceProximityEvent.h
        Source/WebCore/Modules/vibration/*
@@ -1065,8 +1028,6 @@ Files: Documentation/*
        Source/WebCore/dom/NodeRenderStyle.h
        Source/WebCore/dom/NodeTraversal.cpp
        Source/WebCore/dom/NodeTraversal.h
-       Source/WebCore/dom/Notation.cpp
-       Source/WebCore/dom/Notation.h
        Source/WebCore/dom/ProcessingInstruction.cpp
        Source/WebCore/dom/ProcessingInstruction.h
        Source/WebCore/dom/QualifiedName.cpp
@@ -1150,11 +1111,9 @@ Files: Documentation/*
        Source/WebCore/platform/PopupMenu.h
        Source/WebCore/platform/PopupMenuClient.h
        Source/WebCore/platform/SearchPopupMenu.h
-       Source/WebCore/platform/TreeShared.h
        Source/WebCore/platform/animation/*
        Source/WebCore/platform/audio/gstreamer/*
        Source/WebCore/platform/audio/gtk/*
-       Source/WebCore/platform/cairo/*
        Source/WebCore/platform/geoclue/GeolocationProviderGeoclue.h
        Source/WebCore/platform/geoclue/GeolocationProviderGeoclueClient.h
        Source/WebCore/platform/glib/*
@@ -1163,8 +1122,6 @@ Files: Documentation/*
        Source/WebCore/platform/graphics/Font.cpp
        Source/WebCore/platform/graphics/Font.h
        Source/WebCore/platform/graphics/FontDescription.h
-       Source/WebCore/platform/graphics/FontFastPath.cpp
-       Source/WebCore/platform/graphics/FontGlyphs.h
        Source/WebCore/platform/graphics/FontMetrics.h
        Source/WebCore/platform/graphics/FontPlatformData.cpp
        Source/WebCore/platform/graphics/FontPlatformData.h
@@ -1172,8 +1129,6 @@ Files: Documentation/*
        Source/WebCore/platform/graphics/GLContext.h
        Source/WebCore/platform/graphics/GraphicsContext3DPrivate.cpp
        Source/WebCore/platform/graphics/GraphicsContext3DPrivate.h
-       Source/WebCore/platform/graphics/GraphicsLayerAnimation.cpp
-       Source/WebCore/platform/graphics/GraphicsLayerAnimation.h
        Source/WebCore/platform/graphics/GraphicsLayerTransform.cpp
        Source/WebCore/platform/graphics/GraphicsLayerTransform.h
        Source/WebCore/platform/graphics/Icon.h
@@ -1183,23 +1138,15 @@ Files: Documentation/*
        Source/WebCore/platform/graphics/PathTraversalState.cpp
        Source/WebCore/platform/graphics/SVGGlyph.cpp
        Source/WebCore/platform/graphics/SVGGlyph.h
-       Source/WebCore/platform/graphics/SimpleFontData.h
        Source/WebCore/platform/graphics/StrokeStyleApplier.h
        Source/WebCore/platform/graphics/SurrogatePairAwareTextIterator.cpp
        Source/WebCore/platform/graphics/SurrogatePairAwareTextIterator.h
        Source/WebCore/platform/graphics/TextRun.h
-       Source/WebCore/platform/graphics/Tile.h
-       Source/WebCore/platform/graphics/TiledBackingStore.cpp
-       Source/WebCore/platform/graphics/TiledBackingStore.h
-       Source/WebCore/platform/graphics/TiledBackingStoreBackend.h
-       Source/WebCore/platform/graphics/TiledBackingStoreClient.h
        Source/WebCore/platform/graphics/WidthIterator.cpp
        Source/WebCore/platform/graphics/WidthIterator.h
        Source/WebCore/platform/graphics/cairo/DrawErrorUnderline.h
        Source/WebCore/platform/graphics/cairo/FontCustomPlatformData.h
        Source/WebCore/platform/graphics/cairo/IntRectCairo.cpp
-       Source/WebCore/platform/graphics/cairo/OwnPtrCairo.cpp
-       Source/WebCore/platform/graphics/cairo/OwnPtrCairo.h
        Source/WebCore/platform/graphics/cairo/PathCairo.cpp
        Source/WebCore/platform/graphics/cairo/PlatformPathCairo.cpp
        Source/WebCore/platform/graphics/cairo/PlatformPathCairo.h
@@ -1295,10 +1242,6 @@ Files: Documentation/*
        Source/WebKit2/Shared/WebHitTestResult.h
        Source/WebKit2/UIProcess/API/C/CoordinatedGraphics/*
        Source/WebKit2/UIProcess/API/gtk/*
-       Source/WebKit2/UIProcess/CoordinatedGraphics/CoordinatedBackingStore.cpp
-       Source/WebKit2/UIProcess/CoordinatedGraphics/CoordinatedBackingStore.h
-       Source/WebKit2/UIProcess/CoordinatedGraphics/CoordinatedGraphicsScene.cpp
-       Source/WebKit2/UIProcess/CoordinatedGraphics/CoordinatedGraphicsScene.h
        Source/WebKit2/UIProcess/CoordinatedGraphics/CoordinatedLayerTreeHostProxy.cpp
        Source/WebKit2/UIProcess/CoordinatedGraphics/CoordinatedLayerTreeHostProxy.h
        Source/WebKit2/UIProcess/CoordinatedGraphics/PageViewportController.cpp
@@ -1319,14 +1262,11 @@ Files: Documentation/*
        Source/WebKit2/WebProcess/WebCoreSupport/WebSearchPopupMenu.h
        Source/WebKit2/WebProcess/WebCoreSupport/gtk/WebEditorClientGtk.cpp
        Source/WebKit2/WebProcess/WebPage/CoordinatedGraphics/CoordinatedLayerTreeHost.h
-       Source/WebKit2/WebProcess/WebPage/TapHighlightController.cpp
-       Source/WebKit2/WebProcess/WebPage/TapHighlightController.h
        Source/WebKit2/WebProcess/WebPage/WebContextMenu.cpp
        Source/WebKit2/WebProcess/WebPage/WebContextMenu.h
        Source/WebKit2/WebProcess/gtk/*
        Source/WebKit2/WebProcess/soup/*
        Tools/DumpRenderTree/config.h
-       Tools/TestWebKitAPI/Tests/WTF/gobject/GMainLoopSource.cpp
        Tools/TestWebKitAPI/Tests/WebKit2Gtk/DOMDOMWindowTest.cpp
        Tools/TestWebKitAPI/Tests/WebKit2Gtk/DOMNodeFilterTest.cpp
        Tools/TestWebKitAPI/Tests/WebKit2Gtk/DOMNodeTest.cpp
