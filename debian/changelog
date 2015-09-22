@@ -17,6 +17,9 @@ webkit2gtk (2.10.0+dfsg1-1) UNRELEASED; urgency=medium
   * debian/copyright:
     + Remove files that no longer exist from the list.
     + Reorder paragraphs to fix 'unused-paragraph...' lintian warnings.
+  * debian/source/lintian-overrides:
+    + lintian gives false positives with many of the javascript files in
+      the source tarball, thinking that they are minified (see #798900).
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 21 Sep 2015 15:21:03 +0300
 
