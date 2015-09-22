@@ -7,19 +7,6 @@ Comment:
  Source/WebInspectorUI/Tools/PrettyPrinting/populate/jquery.min.js
  Tools/WebKitTestRunner/gtk/fonts/FontWithNoValidEncoding.fon
 
-Files: debian/*
-Copyright: © 2007-2009 Mike Hommey <glandium@debian.org>
-           © 2009 Gustavo Noronha Silva <kov@debian.org>
-           © 2014-2015 Alberto Garcia <berto@igalia.com>
-License: LGPL-2+
-
-Files: debian/jquery-1.9.1.js
-Copyright: © 2005, 2012 jQuery Foundation, Inc. and other contributors
-License: Expat
-Comment:
- Uncompressed version of jquery.min.js, downloaded from
- http://code.jquery.com/jquery-1.9.1.js
-
 Files: *
 Copyright: © 2002-2015 Apple Inc. and others
 License: BSD-2-clause
@@ -27,15 +14,6 @@ Comment:
  The default license of WebKit is BSD 2-clause, available in
  Source/WebKit/LICENSE. The exceptions are listed in the sections
  that follow.
-
-Files: Source/ThirdParty/gtest/scripts/upload.py
-Copyright: © 2007 Google Inc.
-License: Apache-2.0
-
-Files: Source/JavaScriptCore/runtime/WeakRandom.h
-Copyright: © 2009 Apple Inc
-           © 2009 Ian C. Bullard.
-License: BSD-2-clause and Expat
 
 Files: Source/JavaScriptCore/API/JSRetainPtr.h
        Source/JavaScriptCore/API/JSStringRefBSTR.cpp
@@ -702,13 +680,6 @@ Files: Source/JavaScriptCore/API/JSRetainPtr.h
 Copyright: © 2002-2014 Apple Inc. and others
 License: BSD-3-clause
 
-Files: Source/WTF/wtf/Atomics.cpp
-       Source/WTF/wtf/Atomics.h
-       Source/WTF/wtf/ThreadSafeRefCounted.h
-       Source/WTF/wtf/Threading.h
-Copyright: © 2002-2014 Apple Inc. and others
-License: BSD-3-clause and BSL
-
 Files: Source/JavaScriptCore/inspector/scripts/jsmin.py
        Source/ThirdParty/ANGLE/include/EGL/*
        Source/ThirdParty/ANGLE/include/GLES3/gl3.h
@@ -723,15 +694,6 @@ Files: Source/ThirdParty/ANGLE/src/compiler/preprocessor/ExpressionParser.cpp
        Source/ThirdParty/ANGLE/src/compiler/translator/glslang_tab.h
 Copyright: © 2002-2014 Apple Inc. and others
 License: GPL-3+
-
-Files: Source/WTF/wtf/CryptographicallyRandomNumber.cpp
-Copyright: © 1996 David Mazieres <dm@uun.org>
-           © 2008 Damien Miller <djm@openbsd.org>
-License: ISC
-
-Files: Source/WTF/wtf/text/Base64.cpp
-Copyright: © 2002-2014 Apple Inc. and others
-License: LGPL-2
 
 Files: Documentation/*
        Source/JavaScriptCore/*
@@ -1354,6 +1316,44 @@ License: public-domain
 Files: Source/ThirdParty/qunit/*
 Copyright: © 2011 John Resig, Jörn Zaefferer
 License: Expat or GPL-2
+
+Files: Source/ThirdParty/gtest/scripts/upload.py
+Copyright: © 2007 Google Inc.
+License: Apache-2.0
+
+Files: Source/JavaScriptCore/runtime/WeakRandom.h
+Copyright: © 2009 Apple Inc
+           © 2009 Ian C. Bullard.
+License: BSD-2-clause and Expat
+
+Files: Source/WTF/wtf/Atomics.cpp
+       Source/WTF/wtf/Atomics.h
+       Source/WTF/wtf/ThreadSafeRefCounted.h
+       Source/WTF/wtf/Threading.h
+Copyright: © 2002-2014 Apple Inc. and others
+License: BSD-3-clause and BSL
+
+Files: Source/WTF/wtf/CryptographicallyRandomNumber.cpp
+Copyright: © 1996 David Mazieres <dm@uun.org>
+           © 2008 Damien Miller <djm@openbsd.org>
+License: ISC
+
+Files: Source/WTF/wtf/text/Base64.cpp
+Copyright: © 2002-2014 Apple Inc. and others
+License: LGPL-2
+
+Files: debian/*
+Copyright: © 2007-2009 Mike Hommey <glandium@debian.org>
+           © 2009 Gustavo Noronha Silva <kov@debian.org>
+           © 2014-2015 Alberto Garcia <berto@igalia.com>
+License: LGPL-2+
+
+Files: debian/jquery-1.9.1.js
+Copyright: © 2005, 2012 jQuery Foundation, Inc. and other contributors
+License: Expat
+Comment:
+ Uncompressed version of jquery.min.js, downloaded from
+ http://code.jquery.com/jquery-1.9.1.js
 
 License: BSD-2-clause
  Redistribution and use in source and binary forms, with or without
