@@ -1,4 +1,4 @@
-webkit2gtk (2.10.0+dfsg1-1) UNRELEASED; urgency=medium
+webkit2gtk (2.10.0+dfsg1-1) unstable; urgency=medium
 
   * New upstream release.
   * debian/patches/fix-ftbfs-gcc5.patch:
@@ -21,7 +21,7 @@ webkit2gtk (2.10.0+dfsg1-1) UNRELEASED; urgency=medium
     + lintian gives false positives with many of the javascript files in
       the source tarball, thinking that they are minified (see #798900).
 
- -- Alberto Garcia <berto@igalia.com>  Mon, 21 Sep 2015 15:21:03 +0300
+ -- Alberto Garcia <berto@igalia.com>  Tue, 22 Sep 2015 17:21:00 +0300
 
 webkit2gtk (2.8.5+dfsg1-3) unstable; urgency=medium
 
