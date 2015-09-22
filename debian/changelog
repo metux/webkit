@@ -10,6 +10,8 @@ webkit2gtk (2.10.0+dfsg1-1) UNRELEASED; urgency=medium
     + Refresh.
   * debian/control:
     + Add build dependency on libhyphen-dev.
+    + Build depend on libegl1-mesa-dev and libgles2-mesa-dev on armel and
+      armhf.
   * debian/libwebkit2gtk-4.0-37.symbols:
     + Update.
   * debian/copyright:
