@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitWebContext.html" title="WebKitWebContext">
 <link rel="next" href="WebKitAuthenticationRequest.html" title="WebKitAuthenticationRequest">
-<meta name="generator" content="GTK-Doc V1.23.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.24.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -45,7 +45,7 @@
 <tbody>
 <tr>
 <td class="function_type">
-<a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *
+<a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a> *
 </td>
 <td class="function_name">
 <a class="link" href="WebKitWebView.html#webkit-web-view-new" title="webkit_web_view_new ()">webkit_web_view_new</a> <span class="c_punctuation">()</span>
@@ -53,7 +53,7 @@
 </tr>
 <tr>
 <td class="function_type">
-<a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *
+<a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a> *
 </td>
 <td class="function_name">
 <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()">webkit_web_view_new_with_context</a> <span class="c_punctuation">()</span>
@@ -61,7 +61,7 @@
 </tr>
 <tr>
 <td class="function_type">
-<a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *
+<a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a> *
 </td>
 <td class="function_name">
 <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-related-view" title="webkit_web_view_new_with_related_view ()">webkit_web_view_new_with_related_view</a> <span class="c_punctuation">()</span>
@@ -69,7 +69,7 @@
 </tr>
 <tr>
 <td class="function_type">
-<a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *
+<a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a> *
 </td>
 <td class="function_name">
 <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-settings" title="webkit_web_view_new_with_settings ()">webkit_web_view_new_with_settings</a> <span class="c_punctuation">()</span>
@@ -77,7 +77,7 @@
 </tr>
 <tr>
 <td class="function_type">
-<a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *
+<a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a> *
 </td>
 <td class="function_name">
 <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-user-content-manager" title="webkit_web_view_new_with_user_content_manager ()">webkit_web_view_new_with_user_content_manager</a> <span class="c_punctuation">()</span>
@@ -434,7 +434,7 @@
 </tr>
 <tr>
 <td class="function_type">
-<a href="../gio/GInputStream.html"><span class="returnvalue">GInputStream</span></a> *
+<a href="../gio/GInputStream.html#GInputStream-struct"><span class="returnvalue">GInputStream</span></a> *
 </td>
 <td class="function_name">
 <a class="link" href="WebKitWebView.html#webkit-web-view-save-finish" title="webkit_web_view_save_finish ()">webkit_web_view_save_finish</a> <span class="c_punctuation">()</span>
@@ -718,7 +718,7 @@
 </tr>
 <tr>
 <td class="signal_type">
-<a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a>*</td>
+<a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a>*</td>
 <td class="signal_name"><a class="link" href="WebKitWebView.html#WebKitWebView-create" title="The “create” signal">create</a></td>
 <td class="signal_flags">Run Last</td>
 </tr>
@@ -908,10 +908,10 @@
 <pre class="screen">    <a href="/home/cgarcia/gnome/share/gtk-doc/html/gobject/gobject-Boxed-Types.html">GBoxed</a>
     <span class="lineart">├──</span> WebKitJavascriptResult
     <span class="lineart">╰──</span> WebKitScriptDialog
-    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject-struct">GObject</a>
     <span class="lineart">╰──</span> <a href="../gobject/gobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
-        <span class="lineart">╰──</span> <a href="../gtk3/GtkWidget.html">GtkWidget</a>
-            <span class="lineart">╰──</span> <a href="../gtk3/GtkContainer.html">GtkContainer</a>
+        <span class="lineart">╰──</span> <a href="../gtk2/GtkWidget.html#GtkWidget-struct">GtkWidget</a>
+            <span class="lineart">╰──</span> <a href="../gtk2/GtkContainer.html#GtkContainer-struct">GtkContainer</a>
                 <span class="lineart">╰──</span> WebKitWebViewBase
                     <span class="lineart">╰──</span> WebKitWebView
 </pre>
@@ -920,7 +920,7 @@
 <a name="WebKitWebView.implemented-interfaces"></a><h2>Implemented Interfaces</h2>
 <p>
 WebKitWebView implements
- <a href="../atk/AtkObject.html#AtkImplementorIface">AtkImplementorIface</a> and  <a href="../gtk3/GtkBuildable.html">GtkBuildable</a>.</p>
+ AtkImplementorIface and  <a href="../gtk2/GtkBuildable.html#GtkBuildable-struct">GtkBuildable</a>.</p>
 </div>
 <div class="refsect1">
 <a name="WebKitWebView.description"></a><h2>Description</h2>
@@ -930,13 +930,13 @@ of events. You can load any URI into the <a class="link" href="WebKitWebView.htm
 string. With <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> you can control various aspects of the
 rendering and loading of the content.</p>
 <p>Note that <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> is scrollable by itself, so you don't need
-to embed it in a <a href="../gtk3/GtkScrolledWindow.html"><span class="type">GtkScrolledWindow</span></a>.</p>
+to embed it in a <a href="../gtk2/GtkScrolledWindow.html#GtkScrolledWindow-struct"><span class="type">GtkScrolledWindow</span></a>.</p>
 </div>
 <div class="refsect1">
 <a name="WebKitWebView.functions_details"></a><h2>Functions</h2>
 <div class="refsect2">
 <a name="webkit-web-view-new"></a><h3>webkit_web_view_new ()</h3>
-<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *
+<pre class="programlisting"><a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a> *
 webkit_web_view_new (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the default <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> and
 no <a class="link" href="WebKitUserContentManager.html" title="WebKitUserContentManager"><span class="type">WebKitUserContentManager</span></a> associated with it.
@@ -951,7 +951,7 @@ See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-conte
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-new-with-context"></a><h3>webkit_web_view_new_with_context ()</h3>
-<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *
+<pre class="programlisting"><a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a> *
 webkit_web_view_new_with_context (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
 <p>Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the given <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> and
 no <a class="link" href="WebKitUserContentManager.html" title="WebKitUserContentManager"><span class="type">WebKitUserContentManager</span></a> associated with it.
@@ -980,7 +980,7 @@ See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-user-
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-new-with-related-view"></a><h3>webkit_web_view_new_with_related_view ()</h3>
-<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *
+<pre class="programlisting"><a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a> *
 webkit_web_view_new_with_related_view (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
 <p>Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> sharing the same web process with <em class="parameter"><code>web_view</code></em>
 .
@@ -1018,7 +1018,7 @@ and <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span clas
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-new-with-settings"></a><h3>webkit_web_view_new_with_settings ()</h3>
-<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *
+<pre class="programlisting"><a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a> *
 webkit_web_view_new_with_settings (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);</pre>
 <p>Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the given <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>.
 See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()"><code class="function">webkit_web_view_new_with_context()</code></a>, and
@@ -1047,7 +1047,7 @@ See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-conte
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-new-with-user-content-manager"></a><h3>webkit_web_view_new_with_user_content_manager ()</h3>
-<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a> *
+<pre class="programlisting"><a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a> *
 webkit_web_view_new_with_user_content_manager
                                (<em class="parameter"><code><a class="link" href="WebKitUserContentManager.html" title="WebKitUserContentManager"><span class="type">WebKitUserContentManager</span></a> *user_content_manager</code></em>);</pre>
 <p>Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> with the given <a class="link" href="WebKitUserContentManager.html" title="WebKitUserContentManager"><span class="type">WebKitUserContentManager</span></a>.
@@ -2148,7 +2148,7 @@ view contents are scaled with respect to their original size.</p>
 webkit_web_view_can_execute_editing_command
                                (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *command</code></em>,
-                                <em class="parameter"><code><a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> *cancellable</code></em>,
+                                <em class="parameter"><code><a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> *cancellable</code></em>,
                                 <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
 <p>Asynchronously execute the given editing command.</p>
@@ -2176,7 +2176,7 @@ webkit_web_view_can_execute_editing_command
 </tr>
 <tr>
 <td class="parameter_name"><p>cancellable</p></td>
-<td class="parameter_description"><p> a <a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
+<td class="parameter_description"><p> a <a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 <tr>
@@ -2199,7 +2199,7 @@ webkit_web_view_can_execute_editing_command
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 webkit_web_view_can_execute_editing_command_finish
                                (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
+                                <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a> *result</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <p>Finish an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-can-execute-editing-command" title="webkit_web_view_can_execute_editing_command ()"><code class="function">webkit_web_view_can_execute_editing_command()</code></a>.</p>
 <div class="refsect3">
@@ -2218,7 +2218,7 @@ webkit_web_view_can_execute_editing_command_finish
 </tr>
 <tr>
 <td class="parameter_name"><p>result</p></td>
-<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a></p></td>
+<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -2407,7 +2407,7 @@ the result values of scripts.</p>
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_web_view_run_javascript (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *script</code></em>,
-                                <em class="parameter"><code><a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> *cancellable</code></em>,
+                                <em class="parameter"><code><a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> *cancellable</code></em>,
                                 <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
 <p>Asynchronously run <em class="parameter"><code>script</code></em>
@@ -2438,7 +2438,7 @@ WebKitWebSettings:enable-javascript is FALSE, this method will do nothing.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>cancellable</p></td>
-<td class="parameter_description"><p> a <a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
+<td class="parameter_description"><p> a <a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 <tr>
@@ -2460,7 +2460,7 @@ WebKitWebSettings:enable-javascript is FALSE, this method will do nothing.</p>
 <a name="webkit-web-view-run-javascript-finish"></a><h3>webkit_web_view_run_javascript_finish ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitWebView.html#WebKitJavascriptResult"><span class="returnvalue">WebKitJavascriptResult</span></a> *
 webkit_web_view_run_javascript_finish (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                       <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
+                                       <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a> *result</code></em>,
                                        <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <p>Finish an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-run-javascript" title="webkit_web_view_run_javascript ()"><code class="function">webkit_web_view_run_javascript()</code></a>.</p>
 <p>This is an example of using <a class="link" href="WebKitWebView.html#webkit-web-view-run-javascript" title="webkit_web_view_run_javascript ()"><code class="function">webkit_web_view_run_javascript()</code></a> with a script returning
@@ -2584,7 +2584,7 @@ web_view_get_link_url (WebKitWebView *web_view,
 </tr>
 <tr>
 <td class="parameter_name"><p>result</p></td>
-<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a></p></td>
+<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -2609,7 +2609,7 @@ or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">N
 webkit_web_view_run_javascript_from_gresource
                                (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *resource</code></em>,
-                                <em class="parameter"><code><a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> *cancellable</code></em>,
+                                <em class="parameter"><code><a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> *cancellable</code></em>,
                                 <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
 <p>Asynchronously run the script from <em class="parameter"><code>resource</code></em>
@@ -2641,7 +2641,7 @@ of the operation.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>cancellable</p></td>
-<td class="parameter_description"><p> a <a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
+<td class="parameter_description"><p> a <a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 <tr>
@@ -2664,7 +2664,7 @@ of the operation.</p>
 <pre class="programlisting"><a class="link" href="WebKitWebView.html#WebKitJavascriptResult"><span class="returnvalue">WebKitJavascriptResult</span></a> *
 webkit_web_view_run_javascript_from_gresource_finish
                                (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
+                                <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a> *result</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <p>Finish an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-run-javascript-from-gresource" title="webkit_web_view_run_javascript_from_gresource ()"><code class="function">webkit_web_view_run_javascript_from_gresource()</code></a>.</p>
 <p>Check <a class="link" href="WebKitWebView.html#webkit-web-view-run-javascript-finish" title="webkit_web_view_run_javascript_finish ()"><code class="function">webkit_web_view_run_javascript_finish()</code></a> for a usage example.</p>
@@ -2684,7 +2684,7 @@ webkit_web_view_run_javascript_from_gresource_finish
 </tr>
 <tr>
 <td class="parameter_name"><p>result</p></td>
-<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a></p></td>
+<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -2744,7 +2744,7 @@ can be displayed or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_web_view_save (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                       <em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitSaveMode" title="enum WebKitSaveMode"><span class="type">WebKitSaveMode</span></a> save_mode</code></em>,
-                      <em class="parameter"><code><a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> *cancellable</code></em>,
+                      <em class="parameter"><code><a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> *cancellable</code></em>,
                       <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
                       <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
 <p>Asynchronously save the current web page associated to the
@@ -2776,7 +2776,7 @@ operation.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>cancellable</p></td>
-<td class="parameter_description"><p> a <a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
+<td class="parameter_description"><p> a <a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 <tr>
@@ -2796,9 +2796,9 @@ operation.</p>
 <hr>
 <div class="refsect2">
 <a name="webkit-web-view-save-finish"></a><h3>webkit_web_view_save_finish ()</h3>
-<pre class="programlisting"><a href="../gio/GInputStream.html"><span class="returnvalue">GInputStream</span></a> *
+<pre class="programlisting"><a href="../gio/GInputStream.html#GInputStream-struct"><span class="returnvalue">GInputStream</span></a> *
 webkit_web_view_save_finish (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                             <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
+                             <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a> *result</code></em>,
                              <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <p>Finish an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-save" title="webkit_web_view_save ()"><code class="function">webkit_web_view_save()</code></a>.</p>
 <div class="refsect3">
@@ -2817,7 +2817,7 @@ webkit_web_view_save_finish (<em class="parameter"><code><a class="link" href="W
 </tr>
 <tr>
 <td class="parameter_name"><p>result</p></td>
-<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a></p></td>
+<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -2830,7 +2830,7 @@ webkit_web_view_save_finish (<em class="parameter"><code><a class="link" href="W
 </div>
 <div class="refsect3">
 <a name="id-1.2.3.12.51.6"></a><h4>Returns</h4>
-<p> a <a href="../gio/GInputStream.html"><span class="type">GInputStream</span></a> with the result of saving
+<p> a <a href="../gio/GInputStream.html#GInputStream-struct"><span class="type">GInputStream</span></a> with the result of saving
 the current web page or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> in case of error. </p>
 <p><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></p>
 </div>
@@ -2840,9 +2840,9 @@ the current web page or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><c
 <a name="webkit-web-view-save-to-file"></a><h3>webkit_web_view_save_to_file ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_web_view_save_to_file (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                              <em class="parameter"><code><a href="../gio/GFile.html"><span class="type">GFile</span></a> *file</code></em>,
+                              <em class="parameter"><code><a href="../gio/GFile.html#GFile-struct"><span class="type">GFile</span></a> *file</code></em>,
                               <em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitSaveMode" title="enum WebKitSaveMode"><span class="type">WebKitSaveMode</span></a> save_mode</code></em>,
-                              <em class="parameter"><code><a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> *cancellable</code></em>,
+                              <em class="parameter"><code><a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> *cancellable</code></em>,
                               <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
                               <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
 <p>Asynchronously save the current web page associated to the
@@ -2870,7 +2870,7 @@ operation.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>file</p></td>
-<td class="parameter_description"><p>the <a href="../gio/GFile.html"><span class="type">GFile</span></a> where the current web page should be saved to.</p></td>
+<td class="parameter_description"><p>the <a href="../gio/GFile.html#GFile-struct"><span class="type">GFile</span></a> where the current web page should be saved to.</p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -2880,7 +2880,7 @@ operation.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>cancellable</p></td>
-<td class="parameter_description"><p> a <a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
+<td class="parameter_description"><p> a <a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 <tr>
@@ -2902,7 +2902,7 @@ operation.</p>
 <a name="webkit-web-view-save-to-file-finish"></a><h3>webkit_web_view_save_to_file_finish ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 webkit_web_view_save_to_file_finish (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                     <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
+                                     <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a> *result</code></em>,
                                      <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <p>Finish an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-save-to-file" title="webkit_web_view_save_to_file ()"><code class="function">webkit_web_view_save_to_file()</code></a>.</p>
 <div class="refsect3">
@@ -2921,7 +2921,7 @@ webkit_web_view_save_to_file_finish (<em class="parameter"><code><a class="link"
 </tr>
 <tr>
 <td class="parameter_name"><p>result</p></td>
-<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a></p></td>
+<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -2979,9 +2979,9 @@ the download operation. </p>
 <a name="webkit-web-view-get-tls-info"></a><h3>webkit_web_view_get_tls_info ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 webkit_web_view_get_tls_info (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                              <em class="parameter"><code><a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a> **certificate</code></em>,
+                              <em class="parameter"><code><a href="../gio/GTlsCertificate.html#GTlsCertificate-struct"><span class="type">GTlsCertificate</span></a> **certificate</code></em>,
                               <em class="parameter"><code><a href="../gio/gio-TLS-Overview.html#GTlsCertificateFlags"><span class="type">GTlsCertificateFlags</span></a> *errors</code></em>);</pre>
-<p>Retrieves the <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a> associated with the main resource of <em class="parameter"><code>web_view</code></em>
+<p>Retrieves the <a href="../gio/GTlsCertificate.html#GTlsCertificate-struct"><span class="type">GTlsCertificate</span></a> associated with the main resource of <em class="parameter"><code>web_view</code></em>
 ,
 and the <a href="../gio/gio-TLS-Overview.html#GTlsCertificateFlags"><span class="type">GTlsCertificateFlags</span></a> showing what problems, if any, have been found
 with that certificate.
@@ -3013,7 +3013,7 @@ which case subresources that fail certificate verification will be blocked.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>certificate</p></td>
-<td class="parameter_description"><p> return location for a <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a>. </p></td>
+<td class="parameter_description"><p> return location for a <a href="../gio/GTlsCertificate.html#GTlsCertificate-struct"><span class="type">GTlsCertificate</span></a>. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="Parameter for returning results. Default is transfer full."><span class="acronym">out</span></acronym>][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></td>
 </tr>
 <tr>
@@ -3039,7 +3039,7 @@ from the server, or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code
 webkit_web_view_get_snapshot (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                               <em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitSnapshotRegion" title="enum WebKitSnapshotRegion"><span class="type">WebKitSnapshotRegion</span></a> region</code></em>,
                               <em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitSnapshotOptions" title="enum WebKitSnapshotOptions"><span class="type">WebKitSnapshotOptions</span></a> options</code></em>,
-                              <em class="parameter"><code><a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> *cancellable</code></em>,
+                              <em class="parameter"><code><a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> *cancellable</code></em>,
                               <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
                               <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
 <p>Asynchronously retrieves a snapshot of <em class="parameter"><code>web_view</code></em>
@@ -3077,7 +3077,7 @@ operation.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>cancellable</p></td>
-<td class="parameter_description"><p> a <a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a>. </p></td>
+<td class="parameter_description"><p> a <a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a>. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 <tr>
@@ -3099,7 +3099,7 @@ operation.</p>
 <a name="webkit-web-view-get-snapshot-finish"></a><h3>webkit_web_view_get_snapshot_finish ()</h3>
 <pre class="programlisting"><span class="returnvalue">cairo_surface_t</span> *
 webkit_web_view_get_snapshot_finish (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                     <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
+                                     <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a> *result</code></em>,
                                      <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <p>Finishes an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-get-snapshot" title="webkit_web_view_get_snapshot ()"><code class="function">webkit_web_view_get_snapshot()</code></a>.</p>
 <div class="refsect3">
@@ -3118,7 +3118,7 @@ webkit_web_view_get_snapshot_finish (<em class="parameter"><code><a class="link"
 </tr>
 <tr>
 <td class="parameter_name"><p>result</p></td>
-<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a></p></td>
+<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -3140,7 +3140,7 @@ webkit_web_view_get_snapshot_finish (<em class="parameter"><code><a class="link"
 <a name="webkit-web-view-set-background-color"></a><h3>webkit_web_view_set_background_color ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_web_view_set_background_color (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                      <em class="parameter"><code>const <a href="../gdk3/gdk3-RGBA-Colors.html#GdkRGBA"><span class="type">GdkRGBA</span></a> *rgba</code></em>);</pre>
+                                      <em class="parameter"><code>const <span class="type">GdkRGBA</span> *rgba</code></em>);</pre>
 <p>Sets the color that will be used to draw the <em class="parameter"><code>web_view</code></em>
  background before
 the actual contents are rendered. Note that if the web page loaded in <em class="parameter"><code>web_view</code></em>
@@ -3151,7 +3151,7 @@ By default the <em class="parameter"><code>web_view</code></em>
  background color is opaque white.
 If the <em class="parameter"><code>rgba</code></em>
  color is not fully opaque, the parent window must have a RGBA visual and
-<a href="../gtk3/GtkWidget.html#GtkWidget--app-paintable"><span class="type">“app-paintable”</span></a> property set to <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>, for the transparencies to work.</p>
+<a href="../gtk2/GtkWidget.html#GtkWidget--app-paintable"><span class="type">“app-paintable”</span></a> property set to <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>, for the transparencies to work.</p>
 <div class="informalexample">
   <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
     <tbody>
@@ -3215,7 +3215,7 @@ If the <em class="parameter"><code>rgba</code></em>
 </tr>
 <tr>
 <td class="parameter_name"><p>rgba</p></td>
-<td class="parameter_description"><p>a <a href="../gdk3/gdk3-RGBA-Colors.html#GdkRGBA"><span class="type">GdkRGBA</span></a></p></td>
+<td class="parameter_description"><p>a <span class="type">GdkRGBA</span></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 </tbody>
@@ -3228,7 +3228,7 @@ If the <em class="parameter"><code>rgba</code></em>
 <a name="webkit-web-view-get-background-color"></a><h3>webkit_web_view_get_background_color ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_web_view_get_background_color (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
-                                      <em class="parameter"><code><a href="../gdk3/gdk3-RGBA-Colors.html#GdkRGBA"><span class="type">GdkRGBA</span></a> *rgba</code></em>);</pre>
+                                      <em class="parameter"><code><span class="type">GdkRGBA</span> *rgba</code></em>);</pre>
 <p>Gets the color that is used to draw the <em class="parameter"><code>web_view</code></em>
  background before
 the actual contents are rendered.
@@ -3249,7 +3249,7 @@ For more information see also <a class="link" href="WebKitWebView.html#webkit-we
 </tr>
 <tr>
 <td class="parameter_name"><p>rgba</p></td>
-<td class="parameter_description"><p> a <a href="../gdk3/gdk3-RGBA-Colors.html#GdkRGBA"><span class="type">GdkRGBA</span></a> to fill in with the background color. </p></td>
+<td class="parameter_description"><p> a <span class="type">GdkRGBA</span> to fill in with the background color. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="Parameter for returning results. Default is transfer full."><span class="acronym">out</span></acronym>]</span></td>
 </tr>
 </tbody>
@@ -4239,7 +4239,7 @@ destroy the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><spa
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 user_function (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>       *web_view,
                <a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a>   *context_menu,
-               <a href="../gdk3/gdk3-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a>            *event,
+               <a href="../gdk2/gdk2-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a>            *event,
                <a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a> *hit_test_result,
                <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>             user_data)</pre>
 <p>Emmited when a context menu is about to be displayed to give the application
@@ -4262,7 +4262,7 @@ or build its own context menu.</p>
  To build your own menu, you can remove all items from the proposed menu with
  <a class="link" href="WebKitContextMenu.html#webkit-context-menu-remove-all" title="webkit_context_menu_remove_all ()"><code class="function">webkit_context_menu_remove_all()</code></a>, add your own items and return <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> so
  that the menu will be shown. You can also ignore the proposed <a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a>,
- build your own <a href="../gtk3/GtkMenu.html"><span class="type">GtkMenu</span></a> and return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to prevent the proposed menu from being shown.
+ build your own <a href="../gtk2/GtkMenu.html#GtkMenu-struct"><span class="type">GtkMenu</span></a> and return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to prevent the proposed menu from being shown.
 </p></li>
 <li class="listitem"><p>
  If you just want the default menu to be shown always, simply don't connect to this
@@ -4296,7 +4296,7 @@ during the signal emission.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>event</p></td>
-<td class="parameter_description"><p>the <a href="../gdk3/gdk3-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a> that triggered the context menu</p></td>
+<td class="parameter_description"><p>the <a href="../gdk2/gdk2-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a> that triggered the context menu</p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -4354,7 +4354,7 @@ to notify that the context menu is dismissed.</p>
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView-create"></a><h3>The <code class="literal">“create”</code> signal</h3>
-<pre class="programlisting"><a href="../gtk3/GtkWidget.html"><span class="returnvalue">GtkWidget</span></a>*
+<pre class="programlisting"><a href="../gtk2/GtkWidget.html#GtkWidget-struct"><span class="returnvalue">GtkWidget</span></a>*
 user_function (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>          *web_view,
                <a class="link" href="WebKitNavigationAction.html" title="WebKitNavigationAction"><span class="type">WebKitNavigationAction</span></a> *navigation_action,
                <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>                user_data)</pre>
@@ -4831,7 +4831,7 @@ You need to handle the signal if you want to provide your own error page.</p>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 user_function (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>       *web_view,
                <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>               *failing_uri,
-               <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a>     *certificate,
+               <a href="../gio/GTlsCertificate.html#GTlsCertificate-struct"><span class="type">GTlsCertificate</span></a>     *certificate,
                <a href="../gio/gio-TLS-Overview.html#GTlsCertificateFlags"><span class="type">GTlsCertificateFlags</span></a> errors,
                <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>             user_data)</pre>
 <p>Emitted when a TLS error occurs during a load operation.
@@ -4865,7 +4865,7 @@ will finish regardless of the returned value.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>certificate</p></td>
-<td class="parameter_description"><p>a <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a></p></td>
+<td class="parameter_description"><p>a <a href="../gio/GTlsCertificate.html#GTlsCertificate-struct"><span class="type">GTlsCertificate</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -4905,7 +4905,7 @@ on the current mouse coordinates and the result is passed in the
 <em class="parameter"><code>hit_test_result</code></em>
  argument. The <em class="parameter"><code>modifiers</code></em>
  argument is a bitmask of
-<a href="../gdk3/gdk3-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a> flags indicating the state of modifier keys.
+<a href="../gdk2/gdk2-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a> flags indicating the state of modifier keys.
 The signal is emitted again when the mouse is moved out of the
 current element with a new <em class="parameter"><code>hit_test_result</code></em>
 .</p>
@@ -4930,7 +4930,7 @@ current element with a new <em class="parameter"><code>hit_test_result</code></e
 </tr>
 <tr>
 <td class="parameter_name"><p>modifiers</p></td>
-<td class="parameter_description"><p>a bitmask of <a href="../gdk3/gdk3-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a></p></td>
+<td class="parameter_description"><p>a bitmask of <a href="../gdk2/gdk2-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -5250,7 +5250,7 @@ argument.</p>
 <p>It is possible to handle this request asynchronously by increasing the
 reference count of the request.</p>
 <p>The default signal handler will asynchronously run a regular
-<a href="../gtk3/GtkColorChooser.html"><span class="type">GtkColorChooser</span></a> for the user to interact with.</p>
+<span class="type">GtkColorChooser</span> for the user to interact with.</p>
 <div class="refsect3">
 <a name="id-1.2.3.15.20.7"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
@@ -5303,7 +5303,7 @@ instance of the <a class="link" href="WebKitFileChooserRequest.html" title="WebK
 
 argument.</p>
 <p>The default signal handler will asynchronously run a regular
-<a href="../gtk3/GtkFileChooserDialog.html"><span class="type">GtkFileChooserDialog</span></a> for the user to interact with.</p>
+<a href="../gtk2/GtkFileChooserDialog.html#GtkFileChooserDialog-struct"><span class="type">GtkFileChooserDialog</span></a> for the user to interact with.</p>
 <div class="refsect3">
 <a name="id-1.2.3.15.21.6"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
@@ -5531,6 +5531,6 @@ user_function (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><
 </div>
 </div>
 <div class="footer">
-<hr>Generated by GTK-Doc V1.23.1</div>
+<hr>Generated by GTK-Doc V1.24.1</div>
 </body>
 </html>

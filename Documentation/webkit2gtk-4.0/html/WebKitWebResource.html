@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitPrintOperation.html" title="WebKitPrintOperation">
 <link rel="next" href="webkit2gtk-4.0-WebKitError.html" title="WebKitError">
-<meta name="generator" content="GTK-Doc V1.23.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.24.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -152,7 +152,7 @@
 </div>
 <div class="refsect1">
 <a name="WebKitWebResource.object-hierarchy"></a><h2>Object Hierarchy</h2>
-<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
+<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject-struct">GObject</a>
     <span class="lineart">╰──</span> WebKitWebResource
 </pre>
 </div>
@@ -255,7 +255,7 @@ the response hasn't been received yet. </p>
 <a name="webkit-web-resource-get-data"></a><h3>webkit_web_resource_get_data ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_web_resource_get_data (<em class="parameter"><code><a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> *resource</code></em>,
-                              <em class="parameter"><code><a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> *cancellable</code></em>,
+                              <em class="parameter"><code><a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> *cancellable</code></em>,
                               <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
                               <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
 <p>Asynchronously get the raw data for <em class="parameter"><code>resource</code></em>
@@ -279,7 +279,7 @@ webkit_web_resource_get_data (<em class="parameter"><code><a class="link" href="
 </tr>
 <tr>
 <td class="parameter_name"><p>cancellable</p></td>
-<td class="parameter_description"><p> a <a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
+<td class="parameter_description"><p> a <a href="../gio/GCancellable.html#GCancellable-struct"><span class="type">GCancellable</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> to ignore. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 <tr>
@@ -301,7 +301,7 @@ webkit_web_resource_get_data (<em class="parameter"><code><a class="link" href="
 <a name="webkit-web-resource-get-data-finish"></a><h3>webkit_web_resource_get_data_finish ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guchar"><span class="returnvalue">guchar</span></a> *
 webkit_web_resource_get_data_finish (<em class="parameter"><code><a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> *resource</code></em>,
-                                     <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
+                                     <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a> *result</code></em>,
                                      <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gsize"><span class="type">gsize</span></a> *length</code></em>,
                                      <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <p>Finish an asynchronous operation started with <a class="link" href="WebKitWebResource.html#webkit-web-resource-get-data" title="webkit_web_resource_get_data ()"><code class="function">webkit_web_resource_get_data()</code></a>.</p>
@@ -321,7 +321,7 @@ webkit_web_resource_get_data_finish (<em class="parameter"><code><a class="link"
 </tr>
 <tr>
 <td class="parameter_name"><p>result</p></td>
-<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a></p></td>
+<td class="parameter_description"><p>a <a href="../gio/GAsyncResult.html#GAsyncResult-struct"><span class="type">GAsyncResult</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -416,7 +416,7 @@ load operation.</p>
 <a name="WebKitWebResource-failed-with-tls-errors"></a><h3>The <code class="literal">“failed-with-tls-errors”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a>   *resource,
-               <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a>     *certificate,
+               <a href="../gio/GTlsCertificate.html#GTlsCertificate-struct"><span class="type">GTlsCertificate</span></a>     *certificate,
                <a href="../gio/gio-TLS-Overview.html#GTlsCertificateFlags"><span class="type">GTlsCertificateFlags</span></a> errors,
                <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>             user_data)</pre>
 <p>This signal is emitted when a TLS error occurs during the resource load operation.</p>
@@ -436,7 +436,7 @@ user_function (<a class="link" href="WebKitWebResource.html" title="WebKitWebRes
 </tr>
 <tr>
 <td class="parameter_name"><p>certificate</p></td>
-<td class="parameter_description"><p>a <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a></p></td>
+<td class="parameter_description"><p>a <a href="../gio/GTlsCertificate.html#GTlsCertificate-struct"><span class="type">GTlsCertificate</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -582,6 +582,6 @@ received by the server for the initial request.</p>
 </div>
 </div>
 <div class="footer">
-<hr>Generated by GTK-Doc V1.23.1</div>
+<hr>Generated by GTK-Doc V1.24.1</div>
 </body>
 </html>

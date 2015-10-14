@@ -909,7 +909,7 @@ void RenderLayer::updateBlendMode()
 
 void RenderLayer::updateAncestorChainHasBlendingDescendants()
 {
-    for (auto layer = this; layer; layer = layer->parent()) {
+    for (auto* layer = this; layer; layer = layer->parent()) {
         if (!layer->hasNotIsolatedBlendingDescendantsStatusDirty() && layer->hasNotIsolatedBlendingDescendants())
             break;
         layer->m_hasNotIsolatedBlendingDescendants = true;
@@ -924,7 +924,7 @@ void RenderLayer::updateAncestorChainHasBlendingDescendants()
 
 void RenderLayer::dirtyAncestorChainHasBlendingDescendants()
 {
-    for (auto layer = this; layer; layer = layer->parent()) {
+    for (auto* layer = this; layer; layer = layer->parent()) {
         if (layer->hasNotIsolatedBlendingDescendantsStatusDirty())
             break;
         
@@ -1280,13 +1280,13 @@ bool RenderLayer::update3DTransformedDescendantStatus()
         // Transformed or preserve-3d descendants can only be in the z-order lists, not
         // in the normal flow list, so we only need to check those.
         if (Vector<RenderLayer*>* positiveZOrderList = posZOrderList()) {
-            for (auto layer : *positiveZOrderList)
+            for (auto* layer : *positiveZOrderList)
                 m_has3DTransformedDescendant |= layer->update3DTransformedDescendantStatus();
         }
 
         // Now check our negative z-index children.
         if (Vector<RenderLayer*>* negativeZOrderList = negZOrderList()) {
-            for (auto layer : *negativeZOrderList)
+            for (auto* layer : *negativeZOrderList)
                 m_has3DTransformedDescendant |= layer->update3DTransformedDescendantStatus();
         }
         
@@ -3843,7 +3843,7 @@ static void performOverlapTests(OverlapTestRequestMap& overlapTestRequests, cons
         request.key->setOverlapTestResult(true);
         overlappedRequestClients.append(request.key);
     }
-    for (auto client : overlappedRequestClients)
+    for (auto* client : overlappedRequestClients)
         overlapTestRequests.remove(client);
 }
 
@@ -4200,7 +4200,7 @@ void RenderLayer::paintFixedLayersInNamedFlows(GraphicsContext* context, const L
     renderer().view().flowThreadController().collectFixedPositionedLayers(fixedLayers);
 
     // Paint the layers
-    for (auto fixedLayer : fixedLayers)
+    for (auto* fixedLayer : fixedLayers)
         fixedLayer->paintLayer(context, paintingInfo, paintFlags);
 }
 
@@ -4422,7 +4422,7 @@ void RenderLayer::paintList(Vector<RenderLayer*>* list, GraphicsContext* context
     LayerListMutationDetector mutationChecker(this);
 #endif
 
-    for (auto childLayer : *list) {
+    for (auto* childLayer : *list) {
         if (childLayer->isFlowThreadCollectingGraphicsLayersUnderRegions())
             continue;
         childLayer->paintLayer(context, paintingInfo, paintFlags);
@@ -5966,7 +5966,7 @@ LayoutRect RenderLayer::calculateLayerBounds(const RenderLayer* ancestorLayer, c
 #endif
 
     if (Vector<RenderLayer*>* negZOrderList = this->negZOrderList()) {
-        for (auto curLayer : *negZOrderList) {
+        for (auto* curLayer : *negZOrderList) {
             if (flags & IncludeCompositedDescendants || !curLayer->isComposited()) {
                 LayoutRect childUnionBounds = curLayer->calculateLayerBounds(this, curLayer->offsetFromAncestor(this), descendantFlags);
                 unionBounds.unite(childUnionBounds);
@@ -5975,7 +5975,7 @@ LayoutRect RenderLayer::calculateLayerBounds(const RenderLayer* ancestorLayer, c
     }
 
     if (Vector<RenderLayer*>* posZOrderList = this->posZOrderList()) {
-        for (auto curLayer : *posZOrderList) {
+        for (auto* curLayer : *posZOrderList) {
             // The RenderNamedFlowThread is ignored when we calculate the bounds of the RenderView.
             if ((flags & IncludeCompositedDescendants || !curLayer->isComposited()) && !curLayer->isFlowThreadCollectingGraphicsLayersUnderRegions()) {
                 LayoutRect childUnionBounds = curLayer->calculateLayerBounds(this, curLayer->offsetFromAncestor(this), descendantFlags);
@@ -5985,7 +5985,7 @@ LayoutRect RenderLayer::calculateLayerBounds(const RenderLayer* ancestorLayer, c
     }
 
     if (Vector<RenderLayer*>* normalFlowList = this->normalFlowList()) {
-        for (auto curLayer : *normalFlowList) {
+        for (auto* curLayer : *normalFlowList) {
             // RenderView will always return the size of the document, before reaching this point,
             // so there's no way we could hit a RenderNamedFlowThread here.
             ASSERT(!curLayer->isFlowThreadCollectingGraphicsLayersUnderRegions());
@@ -6119,6 +6119,12 @@ bool RenderLayer::backgroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect)
     if (paintsWithTransparency(PaintBehaviorNormal))
         return false;
 
+    if (renderer().isRoot()) {
+        // Normally the document element doens't have a layer.  If it does have a layer, its background propagates to the RenderView
+        // so this layer doesn't draw it.
+        return false;
+    }
+
     // We can't use hasVisibleContent(), because that will be true if our renderer is hidden, but some child
     // is visible and that child doesn't cover the entire rect.
     if (renderer().style().visibility() != VISIBLE)
@@ -6135,6 +6141,10 @@ bool RenderLayer::backgroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect)
     // This function should not be called when layer-lists are dirty.
     // It is somehow getting triggered during style update.
     if (m_zOrderListsDirty || m_normalFlowListDirty)
+        return false;
+
+    // Table painting is special; a table paints its sections.
+    if (renderer().isTablePart())
         return false;
 
     // FIXME: We currently only check the immediate renderer,
@@ -6330,24 +6340,24 @@ void RenderLayer::updateDescendantsLayerListsIfNeeded(bool recursive)
     
     if (isStackingContainer()) {
         if (Vector<RenderLayer*>* list = negZOrderList()) {
-            for (auto childLayer : *list)
+            for (auto* childLayer : *list)
                 layersToUpdate.append(childLayer);
         }
     }
     
     if (Vector<RenderLayer*>* list = normalFlowList()) {
-        for (auto childLayer : *list)
+        for (auto* childLayer : *list)
             layersToUpdate.append(childLayer);
     }
     
     if (isStackingContainer()) {
         if (Vector<RenderLayer*>* list = posZOrderList()) {
-            for (auto childLayer : *list)
+            for (auto* childLayer : *list)
                 layersToUpdate.append(childLayer);
         }
     }
     
-    for (auto childLayer : layersToUpdate) {
+    for (auto* childLayer : layersToUpdate) {
         childLayer->updateLayerListsIfNeeded();
         if (recursive)
             childLayer->updateDescendantsLayerListsIfNeeded(true);
@@ -6887,17 +6897,17 @@ void RenderLayer::updateOrRemoveFilterEffectRenderer()
     }
     
     FilterInfo& filterInfo = FilterInfo::get(*this);
+    Frame& frame = renderer().frame();
     if (!filterInfo.renderer()) {
         RefPtr<FilterEffectRenderer> filterRenderer = FilterEffectRenderer::create();
-        filterRenderer->setFilterScale(renderer().frame().page()->deviceScaleFactor());
-        RenderingMode renderingMode = renderer().frame().settings().acceleratedFiltersEnabled() ? Accelerated : Unaccelerated;
-        filterRenderer->setRenderingMode(renderingMode);
+        filterRenderer->setFilterScale(frame.page()->deviceScaleFactor());
+        filterRenderer->setRenderingMode(frame.settings().acceleratedFiltersEnabled() ? Accelerated : Unaccelerated);
         filterInfo.setRenderer(WTF::move(filterRenderer));
         
         // We can optimize away code paths in other places if we know that there are no software filters.
         renderer().view().setHasSoftwareFilters(true);
-    } else if (filterInfo.renderer()->filterScale() != renderer().frame().page()->deviceScaleFactor()) {
-        filterInfo.renderer()->setFilterScale(renderer().frame().page()->deviceScaleFactor());
+    } else if (filterInfo.renderer()->filterScale() != frame.page()->deviceScaleFactor()) {
+        filterInfo.renderer()->setFilterScale(frame.page()->deviceScaleFactor());
         filterInfo.renderer()->clearIntermediateResults();
     }
 
