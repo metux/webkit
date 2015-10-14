@@ -2302,7 +2302,7 @@ void Document::prepareForDestruction()
     if (!m_clientToIDMap.isEmpty() && page()) {
         Vector<WebCore::MediaPlaybackTargetClient*> clients;
         copyKeysToVector(m_clientToIDMap, clients);
-        for (auto client : clients)
+        for (auto* client : clients)
             removePlaybackTargetPickerClient(*client);
     }
 #endif
@@ -2628,7 +2628,8 @@ void Document::implicitClose()
 
     dispatchWindowLoadEvent();
     enqueuePageshowEvent(PageshowEventNotPersisted);
-    enqueuePopstateEvent(m_pendingStateObject ? m_pendingStateObject.release() : SerializedScriptValue::nullValue());
+    if (m_pendingStateObject)
+        enqueuePopstateEvent(m_pendingStateObject.release());
     
     if (f)
         f->loader().handledOnloadEvents();
@@ -3528,7 +3529,7 @@ void Document::removeAudioProducer(MediaProducer* audioProducer)
 void Document::updateIsPlayingMedia(uint64_t sourceElementID)
 {
     MediaProducer::MediaStateFlags state = MediaProducer::IsNotPlaying;
-    for (auto audioProducer : m_audioProducers)
+    for (auto* audioProducer : m_audioProducers)
         state |= audioProducer->mediaState();
 
 #if ENABLE(MEDIA_SESSION)
@@ -3559,7 +3560,7 @@ void Document::updateIsPlayingMedia(uint64_t sourceElementID)
 
 void Document::pageMutedStateDidChange()
 {
-    for (auto audioProducer : m_audioProducers)
+    for (auto* audioProducer : m_audioProducers)
         audioProducer->pageMutedStateDidChange();
 }
 
