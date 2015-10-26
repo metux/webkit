@@ -10,6 +10,9 @@ webkit2gtk (2.10.3+dfsg1-1) UNRELEASED; urgency=medium
       that are still useful for backtraces.
     + Use -g1 for mips64el as well.
     + Build using -DG_DISABLE_CAST_CHECKS when not in debug mode.
+  * debian/control:
+    + Drop the gir1.2-gtk* and gir1.2-soup* build dependencies, they are
+      already being pulled by libgtk*-dev and libsoup*-dev.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 26 Oct 2015 14:41:33 +0200
 
