@@ -25,15 +25,9 @@ ifeq ($(DEB_BUILD_ARCH),arm64)
 	EXTRA_CMAKE_ARGUMENTS += -DUSE_LD_GOLD=OFF
 endif
 
-# Disable debugging symbols on these arches.
-ifneq (,$(filter $(DEB_BUILD_ARCH),hurd-i386 ia64 kfreebsd-i386 kfreebsd-amd64 mips mipsel powerpc powerpcspe s390 s390x sparc armel armhf hppa arm64))
-	CFLAGS := $(CFLAGS:-g=)
-	EXTRA_DH_ARGUMENTS += -Nlibwebkit2gtk-4.0-37-dbg -Nlibjavascriptcoregtk-4.0-18-dbg
-endif
-
-# The size of the i386 shared library is causing problems, so let's use -g1
-# See https://bugs.webkit.org/show_bug.cgi?id=140176
-ifeq ($(DEB_BUILD_ARCH),i386)
+# The size of the debugging symbols is causing problems
+# in all these arches, so use -g1
+ifneq (,$(filter $(DEB_BUILD_ARCH),i386 hurd-i386 ia64 kfreebsd-i386 kfreebsd-amd64 mips mipsel powerpc powerpcspe s390 s390x sparc armel armhf hppa arm64))
 	CFLAGS := $(CFLAGS:-g=-g1)
 endif
 
