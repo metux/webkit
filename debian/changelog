@@ -13,6 +13,8 @@ webkit2gtk (2.10.3+dfsg1-1) UNRELEASED; urgency=medium
   * debian/control:
     + Drop the gir1.2-gtk* and gir1.2-soup* build dependencies, they are
       already being pulled by libgtk*-dev and libsoup*-dev.
+    + Make libegl1-mesa-dev an explicit requirement in all architectures,
+      it's necessary for the Wayland target.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 26 Oct 2015 14:41:33 +0200
 
