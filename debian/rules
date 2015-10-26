@@ -27,7 +27,7 @@ endif
 
 # The size of the debugging symbols is causing problems
 # in all these arches, so use -g1
-ifneq (,$(filter $(DEB_BUILD_ARCH),i386 hurd-i386 ia64 kfreebsd-i386 kfreebsd-amd64 mips mipsel powerpc powerpcspe s390 s390x sparc armel armhf hppa arm64))
+ifneq (,$(filter $(DEB_BUILD_ARCH),i386 hurd-i386 ia64 kfreebsd-i386 kfreebsd-amd64 mips mipsel mips64el powerpc powerpcspe s390 s390x sparc armel armhf hppa arm64))
 	CFLAGS := $(CFLAGS:-g=-g1)
 endif
 
