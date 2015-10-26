@@ -45,7 +45,7 @@ ifneq (,$(filter debug,$(DEB_BUILD_OPTIONS)))
 	EXTRA_CMAKE_ARGUMENTS += -DCMAKE_BUILD_TYPE=Debug
 else
 	EXTRA_CMAKE_ARGUMENTS += -DCMAKE_BUILD_TYPE=Release
-	CPPFLAGS += -DNDEBUG
+	CPPFLAGS += -DNDEBUG -DG_DISABLE_CAST_CHECKS
 endif
 
 ifeq ($(shell dpkg-vendor --derives-from Ubuntu && echo yes),yes)
