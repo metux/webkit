@@ -1,0 +1,11 @@
+webkit2gtk (2.10.4+dfsg1-1) unstable; urgency=medium
+
+  Since webkit2gtk 2.10.4, support for GTK+2-based plugins (Adobe
+  Flash, Google Talk/Hangouts) has been moved to a separate package
+  called libwebkit2gtk-4.0-37-gtk2.
+
+  This removes the GTK+ 2 dependency from the main libwebkit2gtk package
+  and makes it much smaller, so if you don't want to use any of those
+  plugins you don't need to install this new package.
+
+ -- Alberto Garcia <berto@igalia.com>  Thu, 12 Nov 2015 20:40:18 +0200

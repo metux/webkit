@@ -3,6 +3,22 @@ webkit2gtk (2.10.4+dfsg1-1) UNRELEASED; urgency=medium
   * New upstream release.
   * debian/patches/install-minibrowser.patch:
     + Refresh.
+  * webkit2gtk includes a binary called WebKitPluginProcess2 that allows
+    loading plugins that depend on GTK+2, like Adobe Flash or Google
+    Hangouts. This however has the side effect of requiring GTK+2 and all
+    its dependencies. We're moving the WebKitPluginProcess2 to a separate
+    package so users that don't need any of those plugins don't need to
+    install GTK+2 (Closes: #804412).
+    + debian/control:
+      - Add the entry for the new libwebkit2gtk-4.0-37-gtk2 package.
+    + debian/rules:
+      - Run dh_strip on the new package as well.
+    + debian/libwebkit2gtk-4.0-37-gtk2.install:
+      - Install WebKitPluginProcess2.
+    + debian/libwebkit2gtk-4.0-37.install:
+      - Remove WebKitPluginProcess2.
+    + debian/NEWS:
+      - Add news item about the new package.
 
  -- Alberto Garcia <berto@igalia.com>  Thu, 12 Nov 2015 23:10:53 +0200
 

@@ -74,6 +74,7 @@ override_dh_auto_configure:
 
 override_dh_strip:
 	dh_strip -plibwebkit2gtk-4.0-37 --dbg-package=libwebkit2gtk-4.0-37-dbg $(EXTRA_DH_ARGUMENTS)
+	dh_strip -plibwebkit2gtk-4.0-37-gtk2 --dbg-package=libwebkit2gtk-4.0-37-dbg $(EXTRA_DH_ARGUMENTS)
 	dh_strip -plibjavascriptcoregtk-4.0-18 --dbg-package=libjavascriptcoregtk-4.0-18-dbg $(EXTRA_DH_ARGUMENTS)
 	dh_strip $(EXTRA_DH_ARGUMENTS)
 
