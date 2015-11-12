@@ -1,2 +1,3 @@
 install-minibrowser.patch
 fix-ftbfs-m68k.patch
+hide-gtk2-plugins.patch

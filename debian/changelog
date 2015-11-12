@@ -13,6 +13,8 @@ webkit2gtk (2.10.4+dfsg1-1) UNRELEASED; urgency=medium
       - Add the entry for the new libwebkit2gtk-4.0-37-gtk2 package.
     + debian/rules:
       - Run dh_strip on the new package as well.
+    + debian/patches/hide-gtk2-plugins.patch:
+      - Hide plugins if the plugin process is not available.
     + debian/libwebkit2gtk-4.0-37-gtk2.install:
       - Install WebKitPluginProcess2.
     + debian/libwebkit2gtk-4.0-37.install:
