@@ -2,7 +2,7 @@ include(GNUInstallDirs)
 
 set(PROJECT_VERSION_MAJOR 2)
 set(PROJECT_VERSION_MINOR 10)
-set(PROJECT_VERSION_MICRO 3)
+set(PROJECT_VERSION_MICRO 4)
 set(PROJECT_VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_MICRO})
 set(WEBKITGTK_API_VERSION 4.0)
 
@@ -15,8 +15,8 @@ endif ()
 
 # Libtool library version, not to be confused with API version.
 # See http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-CALCULATE_LIBRARY_VERSIONS_FROM_LIBTOOL_TRIPLE(WEBKIT2 48 6 11)
-CALCULATE_LIBRARY_VERSIONS_FROM_LIBTOOL_TRIPLE(JAVASCRIPTCORE 20 11 2)
+CALCULATE_LIBRARY_VERSIONS_FROM_LIBTOOL_TRIPLE(WEBKIT2 48 7 11)
+CALCULATE_LIBRARY_VERSIONS_FROM_LIBTOOL_TRIPLE(JAVASCRIPTCORE 20 12 2)
 
 # These are shared variables, but we special case their definition so that we can use the
 # CMAKE_INSTALL_* variables that are populated by the GNUInstallDirs macro.
@@ -71,6 +71,7 @@ WEBKIT_OPTION_DEFINE(ENABLE_GTKDOC "Whether or not to use generate gtkdoc." PUBL
 WEBKIT_OPTION_DEFINE(ENABLE_INTROSPECTION "Whether to enable GObject introspection." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_OPENGL "Whether to use OpenGL." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_PLUGIN_PROCESS_GTK2 "Whether to build WebKitPluginProcess2 to load GTK2 based plugins." PUBLIC ON)
+WEBKIT_OPTION_DEFINE(ENABLE_QUARTZ_TARGET "Whether to enable support for the Quartz windowing target." PUBLIC ${GTK3_SUPPORTS_QUARTZ})
 WEBKIT_OPTION_DEFINE(ENABLE_X11_TARGET "Whether to enable support for the X11 windowing target." PUBLIC ${GTK3_SUPPORTS_X11})
 WEBKIT_OPTION_DEFINE(ENABLE_WAYLAND_TARGET "Whether to enable support for the Wayland windowing target." PUBLIC ${GTK3_SUPPORTS_WAYLAND})
 WEBKIT_OPTION_DEFINE(USE_LIBNOTIFY "Whether to enable the default web notification implementation." PUBLIC ON)
@@ -186,6 +187,7 @@ WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_THREADED_COMPOSITOR PRIVATE OFF)
 # this point, and do not attempt to change any option after this point.
 WEBKIT_OPTION_END()
 
+SET_AND_EXPOSE_TO_BUILD(WTF_PLATFORM_QUARTZ ${ENABLE_QUARTZ_TARGET})
 SET_AND_EXPOSE_TO_BUILD(WTF_PLATFORM_X11 ${ENABLE_X11_TARGET})
 SET_AND_EXPOSE_TO_BUILD(WTF_PLATFORM_WAYLAND ${ENABLE_WAYLAND_TARGET})
 
@@ -390,6 +392,12 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO)
     endif ()
 
     SET_AND_EXPOSE_TO_BUILD(USE_GSTREAMER TRUE)
+endif ()
+
+if (ENABLE_QUARTZ_TARGET)
+    if (NOT GTK3_SUPPORTS_QUARTZ)
+        message(FATAL_ERROR "Recompile GTK+ with Quartz backend to use ENABLE_QUARTZ_TARGET")
+    endif ()
 endif ()
 
 if (ENABLE_X11_TARGET)

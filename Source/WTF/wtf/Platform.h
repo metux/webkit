@@ -615,7 +615,7 @@
 #endif
 #endif
 
-#if OS(DARWIN) || OS(FREEBSD) || OS(NETBSD)
+#if (OS(DARWIN) || OS(FREEBSD) || OS(NETBSD)) && !defined(__GLIBC__)
 #define HAVE_STAT_BIRTHTIME 1
 #endif
 
@@ -634,8 +634,10 @@
 #define HAVE_PTHREAD_SETNAME_NP 1
 #define HAVE_READLINE 1
 #define HAVE_SYS_TIMEB_H 1
-#define USE_ACCELERATE 1
 
+#if !PLATFORM(GTK)
+#define USE_ACCELERATE 1
+#endif
 #if !PLATFORM(IOS)
 #define HAVE_HOSTED_CORE_ANIMATION 1
 #endif
