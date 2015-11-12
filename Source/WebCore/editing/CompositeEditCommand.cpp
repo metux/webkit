@@ -352,7 +352,9 @@ void CompositeEditCommand::insertNodeAfter(PassRefPtr<Node> insertChild, PassRef
     ASSERT(insertChild);
     ASSERT(refChild);
     ContainerNode* parent = refChild->parentNode();
-    ASSERT(parent);
+    if (!parent)
+        return;
+
     ASSERT(!parent->isShadowRoot());
     if (parent->lastChild() == refChild)
         appendNode(insertChild, parent);
@@ -1120,7 +1122,7 @@ void CompositeEditCommand::cloneParagraphUnderNewElement(const Position& start, 
 void CompositeEditCommand::cleanupAfterDeletion(VisiblePosition destination)
 {
     VisiblePosition caretAfterDelete = endingSelection().visibleStart();
-    if (caretAfterDelete != destination && isStartOfParagraph(caretAfterDelete) && isEndOfParagraph(caretAfterDelete)) {
+    if (!caretAfterDelete.equals(destination) && isStartOfParagraph(caretAfterDelete) && isEndOfParagraph(caretAfterDelete)) {
         // Note: We want the rightmost candidate.
         Position position = caretAfterDelete.deepEquivalent().downstream();
         Node* node = position.deprecatedNode();
@@ -1161,6 +1163,9 @@ void CompositeEditCommand::cleanupAfterDeletion(VisiblePosition destination)
 
 void CompositeEditCommand::moveParagraphWithClones(const VisiblePosition& startOfParagraphToMove, const VisiblePosition& endOfParagraphToMove, Element* blockElement, Node* outerNode)
 {
+    if (startOfParagraphToMove.isNull() || endOfParagraphToMove.isNull())
+        return;
+    
     ASSERT(outerNode);
     ASSERT(blockElement);
 
