@@ -1,0 +1,53 @@
+From: Alberto Garcia <berto@igalia.com>
+Subject: Make sure that commitSize is at least as big as the page size
+Origin: https://trac.webkit.org/changeset/193648
+Bug: https://bugs.webkit.org/show_bug.cgi?id=130237
+diff --git a/Source/JavaScriptCore/interpreter/JSStack.cpp b/Source/JavaScriptCore/interpreter/JSStack.cpp
+index 83f4a70..d421abf 100644
+--- a/Source/JavaScriptCore/interpreter/JSStack.cpp
++++ b/Source/JavaScriptCore/interpreter/JSStack.cpp
+@@ -40,6 +40,14 @@ namespace JSC {
+ #if !ENABLE(JIT)
+ static size_t committedBytesCount = 0;
+ 
++static size_t commitSize()
++{
++    static size_t size = 0;
++    if (!size)
++        size = std::max(16 * 1024, getpagesize());
++    return size;
++}
++
+ static StaticLock stackStatisticsMutex;
+ #endif // !ENABLE(JIT)
+ 
+@@ -55,7 +63,7 @@ JSStack::JSStack(VM& vm)
+     size_t capacity = Options::maxPerThreadStackUsage();
+     ASSERT(capacity && isPageAligned(capacity));
+ 
+-    m_reservation = PageReservation::reserve(WTF::roundUpToMultipleOf(commitSize, capacity), OSAllocator::JSVMStackPages);
++    m_reservation = PageReservation::reserve(WTF::roundUpToMultipleOf(commitSize(), capacity), OSAllocator::JSVMStackPages);
+     setStackLimit(highAddress());
+     m_commitTop = highAddress();
+     
+@@ -89,7 +97,7 @@ bool JSStack::growSlowCase(Register* newTopOfStack)
+     // have it is still within our budget. If not, we'll fail to grow and
+     // return false.
+     ptrdiff_t delta = reinterpret_cast<char*>(m_commitTop) - reinterpret_cast<char*>(newTopOfStackWithReservedZone);
+-    delta = WTF::roundUpToMultipleOf(commitSize, delta);
++    delta = WTF::roundUpToMultipleOf(commitSize(), delta);
+     Register* newCommitTop = m_commitTop - (delta / sizeof(Register));
+     if (newCommitTop < reservationTop())
+         return false;
+diff --git a/Source/JavaScriptCore/interpreter/JSStack.h b/Source/JavaScriptCore/interpreter/JSStack.h
+index 821992e..770db09 100644
+--- a/Source/JavaScriptCore/interpreter/JSStack.h
++++ b/Source/JavaScriptCore/interpreter/JSStack.h
+@@ -67,7 +67,6 @@ namespace JSC {
+             FirstArgument,
+         };
+ 
+-        static const size_t commitSize = 16 * 1024;
+         // Allow 8k of excess registers before we start trying to reap the stack
+         static const ptrdiff_t maxExcessCapacity = 8 * 1024;
+ 
