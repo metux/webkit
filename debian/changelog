@@ -5,6 +5,9 @@ webkit2gtk (2.10.4+dfsg1-2) UNRELEASED; urgency=medium
   * debian/patches/fix-commitsize.patch:
     + Make sure that commitSize is at least as big as the page size.
       This fixes crashes in JSC in ppc64el.
+  * debian/rules:
+    + Don't pass -DENABLE_YARR_JIT=0, passing -DENABLE_JIT=OFF already
+      takes care of that.
 
  -- Alberto Garcia <berto@igalia.com>  Wed, 02 Dec 2015 10:58:10 +0200
 
