@@ -21,6 +21,7 @@ webkit2gtk (2.10.5-1) UNRELEASED; urgency=medium
   * debian/rules:
     + Don't pass -DENABLE_YARR_JIT=0, passing -DENABLE_JIT=OFF already
       takes care of that.
+    + Remove EXTRA_DH_ARGUMENTS, this is no longer being used.
   * debian/copyright:
     + Update copyright years.
     + Remove mentions to jquery (which is no longer included) and
