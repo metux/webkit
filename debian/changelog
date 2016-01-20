@@ -4,6 +4,8 @@ webkit2gtk (2.10.5-1) UNRELEASED; urgency=medium
     This release doesn't contain any non-DFSG files in the original
     tarball, so we can ship it as-is and remove the +dfsg suffix from the
     Debian version.
+    + debian/watch:
+      - Remove the 'dversionmangle' option.
   * debian/patches/fix-ftbfs-sparc64.patch:
     + Fix FTBFS on sparc64 (Closes: #806816).
   * debian/patches/fix-commitsize.patch:
