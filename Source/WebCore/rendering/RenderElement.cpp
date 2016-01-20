@@ -472,24 +472,31 @@ void RenderElement::setStyle(Ref<RenderStyle>&& style, StyleDifference minimalSt
     }
 }
 
+bool RenderElement::childRequiresTable(const RenderObject& child) const
+{
+    if (is<RenderTableCol>(child)) {
+        const RenderTableCol& newTableColumn = downcast<RenderTableCol>(child);
+        bool isColumnInColumnGroup = newTableColumn.isTableColumn() && is<RenderTableCol>(*this);
+        return !is<RenderTable>(*this) && !isColumnInColumnGroup;
+    }
+    if (is<RenderTableCaption>(child))
+        return !is<RenderTable>(*this);
+
+    if (is<RenderTableSection>(child))
+        return !is<RenderTable>(*this);
+
+    if (is<RenderTableRow>(child))
+        return !is<RenderTableSection>(*this);
+
+    if (is<RenderTableCell>(child))
+        return !is<RenderTableRow>(*this);
+
+    return false;
+}
+
 void RenderElement::addChild(RenderObject* newChild, RenderObject* beforeChild)
 {
-    bool needsTable = false;
-
-    if (is<RenderTableCol>(*newChild)) {
-        RenderTableCol& newTableColumn = downcast<RenderTableCol>(*newChild);
-        bool isColumnInColumnGroup = newTableColumn.isTableColumn() && is<RenderTableCol>(*this);
-        needsTable = !is<RenderTable>(*this) && !isColumnInColumnGroup;
-    } else if (is<RenderTableCaption>(*newChild))
-        needsTable = !is<RenderTable>(*this);
-    else if (is<RenderTableSection>(*newChild))
-        needsTable = !is<RenderTable>(*this);
-    else if (is<RenderTableRow>(*newChild))
-        needsTable = !is<RenderTableSection>(*this);
-    else if (is<RenderTableCell>(*newChild))
-        needsTable = !is<RenderTableRow>(*this);
-
-    if (needsTable) {
+    if (childRequiresTable(*newChild)) {
         RenderTable* table;
         RenderObject* afterChild = beforeChild ? beforeChild->previousSibling() : m_lastChild;
         if (afterChild && afterChild->isAnonymous() && is<RenderTable>(*afterChild) && !afterChild->isBeforeContent())
@@ -966,8 +973,13 @@ void RenderElement::styleDidChange(StyleDifference diff, const RenderStyle* oldS
     if (s_affectsParentBlock)
         handleDynamicFloatPositionChange();
 
-    if (s_noLongerAffectsParentBlock)
+    if (s_noLongerAffectsParentBlock) {
         removeAnonymousWrappersForInlinesIfNecessary();
+        // Fresh floats need to be reparented if they actually belong to the previous anonymous block.
+        // It copies the logic of RenderBlock::addChildIgnoringContinuation
+        if (style().isFloating() && previousSibling() && previousSibling()->isAnonymousBlock())
+            downcast<RenderBoxModelObject>(*parent()).moveChildTo(&downcast<RenderBoxModelObject>(*previousSibling()), this);
+    }
 
     SVGRenderSupport::styleChanged(*this, oldStyle);
 
@@ -1457,7 +1469,13 @@ bool RenderElement::repaintForPausedImageAnimationsIfNeeded(const IntRect& visib
     ASSERT(m_hasPausedImageAnimations);
     if (!shouldRepaintForImageAnimation(*this, visibleRect))
         return false;
+
     repaint();
+
+    // For directly-composited animated GIFs it does not suffice to call repaint() to resume animation. We need to mark the image as changed.
+    if (is<RenderBoxModelObject>(*this))
+        downcast<RenderBoxModelObject>(*this).contentChanged(ImageChanged);
+
     return true;
 }
 
@@ -1768,6 +1786,13 @@ const RenderElement* RenderElement::enclosingRendererWithTextDecoration(TextDeco
 
 void RenderElement::drawLineForBoxSide(GraphicsContext& graphicsContext, const FloatRect& rect, BoxSide side, Color color, EBorderStyle borderStyle, float adjacentWidth1, float adjacentWidth2, bool antialias) const
 {
+    auto drawBorderRect = [&graphicsContext] (const FloatRect& rect)
+    {
+        if (rect.isEmpty())
+            return;
+        graphicsContext.drawRect(rect);
+    };
+
     float x1 = rect.x();
     float x2 = rect.maxX();
     float y1 = rect.y();
@@ -1823,13 +1848,13 @@ void RenderElement::drawLineForBoxSide(GraphicsContext& graphicsContext, const F
             switch (side) {
             case BSTop:
             case BSBottom:
-                graphicsContext.drawRect(snapRectToDevicePixels(x1, y1, length, thirdOfThickness, deviceScaleFactor));
-                graphicsContext.drawRect(snapRectToDevicePixels(x1, y2 - thirdOfThickness, length, thirdOfThickness, deviceScaleFactor));
+                drawBorderRect(snapRectToDevicePixels(x1, y1, length, thirdOfThickness, deviceScaleFactor));
+                drawBorderRect(snapRectToDevicePixels(x1, y2 - thirdOfThickness, length, thirdOfThickness, deviceScaleFactor));
                 break;
             case BSLeft:
             case BSRight:
-                graphicsContext.drawRect(snapRectToDevicePixels(x1, y1, thirdOfThickness, length, deviceScaleFactor));
-                graphicsContext.drawRect(snapRectToDevicePixels(x2 - thirdOfThickness, y1, thirdOfThickness, length, deviceScaleFactor));
+                drawBorderRect(snapRectToDevicePixels(x1, y1, thirdOfThickness, length, deviceScaleFactor));
+                drawBorderRect(snapRectToDevicePixels(x2 - thirdOfThickness, y1, thirdOfThickness, length, deviceScaleFactor));
                 break;
             }
 
@@ -1969,7 +1994,7 @@ void RenderElement::drawLineForBoxSide(GraphicsContext& graphicsContext, const F
             graphicsContext.setFillColor(color, style.colorSpace());
             bool wasAntialiased = graphicsContext.shouldAntialias();
             graphicsContext.setShouldAntialias(antialias);
-            graphicsContext.drawRect(snapRectToDevicePixels(x1, y1, x2 - x1, y2 - y1, deviceScaleFactor));
+            drawBorderRect(snapRectToDevicePixels(x1, y1, x2 - x1, y2 - y1, deviceScaleFactor));
             graphicsContext.setShouldAntialias(wasAntialiased);
             graphicsContext.setStrokeStyle(oldStrokeStyle);
             return;
@@ -2054,11 +2079,10 @@ void RenderElement::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRe
     if (styleToUse.outlineStyleIsAuto() || styleToUse.outlineStyle() == BNONE)
         return;
 
-    IntRect inner = snappedIntRect(paintRect);
-    inner.inflate(outlineOffset);
-
-    IntRect outer = snappedIntRect(inner);
-    outer.inflate(outlineWidth);
+    FloatRect outer = paintRect;
+    outer.inflate(outlineOffset + outlineWidth);
+    FloatRect inner = outer;
+    inner.inflate(-outlineWidth);
 
     // FIXME: This prevents outlines from painting inside the object. See bug 12042
     if (outer.isEmpty())
@@ -2083,14 +2107,14 @@ void RenderElement::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRe
         outlineColor = Color(outlineColor.red(), outlineColor.green(), outlineColor.blue());
     }
 
-    int leftOuter = outer.x();
-    int leftInner = inner.x();
-    int rightOuter = outer.maxX();
-    int rightInner = inner.maxX();
-    int topOuter = outer.y();
-    int topInner = inner.y();
-    int bottomOuter = outer.maxY();
-    int bottomInner = inner.maxY();
+    float leftOuter = outer.x();
+    float leftInner = inner.x();
+    float rightOuter = outer.maxX();
+    float rightInner = std::min(inner.maxX(), rightOuter);
+    float topOuter = outer.y();
+    float topInner = inner.y();
+    float bottomOuter = outer.maxY();
+    float bottomInner = std::min(inner.maxY(), bottomOuter);
 
     drawLineForBoxSide(graphicsContext, FloatRect(FloatPoint(leftOuter, topOuter), FloatPoint(leftInner, bottomOuter)), BSLeft, outlineColor, outlineStyle, outlineWidth, outlineWidth);
     drawLineForBoxSide(graphicsContext, FloatRect(FloatPoint(leftOuter, topOuter), FloatPoint(rightOuter, topInner)), BSTop, outlineColor, outlineStyle, outlineWidth, outlineWidth);

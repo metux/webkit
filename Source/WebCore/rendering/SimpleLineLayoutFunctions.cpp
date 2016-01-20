@@ -82,10 +82,15 @@ void paintFlow(const RenderBlockFlow& flow, const Layout& layout, PaintInfo& pai
     float strokeOverflow = ceilf(flow.style().textStrokeWidth());
     float deviceScaleFactor = flow.document().deviceScaleFactor();
     for (const auto& run : resolver.rangeForRect(paintRect)) {
-        FloatRect rect = run.rect();
-        rect.inflate(strokeOverflow);
-        if (!rect.intersects(paintRect) || run.start() == run.end())
+        if (run.start() == run.end())
             continue;
+
+        FloatRect rect = run.rect();
+        FloatRect visualOverflowRect = rect;
+        visualOverflowRect.inflate(strokeOverflow);
+        if (paintRect.y() > visualOverflowRect.maxY() || paintRect.maxY() < visualOverflowRect.y())
+            continue;
+
         TextRun textRun(run.text());
         textRun.setTabSize(!style.collapseWhiteSpace(), style.tabSize());
         // x position indicates the line offset from the rootbox. It's always 0 in case of simple line layout.

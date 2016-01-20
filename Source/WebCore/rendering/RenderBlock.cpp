@@ -242,11 +242,14 @@ void RenderBlock::styleWillChange(StyleDifference diff, const RenderStyle& newSt
 
     setReplaced(newStyle.isDisplayInlineType());
 
+    if (oldStyle && oldStyle->hasTransformRelatedProperty() && !newStyle.hasTransformRelatedProperty())
+        removePositionedObjects(nullptr, NewContainingBlock);
+
     if (oldStyle && parent() && diff == StyleDifferenceLayout && oldStyle->position() != newStyle.position()) {
         if (newStyle.position() == StaticPosition)
             // Clear our positioned objects list. Our absolutely positioned descendants will be
             // inserted into our containing block's positioned objects list during layout.
-            removePositionedObjects(0, NewContainingBlock);
+            removePositionedObjects(nullptr, NewContainingBlock);
         else if (oldStyle->position() == StaticPosition) {
             // Remove our absolutely positioned descendants from their current containing block.
             // They will be inserted into our positioned objects list during layout.
@@ -2472,12 +2475,12 @@ bool RenderBlock::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
         // Hit test descendants first.
         LayoutSize scrolledOffset(localOffset - scrolledContentOffset());
 
+        if (hitTestAction == HitTestFloat && hitTestFloats(request, result, locationInContainer, toLayoutPoint(scrolledOffset)))
+            return true;
         if (hitTestContents(request, result, locationInContainer, toLayoutPoint(scrolledOffset), hitTestAction)) {
             updateHitTestResult(result, flipForWritingMode(locationInContainer.point() - localOffset));
             return true;
         }
-        if (hitTestAction == HitTestFloat && hitTestFloats(request, result, locationInContainer, toLayoutPoint(scrolledOffset)))
-            return true;
     }
 
     // Check if the point is outside radii.
@@ -2758,6 +2761,14 @@ void RenderBlock::computeBlockPreferredLogicalWidths(LayoutUnit& minLogicalWidth
         } else {
             childMinPreferredLogicalWidth = child->minPreferredLogicalWidth();
             childMaxPreferredLogicalWidth = child->maxPreferredLogicalWidth();
+
+            if (is<RenderBlock>(*child)) {
+                const Length& computedInlineSize = child->style().logicalWidth();
+                if (computedInlineSize.isMaxContent())
+                    childMinPreferredLogicalWidth = childMaxPreferredLogicalWidth;
+                else if (computedInlineSize.isMinContent())
+                    childMaxPreferredLogicalWidth = childMinPreferredLogicalWidth;
+            }
         }
 
         LayoutUnit w = childMinPreferredLogicalWidth + margin;

@@ -233,7 +233,7 @@ CachedResourceHandle<CachedCSSStyleSheet> CachedResourceLoader::requestUserCSSSt
     memoryCache.add(*userSheet);
     // FIXME: loadResource calls setOwningCachedResourceLoader() if the resource couldn't be added to cache. Does this function need to call it, too?
 
-    userSheet->load(*this, ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, SkipSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::SkipPolicyCheck));
+    userSheet->load(*this, ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, ClientRequestedCredentials, SkipSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::SkipPolicyCheck));
     
     return userSheet;
 }
@@ -541,7 +541,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
 
     logMemoryCacheResourceRequest(frame(), resource ? DiagnosticLoggingKeys::inMemoryCacheKey() : DiagnosticLoggingKeys::notInMemoryCacheKey());
 
-    const RevalidationPolicy policy = determineRevalidationPolicy(type, request.mutableResourceRequest(), request.forPreload(), resource.get(), request.defer());
+    const RevalidationPolicy policy = determineRevalidationPolicy(type, request, resource.get());
     switch (policy) {
     case Reload:
         memoryCache.remove(*resource);
@@ -680,13 +680,15 @@ static void logResourceRevalidationDecision(CachedResource::RevalidationDecision
     }
 }
 
-CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalidationPolicy(CachedResource::Type type, ResourceRequest& request, bool forPreload, CachedResource* existingResource, CachedResourceRequest::DeferOption defer) const
+CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalidationPolicy(CachedResource::Type type, CachedResourceRequest& cachedResourceRequest, CachedResource* existingResource) const
 {
+    auto& request = cachedResourceRequest.resourceRequest();
+
     if (!existingResource)
         return Load;
 
     // We already have a preload going for this URL.
-    if (forPreload && existingResource->isPreloaded())
+    if (cachedResourceRequest.forPreload() && existingResource->isPreloaded())
         return Use;
 
     // If the same URL has been loaded as a different type, we need to reload.
@@ -696,6 +698,9 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
         return Reload;
     }
 
+    if (existingResource->encoding() != TextEncoding(cachedResourceRequest.charset()))
+        return Reload;
+
     if (!existingResource->canReuse(request))
         return Reload;
 
@@ -704,7 +709,7 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
 
     // Do not load from cache if images are not enabled. The load for this image will be blocked
     // in CachedImage::load.
-    if (CachedResourceRequest::DeferredByClient == defer)
+    if (cachedResourceRequest.defer() == CachedResourceRequest::DeferredByClient)
         return Reload;
     
     // Don't reload resources while pasting.
@@ -1133,7 +1138,7 @@ void CachedResourceLoader::printPreloadStats()
 
 const ResourceLoaderOptions& CachedResourceLoader::defaultCachedResourceOptions()
 {
-    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, DoSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck);
+    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, ClientRequestedCredentials, DoSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck);
     return options;
 }
 

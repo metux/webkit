@@ -249,7 +249,7 @@ webkit_web_inspector_get_web_view (<em class="parameter"><code><a class="link" h
 This might be <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if the inspector hasn't been loaded yet,
 or it has been closed.</p>
 <div class="refsect3">
-<a name="id-1.2.31.9.2.5"></a><h4>Parameters</h4>
+<a name="webkit-web-inspector-get-web-view.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -264,7 +264,7 @@ or it has been closed.</p>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.31.9.2.6"></a><h4>Returns</h4>
+<a name="webkit-web-inspector-get-web-view.returns"></a><h4>Returns</h4>
 <p> the <span class="type">WebKitWebViewBase</span> used to display the inspector or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -280,7 +280,7 @@ nothing has been loaded yet in the inspected view, if the inspector
 has been closed or when inspected view was loaded from a HTML string
 instead of a URI.</p>
 <div class="refsect3">
-<a name="id-1.2.31.9.3.5"></a><h4>Parameters</h4>
+<a name="webkit-web-inspector-get-inspected-uri.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -295,7 +295,7 @@ instead of a URI.</p>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.31.9.3.6"></a><h4>Returns</h4>
+<a name="webkit-web-inspector-get-inspected-uri.returns"></a><h4>Returns</h4>
 <p> the URI that is currently being inspected or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a></p>
 </div>
 </div>
@@ -308,7 +308,7 @@ webkit_web_inspector_get_can_attach (<em class="parameter"><code><a class="link"
  can be attached to the same window that contains
 the inspected view.</p>
 <div class="refsect3">
-<a name="id-1.2.31.9.4.5"></a><h4>Parameters</h4>
+<a name="webkit-web-inspector-get-can-attach.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -323,7 +323,7 @@ the inspected view.</p>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.31.9.4.6"></a><h4>Returns</h4>
+<a name="webkit-web-inspector-get-can-attach.returns"></a><h4>Returns</h4>
 <p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if there is enough room for the inspector view inside the
 window that contains the inspected view, or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</p>
 </div>
@@ -338,7 +338,7 @@ webkit_web_inspector_is_attached (<em class="parameter"><code><a class="link" hr
  view is currently attached to the same window that contains
 the inspected view.</p>
 <div class="refsect3">
-<a name="id-1.2.31.9.5.5"></a><h4>Parameters</h4>
+<a name="webkit-web-inspector-is-attached.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -353,7 +353,7 @@ the inspected view.</p>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.31.9.5.6"></a><h4>Returns</h4>
+<a name="webkit-web-inspector-is-attached.returns"></a><h4>Returns</h4>
 <p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if <em class="parameter"><code>inspector</code></em>
 is currently attached or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise</p>
 </div>
@@ -367,7 +367,7 @@ webkit_web_inspector_attach (<em class="parameter"><code><a class="link" href="W
  to be attached. The signal <a class="link" href="WebKitWebInspector.html#WebKitWebInspector-attach" title="The “attach” signal"><span class="type">“attach”</span></a>
 will be emitted. If the inspector is already attached it does nothing.</p>
 <div class="refsect3">
-<a name="id-1.2.31.9.6.5"></a><h4>Parameters</h4>
+<a name="webkit-web-inspector-attach.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -391,7 +391,7 @@ webkit_web_inspector_detach (<em class="parameter"><code><a class="link" href="W
  to be detached. The signal <a class="link" href="WebKitWebInspector.html#WebKitWebInspector-detach" title="The “detach” signal"><span class="type">“detach”</span></a>
 will be emitted. If the inspector is already detached it does nothing.</p>
 <div class="refsect3">
-<a name="id-1.2.31.9.7.5"></a><h4>Parameters</h4>
+<a name="webkit-web-inspector-detach.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -414,7 +414,7 @@ webkit_web_inspector_show (<em class="parameter"><code><a class="link" href="Web
 <p>Request <em class="parameter"><code>inspector</code></em>
  to be shown.</p>
 <div class="refsect3">
-<a name="id-1.2.31.9.8.5"></a><h4>Parameters</h4>
+<a name="webkit-web-inspector-show.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -437,7 +437,7 @@ webkit_web_inspector_close (<em class="parameter"><code><a class="link" href="We
 <p>Request <em class="parameter"><code>inspector</code></em>
  to be closed.</p>
 <div class="refsect3">
-<a name="id-1.2.31.9.9.5"></a><h4>Parameters</h4>
+<a name="webkit-web-inspector-close.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -462,7 +462,7 @@ webkit_web_inspector_get_attached_height
 it's attached. If the inspector view is not attached this
 returns 0.</p>
 <div class="refsect3">
-<a name="id-1.2.31.9.10.5"></a><h4>Parameters</h4>
+<a name="webkit-web-inspector-get-attached-height.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -477,7 +477,7 @@ returns 0.</p>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.31.9.10.6"></a><h4>Returns</h4>
+<a name="webkit-web-inspector-get-attached-height.returns"></a><h4>Returns</h4>
 <p> the height of the inspector view when attached</p>
 </div>
 </div>
@@ -534,7 +534,7 @@ the inspector view to a browser tab).</p>
 <p>To prevent the inspector vew from being attached you can connect to this
 signal and simply return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>.</p>
 <div class="refsect3">
-<a name="id-1.2.31.12.2.6"></a><h4>Parameters</h4>
+<a name="WebKitWebInspector-attach.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -556,7 +556,7 @@ signal and simply return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.31.12.2.7"></a><h4>Returns</h4>
+<a name="WebKitWebInspector-attach.returns"></a><h4>Returns</h4>
 <p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
 <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</p>
 </div>
@@ -579,7 +579,7 @@ In both cases, if this signal is not handled, the default implementation
 calls <a href="../gtk2/GtkWindow.html#gtk-window-present"><code class="function">gtk_window_present()</code></a> on the current toplevel <a href="../gtk2/GtkWindow.html#GtkWindow-struct"><span class="type">GtkWindow</span></a> of the
 inspector view.</p>
 <div class="refsect3">
-<a name="id-1.2.31.12.3.6"></a><h4>Parameters</h4>
+<a name="WebKitWebInspector-bring-to-front.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -601,7 +601,7 @@ inspector view.</p>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.31.12.3.7"></a><h4>Returns</h4>
+<a name="WebKitWebInspector-bring-to-front.returns"></a><h4>Returns</h4>
 <p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
 <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</p>
 </div>
@@ -617,7 +617,7 @@ user_function (<a class="link" href="WebKitWebInspector.html" title="WebKitWebIn
 inspector window, you should connect to this signal and destroy your
 window.</p>
 <div class="refsect3">
-<a name="id-1.2.31.12.4.5"></a><h4>Parameters</h4>
+<a name="WebKitWebInspector-closed.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -655,7 +655,7 @@ the signal <a class="link" href="WebKitWebInspector.html#WebKitWebInspector-open
 <p>To prevent the inspector vew from being detached you can connect to this
 signal and simply return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>.</p>
 <div class="refsect3">
-<a name="id-1.2.31.12.5.6"></a><h4>Parameters</h4>
+<a name="WebKitWebInspector-detach.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -677,7 +677,7 @@ signal and simply return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.31.12.5.7"></a><h4>Returns</h4>
+<a name="WebKitWebInspector-detach.returns"></a><h4>Returns</h4>
 <p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
 <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</p>
 </div>
@@ -698,7 +698,7 @@ the inspector in a separate window after being detached.</p>
 <p>To prevent the inspector from being shown you can connect to this
 signal and simply return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a></p>
 <div class="refsect3">
-<a name="id-1.2.31.12.6.6"></a><h4>Parameters</h4>
+<a name="WebKitWebInspector-open-window.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -720,7 +720,7 @@ signal and simply return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.31.12.6.7"></a><h4>Returns</h4>
+<a name="WebKitWebInspector-open-window.returns"></a><h4>Returns</h4>
 <p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
 <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</p>
 </div>

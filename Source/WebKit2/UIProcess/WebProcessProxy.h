@@ -131,6 +131,7 @@ public:
 
     void enableSuddenTermination();
     void disableSuddenTermination();
+    bool isSuddenTerminationEnabled() { return !m_numberOfTimesSuddenTerminationWasDisabled; }
 
     void requestTermination();
 
@@ -154,6 +155,9 @@ public:
 #if ENABLE(NETWORK_PROCESS)
     void reinstateNetworkProcessAssertionState(NetworkProcessProxy&);
 #endif
+
+    void sendMainThreadPing();
+    void didReceiveMainThreadPing();
 
 private:
     explicit WebProcessProxy(WebProcessPool&);
