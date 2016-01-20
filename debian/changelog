@@ -15,9 +15,6 @@ webkit2gtk (2.10.5-1) UNRELEASED; urgency=medium
       - Remove.
   * debian/patches/fix-ftbfs-sparc64.patch:
     + Fix FTBFS on sparc64 (Closes: #806816).
-  * debian/patches/fix-commitsize.patch:
-    + Make sure that commitSize is at least as big as the page size.
-      This fixes crashes in JSC in ppc64el.
   * debian/rules:
     + Don't pass -DENABLE_YARR_JIT=0, passing -DENABLE_JIT=OFF already
       takes care of that.
