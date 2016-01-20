@@ -58,8 +58,6 @@ endif
 	dh $@ --parallel $(EXTRA_DH_ARGUMENTS)
 
 override_dh_auto_configure:
-	slimit -m debian/jquery-1.9.1.js > \
-	   Source/WebInspectorUI/Tools/PrettyPrinting/populate/jquery.min.js
 	CFLAGS="$(CFLAGS) $(CPPFLAGS)" \
 	CXXFLAGS="$(CFLAGS) $(CPPFLAGS)" \
 	LDFLAGS="$(LDFLAGS)" \
@@ -85,10 +83,6 @@ override_dh_makeshlibs:
 override_dh_shlibdeps:
 	dh_shlibdeps $(EXTRA_DH_ARGUMENTS)
 	dh_girepository $(EXTRA_DH_ARGUMENTS)
-
-override_dh_clean:
-	dh_clean $(EXTRA_DH_ARGUMENTS)
-	rm -f Source/WebInspectorUI/Tools/PrettyPrinting/populate/jquery.min.js
 
 override_dh_builddeb:
 	DEB_BUILD_OPTIONS="$(filter-out parallel=%,$(DEB_BUILD_OPTIONS))" \
