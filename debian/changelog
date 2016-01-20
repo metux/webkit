@@ -6,6 +6,8 @@ webkit2gtk (2.10.5-1) UNRELEASED; urgency=medium
     Debian version.
     + debian/watch:
       - Remove the 'dversionmangle' option.
+    + debian/rules:
+      - Remove the get-orig-source target.
   * debian/patches/fix-ftbfs-sparc64.patch:
     + Fix FTBFS on sparc64 (Closes: #806816).
   * debian/patches/fix-commitsize.patch:

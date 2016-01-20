@@ -95,19 +95,3 @@ override_dh_builddeb:
 		dh_builddeb $(EXTRA_DH_ARGUMENTS)
 
 override_dh_auto_test:
-
-VERSION := $(shell dpkg-parsechangelog | sed -ne 's/^Version: \(.*\)-.*/\1/p')
-UPSTREAM_VERSION := $(shell echo $(VERSION) | sed 's/+dfsg1//')
-
-get-orig-source:
-	dh_testdir
-	uscan --rename --download-current-version
-	mkdir "webkit2gtk-$(VERSION)"
-	tar -C "webkit2gtk-$(VERSION)" \
-		--strip-components=1 \
-		--exclude=Source/WebInspectorUI/Tools/PrettyPrinting/populate/jquery.min.js \
-		--exclude=Tools/WebKitTestRunner/gtk/fonts/FontWithNoValidEncoding.fon \
-		-xaf "../webkit2gtk_$(UPSTREAM_VERSION).orig.tar.xz"
-	fakeroot tar -caf "../webkit2gtk_$(VERSION).orig.tar.xz" \
-		"webkit2gtk-$(VERSION)"
-	rm -rf "webkit2gtk-$(VERSION)"
