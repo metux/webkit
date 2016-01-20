@@ -520,6 +520,11 @@ void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const Resource
             cancelMainResourceLoad(frameLoader()->cancelledError(newRequest));
             return;
         }
+        if (!portAllowed(newRequest.url())) {
+            FrameLoader::reportBlockedPortFailed(m_frame, newRequest.url().string());
+            cancelMainResourceLoad(frameLoader()->blockedError(newRequest));
+            return;
+        }
         timing().addRedirect(redirectResponse.url(), newRequest.url());
     }
 
@@ -660,6 +665,10 @@ void DocumentLoader::responseReceived(CachedResource* resource, const ResourceRe
     m_response = response;
 
     if (m_identifierForLoadWithoutResourceLoader) {
+        if (m_mainResource && m_mainResource->wasRedirected()) {
+            ASSERT(m_mainResource->status() == CachedResource::Status::Cached);
+            frameLoader()->client().dispatchDidReceiveServerRedirectForProvisionalLoad();
+        }
         addResponse(m_response);
         frameLoader()->notifier().dispatchDidReceiveResponse(this, m_identifierForLoadWithoutResourceLoader, m_response, 0);
     }
@@ -729,7 +738,12 @@ void DocumentLoader::continueAfterContentPolicy(PolicyAction policy)
         // When starting the request, we didn't know that it would result in download and not navigation. Now we know that main document URL didn't change.
         // Download may use this knowledge for purposes unrelated to cookies, notably for setting file quarantine data.
         frameLoader()->setOriginalURLForDownloadRequest(m_request);
-        frameLoader()->client().convertMainResourceLoadToDownload(this, m_request, m_response);
+
+        if (m_request.url().protocolIsData()) {
+            // We decode data URL internally, there is no resource load to convert.
+            frameLoader()->client().startDownload(m_request);
+        } else
+            frameLoader()->client().convertMainResourceLoadToDownload(this, m_request, m_response);
 
         // It might have gone missing
         if (mainResourceLoader())
@@ -1446,7 +1460,7 @@ void DocumentLoader::startLoadingMainResource()
     // If this is a reload the cache layer might have made the previous request conditional. DocumentLoader can't handle 304 responses itself.
     request.makeUnconditional();
 
-    static NeverDestroyed<ResourceLoaderOptions> mainResourceLoadOptions(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, SkipSecurityCheck, UseDefaultOriginRestrictionsForType, IncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck);
+    static NeverDestroyed<ResourceLoaderOptions> mainResourceLoadOptions(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, ClientRequestedCredentials, SkipSecurityCheck, UseDefaultOriginRestrictionsForType, IncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck);
     CachedResourceRequest cachedResourceRequest(request, mainResourceLoadOptions);
     cachedResourceRequest.setInitiator(*this);
     m_mainResource = m_cachedResourceLoader->requestMainResource(cachedResourceRequest);

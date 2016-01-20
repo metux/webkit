@@ -3283,6 +3283,11 @@ void Document::processReferrerPolicy(const String& policy)
 {
     ASSERT(!policy.isNull());
 
+    // Documents in a Content-Disposition: attachment sandbox should never send a Referer header,
+    // even if the document has a meta tag saying otherwise.
+    if (shouldEnforceContentDispositionAttachmentSandbox())
+        return;
+
     // Note that we're supporting both the standard and legacy keywords for referrer
     // policies, as defined by http://www.w3.org/TR/referrer-policy/#referrer-policy-delivery-meta
     if (equalIgnoringCase(policy, "no-referrer") || equalIgnoringCase(policy, "never"))
@@ -5358,8 +5363,7 @@ void Document::enqueueHashchangeEvent(const String& oldURL, const String& newURL
 
 void Document::enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject)
 {
-    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=36202 Popstate event needs to fire asynchronously
-    dispatchWindowEvent(PopStateEvent::create(stateObject, m_domWindow ? m_domWindow->history() : nullptr));
+    enqueueWindowEvent(PopStateEvent::create(stateObject, m_domWindow ? m_domWindow->history() : nullptr));
 }
 
 void Document::addMediaCanStartListener(MediaCanStartListener* listener)
@@ -6761,6 +6765,7 @@ void Document::applyContentDispositionAttachmentSandbox()
 {
     ASSERT(shouldEnforceContentDispositionAttachmentSandbox());
 
+    setReferrerPolicy(ReferrerPolicyNever);
     if (!isMediaDocument())
         enforceSandboxFlags(SandboxAll);
     else

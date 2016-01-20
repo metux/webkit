@@ -588,12 +588,12 @@
     <keyword type="enum" name="enum WebKitPrintError" link="webkit2gtk-4.0-WebKitError.html#WebKitPrintError"/>
     <keyword type="enum" name="enum WebKitJavascriptError" link="webkit2gtk-4.0-WebKitError.html#WebKitJavascriptError"/>
     <keyword type="enum" name="enum WebKitSnapshotError" link="webkit2gtk-4.0-WebKitError.html#WebKitSnapshotError"/>
-    <keyword type="macro" name="WEBKIT_FAVICON_DATABASE_ERROR" link="WebKitFaviconDatabase.html#WEBKIT-FAVICON-DATABASE-ERROR:CAPS"/>
     <keyword type="function" name="webkit_favicon_database_get_favicon ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon"/>
     <keyword type="function" name="webkit_favicon_database_get_favicon_finish ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-finish"/>
     <keyword type="function" name="webkit_favicon_database_get_favicon_uri ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-uri"/>
     <keyword type="function" name="webkit_favicon_database_clear ()" link="WebKitFaviconDatabase.html#webkit-favicon-database-clear"/>
     <keyword type="struct" name="struct WebKitFaviconDatabase" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase-struct"/>
+    <keyword type="macro" name="WEBKIT_FAVICON_DATABASE_ERROR" link="WebKitFaviconDatabase.html#WEBKIT-FAVICON-DATABASE-ERROR:CAPS"/>
     <keyword type="enum" name="enum WebKitFaviconDatabaseError" link="WebKitFaviconDatabase.html#WebKitFaviconDatabaseError"/>
     <keyword type="signal" name="The “favicon-changed” signal" link="WebKitFaviconDatabase.html#WebKitFaviconDatabase-favicon-changed"/>
     <keyword type="function" name="webkit_color_chooser_request_get_rgba ()" link="WebKitColorChooserRequest.html#webkit-color-chooser-request-get-rgba" since="2.8"/>
@@ -684,10 +684,10 @@
     <keyword type="function" name="webkit_get_major_version ()" link="webkit2gtk-4.0-WebKitVersion.html#webkit-get-major-version"/>
     <keyword type="function" name="webkit_get_minor_version ()" link="webkit2gtk-4.0-WebKitVersion.html#webkit-get-minor-version"/>
     <keyword type="function" name="webkit_get_micro_version ()" link="webkit2gtk-4.0-WebKitVersion.html#webkit-get-micro-version"/>
+    <keyword type="macro" name="WEBKIT_CHECK_VERSION()" link="webkit2gtk-4.0-WebKitVersion.html#WEBKIT-CHECK-VERSION:CAPS"/>
     <keyword type="macro" name="WEBKIT_MAJOR_VERSION" link="webkit2gtk-4.0-WebKitVersion.html#WEBKIT-MAJOR-VERSION:CAPS"/>
     <keyword type="macro" name="WEBKIT_MINOR_VERSION" link="webkit2gtk-4.0-WebKitVersion.html#WEBKIT-MINOR-VERSION:CAPS"/>
     <keyword type="macro" name="WEBKIT_MICRO_VERSION" link="webkit2gtk-4.0-WebKitVersion.html#WEBKIT-MICRO-VERSION:CAPS"/>
-    <keyword type="macro" name="WEBKIT_CHECK_VERSION()" link="webkit2gtk-4.0-WebKitVersion.html#WEBKIT-CHECK-VERSION:CAPS"/>
     <keyword type="function" name="webkit_context_menu_new ()" link="WebKitContextMenu.html#webkit-context-menu-new"/>
     <keyword type="function" name="webkit_context_menu_new_with_items ()" link="WebKitContextMenu.html#webkit-context-menu-new-with-items"/>
     <keyword type="function" name="webkit_context_menu_prepend ()" link="WebKitContextMenu.html#webkit-context-menu-prepend"/>

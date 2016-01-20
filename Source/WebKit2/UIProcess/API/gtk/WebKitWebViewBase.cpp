@@ -279,6 +279,7 @@ static void webkitWebViewBaseRealize(GtkWidget* widget)
 
 #if USE(REDIRECTED_XCOMPOSITE_WINDOW)
     if (PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::X11) {
+        ASSERT(!priv->redirectedWindow);
         priv->redirectedWindow = RedirectedXCompositeWindow::create(
             gtk_widget_get_parent_window(widget),
             [webView] {
@@ -287,8 +288,8 @@ static void webkitWebViewBaseRealize(GtkWidget* widget)
                     gtk_widget_queue_draw(GTK_WIDGET(webView));
             });
         if (priv->redirectedWindow) {
-            DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(priv->pageProxy->drawingArea());
-            drawingArea->setNativeSurfaceHandleForCompositing(priv->redirectedWindow->windowID());
+            if (DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(priv->pageProxy->drawingArea()))
+                drawingArea->setNativeSurfaceHandleForCompositing(priv->redirectedWindow->windowID());
         }
     }
 #endif
@@ -328,8 +329,8 @@ static void webkitWebViewBaseRealize(GtkWidget* widget)
     gdk_window_set_user_data(window, widget);
 
 #if USE(TEXTURE_MAPPER) && PLATFORM(X11) && !USE(REDIRECTED_XCOMPOSITE_WINDOW)
-    DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(priv->pageProxy->drawingArea());
-    drawingArea->setNativeSurfaceHandleForCompositing(GDK_WINDOW_XID(window));
+    if (DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(priv->pageProxy->drawingArea()))
+        drawingArea->setNativeSurfaceHandleForCompositing(GDK_WINDOW_XID(window));
 #endif
 
     gtk_style_context_set_background(gtk_widget_get_style_context(widget), window);
@@ -344,6 +345,13 @@ static void webkitWebViewBaseRealize(GtkWidget* widget)
 static void webkitWebViewBaseUnrealize(GtkWidget* widget)
 {
     WebKitWebViewBase* webView = WEBKIT_WEB_VIEW_BASE(widget);
+#if USE(TEXTURE_MAPPER) && PLATFORM(X11)
+    if (DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(webView->priv->pageProxy->drawingArea()))
+        drawingArea->destroyNativeSurfaceHandleForCompositing();
+#endif
+#if USE(REDIRECTED_XCOMPOSITE_WINDOW)
+    webView->priv->redirectedWindow = nullptr;
+#endif
     gtk_im_context_set_client_window(webView->priv->inputMethodFilter.context(), nullptr);
 
     GTK_WIDGET_CLASS(webkit_web_view_base_parent_class)->unrealize(widget);
@@ -772,11 +780,11 @@ static gboolean webkitWebViewBaseMotionNotifyEvent(GtkWidget* widget, GdkEventMo
     WebKitWebViewBasePrivate* priv = webViewBase->priv;
 
     if (priv->authenticationDialog)
-        return TRUE;
+        return GTK_WIDGET_CLASS(webkit_web_view_base_parent_class)->motion_notify_event(widget, event);
 
     priv->pageProxy->handleMouseEvent(NativeWebMouseEvent(reinterpret_cast<GdkEvent*>(event), 0 /* currentClickCount */));
 
-    return TRUE;
+    return FALSE;
 }
 
 #if ENABLE(TOUCH_EVENTS)
@@ -1154,11 +1162,15 @@ static void webkitWebViewBaseSendInhibitMessageToScreenSaver(WebKitWebViewBase* 
 
 static void screenSaverProxyCreatedCallback(GObject*, GAsyncResult* result, WebKitWebViewBase* webViewBase)
 {
-    WebKitWebViewBasePrivate* priv = webViewBase->priv;
-    priv->screenSaverProxy = adoptGRef(g_dbus_proxy_new_for_bus_finish(result, nullptr));
-    if (!priv->screenSaverProxy)
+    // WebKitWebViewBase cancels the proxy creation on dispose, which means this could be called
+    // after the web view has been destroyed and g_dbus_proxy_new_for_bus_finish will return nullptr.
+    // So, make sure we don't use the web view unless we have a valid proxy.
+    // See https://bugs.webkit.org/show_bug.cgi?id=151653.
+    GRefPtr<GDBusProxy> proxy = adoptGRef(g_dbus_proxy_new_for_bus_finish(result, nullptr));
+    if (!proxy)
         return;
 
+    webViewBase->priv->screenSaverProxy = proxy;
     webkitWebViewBaseSendInhibitMessageToScreenSaver(webViewBase);
 }
 
