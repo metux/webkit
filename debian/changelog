@@ -21,6 +21,13 @@ webkit2gtk (2.10.5-1) UNRELEASED; urgency=medium
     + Remove EXTRA_DH_ARGUMENTS, this is no longer being used.
   * debian/watch:
     + Only scan releases from the stable branches.
+  * Migrate to automatic -dbgsym packages:
+    + debian/control:
+      - Remove the entries for libjavascriptcoregtk-4.0-18-dbg and
+        libwebkit2gtk-4.0-37-dbg.
+      - Require debhelper >= 9.20151219.
+    + debian/rules:
+      - Replace --dbg-package with --ddeb-migration in dh_strip.
   * debian/copyright:
     + Update copyright years.
     + Remove mentions to jquery (which is no longer included) and
