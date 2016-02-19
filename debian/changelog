@@ -8,6 +8,8 @@ webkit2gtk (2.10.6-2) UNRELEASED; urgency=medium
   * debian/patches/fix-ftbfs-m68k.patch:
     + Enclose the changes to the compile assertions inside an #ifdef block
       so they only apply to m68k.
+  * debian/patches/fix-ftbfs-alpha.patch:
+    + Fix FTBFS in alpha (Closes: #815124).
 
  -- Alberto Garcia <berto@igalia.com>  Fri, 29 Jan 2016 09:09:48 +0200
 
