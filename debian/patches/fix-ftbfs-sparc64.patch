@@ -1,3 +1,6 @@
+From: David Matthew Mattli <dmm@mattli.us>
+Subject: Fix FTBFS in sparc64
+Bug-Debian: https://bugs.debian.org/806816
 Index: webkitgtk/Source/WTF/wtf/Platform.h
 ===================================================================
 --- webkitgtk.orig/Source/WTF/wtf/Platform.h

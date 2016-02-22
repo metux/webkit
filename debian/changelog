@@ -10,6 +10,8 @@ webkit2gtk (2.10.6-2) UNRELEASED; urgency=medium
       so they only apply to m68k.
   * debian/patches/fix-ftbfs-alpha.patch:
     + Fix FTBFS in alpha (Closes: #815124).
+  * debian/patches/fix-ftbfs-sparc64.patch:
+    + Add patch metadata.
 
  -- Alberto Garcia <berto@igalia.com>  Fri, 29 Jan 2016 09:09:48 +0200
 
