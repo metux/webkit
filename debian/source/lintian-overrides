@@ -1,18 +1,8 @@
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Controllers/FrameResourceManager.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Controllers/JavaScriptLogViewController.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Controllers/RuntimeManager.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/External/CodeMirror/clojure.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/External/CodeMirror/livescript.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/External/CodeMirror/sql.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/External/ESLint/eslint.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/External/Esprima/esprima.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Protocol/Legacy/6.0/InspectorBackendCommands.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Protocol/Legacy/7.0/InspectorBackendCommands.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Protocol/Legacy/8.0/InspectorBackendCommands.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Views/ActivateButtonNavigationItem.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Views/ContentBrowser.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Views/DebuggerSidebarPanel.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Views/LayoutTimelineDataGridNode.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Views/LogContentView.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Views/ReplayDashboardView.js
-webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Views/TabBrowser.js
+webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/External/CodeMirror/clojure.js line length is 536 characters (>512)
+webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/External/CodeMirror/sql.js line length is 3058 characters (>512)
+webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/External/ESLint/eslint.js line length is 804 characters (>512)
+webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/External/Esprima/esprima.js line length is 4238 characters (>512)
+webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Protocol/Legacy/6.0/InspectorBackendCommands.js line length is 858 characters (>512)
+webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Protocol/Legacy/7.0/InspectorBackendCommands.js line length is 550 characters (>512)
+webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Protocol/Legacy/8.0/InspectorBackendCommands.js line length is 565 characters (>512)
+webkit2gtk source: source-is-missing Source/WebInspectorUI/UserInterface/Views/ActivateButtonNavigationItem.js line length is 272 characters (>256)
