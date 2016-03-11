@@ -1,5 +1,6 @@
-webkit2gtk (2.10.6-2) UNRELEASED; urgency=medium
+webkit2gtk (2.10.8-1) UNRELEASED; urgency=medium
 
+  * New upstream release. This fixes CVE-2016-1726 (Closes: #802380).
   * debian/rules:
     + The list of architectures in which the debug packages are causing
       problems continues to grow, so let's try the opposite approach: we
