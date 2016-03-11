@@ -26,6 +26,7 @@ webkit2gtk (2.10.8-1) UNRELEASED; urgency=medium
       source-is-missing false positives.
   * debian/control:
     + Bump Standards-Version to 3.9.7; no changes needed.
+    + Use secure URIs for the Vcs-* fields.
 
  -- Alberto Garcia <berto@igalia.com>  Fri, 29 Jan 2016 09:09:48 +0200
 
