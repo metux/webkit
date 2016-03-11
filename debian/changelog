@@ -1,6 +1,13 @@
 webkit2gtk (2.10.8-1) UNRELEASED; urgency=medium
 
   * New upstream release. This fixes CVE-2016-1726 (Closes: #802380).
+  * Allow building the package with debhelper < 9.20151219. This won't
+    produce any debug packages (since they are automatically generated
+    now), but it can be useful for backports.
+    + debian/control:
+      - Revert build dependency on debhelper back to >= 9.
+    + debian/rules:
+      - Don't make dh_strip fail if it doesn't support --ddeb-migration.
   * debian/rules:
     + The list of architectures in which the debug packages are causing
       problems continues to grow, so let's try the opposite approach: we
