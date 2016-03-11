@@ -13,6 +13,7 @@ webkit2gtk (2.10.8-1) UNRELEASED; urgency=medium
       problems continues to grow, so let's try the opposite approach: we
       build by default using -g1 except in the cases where we know that
       -g works fine (amd64, ppc64, ppc64el).
+    + Enable all hardening flags.
   * debian/patches/fix-ftbfs-m68k.patch:
     + Enclose the changes to the compile assertions inside an #ifdef block
       so they only apply to m68k.
