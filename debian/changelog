@@ -1,8 +1,8 @@
-webkit2gtk (2.10.9-1) UNRELEASED; urgency=medium
+webkit2gtk (2.10.9-1) unstable; urgency=medium
 
   * New upstream release.
 
- -- Alberto Garcia <berto@igalia.com>  Thu, 17 Mar 2016 12:46:59 +0200
+ -- Alberto Garcia <berto@igalia.com>  Fri, 18 Mar 2016 12:35:25 +0200
 
 webkit2gtk (2.10.8-1) unstable; urgency=high
 
