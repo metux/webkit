@@ -81,7 +81,7 @@ static HashMap<const RenderObject*, ControlStates*>& controlStatesRendererMap()
     return map;
 }
 
-inline RenderElement::RenderElement(ContainerNode& elementOrDocument, Ref<RenderStyle>&& style, unsigned baseTypeFlags)
+inline RenderElement::RenderElement(ContainerNode& elementOrDocument, Ref<RenderStyle>&& style, BaseTypeFlags baseTypeFlags)
     : RenderObject(elementOrDocument)
     , m_baseTypeFlags(baseTypeFlags)
     , m_ancestorLineBoxDirty(false)
@@ -99,17 +99,17 @@ inline RenderElement::RenderElement(ContainerNode& elementOrDocument, Ref<Render
     , m_renderBlockFlowLineLayoutPath(RenderBlockFlow::UndeterminedPath)
     , m_firstChild(nullptr)
     , m_lastChild(nullptr)
-    , m_style(WTF::move(style))
+    , m_style(WTFMove(style))
 {
 }
 
-RenderElement::RenderElement(Element& element, Ref<RenderStyle>&& style, unsigned baseTypeFlags)
-    : RenderElement(static_cast<ContainerNode&>(element), WTF::move(style), baseTypeFlags)
+RenderElement::RenderElement(Element& element, Ref<RenderStyle>&& style, BaseTypeFlags baseTypeFlags)
+    : RenderElement(static_cast<ContainerNode&>(element), WTFMove(style), baseTypeFlags)
 {
 }
 
-RenderElement::RenderElement(Document& document, Ref<RenderStyle>&& style, unsigned baseTypeFlags)
-    : RenderElement(static_cast<ContainerNode&>(document), WTF::move(style), baseTypeFlags)
+RenderElement::RenderElement(Document& document, Ref<RenderStyle>&& style, BaseTypeFlags baseTypeFlags)
+    : RenderElement(static_cast<ContainerNode&>(document), WTFMove(style), baseTypeFlags)
 {
 }
 
@@ -141,6 +141,8 @@ RenderElement::~RenderElement()
     }
     if (m_hasPausedImageAnimations)
         view().removeRendererWithPausedImageAnimations(*this);
+    if (isRegisteredForVisibleInViewportCallback())
+        view().unregisterForVisibleInViewportCallback(*this);
 }
 
 RenderPtr<RenderElement> RenderElement::createFor(Element& element, Ref<RenderStyle>&& style)
@@ -151,50 +153,50 @@ RenderPtr<RenderElement> RenderElement::createFor(Element& element, Ref<RenderSt
     const ContentData* contentData = style.get().contentData();
     if (contentData && !contentData->next() && is<ImageContentData>(*contentData) && !element.isPseudoElement()) {
         auto& styleImage = downcast<ImageContentData>(*contentData).image();
-        auto image = createRenderer<RenderImage>(element, WTF::move(style), const_cast<StyleImage*>(&styleImage));
+        auto image = createRenderer<RenderImage>(element, WTFMove(style), const_cast<StyleImage*>(&styleImage));
         image->setIsGeneratedContent();
-        return WTF::move(image);
+        return WTFMove(image);
     }
 
     switch (style.get().display()) {
     case NONE:
         return nullptr;
     case INLINE:
-        return createRenderer<RenderInline>(element, WTF::move(style));
+        return createRenderer<RenderInline>(element, WTFMove(style));
     case BLOCK:
     case INLINE_BLOCK:
     case COMPACT:
-        return createRenderer<RenderBlockFlow>(element, WTF::move(style));
+        return createRenderer<RenderBlockFlow>(element, WTFMove(style));
     case LIST_ITEM:
-        return createRenderer<RenderListItem>(element, WTF::move(style));
+        return createRenderer<RenderListItem>(element, WTFMove(style));
     case TABLE:
     case INLINE_TABLE:
-        return createRenderer<RenderTable>(element, WTF::move(style));
+        return createRenderer<RenderTable>(element, WTFMove(style));
     case TABLE_ROW_GROUP:
     case TABLE_HEADER_GROUP:
     case TABLE_FOOTER_GROUP:
-        return createRenderer<RenderTableSection>(element, WTF::move(style));
+        return createRenderer<RenderTableSection>(element, WTFMove(style));
     case TABLE_ROW:
-        return createRenderer<RenderTableRow>(element, WTF::move(style));
+        return createRenderer<RenderTableRow>(element, WTFMove(style));
     case TABLE_COLUMN_GROUP:
     case TABLE_COLUMN:
-        return createRenderer<RenderTableCol>(element, WTF::move(style));
+        return createRenderer<RenderTableCol>(element, WTFMove(style));
     case TABLE_CELL:
-        return createRenderer<RenderTableCell>(element, WTF::move(style));
+        return createRenderer<RenderTableCell>(element, WTFMove(style));
     case TABLE_CAPTION:
-        return createRenderer<RenderTableCaption>(element, WTF::move(style));
+        return createRenderer<RenderTableCaption>(element, WTFMove(style));
     case BOX:
     case INLINE_BOX:
-        return createRenderer<RenderDeprecatedFlexibleBox>(element, WTF::move(style));
+        return createRenderer<RenderDeprecatedFlexibleBox>(element, WTFMove(style));
     case FLEX:
     case INLINE_FLEX:
     case WEBKIT_FLEX:
     case WEBKIT_INLINE_FLEX:
-        return createRenderer<RenderFlexibleBox>(element, WTF::move(style));
+        return createRenderer<RenderFlexibleBox>(element, WTFMove(style));
 #if ENABLE(CSS_GRID_LAYOUT)
     case GRID:
     case INLINE_GRID:
-        return createRenderer<RenderGrid>(element, WTF::move(style));
+        return createRenderer<RenderGrid>(element, WTFMove(style));
 #endif
     }
     ASSERT_NOT_REACHED();
@@ -232,7 +234,7 @@ static PassRefPtr<RenderStyle> firstLineStyleForCachedUncachedType(StyleCacheSta
 
 PassRefPtr<RenderStyle> RenderElement::uncachedFirstLineStyle(RenderStyle* style) const
 {
-    if (!document().styleSheetCollection().usesFirstLineRules())
+    if (!view().usesFirstLineRules())
         return nullptr;
 
     return firstLineStyleForCachedUncachedType(Uncached, *this, style);
@@ -240,13 +242,18 @@ PassRefPtr<RenderStyle> RenderElement::uncachedFirstLineStyle(RenderStyle* style
 
 RenderStyle* RenderElement::cachedFirstLineStyle() const
 {
-    ASSERT(document().styleSheetCollection().usesFirstLineRules());
+    ASSERT(view().usesFirstLineRules());
 
     RenderStyle& style = this->style();
     if (RefPtr<RenderStyle> firstLineStyle = firstLineStyleForCachedUncachedType(Cached, *this, &style))
         return firstLineStyle.get();
 
     return &style;
+}
+
+RenderStyle& RenderElement::firstLineStyle() const
+{
+    return view().usesFirstLineRules() ? *cachedFirstLineStyle() : style();
 }
 
 StyleDifference RenderElement::adjustStyleDifference(StyleDifference diff, unsigned contextSensitiveProperties) const
@@ -282,6 +289,11 @@ StyleDifference RenderElement::adjustStyleDifference(StyleDifference diff, unsig
             diff = std::max(diff, StyleDifferenceRecompositeLayer);
         else
             diff = std::max(diff, StyleDifferenceRepaint);
+    }
+    
+    if (contextSensitiveProperties & ContextSensitivePropertyWillChange) {
+        if (style().willChange() && style().willChange()->canTriggerCompositing())
+            diff = std::max(diff, StyleDifferenceRecompositeLayer);
     }
     
     if ((contextSensitiveProperties & ContextSensitivePropertyFilter) && hasLayer()) {
@@ -375,11 +387,6 @@ void RenderElement::initializeStyle()
     updateShapeImage(nullptr, m_style->shapeOutside());
 #endif
 
-    // We need to ensure that view->maximalOutlineSize() is valid for any repaints that happen
-    // during styleDidChange (it's used by clippedOverflowRectForRepaint()).
-    if (m_style->outlineWidth() > 0 && m_style->outlineSize() > maximalOutlineSize(PaintPhaseOutline))
-        view().setMaximalOutlineSize(std::max(theme().platformFocusRingMaxWidth(), static_cast<int>(m_style->outlineSize())));
-
     styleDidChange(StyleDifferenceNewStyle, nullptr);
 
     // We shouldn't have any text children that would need styleDidChange at this point.
@@ -417,7 +424,7 @@ void RenderElement::setStyle(Ref<RenderStyle>&& style, StyleDifference minimalSt
 
     styleWillChange(diff, style.get());
 
-    Ref<RenderStyle> oldStyle(m_style.replace(WTF::move(style)));
+    Ref<RenderStyle> oldStyle(m_style.replace(WTFMove(style)));
 
     updateFillImages(oldStyle.get().backgroundLayers(), m_style->backgroundLayers());
     updateFillImages(oldStyle.get().maskLayers(), m_style->maskLayers());
@@ -428,11 +435,6 @@ void RenderElement::setStyle(Ref<RenderStyle>&& style, StyleDifference minimalSt
 #if ENABLE(CSS_SHAPES)
     updateShapeImage(oldStyle.get().shapeOutside(), m_style->shapeOutside());
 #endif
-
-    // We need to ensure that view->maximalOutlineSize() is valid for any repaints that happen
-    // during styleDidChange (it's used by clippedOverflowRectForRepaint()).
-    if (m_style->outlineWidth() > 0 && m_style->outlineSize() > maximalOutlineSize(PaintPhaseOutline))
-        view().setMaximalOutlineSize(std::max(theme().platformFocusRingMaxWidth(), static_cast<int>(m_style->outlineSize())));
 
     bool doesNotNeedLayout = !parent();
 
@@ -597,6 +599,8 @@ void RenderElement::insertChildInternal(RenderObject* newChild, RenderObject* be
         cache->childrenChanged(this, newChild);
     if (is<RenderBlockFlow>(*this))
         downcast<RenderBlockFlow>(*this).invalidateLineLayoutPath();
+    if (hasOutlineAutoAncestor() || outlineStyleForRepaint().outlineStyleIsAuto())
+        newChild->setHasOutlineAutoAncestor();
 }
 
 void RenderElement::removeChildInternal(RenderObject& oldChild, NotifyChildrenType notifyChildren)
@@ -802,7 +806,7 @@ void RenderElement::propagateStyleToAnonymousChildren(StylePropagationType propa
         if (elementChild.isInFlowPositioned() && downcast<RenderBlock>(elementChild).isAnonymousBlockContinuation())
             newStyle.get().setPosition(elementChild.style().position());
 
-        elementChild.setStyle(WTF::move(newStyle));
+        elementChild.setStyle(WTFMove(newStyle));
     }
 }
 
@@ -886,7 +890,7 @@ void RenderElement::styleWillChange(StyleDifference diff, const RenderStyle& new
 
         bool newStyleSlowScroll = repaintFixedBackgroundsOnScroll && newStyleUsesFixedBackgrounds;
         bool oldStyleSlowScroll = oldStyle && repaintFixedBackgroundsOnScroll && oldStyleUsesFixedBackgrounds;
-        bool drawsRootBackground = isRoot() || (isBody() && !rendererHasBackground(document().documentElement()->renderer()));
+        bool drawsRootBackground = isDocumentElementRenderer() || (isBody() && !rendererHasBackground(document().documentElement()->renderer()));
         if (drawsRootBackground && repaintFixedBackgroundsOnScroll) {
             if (view().compositor().supportsFixedRootBackgroundCompositing()) {
                 if (newStyleSlowScroll && newStyle.hasEntirelyFixedBackground())
@@ -906,7 +910,7 @@ void RenderElement::styleWillChange(StyleDifference diff, const RenderStyle& new
         }
     }
 
-    if (isRoot() || isBody())
+    if (isDocumentElementRenderer() || isBody())
         view().frameView().updateExtendBackgroundIfNecessary();
 }
 
@@ -1014,6 +1018,12 @@ void RenderElement::styleDidChange(StyleDifference diff, const RenderStyle* oldS
     if (oldStyle && !areCursorsEqual(oldStyle, &style()))
         frame().eventHandler().scheduleCursorUpdate();
 #endif
+    bool hadOutlineAuto = oldStyle && oldStyle->outlineStyleIsAuto();
+    bool hasOutlineAuto = outlineStyleForRepaint().outlineStyleIsAuto();
+    if (hasOutlineAuto != hadOutlineAuto) {
+        updateOutlineAutoAncestor(hasOutlineAuto);
+        issueRepaintForOutlineAuto(hasOutlineAuto ? outlineStyleForRepaint().outlineSize() : oldStyle->outlineSize());
+    }
 }
 
 void RenderElement::insertedIntoTree()
@@ -1146,7 +1156,7 @@ void RenderElement::setNeedsSimplifiedNormalFlowLayout()
 
 RenderElement& RenderElement::rendererForRootBackground()
 {
-    ASSERT(isRoot());
+    ASSERT(isDocumentElementRenderer());
     if (!hasBackground() && is<HTMLHtmlElement>(element())) {
         // Locate the <body> element using the DOM. This is easier than trying
         // to crawl around a render tree with potential :before/:after content and
@@ -1292,8 +1302,7 @@ bool RenderElement::repaintAfterLayoutIfNeeded(const RenderLayerModelObject* rep
         // This ASSERT fails due to animations. See https://bugs.webkit.org/show_bug.cgi?id=37048
         // ASSERT(!newOutlineBoxRectPtr || *newOutlineBoxRectPtr == outlineBoundsForRepaint(repaintContainer));
         newOutlineBox = newOutlineBoxRectPtr ? *newOutlineBoxRectPtr : outlineBoundsForRepaint(repaintContainer);
-        if (newOutlineBox.location() != oldOutlineBox.location() || (mustRepaintBackgroundOrBorder(*this) && (newBounds != oldBounds || newOutlineBox != oldOutlineBox)))
-            fullRepaint = true;
+        fullRepaint = (newOutlineBox.location() != oldOutlineBox.location() || (mustRepaintBackgroundOrBorder(*this) && (newBounds != oldBounds || newOutlineBox != oldOutlineBox)));
     }
 
     if (!repaintContainer)
@@ -1417,10 +1426,6 @@ static bool shouldRepaintForImageAnimation(const RenderElement& renderer, const 
     const Document& document = renderer.document();
     if (document.inPageCache())
         return false;
-#if PLATFORM(IOS)
-    if (document.frame()->timersPaused())
-        return false;
-#endif
     if (document.activeDOMObjectsAreSuspended())
         return false;
     if (renderer.style().visibility() != VISIBLE)
@@ -1432,10 +1437,10 @@ static bool shouldRepaintForImageAnimation(const RenderElement& renderer, const 
     // FIXME: This is overly conservative as the image may not be a background-image, in which case it will not
     // be propagated to the root. At this point, we unfortunately don't have access to the image anymore so we
     // can no longer check if it is a background image.
-    bool backgroundIsPaintedByRoot = renderer.isRoot();
+    bool backgroundIsPaintedByRoot = renderer.isDocumentElementRenderer();
     if (renderer.isBody()) {
         auto& rootRenderer = *renderer.parent(); // If <body> has a renderer then <html> does too.
-        ASSERT(rootRenderer.isRoot());
+        ASSERT(rootRenderer.isDocumentElementRenderer());
         ASSERT(is<HTMLHtmlElement>(rootRenderer.element()));
         // FIXME: Should share body background propagation code.
         backgroundIsPaintedByRoot = !rootRenderer.hasBackground();
@@ -1446,6 +1451,35 @@ static bool shouldRepaintForImageAnimation(const RenderElement& renderer, const 
         return false;
 
     return true;
+}
+
+void RenderElement::registerForVisibleInViewportCallback()
+{
+    if (isRegisteredForVisibleInViewportCallback())
+        return;
+    setIsRegisteredForVisibleInViewportCallback(true);
+
+    view().registerForVisibleInViewportCallback(*this);
+}
+
+void RenderElement::unregisterForVisibleInViewportCallback()
+{
+    if (!isRegisteredForVisibleInViewportCallback())
+        return;
+    setIsRegisteredForVisibleInViewportCallback(false);
+
+    view().unregisterForVisibleInViewportCallback(*this);
+    m_visibleInViewportState = VisibilityUnknown;
+}
+
+void RenderElement::visibleInViewportStateChanged(VisibleInViewportState state)
+{
+    if (state == visibleInViewportState())
+        return;
+    setVisibleInViewportState(state);
+
+    if (element())
+        element()->isVisibleInViewportChanged();
 }
 
 void RenderElement::newImageAnimationFrameAvailable(CachedImage& image)
@@ -1539,13 +1573,15 @@ PassRefPtr<RenderStyle> RenderElement::getUncachedPseudoStyle(const PseudoStyleR
     if (isAnonymous())
         return nullptr;
 
+    auto& styleResolver = element()->styleResolver();
+
     if (pseudoStyleRequest.pseudoId == FIRST_LINE_INHERITED) {
-        RefPtr<RenderStyle> result = document().ensureStyleResolver().styleForElement(element(), parentStyle, DisallowStyleSharing);
+        RefPtr<RenderStyle> result = styleResolver.styleForElement(*element(), parentStyle);
         result->setStyleType(FIRST_LINE_INHERITED);
         return result.release();
     }
 
-    return document().ensureStyleResolver().pseudoStyleForElement(element(), pseudoStyleRequest, parentStyle);
+    return styleResolver.pseudoStyleForElement(*element(), pseudoStyleRequest, *parentStyle);
 }
 
 RenderBlock* RenderElement::containingBlockForFixedPosition() const
@@ -1616,7 +1652,7 @@ PassRefPtr<RenderStyle> RenderElement::selectionPseudoStyle() const
         return nullptr;
 
     if (ShadowRoot* root = element()->containingShadowRoot()) {
-        if (root->type() == ShadowRoot::UserAgentShadowRoot) {
+        if (root->type() == ShadowRoot::Type::UserAgent) {
             if (Element* shadowHost = element()->shadowHost())
                 return shadowHost->renderer()->getUncachedPseudoStyle(PseudoStyleRequest(SELECTION));
         }
@@ -1815,7 +1851,6 @@ void RenderElement::drawLineForBoxSide(GraphicsContext& graphicsContext, const F
     if (borderStyle == DOUBLE && (thickness * deviceScaleFactor) < 3)
         borderStyle = SOLID;
 
-    const RenderStyle& style = this->style();
     switch (borderStyle) {
     case BNONE:
     case BHIDDEN:
@@ -1825,7 +1860,7 @@ void RenderElement::drawLineForBoxSide(GraphicsContext& graphicsContext, const F
         bool wasAntialiased = graphicsContext.shouldAntialias();
         StrokeStyle oldStrokeStyle = graphicsContext.strokeStyle();
         graphicsContext.setShouldAntialias(antialias);
-        graphicsContext.setStrokeColor(color, style.colorSpace());
+        graphicsContext.setStrokeColor(color);
         graphicsContext.setStrokeThickness(thickness);
         graphicsContext.setStrokeStyle(borderStyle == DASHED ? DashedStroke : DottedStroke);
         graphicsContext.drawLine(roundPointToDevicePixels(LayoutPoint(x1, y1), deviceScaleFactor), roundPointToDevicePixels(LayoutPoint(x2, y2), deviceScaleFactor));
@@ -1840,7 +1875,7 @@ void RenderElement::drawLineForBoxSide(GraphicsContext& graphicsContext, const F
         if (!adjacentWidth1 && !adjacentWidth2) {
             StrokeStyle oldStrokeStyle = graphicsContext.strokeStyle();
             graphicsContext.setStrokeStyle(NoStroke);
-            graphicsContext.setFillColor(color, style.colorSpace());
+            graphicsContext.setFillColor(color);
 
             bool wasAntialiased = graphicsContext.shouldAntialias();
             graphicsContext.setShouldAntialias(antialias);
@@ -1988,10 +2023,8 @@ void RenderElement::drawLineForBoxSide(GraphicsContext& graphicsContext, const F
         ASSERT(x2 >= x1);
         ASSERT(y2 >= y1);
         if (!adjacentWidth1 && !adjacentWidth2) {
-            // Turn off antialiasing to match the behavior of drawConvexPolygon();
-            // this matters for rects in transformed contexts.
             graphicsContext.setStrokeStyle(NoStroke);
-            graphicsContext.setFillColor(color, style.colorSpace());
+            graphicsContext.setFillColor(color);
             bool wasAntialiased = graphicsContext.shouldAntialias();
             graphicsContext.setShouldAntialias(antialias);
             drawBorderRect(snapRectToDevicePixels(x1, y1, x2 - x1, y2 - y1, deviceScaleFactor));
@@ -2006,37 +2039,42 @@ void RenderElement::drawLineForBoxSide(GraphicsContext& graphicsContext, const F
         x2 = roundToDevicePixel(x2, deviceScaleFactor);
         y2 = roundToDevicePixel(y2, deviceScaleFactor);
 
-        FloatPoint quad[4];
+        Vector<FloatPoint> quad;
+        quad.reserveInitialCapacity(4);
         switch (side) {
         case BSTop:
-            quad[0] = FloatPoint(x1 + std::max<float>(-adjacentWidth1, 0), y1);
-            quad[1] = FloatPoint(x1 + std::max<float>(adjacentWidth1, 0), y2);
-            quad[2] = FloatPoint(x2 - std::max<float>(adjacentWidth2, 0), y2);
-            quad[3] = FloatPoint(x2 - std::max<float>(-adjacentWidth2, 0), y1);
+            quad.uncheckedAppend({ x1 + std::max<float>(-adjacentWidth1, 0), y1 });
+            quad.uncheckedAppend({ x1 + std::max<float>( adjacentWidth1, 0), y2 });
+            quad.uncheckedAppend({ x2 - std::max<float>( adjacentWidth2, 0), y2 });
+            quad.uncheckedAppend({ x2 - std::max<float>(-adjacentWidth2, 0), y1 });
             break;
         case BSBottom:
-            quad[0] = FloatPoint(x1 + std::max<float>(adjacentWidth1, 0), y1);
-            quad[1] = FloatPoint(x1 + std::max<float>(-adjacentWidth1, 0), y2);
-            quad[2] = FloatPoint(x2 - std::max<float>(-adjacentWidth2, 0), y2);
-            quad[3] = FloatPoint(x2 - std::max<float>(adjacentWidth2, 0), y1);
+            quad.uncheckedAppend({ x1 + std::max<float>( adjacentWidth1, 0), y1 });
+            quad.uncheckedAppend({ x1 + std::max<float>(-adjacentWidth1, 0), y2 });
+            quad.uncheckedAppend({ x2 - std::max<float>(-adjacentWidth2, 0), y2 });
+            quad.uncheckedAppend({ x2 - std::max<float>( adjacentWidth2, 0), y1 });
             break;
         case BSLeft:
-            quad[0] = FloatPoint(x1, y1 + std::max<float>(-adjacentWidth1, 0));
-            quad[1] = FloatPoint(x1, y2 - std::max<float>(-adjacentWidth2, 0));
-            quad[2] = FloatPoint(x2, y2 - std::max<float>(adjacentWidth2, 0));
-            quad[3] = FloatPoint(x2, y1 + std::max<float>(adjacentWidth1, 0));
+            quad.uncheckedAppend({ x1, y1 + std::max<float>(-adjacentWidth1, 0) });
+            quad.uncheckedAppend({ x1, y2 - std::max<float>(-adjacentWidth2, 0) });
+            quad.uncheckedAppend({ x2, y2 - std::max<float>( adjacentWidth2, 0) });
+            quad.uncheckedAppend({ x2, y1 + std::max<float>( adjacentWidth1, 0) });
             break;
         case BSRight:
-            quad[0] = FloatPoint(x1, y1 + std::max<float>(adjacentWidth1, 0));
-            quad[1] = FloatPoint(x1, y2 - std::max<float>(adjacentWidth2, 0));
-            quad[2] = FloatPoint(x2, y2 - std::max<float>(-adjacentWidth2, 0));
-            quad[3] = FloatPoint(x2, y1 + std::max<float>(-adjacentWidth1, 0));
+            quad.uncheckedAppend({ x1, y1 + std::max<float>( adjacentWidth1, 0) });
+            quad.uncheckedAppend({ x1, y2 - std::max<float>( adjacentWidth2, 0) });
+            quad.uncheckedAppend({ x2, y2 - std::max<float>(-adjacentWidth2, 0) });
+            quad.uncheckedAppend({ x2, y1 + std::max<float>(-adjacentWidth1, 0) });
             break;
         }
 
         graphicsContext.setStrokeStyle(NoStroke);
-        graphicsContext.setFillColor(color, style.colorSpace());
-        graphicsContext.drawConvexPolygon(4, quad, antialias);
+        graphicsContext.setFillColor(color);
+        bool wasAntialiased = graphicsContext.shouldAntialias();
+        graphicsContext.setShouldAntialias(antialias);
+        graphicsContext.fillPath(Path::polygonPathFromPoints(quad));
+        graphicsContext.setShouldAntialias(wasAntialiased);
+
         graphicsContext.setStrokeStyle(oldStrokeStyle);
         break;
     }
@@ -2047,27 +2085,34 @@ void RenderElement::paintFocusRing(PaintInfo& paintInfo, const LayoutPoint& pain
 {
     ASSERT(style.outlineStyleIsAuto());
 
-    Vector<IntRect> focusRingRects;
+    Vector<LayoutRect> focusRingRects;
     addFocusRingRects(focusRingRects, paintOffset, paintInfo.paintContainer);
+    Vector<FloatRect> pixelSnappedFocusRingRects;
+    float deviceScaleFactor = document().deviceScaleFactor();
+    for (const auto& rect : focusRingRects)
+        pixelSnappedFocusRingRects.append(snapRectToDevicePixels(rect, deviceScaleFactor));
 #if PLATFORM(MAC)
     bool needsRepaint;
-    paintInfo.context->drawFocusRing(focusRingRects, style.outlineWidth(), style.outlineOffset(), document().page()->focusController().timeSinceFocusWasSet(), needsRepaint);
+    paintInfo.context().drawFocusRing(pixelSnappedFocusRingRects, style.outlineOffset(), document().page()->focusController().timeSinceFocusWasSet(), needsRepaint);
     if (needsRepaint)
         document().page()->focusController().setFocusedElementNeedsRepaint();
 #else
-    paintInfo.context->drawFocusRing(focusRingRects, style.outlineWidth(), style.outlineOffset(), style.visitedDependentColor(CSSPropertyOutlineColor));
+    paintInfo.context().drawFocusRing(pixelSnappedFocusRingRects, style.outlineWidth(), style.outlineOffset(), style.visitedDependentColor(CSSPropertyOutlineColor));
 #endif
 }
 
 void RenderElement::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRect)
 {
+    GraphicsContext& graphicsContext = paintInfo.context();
+    if (graphicsContext.paintingDisabled())
+        return;
+
     if (!hasOutline())
         return;
 
     RenderStyle& styleToUse = style();
-    LayoutUnit outlineWidth = styleToUse.outlineWidth();
-
-    int outlineOffset = styleToUse.outlineOffset();
+    float outlineWidth = floorToDevicePixel(styleToUse.outlineWidth(), document().deviceScaleFactor());
+    float outlineOffset = floorToDevicePixel(styleToUse.outlineOffset(), document().deviceScaleFactor());
 
     // Only paint the focus ring by hand if the theme isn't able to draw it.
     if (styleToUse.outlineStyleIsAuto() && !theme().supportsFocusRing(styleToUse))
@@ -2091,7 +2136,6 @@ void RenderElement::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRe
     EBorderStyle outlineStyle = styleToUse.outlineStyle();
     Color outlineColor = styleToUse.visitedDependentColor(CSSPropertyOutlineColor);
 
-    GraphicsContext& graphicsContext = *paintInfo.context;
     bool useTransparencyLayer = outlineColor.hasAlpha();
     if (useTransparencyLayer) {
         if (outlineStyle == SOLID) {
@@ -2099,7 +2143,7 @@ void RenderElement::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRe
             path.addRect(outer);
             path.addRect(inner);
             graphicsContext.setFillRule(RULE_EVENODD);
-            graphicsContext.setFillColor(outlineColor, styleToUse.colorSpace());
+            graphicsContext.setFillColor(outlineColor);
             graphicsContext.fillPath(path);
             return;
         }
@@ -2123,6 +2167,35 @@ void RenderElement::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRe
 
     if (useTransparencyLayer)
         graphicsContext.endTransparencyLayer();
+}
+
+void RenderElement::issueRepaintForOutlineAuto(float outlineSize)
+{
+    LayoutRect repaintRect;
+    Vector<LayoutRect> focusRingRects;
+    addFocusRingRects(focusRingRects, LayoutPoint(), containerForRepaint());
+    for (auto rect : focusRingRects) {
+        rect.inflate(outlineSize);
+        repaintRect.unite(rect);
+    }
+    repaintRectangle(repaintRect);
+}
+
+void RenderElement::updateOutlineAutoAncestor(bool hasOutlineAuto) const
+{
+    for (auto* child = firstChild(); child; child = child->nextSibling()) {
+        if (hasOutlineAuto == child->hasOutlineAutoAncestor())
+            continue;
+        child->setHasOutlineAutoAncestor(hasOutlineAuto);
+        bool childHasOutlineAuto = child->outlineStyleForRepaint().outlineStyleIsAuto();
+        if (childHasOutlineAuto)
+            continue;
+        if (!is<RenderElement>(child))
+            continue;
+        downcast<RenderElement>(*child).updateOutlineAutoAncestor(hasOutlineAuto);
+    }
+    if (hasContinuation())
+        downcast<RenderBoxModelObject>(*this).continuation()->updateOutlineAutoAncestor(hasOutlineAuto);
 }
 
 }

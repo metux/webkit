@@ -7,7 +7,7 @@
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitDOMDocumentType.html" title="WebKitDOMDocumentType">
-<link rel="next" href="WebKitDOMEntityReference.html" title="WebKitDOMEntityReference">
+<link rel="next" href="WebKitDOMEvent.html" title="WebKitDOMEvent">
 <meta name="generator" content="GTK-Doc V1.24.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
@@ -23,7 +23,7 @@
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
 <td><a accesskey="p" href="WebKitDOMDocumentType.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
-<td><a accesskey="n" href="WebKitDOMEntityReference.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="WebKitDOMEvent.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="refentry">
 <a name="WebKitDOMElement"></a><div class="titlepage"></div>
@@ -92,10 +92,10 @@
 </tr>
 <tr>
 <td class="function_type">
-<a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
+<a class="link" href="WebKitDOMHTMLCollection.html" title="WebKitDOMHTMLCollection"><span class="returnvalue">WebKitDOMHTMLCollection</span></a> *
 </td>
 <td class="function_name">
-<a class="link" href="WebKitDOMElement.html#webkit-dom-element-get-elements-by-tag-name" title="webkit_dom_element_get_elements_by_tag_name ()">webkit_dom_element_get_elements_by_tag_name</a> <span class="c_punctuation">()</span>
+<a class="link" href="WebKitDOMElement.html#webkit-dom-element-get-elements-by-tag-name-as-html-collection" title="webkit_dom_element_get_elements_by_tag_name_as_html_collection ()">webkit_dom_element_get_elements_by_tag_name_as_html_collection</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
 <tr>
@@ -132,10 +132,10 @@
 </tr>
 <tr>
 <td class="function_type">
-<a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
+<a class="link" href="WebKitDOMHTMLCollection.html" title="WebKitDOMHTMLCollection"><span class="returnvalue">WebKitDOMHTMLCollection</span></a> *
 </td>
 <td class="function_name">
-<a class="link" href="WebKitDOMElement.html#webkit-dom-element-get-elements-by-tag-name-ns" title="webkit_dom_element_get_elements_by_tag_name_ns ()">webkit_dom_element_get_elements_by_tag_name_ns</a> <span class="c_punctuation">()</span>
+<a class="link" href="WebKitDOMElement.html#webkit-dom-element-get-elements-by-tag-name-ns-as-html-collection" title="webkit_dom_element_get_elements_by_tag_name_ns_as_html_collection ()">webkit_dom_element_get_elements_by_tag_name_ns_as_html_collection</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
 <tr>
@@ -220,10 +220,10 @@
 </tr>
 <tr>
 <td class="function_type">
-<a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
+<a class="link" href="WebKitDOMHTMLCollection.html" title="WebKitDOMHTMLCollection"><span class="returnvalue">WebKitDOMHTMLCollection</span></a> *
 </td>
 <td class="function_name">
-<a class="link" href="WebKitDOMElement.html#webkit-dom-element-get-elements-by-class-name" title="webkit_dom_element_get_elements_by_class_name ()">webkit_dom_element_get_elements_by_class_name</a> <span class="c_punctuation">()</span>
+<a class="link" href="WebKitDOMElement.html#webkit-dom-element-get-elements-by-class-name-as-html-collection" title="webkit_dom_element_get_elements_by_class_name_as_html_collection ()">webkit_dom_element_get_elements_by_class_name_as_html_collection</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
 <tr>
@@ -496,6 +496,30 @@
 </td>
 <td class="function_name">
 <a class="link" href="WebKitDOMElement.html#webkit-dom-element-get-child-element-count" title="webkit_dom_element_get_child_element_count ()">webkit_dom_element_get_child_element_count</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitDOMElement.html#webkit-dom-element-get-elements-by-tag-name" title="webkit_dom_element_get_elements_by_tag_name ()">webkit_dom_element_get_elements_by_tag_name</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitDOMElement.html#webkit-dom-element-get-elements-by-tag-name-ns" title="webkit_dom_element_get_elements_by_tag_name_ns ()">webkit_dom_element_get_elements_by_tag_name_ns</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitDOMElement.html#webkit-dom-element-get-elements-by-class-name" title="webkit_dom_element_get_elements_by_class_name ()">webkit_dom_element_get_elements_by_class_name</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
 </tbody>
@@ -920,13 +944,13 @@ webkit_dom_element_remove_attribute_node
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-dom-element-get-elements-by-tag-name"></a><h3>webkit_dom_element_get_elements_by_tag_name ()</h3>
-<pre class="programlisting"><a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
-webkit_dom_element_get_elements_by_tag_name
+<a name="webkit-dom-element-get-elements-by-tag-name-as-html-collection"></a><h3>webkit_dom_element_get_elements_by_tag_name_as_html_collection ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMHTMLCollection.html" title="WebKitDOMHTMLCollection"><span class="returnvalue">WebKitDOMHTMLCollection</span></a> *
+webkit_dom_element_get_elements_by_tag_name_as_html_collection
                                (<em class="parameter"><code><a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="type">WebKitDOMElement</span></a> *self</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *name</code></em>);</pre>
 <div class="refsect3">
-<a name="webkit-dom-element-get-elements-by-tag-name.parameters"></a><h4>Parameters</h4>
+<a name="webkit-dom-element-get-elements-by-tag-name-as-html-collection.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table class="informaltable" width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -948,10 +972,11 @@ webkit_dom_element_get_elements_by_tag_name
 </table></div>
 </div>
 <div class="refsect3">
-<a name="webkit-dom-element-get-elements-by-tag-name.returns"></a><h4>Returns</h4>
-<p> A <a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="type">WebKitDOMNodeList</span></a>. </p>
+<a name="webkit-dom-element-get-elements-by-tag-name-as-html-collection.returns"></a><h4>Returns</h4>
+<p> A <a class="link" href="WebKitDOMHTMLCollection.html" title="WebKitDOMHTMLCollection"><span class="type">WebKitDOMHTMLCollection</span></a>. </p>
 <p><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></p>
 </div>
+<p class="since">Since: 2.12</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -1102,14 +1127,14 @@ webkit_dom_element_remove_attribute_ns
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-dom-element-get-elements-by-tag-name-ns"></a><h3>webkit_dom_element_get_elements_by_tag_name_ns ()</h3>
-<pre class="programlisting"><a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
-webkit_dom_element_get_elements_by_tag_name_ns
+<a name="webkit-dom-element-get-elements-by-tag-name-ns-as-html-collection"></a><h3>webkit_dom_element_get_elements_by_tag_name_ns_as_html_collection ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMHTMLCollection.html" title="WebKitDOMHTMLCollection"><span class="returnvalue">WebKitDOMHTMLCollection</span></a> *
+webkit_dom_element_get_elements_by_tag_name_ns_as_html_collection
                                (<em class="parameter"><code><a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="type">WebKitDOMElement</span></a> *self</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *namespaceURI</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *localName</code></em>);</pre>
 <div class="refsect3">
-<a name="webkit-dom-element-get-elements-by-tag-name-ns.parameters"></a><h4>Parameters</h4>
+<a name="webkit-dom-element-get-elements-by-tag-name-ns-as-html-collection.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table class="informaltable" width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1136,10 +1161,11 @@ webkit_dom_element_get_elements_by_tag_name_ns
 </table></div>
 </div>
 <div class="refsect3">
-<a name="webkit-dom-element-get-elements-by-tag-name-ns.returns"></a><h4>Returns</h4>
-<p> A <a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="type">WebKitDOMNodeList</span></a>. </p>
+<a name="webkit-dom-element-get-elements-by-tag-name-ns-as-html-collection.returns"></a><h4>Returns</h4>
+<p> A <a class="link" href="WebKitDOMHTMLCollection.html" title="WebKitDOMHTMLCollection"><span class="type">WebKitDOMHTMLCollection</span></a>. </p>
 <p><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></p>
 </div>
+<p class="since">Since: 2.12</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -1456,13 +1482,13 @@ webkit_dom_element_scroll_by_pages (<em class="parameter"><code><a class="link" 
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-dom-element-get-elements-by-class-name"></a><h3>webkit_dom_element_get_elements_by_class_name ()</h3>
-<pre class="programlisting"><a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
-webkit_dom_element_get_elements_by_class_name
+<a name="webkit-dom-element-get-elements-by-class-name-as-html-collection"></a><h3>webkit_dom_element_get_elements_by_class_name_as_html_collection ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMHTMLCollection.html" title="WebKitDOMHTMLCollection"><span class="returnvalue">WebKitDOMHTMLCollection</span></a> *
+webkit_dom_element_get_elements_by_class_name_as_html_collection
                                (<em class="parameter"><code><a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="type">WebKitDOMElement</span></a> *self</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *name</code></em>);</pre>
 <div class="refsect3">
-<a name="webkit-dom-element-get-elements-by-class-name.parameters"></a><h4>Parameters</h4>
+<a name="webkit-dom-element-get-elements-by-class-name-as-html-collection.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table class="informaltable" width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1484,10 +1510,11 @@ webkit_dom_element_get_elements_by_class_name
 </table></div>
 </div>
 <div class="refsect3">
-<a name="webkit-dom-element-get-elements-by-class-name.returns"></a><h4>Returns</h4>
-<p> A <a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="type">WebKitDOMNodeList</span></a>. </p>
+<a name="webkit-dom-element-get-elements-by-class-name-as-html-collection.returns"></a><h4>Returns</h4>
+<p> A <a class="link" href="WebKitDOMHTMLCollection.html" title="WebKitDOMHTMLCollection"><span class="type">WebKitDOMHTMLCollection</span></a>. </p>
 <p><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></p>
 </div>
+<p class="since">Since: 2.12</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -2422,6 +2449,34 @@ webkit_dom_element_get_child_element_count
 <a name="webkit-dom-element-get-child-element-count.returns"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a></p>
 </div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-element-get-elements-by-tag-name"></a><h3>webkit_dom_element_get_elements_by_tag_name ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
+webkit_dom_element_get_elements_by_tag_name
+                               (<em class="parameter"><code><a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="type">WebKitDOMElement</span></a> *self</code></em>,
+                                <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *tag_name</code></em>);</pre>
+<div class="warning"><p><code class="literal">webkit_dom_element_get_elements_by_tag_name</code> is deprecated and should not be used in newly-written code.</p></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-element-get-elements-by-tag-name-ns"></a><h3>webkit_dom_element_get_elements_by_tag_name_ns ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
+webkit_dom_element_get_elements_by_tag_name_ns
+                               (<em class="parameter"><code><a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="type">WebKitDOMElement</span></a> *self</code></em>,
+                                <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *namespace_uri</code></em>,
+                                <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *tag_name</code></em>);</pre>
+<div class="warning"><p><code class="literal">webkit_dom_element_get_elements_by_tag_name_ns</code> is deprecated and should not be used in newly-written code.</p></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-element-get-elements-by-class-name"></a><h3>webkit_dom_element_get_elements_by_class_name ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
+webkit_dom_element_get_elements_by_class_name
+                               (<em class="parameter"><code><a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="type">WebKitDOMElement</span></a> *self</code></em>,
+                                <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *class_name</code></em>);</pre>
+<div class="warning"><p><code class="literal">webkit_dom_element_get_elements_by_class_name</code> is deprecated and should not be used in newly-written code.</p></div>
 </div>
 </div>
 <div class="refsect1">

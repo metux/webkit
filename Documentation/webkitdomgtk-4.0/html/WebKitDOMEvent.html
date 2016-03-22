@@ -6,7 +6,7 @@
 <meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
-<link rel="prev" href="WebKitDOMEntityReference.html" title="WebKitDOMEntityReference">
+<link rel="prev" href="WebKitDOMElement.html" title="WebKitDOMElement">
 <link rel="next" href="WebKitDOMKeyboardEvent.html" title="WebKitDOMKeyboardEvent">
 <meta name="generator" content="GTK-Doc V1.24.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
@@ -21,7 +21,7 @@
 </td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
-<td><a accesskey="p" href="WebKitDOMEntityReference.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="p" href="WebKitDOMElement.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
 <td><a accesskey="n" href="WebKitDOMKeyboardEvent.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="refentry">
@@ -202,6 +202,11 @@
 <tr>
 <td class="property_type"><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a></td>
 <td class="property_name"><a class="link" href="WebKitDOMEvent.html#WebKitDOMEvent--event-phase" title="The “event-phase” property">event-phase</a></td>
+<td class="property_flags">Read</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
+<td class="property_name"><a class="link" href="WebKitDOMEvent.html#WebKitDOMEvent--is-trusted" title="The “is-trusted” property">is-trusted</a></td>
 <td class="property_flags">Read</td>
 </tr>
 <tr>
@@ -911,6 +916,14 @@ webkit_dom_event_set_cancel_bubble (<em class="parameter"><code><a class="link" 
 <p>read-only gushort Event:event-phase.</p>
 <p>Flags: Read</p>
 <p>Default value: 0</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitDOMEvent--is-trusted"></a><h3>The <code class="literal">“is-trusted”</code> property</h3>
+<pre class="programlisting">  “is-trusted”               <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
+<p>read-only gboolean Event:is-trusted.</p>
+<p>Flags: Read</p>
+<p>Default value: FALSE</p>
 </div>
 <hr>
 <div class="refsect2">

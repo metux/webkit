@@ -79,7 +79,7 @@ void LineWidth::updateAvailableWidth(LayoutUnit replacedHeight)
 static bool newFloatShrinksLine(const FloatingObject& newFloat, const RenderBlockFlow& block, bool isFirstLine)
 {
     LayoutUnit blockOffset = block.logicalHeight();
-    if (blockOffset >= block.logicalTopForFloat(&newFloat) && blockOffset < block.logicalBottomForFloat(&newFloat))
+    if (blockOffset >= block.logicalTopForFloat(newFloat) && blockOffset < block.logicalBottomForFloat(newFloat))
         return true;
 
     // initial-letter float always shrinks the first line.
@@ -102,8 +102,8 @@ void LineWidth::shrinkAvailableWidthForNewFloatIfNeeded(const FloatingObject& ne
 #endif
 
     if (newFloat.type() == FloatingObject::FloatLeft) {
-        float newLeft = m_block.logicalRightForFloat(&newFloat);
-        if (shouldIndentText() && m_block.style().isLeftToRightDirection())
+        float newLeft = m_block.logicalRightForFloat(newFloat);
+        if (shouldIndentText() == IndentText && m_block.style().isLeftToRightDirection())
             newLeft += floorToInt(m_block.textIndentOffset());
 #if ENABLE(CSS_SHAPES)
         if (shapeDeltas.isValid()) {
@@ -115,8 +115,8 @@ void LineWidth::shrinkAvailableWidthForNewFloatIfNeeded(const FloatingObject& ne
 #endif
         m_left = std::max<float>(m_left, newLeft);
     } else {
-        float newRight = m_block.logicalLeftForFloat(&newFloat);
-        if (shouldIndentText() && !m_block.style().isLeftToRightDirection())
+        float newRight = m_block.logicalLeftForFloat(newFloat);
+        if (shouldIndentText() == IndentText && !m_block.style().isLeftToRightDirection())
             newRight -= floorToInt(m_block.textIndentOffset());
 #if ENABLE(CSS_SHAPES)
         if (shapeDeltas.isValid()) {
@@ -156,7 +156,8 @@ void LineWidth::applyOverhang(RenderRubyRun* rubyRun, RenderObject* startRendere
     m_overhangWidth += startOverhang + endOverhang;
 }
 
-inline static float availableWidthAtOffset(const RenderBlockFlow& block, const LayoutUnit& offset, bool shouldIndentText, float& newLineLeft, float& newLineRight, const LayoutUnit& lineHeight = 0)
+inline static float availableWidthAtOffset(const RenderBlockFlow& block, const LayoutUnit& offset, IndentTextOrNot shouldIndentText,
+    float& newLineLeft, float& newLineRight, const LayoutUnit& lineHeight = 0)
 {
     newLineLeft = block.logicalLeftOffsetForLine(offset, shouldIndentText, lineHeight);
     newLineRight = block.logicalRightOffsetForLine(offset, shouldIndentText, lineHeight);

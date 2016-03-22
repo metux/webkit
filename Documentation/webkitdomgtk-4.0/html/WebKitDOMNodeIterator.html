@@ -91,14 +91,6 @@
 </tr>
 <tr>
 <td class="function_type">
-<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
-</td>
-<td class="function_name">
-<a class="link" href="WebKitDOMNodeIterator.html#webkit-dom-node-iterator-get-expand-entity-references" title="webkit_dom_node_iterator_get_expand_entity_references ()">webkit_dom_node_iterator_get_expand_entity_references</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="function_type">
 <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
 </td>
 <td class="function_name">
@@ -113,6 +105,14 @@
 <a class="link" href="WebKitDOMNodeIterator.html#webkit-dom-node-iterator-get-pointer-before-reference-node" title="webkit_dom_node_iterator_get_pointer_before_reference_node ()">webkit_dom_node_iterator_get_pointer_before_reference_node</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
+<tr>
+<td class="function_type">
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitDOMNodeIterator.html#webkit-dom-node-iterator-get-expand-entity-references" title="webkit_dom_node_iterator_get_expand_entity_references ()">webkit_dom_node_iterator_get_expand_entity_references</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
 </tbody>
 </table></div>
 </div>
@@ -125,11 +125,6 @@
 <col width="200px" class="properties_flags">
 </colgroup>
 <tbody>
-<tr>
-<td class="property_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
-<td class="property_name"><a class="link" href="WebKitDOMNodeIterator.html#WebKitDOMNodeIterator--expand-entity-references" title="The “expand-entity-references” property">expand-entity-references</a></td>
-<td class="property_flags">Read</td>
-</tr>
 <tr>
 <td class="property_type">
 <a class="link" href="WebKitDOMNodeFilter.html" title="WebKitDOMNodeFilter"><span class="type">WebKitDOMNodeFilter</span></a> *</td>
@@ -355,32 +350,6 @@ webkit_dom_node_iterator_get_filter (<em class="parameter"><code><a class="link"
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-dom-node-iterator-get-expand-entity-references"></a><h3>webkit_dom_node_iterator_get_expand_entity_references ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
-webkit_dom_node_iterator_get_expand_entity_references
-                               (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>);</pre>
-<div class="refsect3">
-<a name="webkit-dom-node-iterator-get-expand-entity-references.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody><tr>
-<td class="parameter_name"><p>self</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr></tbody>
-</table></div>
-</div>
-<div class="refsect3">
-<a name="webkit-dom-node-iterator-get-expand-entity-references.returns"></a><h4>Returns</h4>
-<p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
-</div>
-</div>
-<hr>
-<div class="refsect2">
 <a name="webkit-dom-node-iterator-get-reference-node"></a><h3>webkit_dom_node_iterator_get_reference_node ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
 webkit_dom_node_iterator_get_reference_node
@@ -432,6 +401,14 @@ webkit_dom_node_iterator_get_pointer_before_reference_node
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 </div>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-node-iterator-get-expand-entity-references"></a><h3>webkit_dom_node_iterator_get_expand_entity_references ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
+webkit_dom_node_iterator_get_expand_entity_references
+                               (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>);</pre>
+<div class="warning"><p><code class="literal">webkit_dom_node_iterator_get_expand_entity_references</code> is deprecated and should not be used in newly-written code.</p></div>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitDOMNodeIterator.other_details"></a><h2>Types and Values</h2>
@@ -442,14 +419,6 @@ webkit_dom_node_iterator_get_pointer_before_reference_node
 </div>
 <div class="refsect1">
 <a name="WebKitDOMNodeIterator.property-details"></a><h2>Property Details</h2>
-<div class="refsect2">
-<a name="WebKitDOMNodeIterator--expand-entity-references"></a><h3>The <code class="literal">“expand-entity-references”</code> property</h3>
-<pre class="programlisting">  “expand-entity-references” <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
-<p>read-only gboolean NodeIterator:expand-entity-references.</p>
-<p>Flags: Read</p>
-<p>Default value: FALSE</p>
-</div>
-<hr>
 <div class="refsect2">
 <a name="WebKitDOMNodeIterator--filter"></a><h3>The <code class="literal">“filter”</code> property</h3>
 <pre class="programlisting">  “filter”                   <a class="link" href="WebKitDOMNodeFilter.html" title="WebKitDOMNodeFilter"><span class="type">WebKitDOMNodeFilter</span></a> *</pre>

@@ -110,6 +110,11 @@
 </colgroup>
 <tbody>
 <tr>
+<td class="signal_type"><span class="returnvalue">void</span></td>
+<td class="signal_name"><a class="link" href="WebKitWebPage.html#WebKitWebPage-console-message-sent" title="The “console-message-sent” signal">console-message-sent</a></td>
+<td class="signal_flags">Run Last</td>
+</tr>
+<tr>
 <td class="signal_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a></td>
 <td class="signal_name"><a class="link" href="WebKitWebPage.html#WebKitWebPage-context-menu" title="The “context-menu” signal">context-menu</a></td>
 <td class="signal_flags">Run Last</td>
@@ -315,6 +320,48 @@ webkit_web_page_get_editor (<em class="parameter"><code><a class="link" href="We
 </div>
 <div class="refsect1">
 <a name="WebKitWebPage.signal-details"></a><h2>Signal Details</h2>
+<div class="refsect2">
+<a name="WebKitWebPage-console-message-sent"></a><h3>The <code class="literal">“console-message-sent”</code> signal</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+user_function (<a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a>        *web_page,
+               <a class="link" href="WebKitConsoleMessage.html" title="WebKitConsoleMessage"><span class="type">WebKitConsoleMessage</span></a> *console_message,
+               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>              user_data)</pre>
+<p>Emmited when a message is sent to the console. This can be a message
+produced by the use of JavaScript console API, a javascript exception,
+a security error or other errors, warnings, debug or log messages.
+The <em class="parameter"><code>console_message</code></em>
+ contains information of the message.</p>
+<div class="refsect3">
+<a name="WebKitWebPage-console-message-sent.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>web_page</p></td>
+<td class="parameter_description"><p>the <a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a> on which the signal is emitted</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>console_message</p></td>
+<td class="parameter_description"><p>the <a class="link" href="WebKitConsoleMessage.html" title="WebKitConsoleMessage"><span class="type">WebKitConsoleMessage</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>user_data</p></td>
+<td class="parameter_description"><p>user data set when the signal handler was connected.</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<p>Flags: Run Last</p>
+<p class="since">Since: <a class="link" href="api-index-2-12.html#api-index-2.12">2.12</a></p>
+</div>
+<hr>
 <div class="refsect2">
 <a name="WebKitWebPage-context-menu"></a><h3>The <code class="literal">“context-menu”</code> signal</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>

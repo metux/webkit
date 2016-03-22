@@ -70,7 +70,14 @@ static void webkitUserMediaPermissionRequestAllow(WebKitPermissionRequest* reque
         return;
 
     priv->madeDecision = true;
-    priv->request->allow();
+
+    auto videoDeviceUIDs = priv->request->videoDeviceUIDs();
+    auto audioDeviceUIDs = priv->request->audioDeviceUIDs();
+
+    auto videoDevice = !videoDeviceUIDs.isEmpty() ? videoDeviceUIDs[0] : emptyString();
+    auto audioDevice = !audioDeviceUIDs.isEmpty() ? audioDeviceUIDs[0] : emptyString();
+    
+    priv->request->allow(audioDevice, videoDevice);
 }
 
 static void webkitUserMediaPermissionRequestDeny(WebKitPermissionRequest* request)

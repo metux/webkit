@@ -165,7 +165,7 @@ RefPtr<Image> CSSCrossfadeValue::image(RenderElement* renderer, const FloatSize&
     if (!fromImage || !toImage)
         return Image::nullImage();
 
-    m_generatedImage = CrossfadeGeneratedImage::create(fromImage, toImage, m_percentageValue->getFloatValue(), fixedSize(renderer), size);
+    m_generatedImage = CrossfadeGeneratedImage::create(*fromImage, *toImage, m_percentageValue->getFloatValue(), fixedSize(renderer), size);
 
     return m_generatedImage;
 }
@@ -200,7 +200,7 @@ RefPtr<CSSCrossfadeValue> CSSCrossfadeValue::blend(const CSSCrossfadeValue& from
     auto fromImageValue = CSSImageValue::create(m_cachedFromImage->url(), fromStyledImage.get());
     auto toImageValue = CSSImageValue::create(m_cachedToImage->url(), toStyledImage.get());
 
-    RefPtr<CSSCrossfadeValue> crossfadeValue = CSSCrossfadeValue::create(WTF::move(fromImageValue), WTF::move(toImageValue));
+    RefPtr<CSSCrossfadeValue> crossfadeValue = CSSCrossfadeValue::create(WTFMove(fromImageValue), WTFMove(toImageValue));
 
     double fromPercentage = from.m_percentageValue->getDoubleValue();
     if (from.m_percentageValue->isPercentage())

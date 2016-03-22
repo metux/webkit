@@ -13,7 +13,12 @@ set(bmalloc_SOURCES
     bmalloc/SegregatedFreeList.cpp
     bmalloc/StaticMutex.cpp
     bmalloc/VMHeap.cpp
+    bmalloc/XLargeMap.cpp
     bmalloc/mbmalloc.cpp
+)
+
+set(bmalloc_LIBRARIES
+    ${CMAKE_DL_LIBS}
 )
 
 WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()

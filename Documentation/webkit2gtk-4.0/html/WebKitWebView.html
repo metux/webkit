@@ -104,6 +104,14 @@
 <span class="returnvalue">void</span>
 </td>
 <td class="function_name">
+<a class="link" href="WebKitWebView.html#webkit-web-view-try-close" title="webkit_web_view_try_close ()">webkit_web_view_try_close</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
 <a class="link" href="WebKitWebView.html#webkit-web-view-load-uri" title="webkit_web_view_load_uri ()">webkit_web_view_load_uri</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
@@ -530,6 +538,22 @@
 </tr>
 <tr>
 <td class="function_type">
+<a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="returnvalue">WebKitWebViewSessionState</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebView.html#webkit-web-view-get-session-state" title="webkit_web_view_get_session_state ()">webkit_web_view_get_session_state</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebView.html#webkit-web-view-restore-session-state" title="webkit_web_view_restore_session_state ()">webkit_web_view_restore_session_state</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
 <a class="link" href="WebKitWebView.html#WebKitJavascriptResult"><span class="returnvalue">WebKitJavascriptResult</span></a> *
 </td>
 <td class="function_name">
@@ -604,6 +628,38 @@
 </td>
 <td class="function_name">
 <a class="link" href="WebKitWebView.html#webkit-web-view-get-main-resource" title="webkit_web_view_get_main_resource ()">webkit_web_view_get_main_resource</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="returnvalue">WebKitWebViewSessionState</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebView.html#webkit-web-view-session-state-new" title="webkit_web_view_session_state_new ()">webkit_web_view_session_state_new</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="returnvalue">WebKitWebViewSessionState</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebView.html#webkit-web-view-session-state-ref" title="webkit_web_view_session_state_ref ()">webkit_web_view_session_state_ref</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebView.html#webkit-web-view-session-state-unref" title="webkit_web_view_session_state_unref ()">webkit_web_view_session_state_unref</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a href="../glib/glib-Byte-Arrays.html#GBytes"><span class="returnvalue">GBytes</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebView.html#webkit-web-view-session-state-serialize" title="webkit_web_view_session_state_serialize ()">webkit_web_view_session_state_serialize</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
 </tbody>
@@ -820,7 +876,7 @@
 </tbody>
 </table></div>
 </div>
-<a name="WebKitJavascriptResult"></a><a name="WebKitScriptDialog"></a><div class="refsect1">
+<a name="WebKitJavascriptResult"></a><a name="WebKitScriptDialog"></a><a name="WebKitWebViewSessionState"></a><div class="refsect1">
 <a name="WebKitWebView.other"></a><h2>Types and Values</h2>
 <div class="informaltable"><table class="informaltable" width="100%" border="0">
 <colgroup>
@@ -900,6 +956,10 @@
 <td class="datatype_keyword">enum</td>
 <td class="function_name"><a class="link" href="WebKitWebView.html#WebKitScriptDialogType" title="enum WebKitScriptDialogType">WebKitScriptDialogType</a></td>
 </tr>
+<tr>
+<td class="datatype_keyword"> </td>
+<td class="function_name"><a class="link" href="WebKitWebView.html#WebKitWebViewSessionState-struct" title="WebKitWebViewSessionState">WebKitWebViewSessionState</a></td>
+</tr>
 </tbody>
 </table></div>
 </div>
@@ -907,7 +967,8 @@
 <a name="WebKitWebView.object-hierarchy"></a><h2>Object Hierarchy</h2>
 <pre class="screen">    <a href="/home/cgarcia/gnome/share/gtk-doc/html/gobject/gobject-Boxed-Types.html">GBoxed</a>
     <span class="lineart">├──</span> WebKitJavascriptResult
-    <span class="lineart">╰──</span> WebKitScriptDialog
+    <span class="lineart">├──</span> WebKitScriptDialog
+    <span class="lineart">╰──</span> WebKitWebViewSessionState
     <a href="../gobject/gobject-The-Base-Object-Type.html#GObject-struct">GObject</a>
     <span class="lineart">╰──</span> <a href="../gobject/gobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
         <span class="lineart">╰──</span> <a href="../gtk2/GtkWidget.html#GtkWidget-struct">GtkWidget</a>
@@ -1132,6 +1193,33 @@ view does not have an user content manager.</p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
 <p class="since">Since: <a class="link" href="api-index-2-6.html#api-index-2.6">2.6</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-try-close"></a><h3>webkit_web_view_try_close ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+webkit_web_view_try_close (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<p>Tries to close the <em class="parameter"><code>web_view</code></em>
+. This will fire the onbeforeunload event
+to ask the user for confirmation to close the page. If there isn't an
+onbeforeunload event handler or the user confirms to close the page,
+the <a class="link" href="WebKitWebView.html#WebKitWebView-close" title="The “close” signal"><span class="type">“close”</span></a> signal is emitted, otherwise nothing happens.</p>
+<div class="refsect3">
+<a name="webkit-web-view-try-close.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>web_view</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-12.html#api-index-2.12">2.12</a></p>
 </div>
 <hr>
 <div class="refsect2">
@@ -3066,13 +3154,13 @@ operation.</p>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
-<td class="parameter_name"><p>options</p></td>
-<td class="parameter_description"><p><a class="link" href="WebKitWebView.html#WebKitSnapshotOptions" title="enum WebKitSnapshotOptions"><span class="type">WebKitSnapshotOptions</span></a> for the snapshot</p></td>
+<td class="parameter_name"><p>region</p></td>
+<td class="parameter_description"><p>the <a class="link" href="WebKitWebView.html#WebKitSnapshotRegion" title="enum WebKitSnapshotRegion"><span class="type">WebKitSnapshotRegion</span></a> for this snapshot</p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
-<td class="parameter_name"><p>region</p></td>
-<td class="parameter_description"><p>the <a class="link" href="WebKitWebView.html#WebKitSnapshotRegion" title="enum WebKitSnapshotRegion"><span class="type">WebKitSnapshotRegion</span></a> for this snapshot</p></td>
+<td class="parameter_name"><p>options</p></td>
+<td class="parameter_description"><p><a class="link" href="WebKitWebView.html#WebKitSnapshotOptions" title="enum WebKitSnapshotOptions"><span class="type">WebKitSnapshotOptions</span></a> for the snapshot</p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -3336,6 +3424,68 @@ webkit_web_view_get_editor_state (<em class="parameter"><code><a class="link" hr
 </div>
 <hr>
 <div class="refsect2">
+<a name="webkit-web-view-get-session-state"></a><h3>webkit_web_view_get_session_state ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="returnvalue">WebKitWebViewSessionState</span></a> *
+webkit_web_view_get_session_state (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<p>Gets the current session state of <em class="parameter"><code>web_view</code></em>
+</p>
+<div class="refsect3">
+<a name="webkit-web-view-get-session-state.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>web_view</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3">
+<a name="webkit-web-view-get-session-state.returns"></a><h4>Returns</h4>
+<p> a <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a>. </p>
+<p><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></p>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-12.html#api-index-2.12">2.12</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-restore-session-state"></a><h3>webkit_web_view_restore_session_state ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+webkit_web_view_restore_session_state (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
+                                       <em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a> *state</code></em>);</pre>
+<p>Restore the <em class="parameter"><code>web_view</code></em>
+ session state from <em class="parameter"><code>state</code></em>
+</p>
+<div class="refsect3">
+<a name="webkit-web-view-restore-session-state.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>web_view</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>state</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-12.html#api-index-2.12">2.12</a></p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-javascript-result-ref"></a><h3>webkit_javascript_result_ref ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitWebView.html#WebKitJavascriptResult"><span class="returnvalue">WebKitJavascriptResult</span></a> *
 webkit_javascript_result_ref (<em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitJavascriptResult"><span class="type">WebKitJavascriptResult</span></a> *js_result</code></em>);</pre>
@@ -3505,12 +3655,12 @@ webkit_script_dialog_get_message (<em class="parameter"><code><a class="link" hr
 webkit_script_dialog_confirm_set_confirmed
                                (<em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitScriptDialog"><span class="type">WebKitScriptDialog</span></a> *dialog</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> confirmed</code></em>);</pre>
-<p>This method is used for <a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-CONFIRM:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_CONFIRM</code></a> dialogs when
+<p>This method is used for <a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-CONFIRM:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_CONFIRM</code></a> and <a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-BEFORE-UNLOAD-CONFIRM:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_BEFORE_UNLOAD_CONFIRM</code></a> dialogs when
 <a class="link" href="WebKitWebView.html#WebKitWebView-script-dialog" title="The “script-dialog” signal"><span class="type">“script-dialog”</span></a> signal is emitted to set whether the user
 confirmed the dialog or not. The default implementation of <a class="link" href="WebKitWebView.html#WebKitWebView-script-dialog" title="The “script-dialog” signal"><span class="type">“script-dialog”</span></a>
-signal sets <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> when the OK button is clicked and <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.
+signal sets <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> when the OK or Stay buttons are clicked and <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.
 It's an error to use this method with a <a class="link" href="WebKitWebView.html#WebKitScriptDialog"><span class="type">WebKitScriptDialog</span></a> that is not of type
-<a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-CONFIRM:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_CONFIRM</code></a>.</p>
+<a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-CONFIRM:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_CONFIRM</code></a> or <a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-BEFORE-UNLOAD-CONFIRM:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_BEFORE_UNLOAD_CONFIRM</code></a></p>
 <div class="refsect3">
 <a name="webkit-script-dialog-confirm-set-confirmed.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table class="informaltable" width="100%" border="0">
@@ -3627,6 +3777,121 @@ webkit_web_view_get_main_resource (<em class="parameter"><code><a class="link" h
 or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if nothing has been loaded. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-session-state-new"></a><h3>webkit_web_view_session_state_new ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="returnvalue">WebKitWebViewSessionState</span></a> *
+webkit_web_view_session_state_new (<em class="parameter"><code><a href="../glib/glib-Byte-Arrays.html#GBytes"><span class="type">GBytes</span></a> *data</code></em>);</pre>
+<p>Creates a new <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a> from serialized data.</p>
+<div class="refsect3">
+<a name="webkit-web-view-session-state-new.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>data</p></td>
+<td class="parameter_description"><p>a <a href="../glib/glib-Byte-Arrays.html#GBytes"><span class="type">GBytes</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3">
+<a name="webkit-web-view-session-state-new.returns"></a><h4>Returns</h4>
+<p> a new <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a>, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if <em class="parameter"><code>data</code></em>
+doesn't contain a
+valid serialized <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a>. </p>
+<p><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></p>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-12.html#api-index-2.12">2.12</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-session-state-ref"></a><h3>webkit_web_view_session_state_ref ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="returnvalue">WebKitWebViewSessionState</span></a> *
+webkit_web_view_session_state_ref (<em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a> *state</code></em>);</pre>
+<p>Atomically increments the reference count of <em class="parameter"><code>state</code></em>
+ by one. This
+function is MT-safe and may be called from any thread.</p>
+<div class="refsect3">
+<a name="webkit-web-view-session-state-ref.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>state</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3">
+<a name="webkit-web-view-session-state-ref.returns"></a><h4>Returns</h4>
+<p> The passed in <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a></p>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-12.html#api-index-2.12">2.12</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-session-state-unref"></a><h3>webkit_web_view_session_state_unref ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+webkit_web_view_session_state_unref (<em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a> *state</code></em>);</pre>
+<p>Atomically decrements the reference count of <em class="parameter"><code>state</code></em>
+ by one. If the
+reference count drops to 0, all memory allocated by the <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a> is
+released. This function is MT-safe and may be called from any thread.</p>
+<div class="refsect3">
+<a name="webkit-web-view-session-state-unref.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>state</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-12.html#api-index-2.12">2.12</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-session-state-serialize"></a><h3>webkit_web_view_session_state_serialize ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Byte-Arrays.html#GBytes"><span class="returnvalue">GBytes</span></a> *
+webkit_web_view_session_state_serialize
+                               (<em class="parameter"><code><a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a> *state</code></em>);</pre>
+<p>Serializes a <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a>.</p>
+<div class="refsect3">
+<a name="webkit-web-view-session-state-serialize.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>state</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitWebView.html#WebKitWebViewSessionState"><span class="type">WebKitWebViewSessionState</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3">
+<a name="webkit-web-view-session-state-serialize.returns"></a><h4>Returns</h4>
+<p> a <a href="../glib/glib-Byte-Arrays.html#GBytes"><span class="type">GBytes</span></a> containing the <em class="parameter"><code>state</code></em>
+serialized. </p>
+<p><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></p>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-12.html#api-index-2.12">2.12</a></p>
 </div>
 </div>
 <div class="refsect1">
@@ -4018,9 +4283,22 @@ information to the user.</p>
 </td>
 <td class="enum_member_annotations"> </td>
 </tr>
+<tr>
+<td class="enum_member_name"><p><a name="WEBKIT-SCRIPT-DIALOG-BEFORE-UNLOAD-CONFIRM:CAPS"></a>WEBKIT_SCRIPT_DIALOG_BEFORE_UNLOAD_CONFIRM</p></td>
+<td class="enum_member_description">
+<p>Before unload confirm dialog,
+used to ask confirmation to leave the current page to the user. Since 2.12</p>
+</td>
+<td class="enum_member_annotations"> </td>
+</tr>
 </tbody>
 </table></div>
 </div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebViewSessionState-struct"></a><h3>WebKitWebViewSessionState</h3>
+<pre class="programlisting">typedef struct _WebKitWebViewSessionState WebKitWebViewSessionState;</pre>
 </div>
 </div>
 <div class="refsect1">
@@ -4203,10 +4481,12 @@ dialog asynchronously for the user to interact with.</p>
 <div class="refsect2">
 <a name="WebKitWebView-close"></a><h3>The <code class="literal">“close”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
-user_function (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *webView,
+user_function (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
                <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)</pre>
 <p>Emitted when closing a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> is requested. This occurs when a
-call is made from JavaScript's <code class="function">window.close</code> function.
+call is made from JavaScript's <code class="function">window.close</code> function or
+after trying to close the <em class="parameter"><code>web_view</code></em>
+ with <a class="link" href="WebKitWebView.html#webkit-web-view-try-close" title="webkit_web_view_try_close ()"><code class="function">webkit_web_view_try_close()</code></a>.
 It is the owner's responsibility to handle this signal to hide or
 destroy the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>, if necessary.</p>
 <div class="refsect3">
@@ -4219,7 +4499,7 @@ destroy the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><spa
 </colgroup>
 <tbody>
 <tr>
-<td class="parameter_name"><p>webView</p></td>
+<td class="parameter_name"><p>web_view</p></td>
 <td class="parameter_description"><p>the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> on which the signal is emitted</p></td>
 <td class="parameter_annotations"> </td>
 </tr>
@@ -4768,7 +5048,7 @@ load operation.</p>
 user_function (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>  *web_view,
                <a class="link" href="WebKitWebView.html#WebKitLoadEvent" title="enum WebKitLoadEvent"><span class="type">WebKitLoadEvent</span></a> load_event,
                <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>          *failing_uri,
-               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        error,
+               <a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a>         *error,
                <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)</pre>
 <p>Emitted when an error occurs during a load operation.
 If the error happened when starting to load data for a page
@@ -5346,7 +5626,8 @@ user_function (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><
                <a class="link" href="WebKitWebView.html#WebKitScriptDialog"><span class="type">WebKitScriptDialog</span></a> *dialog,
                <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
 <p>Emitted when JavaScript code calls <code class="function">window.alert</code>,
-<code class="function">window.confirm</code> or <code class="function">window.prompt</code>.
+<code class="function">window.confirm</code> or <code class="function">window.prompt</code>,
+or when <code class="function">onbeforeunload</code> event is fired.
 The <em class="parameter"><code>dialog</code></em>
  parameter should be used to build the dialog.
 If the signal is not handled a different dialog will be built and shown depending
@@ -5361,6 +5642,9 @@ on the dialog type:</p>
 <li class="listitem"><p>
  <a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-PROMPT:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_PROMPT</code></a>: message dialog with OK and Cancel buttons and
  a text entry with the default text.
+</p></li>
+<li class="listitem"><p>
+ <a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-BEFORE-UNLOAD-CONFIRM:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_BEFORE_UNLOAD_CONFIRM</code></a>: message dialog with Stay and Leave buttons.
 </p></li>
 </ul></div>
 <div class="refsect3">
