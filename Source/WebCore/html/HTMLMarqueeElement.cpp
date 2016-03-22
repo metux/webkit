@@ -94,7 +94,7 @@ void HTMLMarqueeElement::collectStyleForPresentationAttribute(const QualifiedNam
             addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeSpeed, value);
     } else if (name == loopAttr) {
         if (!value.isEmpty()) {
-            if (value == "-1" || equalIgnoringCase(value, "infinite"))
+            if (value == "-1" || equalLettersIgnoringASCIICase(value, "infinite"))
                 addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitMarqueeRepetition, CSSValueInfinite);
             else
                 addHTMLLengthToStyle(style, CSSPropertyWebkitMarqueeRepetition, value);
@@ -166,7 +166,7 @@ void HTMLMarqueeElement::setLoop(int loop, ExceptionCode& ec)
         setIntegralAttribute(loopAttr, loop);
 }
 
-bool HTMLMarqueeElement::canSuspendForPageCache() const
+bool HTMLMarqueeElement::canSuspendForDocumentSuspension() const
 {
     return true;
 }

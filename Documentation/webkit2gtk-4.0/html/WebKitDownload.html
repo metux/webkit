@@ -708,7 +708,7 @@ directory using <em class="parameter"><code>suggested_filename</code></em>
 <a name="WebKitDownload-failed"></a><h3>The <code class="literal">“failed”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> *download,
-               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        error,
+               <a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a>         *error,
                <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)</pre>
 <p>This signal is emitted when an error occurs during the download
 operation. The given <em class="parameter"><code>error</code></em>

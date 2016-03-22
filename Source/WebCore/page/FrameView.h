@@ -105,8 +105,6 @@ public:
     virtual void setContentsSize(const IntSize&) override;
     virtual void updateContentsSize() override;
 
-    WEBCORE_EXPORT IntSize contentsSizeRespectingOverflow() const;
-
     void layout(bool allowSubtree = true);
     WEBCORE_EXPORT bool didFirstLayout() const;
     void layoutTimerFired();
@@ -237,13 +235,13 @@ public:
 #if USE(COORDINATED_GRAPHICS)
     virtual void setFixedVisibleContentRect(const IntRect&) override;
 #endif
-    WEBCORE_EXPORT virtual void setScrollPosition(const IntPoint&) override;
+    WEBCORE_EXPORT virtual void setScrollPosition(const ScrollPosition&) override;
     virtual void updateLayerPositionsAfterScrolling() override;
     virtual void updateCompositingLayersAfterScrolling() override;
-    virtual bool requestScrollPositionUpdate(const IntPoint&) override;
+    virtual bool requestScrollPositionUpdate(const ScrollPosition&) override;
     virtual bool isRubberBandInProgress() const override;
-    WEBCORE_EXPORT virtual IntPoint minimumScrollPosition() const override;
-    WEBCORE_EXPORT virtual IntPoint maximumScrollPosition() const override;
+    WEBCORE_EXPORT virtual ScrollPosition minimumScrollPosition() const override;
+    WEBCORE_EXPORT virtual ScrollPosition maximumScrollPosition() const override;
 
     void viewportContentsChanged();
     WEBCORE_EXPORT void resumeVisibleImageAnimationsIncludingSubframes();
@@ -278,13 +276,13 @@ public:
 
     // Functions for querying the current scrolled position, negating the effects of overhang
     // and adjusting for page scale.
-    LayoutSize scrollOffsetForFixedPosition() const
+    LayoutPoint scrollPositionForFixedPosition() const
     {
-        return scrollOffsetForFixedPosition(visibleContentRect(), totalContentsSize(), scrollPosition(), scrollOrigin(), frameScaleFactor(), fixedElementsLayoutRelativeToFrame(), scrollBehaviorForFixedElements(), headerHeight(), footerHeight());
+        return scrollPositionForFixedPosition(visibleContentRect(), totalContentsSize(), scrollPosition(), scrollOrigin(), frameScaleFactor(), fixedElementsLayoutRelativeToFrame(), scrollBehaviorForFixedElements(), headerHeight(), footerHeight());
     }
     
     // Static function can be called from another thread.
-    static LayoutSize scrollOffsetForFixedPosition(const LayoutRect& visibleContentRect, const LayoutSize& totalContentsSize, const LayoutPoint& scrollPosition, const LayoutPoint& scrollOrigin, float frameScaleFactor, bool fixedElementsLayoutRelativeToFrame, ScrollBehaviorForFixedElements, int headerHeight, int footerHeight);
+    static LayoutPoint scrollPositionForFixedPosition(const LayoutRect& visibleContentRect, const LayoutSize& totalContentsSize, const LayoutPoint& scrollPosition, const LayoutPoint& scrollOrigin, float frameScaleFactor, bool fixedElementsLayoutRelativeToFrame, ScrollBehaviorForFixedElements, int headerHeight, int footerHeight);
 
     // These layers are positioned differently when there is a topContentInset, a header, or a footer. These value need to be computed
     // on both the main thread and the scrolling thread.
@@ -323,7 +321,7 @@ public:
     void addEmbeddedObjectToUpdate(RenderEmbeddedObject&);
     void removeEmbeddedObjectToUpdate(RenderEmbeddedObject&);
 
-    WEBCORE_EXPORT virtual void paintContents(GraphicsContext*, const IntRect& dirtyRect) override;
+    WEBCORE_EXPORT virtual void paintContents(GraphicsContext&, const IntRect& dirtyRect) override;
 
     struct PaintingState {
         PaintBehavior paintBehavior;
@@ -337,8 +335,8 @@ public:
         }
     };
 
-    void willPaintContents(GraphicsContext*, const IntRect& dirtyRect, PaintingState&);
-    void didPaintContents(GraphicsContext*, const IntRect& dirtyRect, PaintingState&);
+    void willPaintContents(GraphicsContext&, const IntRect& dirtyRect, PaintingState&);
+    void didPaintContents(GraphicsContext&, const IntRect& dirtyRect, PaintingState&);
 
 #if PLATFORM(IOS)
     WEBCORE_EXPORT void didReplaceMultipartContent();
@@ -353,11 +351,11 @@ public:
 
     enum SelectionInSnapshot { IncludeSelection, ExcludeSelection };
     enum CoordinateSpaceForSnapshot { DocumentCoordinates, ViewCoordinates };
-    WEBCORE_EXPORT void paintContentsForSnapshot(GraphicsContext*, const IntRect& imageRect, SelectionInSnapshot shouldPaintSelection, CoordinateSpaceForSnapshot);
+    WEBCORE_EXPORT void paintContentsForSnapshot(GraphicsContext&, const IntRect& imageRect, SelectionInSnapshot shouldPaintSelection, CoordinateSpaceForSnapshot);
 
-    virtual void paintOverhangAreas(GraphicsContext*, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect) override;
-    virtual void paintScrollCorner(GraphicsContext*, const IntRect& cornerRect) override;
-    virtual void paintScrollbar(GraphicsContext*, Scrollbar*, const IntRect&) override;
+    virtual void paintOverhangAreas(GraphicsContext&, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect) override;
+    virtual void paintScrollCorner(GraphicsContext&, const IntRect& cornerRect) override;
+    virtual void paintScrollbar(GraphicsContext&, Scrollbar&, const IntRect&) override;
 
     WEBCORE_EXPORT Color documentBackgroundColor() const;
 
@@ -494,6 +492,9 @@ public:
     WEBCORE_EXPORT GraphicsLayer* setWantsLayerForBottomOverHangArea(bool) const;
 #endif
 
+    LayoutRect fixedScrollableAreaBoundsInflatedForScrolling(const LayoutRect& uninflatedBounds) const;
+    LayoutPoint scrollPositionRespectingCustomFixedPosition() const;
+
     virtual int headerHeight() const override { return m_headerHeight; }
     WEBCORE_EXPORT void setHeaderHeight(int);
     virtual int footerHeight() const override { return m_footerHeight; }
@@ -543,6 +544,7 @@ public:
 #if ENABLE(CSS_SCROLL_SNAP)
     void updateSnapOffsets() override;
     bool isScrollSnapInProgress() const override;
+    void updateScrollingCoordinatorScrollSnapProperties() const;
 #endif
 
     virtual float adjustScrollStepForFixedContent(float step, ScrollbarOrientation, ScrollGranularity) override;
@@ -592,7 +594,7 @@ private:
 
     virtual bool shouldDeferScrollUpdateAfterContentSizeChange() override;
 
-    virtual void scrollPositionChangedViaPlatformWidgetImpl(const IntPoint& oldPosition, const IntPoint& newPosition) override;
+    virtual void scrollOffsetChangedViaPlatformWidgetImpl(const ScrollOffset& oldOffset, const ScrollOffset& newOffset) override;
 
     void applyOverflowToViewport(const RenderElement&, ScrollbarMode& hMode, ScrollbarMode& vMode);
     void applyPaginationToViewport();
@@ -619,10 +621,10 @@ private:
 
     // ScrollableArea interface
     virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) override;
-    virtual void scrollTo(const IntSize&) override;
+    virtual void scrollTo(const ScrollPosition&) override;
     virtual void setVisibleScrollerThumbRect(const IntRect&) override;
     virtual ScrollableArea* enclosingScrollableArea() const override;
-    virtual IntRect scrollableAreaBoundingBox() const override;
+    virtual IntRect scrollableAreaBoundingBox(bool* = nullptr) const override;
     virtual bool scrollAnimatorEnabled() const override;
     virtual GraphicsLayer* layerForScrolling() const override;
     virtual GraphicsLayer* layerForHorizontalScrollbar() const override;
@@ -634,6 +636,8 @@ private:
 
     virtual bool usesCompositedScrolling() const override;
     virtual bool usesAsyncScrolling() const override;
+    bool usesMockScrollAnimator() const override;
+    void logMockScrollAnimatorMessage(const String&) const override;
 
     // Override scrollbar notifications to update the AXObject cache.
     virtual void didAddScrollbar(Scrollbar*, ScrollbarOrientation) override;
@@ -653,7 +657,7 @@ private:
     bool updateEmbeddedObjects();
     void updateEmbeddedObject(RenderEmbeddedObject&);
     void scrollToAnchor();
-    void scrollPositionChanged(const IntPoint& oldPosition, const IntPoint& newPosition);
+    void scrollPositionChanged(const ScrollPosition& oldPosition, const ScrollPosition& newPosition);
     void scrollableAreaSetChanged();
     void sendScrollEvent();
 

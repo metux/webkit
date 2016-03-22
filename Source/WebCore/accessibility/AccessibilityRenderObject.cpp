@@ -965,16 +965,10 @@ void AccessibilityRenderObject::addRadioButtonGroupMembers(AccessibilityChildren
                 linkedUIElements.append(object);        
         } 
     } else {
-        RefPtr<NodeList> list = node->document().getElementsByTagName(inputTag.localName());
-        unsigned length = list->length();
-        for (unsigned i = 0; i < length; ++i) {
-            Node* item = list->item(i);
-            if (is<HTMLInputElement>(*item)) {
-                HTMLInputElement& associateElement = downcast<HTMLInputElement>(*item);
-                if (associateElement.isRadioButton() && associateElement.name() == input.name()) {
-                    if (AccessibilityObject* object = axObjectCache()->getOrCreate(&associateElement))
-                        linkedUIElements.append(object);
-                }
+        for (auto& associateElement : descendantsOfType<HTMLInputElement>(node->document())) {
+            if (associateElement.isRadioButton() && associateElement.name() == input.name()) {
+                if (AccessibilityObject* object = axObjectCache()->getOrCreate(&associateElement))
+                    linkedUIElements.append(object);
             }
         }
     }
@@ -1058,7 +1052,7 @@ bool AccessibilityRenderObject::supportsARIADropping() const
 bool AccessibilityRenderObject::supportsARIADragging() const
 {
     const AtomicString& grabbed = getAttribute(aria_grabbedAttr);
-    return equalIgnoringCase(grabbed, "true") || equalIgnoringCase(grabbed, "false");   
+    return equalLettersIgnoringASCIICase(grabbed, "true") || equalLettersIgnoringASCIICase(grabbed, "false");
 }
 
 bool AccessibilityRenderObject::isARIAGrabbed()
@@ -1162,7 +1156,7 @@ AccessibilityObjectInclusion AccessibilityRenderObject::defaultObjectInclusion()
 
     if (m_renderer->style().visibility() != VISIBLE) {
         // aria-hidden is meant to override visibility as the determinant in AX hierarchy inclusion.
-        if (equalIgnoringCase(getAttribute(aria_hiddenAttr), "false"))
+        if (equalLettersIgnoringASCIICase(getAttribute(aria_hiddenAttr), "false"))
             return DefaultBehavior;
         
         return IgnoreObject;
@@ -1392,6 +1386,9 @@ bool AccessibilityRenderObject::computeAccessibilityIsIgnored() const
     if (node && node->hasTagName(dfnTag))
         return false;
     
+    if (isStyleFormatGroup())
+        return false;
+    
     // Make sure that ruby containers are not ignored.
     if (m_renderer->isRubyRun() || m_renderer->isRubyBlock() || m_renderer->isRubyInline())
         return false;
@@ -1499,7 +1496,8 @@ PlainTextRange AccessibilityRenderObject::selectedTextRange() const
         return PlainTextRange();
     
     AccessibilityRole ariaRole = ariaRoleAttribute();
-    if (isNativeTextControl() && ariaRole == UnknownRole) {
+    // Use the text control native range if it's a native object and it has no ARIA role (or has a text based ARIA role).
+    if (isNativeTextControl() && (ariaRole == UnknownRole || isARIATextControl())) {
         HTMLTextFormControlElement& textControl = downcast<RenderTextControl>(*m_renderer).textFormControlElement();
         return PlainTextRange(textControl.selectionStart(), textControl.selectionEnd() - textControl.selectionStart());
     }
@@ -1589,7 +1587,7 @@ bool AccessibilityRenderObject::elementAttributeValue(const QualifiedName& attri
     if (!m_renderer)
         return false;
     
-    return equalIgnoringCase(getAttribute(attributeName), "true");
+    return equalLettersIgnoringASCIICase(getAttribute(attributeName), "true");
 }
     
 bool AccessibilityRenderObject::isSelected() const
@@ -1597,12 +1595,10 @@ bool AccessibilityRenderObject::isSelected() const
     if (!m_renderer)
         return false;
     
-    Node* node = m_renderer->node();
-    if (!node)
+    if (!m_renderer->node())
         return false;
     
-    const AtomicString& ariaSelected = getAttribute(aria_selectedAttr);
-    if (equalIgnoringCase(ariaSelected, "true"))
+    if (equalLettersIgnoringASCIICase(getAttribute(aria_selectedAttr), "true"))
         return true;    
     
     if (isTabItem() && isTabItemSelected())
@@ -1795,19 +1791,18 @@ void AccessibilityRenderObject::getDocumentLinks(AccessibilityChildrenVector& re
 {
     Document& document = m_renderer->document();
     Ref<HTMLCollection> links = document.links();
-    for (unsigned i = 0; Node* curr = links->item(i); i++) {
-        RenderObject* obj = curr->renderer();
-        if (obj) {
-            RefPtr<AccessibilityObject> axobj = document.axObjectCache()->getOrCreate(obj);
-            ASSERT(axobj);
-            if (!axobj->accessibilityIsIgnored() && axobj->isLink())
-                result.append(axobj);
+    for (unsigned i = 0; auto* current = links->item(i); ++i) {
+        if (auto* renderer = current->renderer()) {
+            RefPtr<AccessibilityObject> axObject = document.axObjectCache()->getOrCreate(renderer);
+            ASSERT(axObject);
+            if (!axObject->accessibilityIsIgnored() && axObject->isLink())
+                result.append(axObject);
         } else {
-            Node* parent = curr->parentNode();
-            if (is<HTMLAreaElement>(*curr) && is<HTMLMapElement>(parent)) {
+            auto* parent = current->parentNode();
+            if (is<HTMLAreaElement>(*current) && is<HTMLMapElement>(parent)) {
                 auto& areaObject = downcast<AccessibilityImageMapLink>(*axObjectCache()->getOrCreate(ImageMapLinkRole));
                 HTMLMapElement& map = downcast<HTMLMapElement>(*parent);
-                areaObject.setHTMLAreaElement(downcast<HTMLAreaElement>(curr));
+                areaObject.setHTMLAreaElement(downcast<HTMLAreaElement>(current));
                 areaObject.setHTMLMapElement(&map);
                 areaObject.setParent(accessibilityParentForImageMap(&map));
 
@@ -1996,7 +1991,7 @@ IntRect AccessibilityRenderObject::boundsForVisiblePositionRange(const VisiblePo
     // if the rectangle spans lines and contains multiple text chars, use the range's bounding box intead
     if (rect1.maxY() != rect2.maxY()) {
         RefPtr<Range> dataRange = makeRange(range.start, range.end);
-        LayoutRect boundingBox = dataRange->boundingBox();
+        LayoutRect boundingBox = dataRange->absoluteBoundingBox();
         String rangeString = plainText(dataRange.get());
         if (rangeString.length() > 1 && !boundingBox.isEmpty())
             ourrect = boundingBox;
@@ -2560,16 +2555,13 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
             return RadioButtonRole;
         if (input.isTextButton())
             return buttonRoleType();
-        // On iOS, the date field is a popup button. On other platforms this is a text field.
+        // On iOS, the date field and time field are popup buttons. On other platforms they are text fields.
 #if PLATFORM(IOS)
-        if (input.isDateField())
+        if (input.isDateField() || input.isTimeField())
             return PopUpButtonRole;
 #endif
-        
 #if ENABLE(INPUT_TYPE_COLOR)
-        // FIXME: Shouldn't this use input.isColorControl()?
-        const AtomicString& type = input.getAttribute(typeAttr);
-        if (equalIgnoringCase(type, "color"))
+        if (input.isColorControl())
             return ColorWellRole;
 #endif
     }
@@ -2592,7 +2584,10 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
         return SVGRootRole;
     if (node && node->hasTagName(SVGNames::gTag))
         return GroupRole;
-
+    
+    if (isStyleFormatGroup())
+        return GroupRole;
+    
 #if ENABLE(MATHML)
     if (node && node->hasTagName(MathMLNames::mathTag))
         return DocumentMathRole;
@@ -2711,7 +2706,7 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
         return GroupRole;
 
     if (m_renderer->isRenderBlockFlow()) {
-#if PLATFORM(GTK)
+#if PLATFORM(GTK) || PLATFORM(EFL)
         // For ATK, GroupRole maps to ATK_ROLE_PANEL. Panels are most commonly found (and hence
         // expected) in UI elements; not text blocks.
         return m_renderer->isAnonymousBlock() ? DivRole : GroupRole;
@@ -2735,13 +2730,20 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
 AccessibilityOrientation AccessibilityRenderObject::orientation() const
 {
     const AtomicString& ariaOrientation = getAttribute(aria_orientationAttr);
-    if (equalIgnoringCase(ariaOrientation, "horizontal"))
+    if (equalLettersIgnoringASCIICase(ariaOrientation, "horizontal"))
         return AccessibilityOrientationHorizontal;
-    if (equalIgnoringCase(ariaOrientation, "vertical"))
+    if (equalLettersIgnoringASCIICase(ariaOrientation, "vertical"))
         return AccessibilityOrientationVertical;
+    if (equalLettersIgnoringASCIICase(ariaOrientation, "undefined"))
+        return AccessibilityOrientationUndefined;
 
-    if (isScrollbar())
+    // ARIA 1.1 Implicit defaults are defined on some roles.
+    // http://www.w3.org/TR/wai-aria-1.1/#aria-orientation
+    if (isScrollbar() || isComboBox() || isListBox() || isMenu() || isTree())
         return AccessibilityOrientationVertical;
+    
+    if (isMenuBar() || isSplitter() || isTabList() || isToolbar())
+        return AccessibilityOrientationHorizontal;
     
     return AccessibilityObject::orientation();
 }
@@ -2832,7 +2834,7 @@ bool AccessibilityRenderObject::canSetExpandedAttribute() const
     
     // An object can be expanded if it aria-expanded is true or false.
     const AtomicString& ariaExpanded = getAttribute(aria_expandedAttr);
-    return equalIgnoringCase(ariaExpanded, "true") || equalIgnoringCase(ariaExpanded, "false");
+    return equalLettersIgnoringASCIICase(ariaExpanded, "true") || equalLettersIgnoringASCIICase(ariaExpanded, "false");
 }
 
 bool AccessibilityRenderObject::canSetValueAttribute() const
@@ -2846,10 +2848,10 @@ bool AccessibilityRenderObject::canSetValueAttribute() const
     if (isMeter())
         return false;
 
-    if (equalIgnoringCase(getAttribute(aria_readonlyAttr), "true"))
+    auto& readOnly = getAttribute(aria_readonlyAttr);
+    if (equalLettersIgnoringASCIICase(readOnly, "true"))
         return false;
-    
-    if (equalIgnoringCase(getAttribute(aria_readonlyAttr), "false"))
+    if (equalLettersIgnoringASCIICase(readOnly, "false"))
         return true;
 
     if (isProgressIndicator() || isSlider())
@@ -3190,10 +3192,11 @@ const AtomicString& AccessibilityRenderObject::ariaLiveRegionRelevant() const
 bool AccessibilityRenderObject::ariaLiveRegionAtomic() const
 {
     const AtomicString& atomic = getAttribute(aria_atomicAttr);
-    if (equalIgnoringCase(atomic, "true"))
+    if (equalLettersIgnoringASCIICase(atomic, "true"))
         return true;
-    if (equalIgnoringCase(atomic, "false"))
+    if (equalLettersIgnoringASCIICase(atomic, "false"))
         return false;
+
     // WAI-ARIA "alert" and "status" roles have an implicit aria-atomic value of true.
     switch (roleValue()) {
     case ApplicationAlertRole:
@@ -3577,7 +3580,8 @@ void AccessibilityRenderObject::scrollTo(const IntPoint& point) const
     if (!box.canBeScrolledAndHasScrollableArea())
         return;
 
-    box.layer()->scrollToOffset(toIntSize(point), RenderLayer::ScrollOffsetClamped);
+    // FIXME: is point a ScrollOffset or ScrollPosition? Test in RTL overflow.
+    box.layer()->scrollToOffset(point, RenderLayer::ScrollOffsetClamped);
 }
 
 #if ENABLE(MATHML)

@@ -72,6 +72,14 @@
 <a class="link" href="WebKitNotification.html#webkit-notification-close" title="webkit_notification_close ()">webkit_notification_close</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitNotification.html#webkit-notification-clicked" title="webkit_notification_clicked ()">webkit_notification_clicked</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
 </tbody>
 </table></div>
 </div>
@@ -112,11 +120,18 @@
 <col width="300px" class="signals_name">
 <col width="200px" class="signals_flags">
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
+<td class="signal_type"><span class="returnvalue">void</span></td>
+<td class="signal_name"><a class="link" href="WebKitNotification.html#WebKitNotification-clicked" title="The “clicked” signal">clicked</a></td>
+<td class="signal_flags">Run Last</td>
+</tr>
+<tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="WebKitNotification.html#WebKitNotification-closed" title="The “closed” signal">closed</a></td>
 <td class="signal_flags">Run Last</td>
-</tr></tbody>
+</tr>
+</tbody>
 </table></div>
 </div>
 <div class="refsect1">
@@ -246,6 +261,30 @@ webkit_notification_close (<em class="parameter"><code><a class="link" href="Web
 </div>
 <p class="since">Since: <a class="link" href="api-index-2-8.html#api-index-2.8">2.8</a></p>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-notification-clicked"></a><h3>webkit_notification_clicked ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+webkit_notification_clicked (<em class="parameter"><code><a class="link" href="WebKitNotification.html" title="WebKitNotification"><span class="type">WebKitNotification</span></a> *notification</code></em>);</pre>
+<p>Tells WebKit the notification has been clicked. This will emit the
+<a class="link" href="WebKitNotification.html#WebKitNotification-clicked" title="The “clicked” signal"><span class="type">“clicked”</span></a> signal.</p>
+<div class="refsect3">
+<a name="webkit-notification-clicked.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>notification</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitNotification.html" title="WebKitNotification"><span class="type">WebKitNotification</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-12.html#api-index-2.12">2.12</a></p>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitNotification.other_details"></a><h2>Types and Values</h2>
@@ -285,6 +324,38 @@ webkit_notification_close (<em class="parameter"><code><a class="link" href="Web
 </div>
 <div class="refsect1">
 <a name="WebKitNotification.signal-details"></a><h2>Signal Details</h2>
+<div class="refsect2">
+<a name="WebKitNotification-clicked"></a><h3>The <code class="literal">“clicked”</code> signal</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+user_function (<a class="link" href="WebKitNotification.html" title="WebKitNotification"><span class="type">WebKitNotification</span></a> *notification,
+               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
+<p>Emitted when a notification has been clicked. See <a class="link" href="WebKitNotification.html#webkit-notification-clicked" title="webkit_notification_clicked ()"><code class="function">webkit_notification_clicked()</code></a>.</p>
+<div class="refsect3">
+<a name="WebKitNotification-clicked.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>notification</p></td>
+<td class="parameter_description"><p>the <a class="link" href="WebKitNotification.html" title="WebKitNotification"><span class="type">WebKitNotification</span></a> on which the signal is emitted</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>user_data</p></td>
+<td class="parameter_description"><p>user data set when the signal handler was connected.</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<p>Flags: Run Last</p>
+<p class="since">Since: <a class="link" href="api-index-2-12.html#api-index-2.12">2.12</a></p>
+</div>
+<hr>
 <div class="refsect2">
 <a name="WebKitNotification-closed"></a><h3>The <code class="literal">“closed”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>

@@ -23,6 +23,7 @@
 #define WTF_HashTable_h
 
 #include <atomic>
+#include <iterator>
 #include <mutex>
 #include <string.h>
 #include <type_traits>
@@ -103,7 +104,7 @@ namespace WTF {
     typedef enum { HashItemKnownGood } HashItemKnownGoodTag;
 
     template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
-    class HashTableConstIterator {
+    class HashTableConstIterator : public std::iterator<std::forward_iterator_tag, Value, std::ptrdiff_t, const Value*, const Value&> {
     private:
         typedef HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits> HashTableType;
         typedef HashTableIterator<Key, Value, Extractor, HashFunctions, Traits, KeyTraits> iterator;
@@ -239,7 +240,7 @@ namespace WTF {
     };
 
     template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
-    class HashTableIterator {
+    class HashTableIterator : public std::iterator<std::forward_iterator_tag, Value, std::ptrdiff_t, Value*, Value&> {
     private:
         typedef HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits> HashTableType;
         typedef HashTableIterator<Key, Value, Extractor, HashFunctions, Traits, KeyTraits> iterator;
@@ -286,9 +287,12 @@ namespace WTF {
     };
 
     template<typename IteratorType> struct HashTableAddResult {
+        HashTableAddResult() : isNewEntry(false) { }
         HashTableAddResult(IteratorType iter, bool isNewEntry) : iterator(iter), isNewEntry(isNewEntry) { }
         IteratorType iterator;
         bool isNewEntry;
+
+        explicit operator bool() const { return isNewEntry; }
     };
 
     template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
@@ -378,7 +382,7 @@ namespace WTF {
         bool isEmpty() const { return !m_keyCount; }
 
         AddResult add(const ValueType& value) { return add<IdentityTranslatorType>(Extractor::extract(value), value); }
-        AddResult add(ValueType&& value) { return add<IdentityTranslatorType>(Extractor::extract(value), WTF::move(value)); }
+        AddResult add(ValueType&& value) { return add<IdentityTranslatorType>(Extractor::extract(value), WTFMove(value)); }
 
         // A special version of add() that finds the object by hashing and comparing
         // with some other type, to avoid the cost of type conversion if the object is already
@@ -981,7 +985,7 @@ namespace WTF {
 
         Value* newEntry = lookupForWriting(Extractor::extract(entry)).first;
         newEntry->~Value();
-        new (NotNull, newEntry) ValueType(WTF::move(entry));
+        new (NotNull, newEntry) ValueType(WTFMove(entry));
 
         return newEntry;
     }
@@ -1180,7 +1184,7 @@ namespace WTF {
                 continue;
             }
 
-            Value* reinsertedEntry = reinsert(WTF::move(oldTable[i]));
+            Value* reinsertedEntry = reinsert(WTFMove(oldTable[i]));
             if (&oldTable[i] == entry) {
                 ASSERT(!newEntry);
                 newEntry = reinsertedEntry;
@@ -1295,7 +1299,7 @@ namespace WTF {
         other.m_deletedCount = 0;
 
 #if DUMP_HASHTABLE_STATS_PER_TABLE
-        m_stats = WTF::move(other.m_stats);
+        m_stats = WTFMove(other.m_stats);
         other.m_stats = nullptr;
 #endif
     }
@@ -1303,7 +1307,7 @@ namespace WTF {
     template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
     inline auto HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::operator=(HashTable&& other) -> HashTable&
     {
-        HashTable temp = WTF::move(other);
+        HashTable temp = WTFMove(other);
         swap(temp);
         return *this;
     }
@@ -1422,7 +1426,7 @@ namespace WTF {
 
     // iterator adapters
 
-    template<typename HashTableType, typename ValueType> struct HashTableConstIteratorAdapter {
+    template<typename HashTableType, typename ValueType> struct HashTableConstIteratorAdapter : public std::iterator<std::forward_iterator_tag, ValueType, std::ptrdiff_t, const ValueType*, const ValueType&> {
         HashTableConstIteratorAdapter() {}
         HashTableConstIteratorAdapter(const typename HashTableType::const_iterator& impl) : m_impl(impl) {}
 
@@ -1436,7 +1440,7 @@ namespace WTF {
         typename HashTableType::const_iterator m_impl;
     };
 
-    template<typename HashTableType, typename ValueType> struct HashTableIteratorAdapter {
+    template<typename HashTableType, typename ValueType> struct HashTableIteratorAdapter : public std::iterator<std::forward_iterator_tag, ValueType, std::ptrdiff_t, ValueType*, ValueType&> {
         HashTableIteratorAdapter() {}
         HashTableIteratorAdapter(const typename HashTableType::iterator& impl) : m_impl(impl) {}
 

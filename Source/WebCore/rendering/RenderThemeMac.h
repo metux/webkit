@@ -61,7 +61,6 @@ public:
     virtual Color platformInactiveListBoxSelectionBackgroundColor() const override;
     virtual Color platformInactiveListBoxSelectionForegroundColor() const override;
     virtual Color platformFocusRingColor() const override;
-    virtual int platformFocusRingMaxWidth() const override;
 
     virtual ScrollbarControlSize scrollbarControlSizeForPart(ControlPart) override { return SmallScrollbar; }
 
@@ -101,14 +100,12 @@ public:
     // A view associated to the contained document.
     NSView* documentViewFor(const RenderObject&) const;
 
-    virtual bool defaultButtonHasAnimation() const override;
-
 protected:
     RenderThemeMac();
     virtual ~RenderThemeMac();
 
     // System fonts.
-    virtual void updateCachedSystemFontDescription(CSSValueID, FontDescription&) const override;
+    virtual void updateCachedSystemFontDescription(CSSValueID, FontCascadeDescription&) const override;
 
 #if ENABLE(VIDEO)
     // Media controls
@@ -194,6 +191,7 @@ private:
 
     // Helpers for adjusting appearance and for painting
 
+    void paintCellAndSetFocusedElementNeedsRepaintIfNecessary(NSCell*, const RenderObject&, const PaintInfo&, const FloatRect&);
     void setPopupButtonCellState(const RenderObject&, const IntSize&);
     const IntSize* popupButtonSizes() const;
     const int* popupButtonMargins() const;

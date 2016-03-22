@@ -48,23 +48,27 @@ public:
 
     using ScrollbarThemeComposite::thumbRect;
     IntRect thumbRect(Scrollbar&, const IntRect& unconstrainedTrackRect);
-    bool paint(Scrollbar&, GraphicsContext&, const IntRect& damageRect) override;
-    void paintScrollbarBackground(GraphicsContext&, Scrollbar&) override;
-    void paintTrackBackground(GraphicsContext&, Scrollbar&, const IntRect&) override;
-    void paintThumb(GraphicsContext&, Scrollbar&, const IntRect&) override;
+    virtual bool paint(Scrollbar&, GraphicsContext&, const IntRect& damageRect) override;
+    virtual void paintScrollbarBackground(GraphicsContext&, Scrollbar&) override;
+    virtual void paintTrackBackground(GraphicsContext&, Scrollbar&, const IntRect&) override;
+    virtual void paintThumb(GraphicsContext&, Scrollbar&, const IntRect&) override;
     virtual void paintButton(GraphicsContext&, Scrollbar&, const IntRect&, ScrollbarPart) override;
-    virtual bool shouldCenterOnThumb(Scrollbar&, const PlatformMouseEvent&) override;
+    virtual ScrollbarButtonPressAction handleMousePressEvent(Scrollbar&, const PlatformMouseEvent&, ScrollbarPart) override;
     virtual int scrollbarThickness(ScrollbarControlSize) override;
     virtual int minimumThumbLength(Scrollbar&) override;
 
     // TODO: These are the default GTK+ values. At some point we should pull these from the theme itself.
     virtual double initialAutoscrollTimerDelay() override { return 0.20; }
     virtual double autoscrollTimerDelay() override { return 0.02; }
-    void themeChanged();
+    virtual void themeChanged() override;
+    virtual bool usesOverlayScrollbars() const override { return m_usesOverlayScrollbars; }
+    // When using overlay scrollbars, always invalidate the whole scrollbar when entering/leaving.
+    virtual bool invalidateOnMouseEnterExit() override { return m_usesOverlayScrollbars; }
 
 private:
     void updateThemeProperties();
-    GRefPtr<GtkStyleContext> getOrCreateStyleContext(ScrollbarOrientation = VerticalScrollbar);
+    enum class StyleContextMode { Layout, Paint };
+    GRefPtr<GtkStyleContext> getOrCreateStyleContext(Scrollbar* = nullptr, StyleContextMode = StyleContextMode::Layout);
 
     IntSize buttonSize(Scrollbar&, ScrollbarPart);
     int stepperSize(Scrollbar&, ScrollbarPart);
@@ -81,6 +85,7 @@ private:
     gboolean m_hasForwardButtonEndPart;
     gboolean m_hasBackButtonStartPart;
     gboolean m_hasBackButtonEndPart;
+    bool m_usesOverlayScrollbars { false };
 #endif // GTK_API_VERSION_2
 };
 
