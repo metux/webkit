@@ -15,7 +15,7 @@ Index: webkitgtk/Source/cmake/OptionsGTK.cmake
 ===================================================================
 --- webkitgtk.orig/Source/cmake/OptionsGTK.cmake
 +++ webkitgtk/Source/cmake/OptionsGTK.cmake
-@@ -103,7 +103,7 @@ if (DEVELOPER_MODE)
+@@ -114,7 +114,7 @@ if (DEVELOPER_MODE)
      WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MINIBROWSER PUBLIC ON)
      WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_API_TESTS PRIVATE ON)
  else ()
