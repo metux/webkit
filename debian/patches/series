@@ -4,3 +4,4 @@ hide-gtk2-plugins.patch
 fix-ftbfs-sparc64.patch
 fix-ftbfs-alpha.patch
 fix-ftbfs-freebsd.patch
+fix-ftbfs-powerpc.patch
