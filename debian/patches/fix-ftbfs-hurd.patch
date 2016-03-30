@@ -1,0 +1,19 @@
+From: Alberto Garcia <berto@igalia.com>
+Subject: Fix FTBFS in the Hurd
+Bug: https://bugs.webkit.org/show_bug.cgi?id=156102
+Origin: https://github.com/WebKit/webkit/commit/c5236e25637825f500c30ac968fc52efe5d3c78f
+Index: webkitgtk/Source/JavaScriptCore/jsc.cpp
+===================================================================
+--- webkitgtk.orig/Source/JavaScriptCore/jsc.cpp
++++ webkitgtk/Source/JavaScriptCore/jsc.cpp
+@@ -104,6 +104,10 @@
+ #include <Ecore.h>
+ #endif
+ 
++#if !defined(PATH_MAX)
++#define PATH_MAX 4096
++#endif
++
+ using namespace JSC;
+ using namespace WTF;
+ 
