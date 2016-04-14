@@ -25,7 +25,6 @@
 
 #include "LargeObject.h"
 #include "PerProcess.h"
-#include "SuperChunk.h"
 #include "VMHeap.h"
 #include <thread>
 
@@ -36,36 +35,74 @@ VMHeap::VMHeap()
 {
 }
 
-void VMHeap::allocateSmallChunk(std::lock_guard<StaticMutex>& lock)
+LargeObject VMHeap::allocateChunk(std::lock_guard<StaticMutex>& lock)
 {
-    if (!m_smallChunks.size())
-        allocateSuperChunk(lock);
+    Chunk* chunk =
+        new (vmAllocate(chunkSize, chunkSize)) Chunk(lock, ObjectType::Large);
 
-    // We initialize chunks lazily to avoid dirtying their metadata pages.
-    SmallChunk* smallChunk = new (m_smallChunks.pop()->smallChunk()) SmallChunk(lock);
-    for (auto* it = smallChunk->begin(); it < smallChunk->end(); ++it)
-        m_smallPages.push(it);
-}
-
-LargeObject VMHeap::allocateLargeChunk(std::lock_guard<StaticMutex>& lock)
-{
-    if (!m_largeChunks.size())
-        allocateSuperChunk(lock);
-
-    // We initialize chunks lazily to avoid dirtying their metadata pages.
-    LargeChunk* largeChunk = new (m_largeChunks.pop()->largeChunk()) LargeChunk;
-    return LargeObject(largeChunk->begin());
-}
-
-void VMHeap::allocateSuperChunk(std::lock_guard<StaticMutex>&)
-{
-    SuperChunk* superChunk =
-        new (vmAllocate(superChunkSize, superChunkSize)) SuperChunk;
-    m_smallChunks.push(superChunk);
-    m_largeChunks.push(superChunk);
 #if BOS(DARWIN)
-    m_zone.addSuperChunk(superChunk);
+    m_zone.addChunk(chunk);
 #endif
+
+    size_t alignment = largeAlignment;
+    size_t metadataSize = roundUpToMultipleOf(alignment, sizeof(Chunk));
+
+    Range range(chunk->bytes() + metadataSize, chunkSize - metadataSize);
+    BASSERT(range.size() <= largeObjectMax);
+
+    BeginTag* beginTag = Chunk::beginTag(range.begin());
+    beginTag->setRange(range);
+    beginTag->setFree(true);
+    beginTag->setVMState(VMState::Virtual);
+
+    EndTag* endTag = Chunk::endTag(range.begin(), range.size());
+    endTag->init(beginTag);
+
+    // Mark the left and right edges of our range as allocated. This naturally
+    // prevents merging logic from overflowing left (into metadata) or right
+    // (beyond our chunk), without requiring special-case checks.
+
+    EndTag* leftSentinel = beginTag->prev();
+    BASSERT(leftSentinel >= chunk->boundaryTags().begin());
+    BASSERT(leftSentinel < chunk->boundaryTags().end());
+    leftSentinel->initSentinel();
+
+    BeginTag* rightSentinel = endTag->next();
+    BASSERT(rightSentinel >= chunk->boundaryTags().begin());
+    BASSERT(rightSentinel < chunk->boundaryTags().end());
+    rightSentinel->initSentinel();
+
+    return LargeObject(range.begin());
+}
+
+void VMHeap::allocateSmallChunk(std::lock_guard<StaticMutex>& lock, size_t pageClass)
+{
+    Chunk* chunk =
+        new (vmAllocate(chunkSize, chunkSize)) Chunk(lock, ObjectType::Small);
+
+#if BOS(DARWIN)
+    m_zone.addChunk(chunk);
+#endif
+
+    size_t pageSize = bmalloc::pageSize(pageClass);
+    size_t smallPageCount = pageSize / smallPageSize;
+
+    // We align to our page size in order to guarantee that we can service
+    // aligned allocation requests at equal and smaller powers of two.
+    size_t metadataSize = divideRoundingUp(sizeof(Chunk), pageSize) * pageSize;
+
+    Object begin(chunk, metadataSize);
+    Object end(chunk, chunkSize);
+
+    for (Object it = begin; it + pageSize <= end; it = it + pageSize) {
+        SmallPage* page = it.page();
+        new (page) SmallPage;
+
+        for (size_t i = 0; i < smallPageCount; ++i)
+            page[i].setSlide(i);
+
+        m_smallPages[pageClass].push(page);
+    }
 }
 
 } // namespace bmalloc
