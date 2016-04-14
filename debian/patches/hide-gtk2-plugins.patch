@@ -5,7 +5,7 @@ Index: webkitgtk/Source/WebKit2/UIProcess/Plugins/unix/PluginProcessProxyUnix.cp
 ===================================================================
 --- webkitgtk.orig/Source/WebKit2/UIProcess/Plugins/unix/PluginProcessProxyUnix.cpp
 +++ webkitgtk/Source/WebKit2/UIProcess/Plugins/unix/PluginProcessProxyUnix.cpp
-@@ -89,13 +89,16 @@ bool PluginProcessProxy::scanPlugin(cons
+@@ -83,13 +83,16 @@ bool PluginProcessProxy::scanPlugin(cons
  
  #if PLATFORM(GTK)
      bool requiresGtk2 = pluginRequiresGtk2(pluginPath);

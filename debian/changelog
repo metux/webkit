@@ -1,6 +1,15 @@
 webkit2gtk (2.12.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * debian/patches/fix-ftbfs-freebsd.patch,
+    debian/patches/fix-ftbfs-powerpc.patch,
+    debian/patches/fix-ftbfs-hurd.patch:
+    + Remove, all these are upstream now.
+  * debian/patches/fix-ftbfs-alpha.patch,
+    debian/patches/fix-ftbfs-m68k.patch,
+    debian/patches/fix-ftbfs-sparc64.patch,
+    debian/patches/hide-gtk2-plugins.patch
+    + Refresh.
 
  -- Alberto Garcia <berto@igalia.com>  Thu, 14 Apr 2016 14:07:29 +0300
 

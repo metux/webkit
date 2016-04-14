@@ -30,7 +30,7 @@ Index: webkitgtk/Source/WTF/wtf/Platform.h
 ===================================================================
 --- webkitgtk.orig/Source/WTF/wtf/Platform.h
 +++ webkitgtk/Source/WTF/wtf/Platform.h
-@@ -344,6 +344,12 @@
+@@ -346,6 +346,12 @@
  #define WTF_CPU_NEEDS_ALIGNED_ACCESS 1
  #endif
  

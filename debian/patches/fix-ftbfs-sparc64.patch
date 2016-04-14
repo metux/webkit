@@ -5,7 +5,7 @@ Index: webkitgtk/Source/WTF/wtf/Platform.h
 ===================================================================
 --- webkitgtk.orig/Source/WTF/wtf/Platform.h
 +++ webkitgtk/Source/WTF/wtf/Platform.h
-@@ -153,6 +153,12 @@
+@@ -155,6 +155,12 @@
  #define WTF_CPU_BIG_ENDIAN 1
  #endif
  
@@ -18,7 +18,7 @@ Index: webkitgtk/Source/WTF/wtf/Platform.h
  /* CPU(X86) - i386 / x86 32-bit */
  #if   defined(__i386__) \
      || defined(i386)     \
-@@ -340,7 +346,7 @@
+@@ -342,7 +348,7 @@
  
  #endif /* ARM */
  
@@ -27,7 +27,7 @@ Index: webkitgtk/Source/WTF/wtf/Platform.h
  #define WTF_CPU_NEEDS_ALIGNED_ACCESS 1
  #endif
  
-@@ -701,6 +707,7 @@
+@@ -703,6 +709,7 @@
      || CPU(ALPHA) \
      || CPU(ARM64) \
      || CPU(S390X) \
