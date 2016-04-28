@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2016 Apple Inc. All rights reserved.
  *
  * Portions are Copyright (C) 1998 Netscape Communications Corporation.
  *
@@ -2345,6 +2345,8 @@ void RenderLayer::scrollTo(const ScrollPosition& position)
     RenderBox* box = renderBox();
     if (!box)
         return;
+
+    LOG_WITH_STREAM(Scrolling, stream << "RenderLayer::scrollTo " << position);
 
     ScrollPosition newPosition = position;
     if (box->style().overflowX() != OMARQUEE) {
@@ -5337,8 +5339,8 @@ RenderLayer* RenderLayer::hitTestList(Vector<RenderLayer*>* list, RenderLayer* r
         return nullptr;
 
     RenderLayer* resultLayer = nullptr;
-    for (int i = list->size() - 1; i >= 0; --i) {
-        RenderLayer* childLayer = list->at(i);
+    for (size_t i = list->size(); i > 0; --i) {
+        RenderLayer* childLayer = list->at(i - 1);
         if (childLayer->isFlowThreadCollectingGraphicsLayersUnderRegions())
             continue;
         RenderLayer* hitLayer = nullptr;
