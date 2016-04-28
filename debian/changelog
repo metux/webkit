@@ -1,6 +1,8 @@
 webkit2gtk (2.12.2-1) UNRELEASED; urgency=medium
 
   * New upstream release (Closes: #803104).
+  * debian/control:
+    + Update build dependency on gtk+3 to >= 3.20 (see #820309).
 
  -- Alberto Garcia <berto@igalia.com>  Thu, 28 Apr 2016 11:46:35 +0300
 
