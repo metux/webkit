@@ -3,6 +3,8 @@ webkit2gtk (2.12.2-2) UNRELEASED; urgency=medium
   * debian/control:
     + Now that the GTK+ transition to 3.20 is done, we can revert the
       build dependency on gtk+3 back to >= 3.10.
+  * debian/rules:
+    + Pass '--with gir' to dh instead of overriding dh_shlibdeps.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 09 May 2016 16:56:14 +0300
 
