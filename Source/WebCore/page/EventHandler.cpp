@@ -1134,6 +1134,8 @@ HitTestResult EventHandler::hitTestResultAtPoint(const LayoutPoint& point, HitTe
     if (!renderView)
         return result;
     
+    // We should always start hittesting a clean tree.
+    renderView->document().updateLayoutIgnorePendingStylesheets();
     // hitTestResultAtPoint is specifically used to hitTest into all frames, thus it always allows child frame content.
     HitTestRequest request(hitType | HitTestRequest::AllowChildFrameContent);
     renderView->hitTest(request, result);
@@ -1946,24 +1948,6 @@ void EventHandler::invalidateClick()
     m_clickNode = nullptr;
 }
 
-static Node* targetNodeForClickEvent(Node* mousePressNode, Node* mouseReleaseNode)
-{
-    if (!mousePressNode || !mouseReleaseNode)
-        return nullptr;
-
-    if (mousePressNode == mouseReleaseNode)
-        return mouseReleaseNode;
-
-    Element* mouseReleaseShadowHost = mouseReleaseNode->shadowHost();
-    if (mouseReleaseShadowHost && mouseReleaseShadowHost == mousePressNode->shadowHost()) {
-        // We want to dispatch the click to the shadow tree host element to give listeners the illusion that the
-        // shadom tree is a single element. For example, we want to give the illusion that <input type="range">
-        // is a single element even though it is a composition of multiple shadom tree elements.
-        return mouseReleaseShadowHost;
-    }
-    return nullptr;
-}
-
 bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& platformMouseEvent)
 {
     RefPtr<FrameView> protector(m_frame.view());
@@ -2025,7 +2009,8 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& platformMou
 
     bool contextMenuEvent = platformMouseEvent.button() == RightButton;
 
-    Node* nodeToClick = targetNodeForClickEvent(m_clickNode.get(), mouseEvent.targetNode());
+    Node* targetNode = mouseEvent.targetNode();
+    Node* nodeToClick = (m_clickNode && targetNode) ? commonAncestorCrossingShadowBoundary(*m_clickNode, *targetNode) : nullptr;
     bool swallowClickEvent = m_clickCount > 0 && !contextMenuEvent && nodeToClick && !dispatchMouseEvent(eventNames().clickEvent, nodeToClick, true, m_clickCount, platformMouseEvent, true);
 
     if (m_resizeLayer) {
@@ -2601,7 +2586,7 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& event)
     m_isHandlingWheelEvent = true;
     setFrameWasScrolledByUser();
 
-    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request;
     HitTestResult result(view->windowToContents(event.position()));
     renderView->hitTest(request, result);
 

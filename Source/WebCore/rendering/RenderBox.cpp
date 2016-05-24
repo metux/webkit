@@ -2152,10 +2152,6 @@ void RenderBox::positionLineBox(InlineElementBox& box)
             if (style().hasStaticBlockPosition(box.isHorizontal()))
                 setChildNeedsLayout(MarkOnlyThis); // Just mark the positioned object as needing layout, so it will update its position properly.
         }
-
-        // Nuke the box.
-        box.removeFromParent();
-        delete &box;
         return;
     }
 
@@ -2893,8 +2889,13 @@ Optional<LayoutUnit> RenderBox::computeIntrinsicLogicalContentHeightUsing(Length
 {
     // FIXME: The CSS sizing spec is considering changing what min-content/max-content should resolve to.
     // If that happens, this code will have to change.
-    if (logicalHeightLength.isMinContent() || logicalHeightLength.isMaxContent() || logicalHeightLength.isFitContent())
+    if (logicalHeightLength.isMinContent() || logicalHeightLength.isMaxContent() || logicalHeightLength.isFitContent()) {
+        if (!intrinsicContentHeight)
+            return intrinsicContentHeight;
+        if (style().boxSizing() == BORDER_BOX)
+            return intrinsicContentHeight.value() + borderAndPaddingLogicalHeight();
         return intrinsicContentHeight;
+    }
     if (logicalHeightLength.isFillAvailable())
         return containingBlock()->availableLogicalHeight(ExcludeMarginBorderPadding) - borderAndPadding;
     ASSERT_NOT_REACHED();
@@ -3031,8 +3032,12 @@ LayoutUnit RenderBox::computeReplacedLogicalWidth(ShouldComputePreferred shouldC
 
 LayoutUnit RenderBox::computeReplacedLogicalWidthRespectingMinMaxWidth(LayoutUnit logicalWidth, ShouldComputePreferred shouldComputePreferred) const
 {
-    LayoutUnit minLogicalWidth = (shouldComputePreferred == ComputePreferred && style().logicalMinWidth().isPercentOrCalculated()) || style().logicalMinWidth().isUndefined() ? logicalWidth : computeReplacedLogicalWidthUsing(MinSize, style().logicalMinWidth());
-    LayoutUnit maxLogicalWidth = (shouldComputePreferred == ComputePreferred && style().logicalMaxWidth().isPercentOrCalculated()) || style().logicalMaxWidth().isUndefined() ? logicalWidth : computeReplacedLogicalWidthUsing(MaxSize, style().logicalMaxWidth());
+    auto& logicalMinWidth = style().logicalMinWidth();
+    auto& logicalMaxWidth = style().logicalMaxWidth();
+    bool useLogicalWidthForMinWidth = (shouldComputePreferred == ComputePreferred && logicalMinWidth.isPercentOrCalculated()) || logicalMinWidth.isUndefined();
+    bool useLogicalWidthForMaxWidth = (shouldComputePreferred == ComputePreferred && logicalMaxWidth.isPercentOrCalculated()) || logicalMaxWidth.isUndefined();
+    auto minLogicalWidth =  useLogicalWidthForMinWidth ? logicalWidth : computeReplacedLogicalWidthUsing(MinSize, logicalMinWidth);
+    auto maxLogicalWidth =  useLogicalWidthForMaxWidth ? logicalWidth : computeReplacedLogicalWidthUsing(MaxSize, logicalMaxWidth);
     return std::max(minLogicalWidth, std::min(logicalWidth, maxLogicalWidth));
 }
 

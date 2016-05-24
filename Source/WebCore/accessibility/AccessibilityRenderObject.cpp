@@ -86,6 +86,7 @@
 #include "RenderMenuList.h"
 #include "RenderSVGRoot.h"
 #include "RenderSVGShape.h"
+#include "RenderTableCell.h"
 #include "RenderText.h"
 #include "RenderTextControl.h"
 #include "RenderTextControlSingleLine.h"
@@ -520,22 +521,6 @@ bool AccessibilityRenderObject::isFileUploadButton() const
     
     return false;
 }
-    
-bool AccessibilityRenderObject::isReadOnly() const
-{
-    ASSERT(m_renderer);
-    
-    if (isWebArea()) {
-        if (HTMLElement* body = m_renderer->document().bodyOrFrameset()) {
-            if (body->hasEditableStyle())
-                return false;
-        }
-
-        return !m_renderer->document().hasEditableStyle();
-    }
-
-    return AccessibilityNodeObject::isReadOnly();
-}
 
 bool AccessibilityRenderObject::isOffScreen() const
 {
@@ -920,7 +905,7 @@ IntPoint AccessibilityRenderObject::clickPoint()
         return children()[0]->clickPoint();
 
     // use the default position unless this is an editable web area, in which case we use the selection bounds.
-    if (!isWebArea() || isReadOnly())
+    if (!isWebArea() || !canSetValueAttribute())
         return AccessibilityObject::clickPoint();
     
     VisibleSelection visSelection = selection();
@@ -2640,7 +2625,7 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     // the cell should not be treated as a cell (e.g. because it is a layout table.
     // In ATK, there is a distinction between generic text block elements and other
     // generic containers; AX API does not make this distinction.
-    if (node && (node->hasTagName(tdTag) || node->hasTagName(thTag)))
+    if (is<RenderTableCell>(m_renderer))
 #if PLATFORM(GTK) || PLATFORM(EFL)
         return DivRole;
 #else
@@ -2855,34 +2840,6 @@ bool AccessibilityRenderObject::canSetExpandedAttribute() const
     return equalLettersIgnoringASCIICase(ariaExpanded, "true") || equalLettersIgnoringASCIICase(ariaExpanded, "false");
 }
 
-bool AccessibilityRenderObject::canSetValueAttribute() const
-{
-
-    // In the event of a (Boolean)@readonly and (True/False/Undefined)@aria-readonly
-    // value mismatch, the host language native attribute value wins.    
-    if (isNativeTextControl())
-        return !isReadOnly();
-
-    if (isMeter())
-        return false;
-
-    auto& readOnly = getAttribute(aria_readonlyAttr);
-    if (equalLettersIgnoringASCIICase(readOnly, "true"))
-        return false;
-    if (equalLettersIgnoringASCIICase(readOnly, "false"))
-        return true;
-
-    if (isProgressIndicator() || isSlider())
-        return true;
-
-    if (isTextControl() && !isNativeTextControl())
-        return true;
-
-    // Any node could be contenteditable, so isReadOnly should be relied upon
-    // for this information for all elements.
-    return !isReadOnly();
-}
-
 bool AccessibilityRenderObject::canSetTextRangeAttributes() const
 {
     return isTextControl();
@@ -2904,7 +2861,7 @@ void AccessibilityRenderObject::textChanged()
         if (parent->supportsARIALiveRegion())
             cache->postNotification(renderParent, AXObjectCache::AXLiveRegionChanged);
 
-        if ((parent->isARIATextControl() || parent->hasContentEditableAttributeSet()) && !parent->isNativeTextControl())
+        if (parent->isNonNativeTextControl())
             cache->postNotification(renderParent, AXObjectCache::AXValueChanged);
     }
 }
