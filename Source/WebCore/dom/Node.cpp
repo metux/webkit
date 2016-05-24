@@ -938,6 +938,65 @@ bool Node::containsIncludingHostElements(const Node* node) const
 #endif
 }
 
+static inline Node* ancestor(Node* node, unsigned depth)
+{
+    for (unsigned i = 0; i < depth; ++i)
+        node = node->parentNode();
+    return node;
+}
+
+Node* commonAncestor(Node& thisNode, Node& otherNode)
+{
+    unsigned thisDepth = 0;
+    for (auto node = &thisNode; node; node = node->parentNode()) {
+        if (node == &otherNode)
+            return node;
+        thisDepth++;
+    }
+    unsigned otherDepth = 0;
+    for (auto node = &otherNode; node; node = node->parentNode()) {
+        if (node == &thisNode)
+            return &thisNode;
+        otherDepth++;
+    }
+
+    Node* thisAncestor = &thisNode;
+    Node* otherAncestor = &otherNode;
+    if (thisDepth > otherDepth)
+        thisAncestor = ancestor(thisAncestor, thisDepth - otherDepth);
+    else if (otherDepth > thisDepth)
+        otherAncestor = ancestor(otherAncestor, otherDepth - thisDepth);
+
+    for (; thisAncestor; thisAncestor = thisAncestor->parentNode()) {
+        if (thisAncestor == otherAncestor)
+            return thisAncestor;
+        otherAncestor = otherAncestor->parentNode();
+    }
+    ASSERT(!otherAncestor);
+    return nullptr;
+}
+
+Node* commonAncestorCrossingShadowBoundary(Node& node, Node& other)
+{
+    if (&node == &other)
+        return &node;
+
+    Element* shadowHost = node.shadowHost();
+    // FIXME: This test might be wrong for user-authored shadow trees.
+    if (shadowHost && shadowHost == other.shadowHost())
+        return shadowHost;
+
+    TreeScope* scope = commonTreeScope(&node, &other);
+    if (!scope)
+        return nullptr;
+
+    Node* parentNode = scope->ancestorInThisScope(&node);
+    ASSERT(parentNode);
+    Node* parentOther = scope->ancestorInThisScope(&other);
+    ASSERT(parentOther);
+    return commonAncestor(*parentNode, *parentOther);
+}
+
 Node* Node::pseudoAwarePreviousSibling() const
 {
     Element* parentOrHost = is<PseudoElement>(*this) ? downcast<PseudoElement>(*this).hostElement() : parentElement();
@@ -1058,6 +1117,22 @@ HTMLSlotElement* Node::assignedSlot() const
     return shadowRoot->findAssignedSlot(*this);
 }
 #endif
+
+ContainerNode* Node::parentInComposedTree() const
+{
+    ASSERT(isMainThreadOrGCThread());
+#if ENABLE(SHADOW_DOM) || ENABLE(DETAILS_ELEMENT)
+    if (auto* parent = parentElement()) {
+        if (auto* shadowRoot = parent->shadowRoot()) {
+            if (auto* assignedSlot = shadowRoot->findAssignedSlot(*this))
+                return assignedSlot;
+        }
+    }
+#endif
+    if (is<ShadowRoot>(*this))
+        return downcast<ShadowRoot>(*this).host();
+    return parentNode();
+}
 
 bool Node::isInUserAgentShadowTree() const
 {
