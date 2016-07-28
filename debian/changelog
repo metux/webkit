@@ -1,3 +1,9 @@
+webkit2gtk (2.13.4-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 28 Jul 2016 13:36:24 +0200
+
 webkit2gtk (2.12.3-1) unstable; urgency=high
 
   * New upstream release (Closes: #821228).
