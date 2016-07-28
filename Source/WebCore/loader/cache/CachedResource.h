@@ -70,11 +70,13 @@ public:
 #if ENABLE(SVG_FONTS)
         SVGFontResource,
 #endif
+        MediaResource,
         RawResource,
         SVGDocumentResource
 #if ENABLE(XSLT)
         , XSLStyleSheet
 #endif
+        , LinkPreload
 #if ENABLE(LINK_PREFETCH)
         , LinkPrefetch
         , LinkSubresource
@@ -161,8 +163,8 @@ public:
     bool areAllClientsXMLHttpRequests() const;
 
     bool isImage() const { return type() == ImageResource; }
-    // FIXME: CachedRawResource could be either a main resource or a raw XHR resource.
-    bool isMainOrRawResource() const { return type() == MainResource || type() == RawResource; }
+    // FIXME: CachedRawResource could be a main resource, an audio/video resource, or a raw XHR/icon resource.
+    bool isMainOrMediaOrRawResource() const { return type() == MainResource || type() == MediaResource || type() == RawResource; }
     bool ignoreForRequestCount() const
     {
         return type() == MainResource
@@ -196,7 +198,9 @@ public:
 
     virtual void redirectReceived(ResourceRequest&, const ResourceResponse&);
     virtual void responseReceived(const ResourceResponse&);
-    void setResponse(const ResourceResponse& response) { m_response = response; }
+    virtual bool shouldCacheResponse(const ResourceResponse&) { return true; }
+    void setResponse(const ResourceResponse&);
+    void setOpaqueRedirect() { m_responseType = ResourceResponseBase::Type::Opaqueredirect; }
     const ResourceResponse& response() const { return m_response; }
     // This is the same as response() except after HTTP redirect to data: URL.
     const ResourceResponse& responseForSameOriginPolicyChecks() const;
@@ -238,6 +242,8 @@ public:
     virtual RevalidationDecision makeRevalidationDecision(CachePolicy) const;
     bool redirectChainAllowsReuse(ReuseExpiredRedirectionOrNot) const;
 
+    bool varyHeaderValuesMatch(const ResourceRequest&, const CachedResourceLoader&);
+
     bool isCacheValidator() const { return m_resourceToRevalidate; }
     CachedResource* resourceToRevalidate() const { return m_resourceToRevalidate; }
     
@@ -263,6 +269,7 @@ public:
 #endif
 
     unsigned long identifierForLoadWithoutResourceLoader() const { return m_identifierForLoadWithoutResourceLoader; }
+    static ResourceLoadPriority defaultPriorityForResourceType(Type);
 
 protected:
     void setEncodedSize(unsigned);
@@ -277,6 +284,7 @@ protected:
     RefPtr<SubresourceLoader> m_loader;
     ResourceLoaderOptions m_options;
     ResourceResponse m_response;
+    ResourceResponseBase::Type m_responseType { ResourceResponseBase::Type::Basic };
     ResourceResponse m_redirectResponseForSameOriginPolicyChecks;
     RefPtr<SharedBuffer> m_data;
     DeferrableOneShotTimer m_decodedDataDeletionTimer;
@@ -347,6 +355,8 @@ private:
     HashSet<CachedResourceHandleBase*> m_handlesToRevalidate;
 
     RedirectChainCacheStatus m_redirectChainCacheStatus;
+
+    Vector<std::pair<String, String>> m_varyingHeaderValues;
 
     unsigned long m_identifierForLoadWithoutResourceLoader { 0 };
 };

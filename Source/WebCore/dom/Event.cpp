@@ -23,6 +23,8 @@
 #include "config.h"
 #include "Event.h"
 
+#include "EventNames.h"
+#include "EventPath.h"
 #include "EventTarget.h"
 #include "UserGestureIndicator.h"
 #include <wtf/CurrentTime.h>
@@ -35,8 +37,8 @@ Event::Event()
 }
 
 Event::Event(const AtomicString& eventType, bool canBubbleArg, bool cancelableArg)
-    : m_isInitialized(true)
-    , m_type(eventType)
+    : m_type(eventType)
+    , m_isInitialized(true)
     , m_canBubble(canBubbleArg)
     , m_cancelable(cancelableArg)
     , m_isTrusted(true)
@@ -45,8 +47,8 @@ Event::Event(const AtomicString& eventType, bool canBubbleArg, bool cancelableAr
 }
 
 Event::Event(const AtomicString& eventType, bool canBubbleArg, bool cancelableArg, double timestamp)
-    : m_isInitialized(true)
-    , m_type(eventType)
+    : m_type(eventType)
+    , m_isInitialized(true)
     , m_canBubble(canBubbleArg)
     , m_cancelable(cancelableArg)
     , m_isTrusted(true)
@@ -55,10 +57,11 @@ Event::Event(const AtomicString& eventType, bool canBubbleArg, bool cancelableAr
 }
 
 Event::Event(const AtomicString& eventType, const EventInit& initializer)
-    : m_isInitialized(true)
-    , m_type(eventType)
+    : m_type(eventType)
+    , m_isInitialized(true)
     , m_canBubble(initializer.bubbles)
     , m_cancelable(initializer.cancelable)
+    , m_composed(initializer.composed)
     , m_createTime(convertSecondsToDOMTimeStamp(currentTime()))
 {
 }
@@ -83,6 +86,26 @@ void Event::initEvent(const AtomicString& eventTypeArg, bool canBubbleArg, bool 
     m_cancelable = cancelableArg;
 }
 
+bool Event::composed() const
+{
+    if (m_composed)
+        return true;
+
+    // http://w3c.github.io/webcomponents/spec/shadow/#scoped-flag
+    if (!isTrusted())
+        return false;
+
+    return m_type == eventNames().inputEvent
+        || m_type == eventNames().textInputEvent
+        || m_type == eventNames().DOMActivateEvent
+        || isCompositionEvent()
+        || isClipboardEvent()
+        || isFocusEvent()
+        || isKeyboardEvent()
+        || isMouseEvent()
+        || isTouchEvent();
+}
+
 EventInterface Event::eventInterface() const
 {
     return EventInterfaceType;
@@ -104,6 +127,11 @@ bool Event::isFocusEvent() const
 }
 
 bool Event::isKeyboardEvent() const
+{
+    return false;
+}
+
+bool Event::isCompositionEvent() const
 {
     return false;
 }
@@ -161,6 +189,13 @@ void Event::setTarget(RefPtr<EventTarget>&& target)
     m_target = WTFMove(target);
     if (m_target)
         receivedTarget();
+}
+
+Vector<EventTarget*> Event::composedPath() const
+{
+    if (!m_eventPath)
+        return Vector<EventTarget*>();
+    return m_eventPath->computePathUnclosedToTarget(*m_currentTarget);
 }
 
 void Event::receivedTarget()

@@ -23,8 +23,10 @@
 
 #include "Chrome.h"
 #include "ChromeClient.h"
+#include "ContentSecurityPolicy.h"
 #include "Event.h"
 #include "EventHandler.h"
+#include "EventNames.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
@@ -43,6 +45,7 @@
 #include "RenderEmbeddedObject.h"
 #include "RenderImage.h"
 #include "RenderSnapshottedPlugIn.h"
+#include "RenderTreeUpdater.h"
 #include "SchemeRegistry.h"
 #include "ScriptController.h"
 #include "SecurityOrigin.h"
@@ -193,7 +196,7 @@ bool HTMLPlugInImageElement::wouldLoadAsNetscapePlugin(const String& url, const 
     return false;
 }
 
-RenderPtr<RenderElement> HTMLPlugInImageElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition& insertionPosition)
+RenderPtr<RenderElement> HTMLPlugInImageElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition& insertionPosition)
 {
     ASSERT(!document().inPageCache());
 
@@ -322,7 +325,7 @@ void HTMLPlugInImageElement::didMoveToNewDocument(Document* oldDocument)
 void HTMLPlugInImageElement::prepareForDocumentSuspension()
 {
     if (renderer())
-        Style::detachRenderTree(*this);
+        RenderTreeUpdater::tearDownRenderers(*this);
 
     HTMLPlugInElement::prepareForDocumentSuspension();
 }
@@ -404,9 +407,14 @@ void HTMLPlugInImageElement::didAddUserAgentShadowRoot(ShadowRoot* root)
 
     // It is expected the JS file provides a createOverlay(shadowRoot, title, subtitle) function.
     JSC::JSObject* overlay = globalObject->get(exec, JSC::Identifier::fromString(exec, "createOverlay")).toObject(exec);
+    if (!overlay) {
+        ASSERT(exec->hadException());
+        exec->clearException();
+        return;
+    }
     JSC::CallData callData;
     JSC::CallType callType = overlay->methodTable()->getCallData(overlay, callData);
-    if (callType == JSC::CallTypeNone)
+    if (callType == JSC::CallType::None)
         return;
 
     JSC::call(exec, overlay, callType, callData, globalObject, argList);
@@ -763,8 +771,33 @@ void HTMLPlugInImageElement::defaultEventHandler(Event* event)
     HTMLPlugInElement::defaultEventHandler(event);
 }
 
+bool HTMLPlugInImageElement::allowedToLoadPluginContent(const String& url, const String& mimeType) const
+{
+    URL completedURL;
+    if (!url.isEmpty())
+        completedURL = document().completeURL(url);
+
+    ASSERT(document().contentSecurityPolicy());
+    const ContentSecurityPolicy& contentSecurityPolicy = *document().contentSecurityPolicy();
+
+    contentSecurityPolicy.upgradeInsecureRequestIfNeeded(completedURL, ContentSecurityPolicy::InsecureRequestType::Load);
+
+    String declaredMimeType = document().isPluginDocument() && document().ownerElement() ?
+        document().ownerElement()->attributeWithoutSynchronization(HTMLNames::typeAttr) : attributeWithoutSynchronization(HTMLNames::typeAttr);
+    bool isInUserAgentShadowTree = this->isInUserAgentShadowTree();
+    return contentSecurityPolicy.allowObjectFromSource(completedURL, isInUserAgentShadowTree) && contentSecurityPolicy.allowPluginType(mimeType, declaredMimeType, completedURL, isInUserAgentShadowTree);
+}
+
 bool HTMLPlugInImageElement::requestObject(const String& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues)
 {
+    if (url.isEmpty() && mimeType.isEmpty())
+        return false;
+
+    if (!allowedToLoadPluginContent(url, mimeType)) {
+        renderEmbeddedObject()->setPluginUnavailabilityReason(RenderEmbeddedObject::PluginBlockedByContentSecurityPolicy);
+        return false;
+    }
+
     if (HTMLPlugInElement::requestObject(url, mimeType, paramNames, paramValues))
         return true;
     

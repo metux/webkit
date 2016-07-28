@@ -1,104 +1,49 @@
-==================
-WebKitGTK+  2.12.3
-==================
+=================
+WebKitGTK+ 2.13.4
+=================
 
-What's new in WebKitGTK+ 2.12.3?
+What's new in WebKitGTK+ 2.13.4?
 
-  - Improved the detection of supported MIME types supported by the media player.
-  - Fix web process crash when playing adaptive streaming media.
-  - Change the volume while thumb slider is dragged, not only when released.
-  - Fix leaked thread in network process.
+  - Switched to use the threaded compositor. Accelerated compositing mode is now always enabled by default
+    and happens in a separate thread in the web process.
+  - Make web view background colors work in accelerated compositing mode.
   - Fix several crashes and rendering issues.
-  - Translation updates: Hungarian.
-  - Security fixes: CVE-2016-1857, CVE-2016-1856.
 
-==================
-WebKitGTK+  2.12.2
-==================
+=================
+WebKitGTK+ 2.13.3
+=================
 
-What's new in WebKitGTK+ 2.12.2?
+What's new in WebKitGTK+ 2.13.3?
 
-  - Fix rendering of scrollbars with GTK themes using stepper buttons.
-  - Fix compatibility issue with 2.12.1 regarding local storage access from file URLs.
-  - Make menu list buttons use the text color from the theme.
-  - Do not show resize grip in non-resizable text fields.
-  - Fix accessibility events causing Orca to echo key presses instead of speaking the
-    inserted characters in password fields.
-  - Fix an off by one error in hyphenation.
+  - Fix Web Process deadlocks when loading HLS videos.
+  - Make videos work when painted into a canvas when accelerated compositing is enabled.
+  - Fix flickering with animated GIFs.
+  - Fix a Web Process crash when video repaint is requested with GStreamer GL enabled.
+  - Reduce the amount of file descriptors that the Web Process keeps open.
+  - Make memory pressure handler work when cgroups are not available.
   - Fix several crashes and rendering issues.
-  - Fix the build with libjpeg v9.
-  - Translation updates: Bulgarian, Finnish, Greek, Italian, Turkish.
 
-==================
-WebKitGTK+  2.12.1
-==================
+=================
+WebKitGTK+ 2.13.2
+=================
 
-What's new in WebKitGTK+ 2.12.1?
+What's new in WebKitGTK+ 2.13.2?
 
-  - Fix spotify player.
-  - Improve themed control elements rendering to better match GTK+ widgets.
-  - Make remote web inspector work again.
+  - Properly redraw the web view when reparented in force compositing mode.
+  - Flip the volume control layout in media controls on RTL.
+  - Add support for video orientation to the GStreamer media backend.
   - Fix several crashes and rendering issues.
-  - Fix several memory leaks.
-  - Fix the build in Linux / PowerPC.
-  - Fix detection of S390X and PPC64 architectures.
-  - Fix the build in glibc-based BSD systems
-  - Translation updates: Brazilian Portuguese.
 
-==================
-WebKitGTK+  2.12.0
-==================
+=================
+WebKitGTK+ 2.13.1
+=================
 
-What's new in WebKitGTK+ 2.12.0?
+What's new in WebKitGTK+ 2.13.1?
 
-  - Enable GSS-Negotiate support when available in libsoup.
-  - Fix overlay scrollbar indicator position.
-  - Fix smooth scrolling behavior that was not fixed in all cases in 2.11.92.
-  - Fix the build with newer versions of GCC and clang.
-
-==================
-WebKitGTK+ 2.11.92
-==================
-
-What's new in WebKitGTK+ 2.11.92?
-
-  - Revert the patch to limit the number of tiles according to the visible area introduced in 2.11.90,
-    because it caused rendering issues in several popular websites.
-  - Fix scrollbars rendering again with GTK+ >= 3.19.11.
-  - Fix rendering of slider input elements.
-  - Fix rendering artifacts when using a web view background color.
-  - Make webkit_web_context_clear_cache() work again.
-  - Fix smooth scrolling behavior that was changed by mistake.
-  - Don't force ENABLE_INTROSPECTION=OFF on Mac.
-  - Install WebProcess and NetworkProcess on OSX when not building the Mac port.
-
-==================
-WebKitGTK+ 2.11.91
-==================
-
-What's new in WebKitGTK+ 2.11.91?
-
-  - Do not show stale contents after session restore.
-  - Fix flickering and rendering artifacts when entering accelerated compositing mode
-    before the web view is realized.
-  - Fix several rendering issues and crashes.
-  - Fix build with FTL enabled in FreeBSD.
-  - Translation updates: Polish.
-
-==================
-WebKitGTK+ 2.11.90
-==================
-
-What's new in WebKitGTK+ 2.11.90?
-
-  - Switch to use overlay scrollbars like all other GTK+ widgets and ensure the behavior
-    is consistent with GTK+ too.
-  - Limit the number of tiles according to the visible area. This was causing a huge memory
-    consumption with some websites.
-  - Fix toggle buttons rendering with GTK+ 3.19.
-  - Fix HTTP authentication dialog rendering when accelerated compositing mode is enabled.
-  - Use G_TYPE_ERROR instead of G_TYPE_POINTER for GError parameters of signals.
-  - Fix several memory leaks.
+  - CSS Grid Layout has been unprefixed and can be enabled as an experimental feature at runtime.
+  - The HTTP disk cache implements speculative resources revalidation.
+  - Add a new WebKitSetting to allow universal access from file URLs.
+  - Fix several crashes and rendering issues.
 
 =================
 WebKitGTK+ 2.11.5

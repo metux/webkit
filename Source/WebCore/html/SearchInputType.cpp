@@ -76,7 +76,7 @@ void SearchInputType::maxResultsAttributeChanged()
         updateResultButtonPseudoType(*m_resultsButton, element().maxResults());
 }
 
-RenderPtr<RenderElement> SearchInputType::createInputRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> SearchInputType::createInputRenderer(RenderStyle&& style)
 {
     return createRenderer<RenderSearchField>(element(), WTFMove(style));
 }
@@ -107,14 +107,14 @@ void SearchInputType::createShadowSubtree()
     ASSERT(container);
     ASSERT(textWrapper);
 
-    Ref<SearchFieldResultsButtonElement> resultsButton = SearchFieldResultsButtonElement::create(element().document());
+    auto resultsButton = SearchFieldResultsButtonElement::create(element().document());
     m_resultsButton = resultsButton.ptr();
     updateResultButtonPseudoType(resultsButton.get(), element().maxResults());
-    container->insertBefore(WTFMove(resultsButton), textWrapper, IGNORE_EXCEPTION);
+    container->insertBefore(resultsButton, textWrapper, IGNORE_EXCEPTION);
 
-    Ref<SearchFieldCancelButtonElement> cancelButton = SearchFieldCancelButtonElement::create(element().document());
+    auto cancelButton = SearchFieldCancelButtonElement::create(element().document());
     m_cancelButton = cancelButton.ptr();
-    container->insertBefore(WTFMove(cancelButton), textWrapper->nextSibling(), IGNORE_EXCEPTION);
+    container->insertBefore(cancelButton, textWrapper->nextSibling(), IGNORE_EXCEPTION);
 }
 
 HTMLElement* SearchInputType::resultsButtonElement() const
@@ -137,7 +137,7 @@ void SearchInputType::handleKeydownEvent(KeyboardEvent* event)
     const String& key = event->keyIdentifier();
     if (key == "U+001B") {
         Ref<HTMLInputElement> input(this->element());
-        input->setValueForUser("");
+        input->setValueForUser(emptyString());
         input->onSearch();
         event->setDefaultHandled();
         return;
@@ -180,7 +180,7 @@ void SearchInputType::searchEventTimerFired()
 
 bool SearchInputType::searchEventsShouldBeDispatched() const
 {
-    return element().fastHasAttribute(incrementalAttr);
+    return element().hasAttributeWithoutSynchronization(incrementalAttr);
 }
 
 void SearchInputType::didSetValueByUserEdit()

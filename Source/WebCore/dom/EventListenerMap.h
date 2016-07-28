@@ -52,10 +52,12 @@ public:
     bool isEmpty() const { return m_entries.isEmpty(); }
     WEBCORE_EXPORT bool contains(const AtomicString& eventType) const;
     bool containsCapturing(const AtomicString& eventType) const;
+    bool containsActive(const AtomicString& eventType) const;
 
     void clear();
-    bool add(const AtomicString& eventType, PassRefPtr<EventListener>, bool useCapture);
-    bool remove(const AtomicString& eventType, EventListener*, bool useCapture, size_t& indexOfRemovedListener);
+
+    bool add(const AtomicString& eventType, Ref<EventListener>&&, const RegisteredEventListener::Options&);
+    bool remove(const AtomicString& eventType, EventListener&, bool useCapture, size_t& indexOfRemovedListener);
     EventListenerVector* find(const AtomicString& eventType);
     Vector<AtomicString> eventTypes() const;
 

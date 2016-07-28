@@ -2,7 +2,7 @@
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2003-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Nikolas Zimmermann <zimmermann@kde.org>
  *
  * This library is free software; you can redistribute it and/or
@@ -31,6 +31,7 @@
 #include "CrossOriginAccessControl.h"
 #include "CurrentScriptIncrementer.h"
 #include "Event.h"
+#include "EventNames.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "HTMLNames.h"
@@ -258,16 +259,20 @@ bool ScriptElement::requestScript(const String& sourceUrl)
 
     ASSERT(!m_cachedScript);
     if (!stripLeadingAndTrailingHTMLSpaces(sourceUrl).isEmpty()) {
+        bool hasKnownNonce = m_element.document().contentSecurityPolicy()->allowScriptWithNonce(m_element.attributeWithoutSynchronization(HTMLNames::nonceAttr), m_element.isInUserAgentShadowTree());
         ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
-        options.setContentSecurityPolicyImposition(m_element.isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+        options.setContentSecurityPolicyImposition(hasKnownNonce ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
 
         CachedResourceRequest request(ResourceRequest(m_element.document().completeURL(sourceUrl)), options);
 
-        String crossOriginMode = m_element.fastGetAttribute(HTMLNames::crossoriginAttr);
+        m_element.document().contentSecurityPolicy()->upgradeInsecureRequestIfNeeded(request.mutableResourceRequest(), ContentSecurityPolicy::InsecureRequestType::Load);
+
+        String crossOriginMode = m_element.attributeWithoutSynchronization(HTMLNames::crossoriginAttr);
         if (!crossOriginMode.isNull()) {
             m_requestUsesAccessControl = true;
             StoredCredentials allowCredentials = equalLettersIgnoringASCIICase(crossOriginMode, "use-credentials") ? AllowStoredCredentials : DoNotAllowStoredCredentials;
-            updateRequestForAccessControl(request.mutableResourceRequest(), m_element.document().securityOrigin(), allowCredentials);
+            ASSERT(m_element.document().securityOrigin());
+            updateRequestForAccessControl(request.mutableResourceRequest(), *m_element.document().securityOrigin(), allowCredentials);
         }
         request.setCharset(scriptCharset());
         request.setInitiator(&element());
@@ -279,8 +284,7 @@ bool ScriptElement::requestScript(const String& sourceUrl)
     if (m_cachedScript)
         return true;
 
-    RefPtr<Element> element = &m_element;
-    callOnMainThread([this, element] {
+    callOnMainThread([this, element = Ref<Element>(m_element)] {
         dispatchErrorEvent();
     });
     return false;
@@ -293,8 +297,13 @@ void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
     if (sourceCode.isEmpty())
         return;
 
-    if (!m_isExternalScript && !m_element.document().contentSecurityPolicy()->allowInlineScript(m_element.document().url(), m_startLineNumber, m_element.isInUserAgentShadowTree()))
-        return;
+    if (!m_isExternalScript) {
+        ASSERT(m_element.document().contentSecurityPolicy());
+        const ContentSecurityPolicy& contentSecurityPolicy = *m_element.document().contentSecurityPolicy();
+        bool hasKnownNonce = contentSecurityPolicy.allowScriptWithNonce(m_element.attributeWithoutSynchronization(HTMLNames::nonceAttr), m_element.isInUserAgentShadowTree());
+        if (!contentSecurityPolicy.allowInlineScript(m_element.document().url(), m_startLineNumber, sourceCode.source().toStringWithoutCopying(), hasKnownNonce))
+            return;
+    }
 
 #if ENABLE(NOSNIFF)
     if (m_isExternalScript && m_cachedScript && !m_cachedScript->mimeTypeAllowedByNosniff()) {
@@ -306,7 +315,7 @@ void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
     Ref<Document> document(m_element.document());
     if (Frame* frame = document->frame()) {
         IgnoreDestructiveWriteCountIncrementer ignoreDesctructiveWriteCountIncrementer(m_isExternalScript ? document.ptr() : nullptr);
-        CurrentScriptIncrementer currentScriptIncrementer(document, &m_element);
+        CurrentScriptIncrementer currentScriptIncrementer(document, m_element);
 
         // Create a script from the script element node, using the script
         // block's source and the script block's type.

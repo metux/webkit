@@ -258,7 +258,9 @@ void AlternativeTextController::applyAlternativeTextToRange(const Range* range, 
 
     Position startPositionOfRangeWithAlternative = range->startPosition();
     ExceptionCode ec = 0;
-    correctionStartOffsetInParagraphAsRange->setEnd(startPositionOfRangeWithAlternative.containerNode(), startPositionOfRangeWithAlternative.computeOffsetInContainerNode(), ec);
+    if (!startPositionOfRangeWithAlternative.containerNode())
+        return;
+    correctionStartOffsetInParagraphAsRange->setEnd(*startPositionOfRangeWithAlternative.containerNode(), startPositionOfRangeWithAlternative.computeOffsetInContainerNode(), ec);
     if (ec)
         return;
 
@@ -338,13 +340,13 @@ void AlternativeTextController::timerFired()
     }
         break;
     case AlternativeTextTypeReversion: {
-        if (!m_alternativeTextInfo.rangeWithAlternative)
+        auto* details = static_cast<const AutocorrectionAlternativeDetails*>(m_alternativeTextInfo.details.get());
+        if (!m_alternativeTextInfo.rangeWithAlternative || !details || details->replacementString().isEmpty())
             break;
         m_alternativeTextInfo.isActive = true;
         m_alternativeTextInfo.originalText = plainText(m_alternativeTextInfo.rangeWithAlternative.get());
         FloatRect boundingBox = rootViewRectForRange(m_alternativeTextInfo.rangeWithAlternative.get());
         if (!boundingBox.isEmpty()) {
-            const AutocorrectionAlternativeDetails* details = static_cast<const AutocorrectionAlternativeDetails*>(m_alternativeTextInfo.details.get());
             if (AlternativeTextClient* client = alternativeTextClient())
                 client->showCorrectionAlternative(m_alternativeTextInfo.type, boundingBox, m_alternativeTextInfo.originalText, details->replacementString(), Vector<String>());
         }
@@ -355,7 +357,7 @@ void AlternativeTextController::timerFired()
             break;
         String paragraphText = plainText(TextCheckingParagraph(m_alternativeTextInfo.rangeWithAlternative).paragraphRange().get());
         Vector<String> suggestions;
-        textChecker()->getGuessesForWord(m_alternativeTextInfo.originalText, paragraphText, suggestions);
+        textChecker()->getGuessesForWord(m_alternativeTextInfo.originalText, paragraphText, m_frame.selection().selection(), suggestions);
         if (suggestions.isEmpty()) {
             m_alternativeTextInfo.rangeWithAlternative = nullptr;
             break;
@@ -581,7 +583,7 @@ void AlternativeTextController::markPrecedingWhitespaceForDeletedAutocorrectionA
 
     RefPtr<Range> precedingCharacterRange = Range::create(*m_frame.document(), precedingCharacterPosition, endOfSelection);
     String string = plainText(precedingCharacterRange.get());
-    if (string.isEmpty() || !isWhitespace(string[string.length() - 1]))
+    if (string.isEmpty() || !deprecatedIsEditingWhitespace(string[string.length() - 1]))
         return;
 
     // Mark this whitespace to indicate we have deleted an autocorrection following this
@@ -638,7 +640,7 @@ bool AlternativeTextController::respondToMarkerAtEndOfWord(const DocumentMarker&
     switch (marker.type()) {
     case DocumentMarker::Spelling:
         m_alternativeTextInfo.rangeWithAlternative = wordRange;
-        m_alternativeTextInfo.details = AutocorrectionAlternativeDetails::create("");
+        m_alternativeTextInfo.details = AutocorrectionAlternativeDetails::create(emptyString());
         startAlternativeTextUITimer(AlternativeTextTypeSpellingSuggestions);
         break;
     case DocumentMarker::Replacement:
@@ -669,7 +671,7 @@ String AlternativeTextController::markerDescriptionForAppliedAlternativeText(Alt
 
     if (alternativeTextType != AlternativeTextTypeReversion && alternativeTextType != AlternativeTextTypeDictationAlternatives && (markerType == DocumentMarker::Replacement || markerType == DocumentMarker::Autocorrected))
         return m_alternativeTextInfo.originalText;
-    return "";
+    return emptyString();
 }
 
 #endif

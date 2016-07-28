@@ -60,6 +60,7 @@
 #include "ThreadableLoaderClient.h"
 #include "URL.h"
 #include "WebSocketFrame.h"
+#include <inspector/ContentSearchUtilities.h>
 #include <inspector/IdentifiersFactory.h>
 #include <inspector/InspectorFrontendRouter.h>
 #include <inspector/InspectorValues.h>
@@ -85,7 +86,7 @@ public:
 
     virtual ~InspectorThreadableLoaderClient() { }
 
-    virtual void didReceiveResponse(unsigned long, const ResourceResponse& response) override
+    void didReceiveResponse(unsigned long, const ResourceResponse& response) override
     {
         m_mimeType = response.mimeType();
         m_statusCode = response.httpStatusCode();
@@ -101,7 +102,7 @@ public:
         m_decoder = TextResourceDecoder::create(ASCIILiteral("text/plain"), textEncoding, useDetector);
     }
 
-    virtual void didReceiveData(const char* data, int dataLength) override
+    void didReceiveData(const char* data, int dataLength) override
     {
         if (!dataLength)
             return;
@@ -112,7 +113,7 @@ public:
         m_responseText.append(m_decoder->decode(data, dataLength));
     }
 
-    virtual void didFinishLoading(unsigned long, double) override
+    void didFinishLoading(unsigned long, double) override
     {
         if (m_decoder)
             m_responseText.append(m_decoder->flush());
@@ -121,15 +122,9 @@ public:
         dispose();
     }
 
-    virtual void didFail(const ResourceError&) override
+    void didFail(const ResourceError& error) override
     {
-        m_callback->sendFailure(ASCIILiteral("Loading resource for inspector failed"));
-        dispose();
-    }
-
-    virtual void didFailRedirectCheck() override
-    {
-        m_callback->sendFailure(ASCIILiteral("Loading resource for inspector failed redirect check"));
+        m_callback->sendFailure(error.isAccessControl() ? ASCIILiteral("Loading resource for inspector failed access control check") : ASCIILiteral("Loading resource for inspector failed"));
         dispose();
     }
 
@@ -210,8 +205,11 @@ static Ref<Inspector::Protocol::Network::Request> buildObjectForResourceRequest(
         .setMethod(request.httpMethod())
         .setHeaders(buildObjectForHeaders(request.httpHeaderFields()))
         .release();
-    if (request.httpBody() && !request.httpBody()->isEmpty())
-        requestObject->setPostData(request.httpBody()->flattenToString());
+    if (request.httpBody() && !request.httpBody()->isEmpty()) {
+        Vector<char> bytes;
+        request.httpBody()->flatten(bytes);
+        requestObject->setPostData(String::fromUTF8WithLatin1Fallback(bytes.data(), bytes.size()));
+    }
     return requestObject;
 }
 
@@ -452,10 +450,7 @@ void InspectorNetworkAgent::didReceiveScriptResponse(unsigned long identifier)
 
 void InspectorNetworkAgent::didFinishXHRLoading(ThreadableLoaderClient*, unsigned long identifier, const String& sourceString)
 {
-    // For Asynchronous XHRs, the inspector can grab the data directly off of the CachedResource. For sync XHRs, we need to
-    // provide the data here, since no CachedResource was involved.
-    if (m_loadingXHRSynchronously)
-        m_resourcesData->setResourceContent(IdentifiersFactory::requestId(identifier), sourceString);
+    m_resourcesData->setResourceContent(IdentifiersFactory::requestId(identifier), sourceString);
 }
 
 void InspectorNetworkAgent::didReceiveXHRResponse(unsigned long identifier)
@@ -678,13 +673,13 @@ void InspectorNetworkAgent::loadResource(ErrorString& errorString, const String&
     options.setSendLoadCallbacks(SendCallbacks); // So we remove this from m_hiddenRequestIdentifiers on completion.
     options.setAllowCredentials(AllowStoredCredentials);
     options.setDefersLoadingPolicy(DefersLoadingPolicy::DisallowDefersLoading); // So the request is never deferred.
-    options.crossOriginRequestPolicy = AllowCrossOriginRequests;
+    options.mode = FetchOptions::Mode::NoCors;
     options.contentSecurityPolicyEnforcement = ContentSecurityPolicyEnforcement::DoNotEnforce;
 
     // InspectorThreadableLoaderClient deletes itself when the load completes.
     InspectorThreadableLoaderClient* inspectorThreadableLoaderClient = new InspectorThreadableLoaderClient(callback.copyRef());
 
-    RefPtr<DocumentThreadableLoader> loader = DocumentThreadableLoader::create(*document, *inspectorThreadableLoaderClient, request, options);
+    auto loader = DocumentThreadableLoader::create(*document, *inspectorThreadableLoaderClient, request, options);
     if (!loader) {
         inspectorThreadableLoaderClient->didFailLoaderCreation();
         return;
@@ -694,7 +689,46 @@ void InspectorNetworkAgent::loadResource(ErrorString& errorString, const String&
     if (!callback->isActive())
         return;
 
-    inspectorThreadableLoaderClient->setLoader(loader.release());
+    inspectorThreadableLoaderClient->setLoader(WTFMove(loader));
+}
+
+static Ref<Inspector::Protocol::Page::SearchResult> buildObjectForSearchResult(const String& requestId, const String& frameId, const String& url, int matchesCount)
+{
+    auto searchResult = Inspector::Protocol::Page::SearchResult::create()
+        .setUrl(url)
+        .setFrameId(frameId)
+        .setMatchesCount(matchesCount)
+        .release();
+    searchResult->setRequestId(requestId);
+    return searchResult;
+}
+
+void InspectorNetworkAgent::searchOtherRequests(const JSC::Yarr::RegularExpression& regex, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Page::SearchResult>>& result)
+{
+    Vector<NetworkResourcesData::ResourceData*> resources = m_resourcesData->resources();
+    for (auto* resourceData : resources) {
+        if (resourceData->hasContent()) {
+            int matchesCount = ContentSearchUtilities::countRegularExpressionMatches(regex, resourceData->content());
+            if (matchesCount)
+                result->addItem(buildObjectForSearchResult(resourceData->requestId(), resourceData->frameId(), resourceData->url(), matchesCount));
+        }
+    }
+}
+
+void InspectorNetworkAgent::searchInRequest(ErrorString& errorString, const String& requestId, const String& query, bool caseSensitive, bool isRegex, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::GenericTypes::SearchMatch>>& results)
+{
+    NetworkResourcesData::ResourceData const* resourceData = m_resourcesData->data(requestId);
+    if (!resourceData) {
+        errorString = ASCIILiteral("No resource with given identifier found");
+        return;
+    }
+
+    if (!resourceData->hasContent()) {
+        errorString = ASCIILiteral("No resource content");
+        return;
+    }
+
+    results = ContentSearchUtilities::searchInTextByLines(resourceData->content(), query, caseSensitive, isRegex);
 }
 
 void InspectorNetworkAgent::mainFrameNavigated(DocumentLoader& loader)

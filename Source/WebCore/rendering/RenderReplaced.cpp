@@ -46,21 +46,21 @@ namespace WebCore {
 const int cDefaultWidth = 300;
 const int cDefaultHeight = 150;
 
-RenderReplaced::RenderReplaced(Element& element, Ref<RenderStyle>&& style)
+RenderReplaced::RenderReplaced(Element& element, RenderStyle&& style)
     : RenderBox(element, WTFMove(style), RenderReplacedFlag)
     , m_intrinsicSize(cDefaultWidth, cDefaultHeight)
 {
     setReplaced(true);
 }
 
-RenderReplaced::RenderReplaced(Element& element, Ref<RenderStyle>&& style, const LayoutSize& intrinsicSize)
+RenderReplaced::RenderReplaced(Element& element, RenderStyle&& style, const LayoutSize& intrinsicSize)
     : RenderBox(element, WTFMove(style), RenderReplacedFlag)
     , m_intrinsicSize(intrinsicSize)
 {
     setReplaced(true);
 }
 
-RenderReplaced::RenderReplaced(Document& document, Ref<RenderStyle>&& style, const LayoutSize& intrinsicSize)
+RenderReplaced::RenderReplaced(Document& document, RenderStyle&& style, const LayoutSize& intrinsicSize)
     : RenderBox(document, WTFMove(style), RenderReplacedFlag)
     , m_intrinsicSize(intrinsicSize)
 {
@@ -145,7 +145,7 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 #endif
     LayoutPoint adjustedPaintOffset = paintOffset + location();
     
-    if (hasBoxDecorations() && paintInfo.phase == PaintPhaseForeground)
+    if (hasVisibleBoxDecorations() && paintInfo.phase == PaintPhaseForeground)
         paintBoxDecorations(paintInfo, adjustedPaintOffset);
     
     if (paintInfo.phase == PaintPhaseMask) {
@@ -154,10 +154,13 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     }
 
     LayoutRect paintRect = LayoutRect(adjustedPaintOffset, size());
-    if ((paintInfo.phase == PaintPhaseOutline || paintInfo.phase == PaintPhaseSelfOutline) && style().outlineWidth())
-        paintOutline(paintInfo, paintRect);
-    
-    if (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection && !canHaveChildren())
+    if (paintInfo.phase == PaintPhaseOutline || paintInfo.phase == PaintPhaseSelfOutline) {
+        if (style().outlineWidth())
+            paintOutline(paintInfo, paintRect);
+        return;
+    }
+
+    if (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection)
         return;
     
     if (!paintInfo.shouldPaintWithinRoot(*this))
@@ -287,6 +290,31 @@ bool RenderReplaced::hasReplacedLogicalHeight() const
     return false;
 }
 
+bool RenderReplaced::setNeedsLayoutIfNeededAfterIntrinsicSizeChange()
+{
+    setPreferredLogicalWidthsDirty(true);
+    
+    // If the actual area occupied by the image has changed and it is not constrained by style then a layout is required.
+    bool imageSizeIsConstrained = style().logicalWidth().isSpecified() && style().logicalHeight().isSpecified();
+    
+    // FIXME: We only need to recompute the containing block's preferred size
+    // if the containing block's size depends on the image's size (i.e., the container uses shrink-to-fit sizing).
+    // There's no easy way to detect that shrink-to-fit is needed, always force a layout.
+    bool containingBlockNeedsToRecomputePreferredSize =
+        style().logicalWidth().isPercentOrCalculated()
+        || style().logicalMaxWidth().isPercentOrCalculated()
+        || style().logicalMinWidth().isPercentOrCalculated();
+    
+    bool layoutSizeDependsOnIntrinsicSize = style().aspectRatioType() == AspectRatioFromIntrinsic;
+    
+    if (!imageSizeIsConstrained || containingBlockNeedsToRecomputePreferredSize || layoutSizeDependsOnIntrinsicSize) {
+        setNeedsLayout();
+        return true;
+    }
+
+    return false;
+}
+    
 void RenderReplaced::computeAspectRatioInformationForRenderBox(RenderBox* contentRenderer, FloatSize& constrainedSize, double& intrinsicRatio) const
 {
     FloatSize intrinsicSize;
@@ -338,8 +366,6 @@ LayoutRect RenderReplaced::replacedContentRect(const LayoutSize& intrinsicSize) 
         return contentRect;
 
     ObjectFit objectFit = style().objectFit();
-    if (objectFit == ObjectFitFill)
-        return contentRect;
 
     LayoutRect finalRect = contentRect;
     switch (objectFit) {
@@ -354,13 +380,14 @@ LayoutRect RenderReplaced::replacedContentRect(const LayoutSize& intrinsicSize) 
         finalRect.setSize(intrinsicSize);
         break;
     case ObjectFitFill:
-        ASSERT_NOT_REACHED();
+        break;
     }
 
-    // FIXME: This is where object-position should be taken into account, but since it's not
-    // implemented yet, assume the initial value of "50% 50%".
-    LayoutUnit xOffset = (contentRect.width() - finalRect.width()) / 2;
-    LayoutUnit yOffset = (contentRect.height() - finalRect.height()) / 2;
+    LengthPoint objectPosition = style().objectPosition();
+
+    LayoutUnit xOffset = minimumValueForLength(objectPosition.x(), contentRect.width() - finalRect.width());
+    LayoutUnit yOffset = minimumValueForLength(objectPosition.y(), contentRect.height() - finalRect.height());
+
     finalRect.move(xOffset, yOffset);
 
     return finalRect;

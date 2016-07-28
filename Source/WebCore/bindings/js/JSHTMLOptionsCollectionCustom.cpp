@@ -43,7 +43,7 @@ bool JSHTMLOptionsCollection::nameGetter(ExecState* exec, PropertyName propertyN
     if (!item)
         return false;
 
-    value = toJS(exec, globalObject(), item);
+    value = toJS(exec, globalObject(), *item);
     return true;
 }
 
@@ -75,7 +75,7 @@ JSValue JSHTMLOptionsCollection::remove(ExecState& state)
     // The argument can be an HTMLOptionElement or an index.
     JSValue argument = state.argument(0);
     if (HTMLOptionElement* option = JSHTMLOptionElement::toWrapped(argument))
-        wrapped().remove(option);
+        wrapped().remove(*option);
     else
         wrapped().remove(argument.toInt32(&state));
     return jsUndefined();

@@ -115,7 +115,7 @@ private:
     Vector<RenderMultiColumnSpannerPlaceholder*> m_spannerStack;
 };
 
-RenderView::RenderView(Document& document, Ref<RenderStyle>&& style)
+RenderView::RenderView(Document& document, RenderStyle&& style)
     : RenderBlockFlow(document, WTFMove(style))
     , m_frameView(*document.view())
     , m_selectionUnsplitStart(nullptr)
@@ -277,7 +277,8 @@ void RenderView::initializeLayoutState(LayoutState& state)
 
     state.m_pageLogicalHeight = m_pageLogicalHeight;
     state.m_pageLogicalHeightChanged = m_pageLogicalHeightChanged;
-    state.m_isPaginated = state.m_pageLogicalHeight;
+    ASSERT(state.m_pageLogicalHeight >= 0);
+    state.m_isPaginated = state.m_pageLogicalHeight > 0;
 }
 
 // The algorithm below assumes this is a full layout. In case there are previously computed values for regions, supplemental steps are taken
@@ -612,7 +613,11 @@ void RenderView::repaintRootContents()
         layer()->setBackingNeedsRepaint(GraphicsLayer::DoNotClipToLayer);
         return;
     }
-    repaint();
+
+    // Always use layoutOverflowRect() to fix rdar://problem/27182267.
+    // This should be cleaned up via webkit.org/b/159913 and webkit.org/b/159914.
+    RenderLayerModelObject* repaintContainer = containerForRepaint();
+    repaintUsingContainer(repaintContainer, computeRectForRepaint(layoutOverflowRect(), repaintContainer));
 }
 
 void RenderView::repaintViewRectangle(const LayoutRect& repaintRect) const
@@ -635,6 +640,16 @@ void RenderView::repaintViewRectangle(const LayoutRect& repaintRect) const
 #endif
         adjustedRect.moveBy(-viewRect.location());
         adjustedRect.moveBy(ownerBox->contentBoxRect().location());
+
+        // A dirty rect in an iframe is relative to the contents of that iframe.
+        // When we traverse between parent frames and child frames, we need to make sure
+        // that the coordinate system is mapped appropriately between the iframe's contents
+        // and the Renderer that contains the iframe. This transformation must account for a
+        // left scrollbar (if one exists).
+        FrameView& frameView = this->frameView();
+        if (frameView.shouldPlaceBlockDirectionScrollbarOnLeft() && frameView.verticalScrollbar())
+            adjustedRect.move(LayoutSize(frameView.verticalScrollbar()->occupiedWidth(), 0));
+
         ownerBox->repaintRectangle(adjustedRect);
         return;
     }
@@ -680,7 +695,7 @@ LayoutRect RenderView::visualOverflowRect() const
     return RenderBlockFlow::visualOverflowRect();
 }
 
-LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const RenderLayerModelObject* repaintContainer, bool fixed) const
+LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const RenderLayerModelObject* repaintContainer, RepaintContext context) const
 {
     // If a container was specified, and was not nullptr or the RenderView,
     // then we should have found it by now.
@@ -699,7 +714,7 @@ LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const Rende
             adjustedRect.setX(viewWidth() - adjustedRect.maxX());
     }
 
-    if (fixed)
+    if (context.m_hasPositionFixedDescendant)
         adjustedRect.moveBy(frameView().scrollPositionRespectingCustomFixedPosition());
     
     // Apply our transform if we have one (because of full page zooming).
@@ -1184,17 +1199,6 @@ void RenderView::pushLayoutState(RenderObject& root)
 
     m_layoutState = std::make_unique<LayoutState>(root);
     pushLayoutStateForCurrentFlowThread(root);
-}
-
-bool RenderView::shouldDisableLayoutStateForSubtree(RenderObject* renderer) const
-{
-    RenderObject* o = renderer;
-    while (o) {
-        if (o->hasTransform() || o->hasReflection())
-            return true;
-        o = o->container();
-    }
-    return false;
 }
 
 IntSize RenderView::viewportSizeForCSSViewportUnits() const

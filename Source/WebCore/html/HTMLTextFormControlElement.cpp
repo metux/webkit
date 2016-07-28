@@ -26,6 +26,7 @@
 #include "HTMLTextFormControlElement.h"
 
 #include "AXObjectCache.h"
+#include "CSSPrimitiveValueMappings.h"
 #include "ChromeClient.h"
 #include "Document.h"
 #include "Event.h"
@@ -36,6 +37,7 @@
 #include "HTMLFormElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
+#include "HTMLParserIdioms.h"
 #include "NodeTraversal.h"
 #include "Page.h"
 #include "RenderBlockFlow.h"
@@ -122,7 +124,7 @@ String HTMLTextFormControlElement::strippedPlaceholder() const
 {
     // According to the HTML5 specification, we need to remove CR and LF from
     // the attribute value.
-    const AtomicString& attributeValue = fastGetAttribute(placeholderAttr);
+    const AtomicString& attributeValue = attributeWithoutSynchronization(placeholderAttr);
     if (!attributeValue.contains(newlineCharacter) && !attributeValue.contains(carriageReturn))
         return attributeValue;
 
@@ -142,7 +144,7 @@ static bool isNotLineBreak(UChar ch) { return ch != newlineCharacter && ch != ca
 
 bool HTMLTextFormControlElement::isPlaceholderEmpty() const
 {
-    const AtomicString& attributeValue = fastGetAttribute(placeholderAttr);
+    const AtomicString& attributeValue = attributeWithoutSynchronization(placeholderAttr);
     return attributeValue.string().find(isNotLineBreak) == notFound;
 }
 
@@ -162,9 +164,6 @@ void HTMLTextFormControlElement::updatePlaceholderVisibility()
         return;
 
     setNeedsStyleRecalc();
-
-    if (HTMLElement* placeholder = placeholderElement())
-        placeholder->setInlineStyleProperty(CSSPropertyDisplay, m_isPlaceholderVisible ? CSSValueBlock : CSSValueNone, true);
 }
 
 void HTMLTextFormControlElement::setSelectionStart(int start)
@@ -507,7 +506,7 @@ void HTMLTextFormControlElement::readOnlyAttributeChanged()
 void HTMLTextFormControlElement::updateInnerTextElementEditability()
 {
     if (TextControlInnerTextElement* innerText = innerTextElement())
-        innerText->setAttribute(contenteditableAttr, isDisabledOrReadOnly() ? "false" : "plaintext-only");
+        innerText->setAttributeWithoutSynchronization(contenteditableAttr, isDisabledOrReadOnly() ? "false" : "plaintext-only");
 }
 
 bool HTMLTextFormControlElement::lastChangeWasUserEdit() const
@@ -741,7 +740,7 @@ static const Element* parentHTMLElement(const Element* element)
 String HTMLTextFormControlElement::directionForFormData() const
 {
     for (const Element* element = this; element; element = parentHTMLElement(element)) {
-        const AtomicString& dirAttributeValue = element->fastGetAttribute(dirAttr);
+        const AtomicString& dirAttributeValue = element->attributeWithoutSynchronization(dirAttr);
         if (dirAttributeValue.isNull())
             continue;
 
@@ -756,6 +755,58 @@ String HTMLTextFormControlElement::directionForFormData() const
     }
 
     return "ltr";
+}
+
+void HTMLTextFormControlElement::setMaxLengthForBindings(int maxLength, ExceptionCode& ec)
+{
+    if (maxLength < 0)
+        ec = INDEX_SIZE_ERR;
+    else
+        setIntegralAttribute(maxlengthAttr, maxLength);
+}
+
+void HTMLTextFormControlElement::adjustInnerTextStyle(const RenderStyle& parentStyle, RenderStyle& textBlockStyle) const
+{
+    // The inner block, if present, always has its direction set to LTR,
+    // so we need to inherit the direction and unicode-bidi style from the element.
+    textBlockStyle.setDirection(parentStyle.direction());
+    textBlockStyle.setUnicodeBidi(parentStyle.unicodeBidi());
+
+    if (HTMLElement* innerText = innerTextElement()) {
+        if (const StyleProperties* properties = innerText->presentationAttributeStyle()) {
+            RefPtr<CSSValue> value = properties->getPropertyCSSValue(CSSPropertyWebkitUserModify);
+            if (is<CSSPrimitiveValue>(value.get()))
+                textBlockStyle.setUserModify(downcast<CSSPrimitiveValue>(*value));
+        }
+    }
+
+    if (isDisabledFormControl())
+        textBlockStyle.setColor(document().page()->theme().disabledTextColor(textBlockStyle.visitedDependentColor(CSSPropertyColor), parentStyle.visitedDependentColor(CSSPropertyBackgroundColor)));
+#if PLATFORM(IOS)
+    if (textBlockStyle.textSecurity() != TSNONE && !textBlockStyle.isLeftToRightDirection()) {
+        // Preserve the alignment but force the direction to LTR so that the last-typed, unmasked character
+        // (which cannot have RTL directionality) will appear to the right of the masked characters. See <rdar://problem/7024375>.
+        
+        switch (textBlockStyle.textAlign()) {
+        case TASTART:
+        case JUSTIFY:
+            textBlockStyle.setTextAlign(RIGHT);
+            break;
+        case TAEND:
+            textBlockStyle.setTextAlign(LEFT);
+            break;
+        case LEFT:
+        case RIGHT:
+        case CENTER:
+        case WEBKIT_LEFT:
+        case WEBKIT_RIGHT:
+        case WEBKIT_CENTER:
+            break;
+        }
+
+        textBlockStyle.setDirection(LTR);
+    }
+#endif
 }
 
 } // namespace Webcore

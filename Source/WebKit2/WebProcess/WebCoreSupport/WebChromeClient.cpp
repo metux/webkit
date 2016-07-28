@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,7 +43,6 @@
 #include "WebFullScreenManager.h"
 #include "WebHitTestResultData.h"
 #include "WebImage.h"
-#include "WebOpenPanelParameters.h"
 #include "WebOpenPanelResultListener.h"
 #include "WebPage.h"
 #include "WebPageCreationParameters.h"
@@ -76,6 +75,7 @@
 #include <WebCore/Settings.h>
 
 #if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
+#include "WebPlaybackSessionManager.h"
 #include "WebVideoFullscreenManager.h"
 #endif
 
@@ -169,6 +169,16 @@ void WebChromeClient::unfocus()
 }
 
 #if PLATFORM(COCOA)
+void WebChromeClient::elementDidFocus(const WebCore::Node* node)
+{
+    m_page->elementDidFocus(const_cast<WebCore::Node*>(node));
+}
+
+void WebChromeClient::elementDidBlur(const WebCore::Node* node)
+{
+    m_page->elementDidBlur(const_cast<WebCore::Node*>(node));
+}
+
 void WebChromeClient::makeFirstResponder()
 {
     m_page->send(Messages::WebPageProxy::MakeFirstResponder());
@@ -214,19 +224,22 @@ Page* WebChromeClient::createWindow(Frame* frame, const FrameLoadRequest& reques
         frame->document()->webkitCancelFullScreen();
 #endif
 
+    auto& webProcess = WebProcess::singleton();
+
     WebFrame* webFrame = WebFrame::fromCoreFrame(*frame);
 
     NavigationActionData navigationActionData;
     navigationActionData.navigationType = navigationAction.type();
     navigationActionData.modifiers = InjectedBundleNavigationAction::modifiersForNavigationAction(navigationAction);
     navigationActionData.mouseButton = InjectedBundleNavigationAction::mouseButtonForNavigationAction(navigationAction);
-    navigationActionData.isProcessingUserGesture = navigationAction.processingUserGesture();
+    navigationActionData.syntheticClickType = InjectedBundleNavigationAction::syntheticClickTypeForNavigationAction(navigationAction);
+    navigationActionData.userGestureTokenIdentifier = webProcess.userGestureTokenIdentifier(navigationAction.userGestureToken());
     navigationActionData.canHandleRequest = m_page->canHandleRequest(request.resourceRequest());
     navigationActionData.shouldOpenExternalURLsPolicy = navigationAction.shouldOpenExternalURLsPolicy();
+    navigationActionData.downloadAttribute = navigationAction.downloadAttribute();
 
     uint64_t newPageID = 0;
     WebPageCreationParameters parameters;
-    auto& webProcess = WebProcess::singleton();
     if (!webProcess.parentProcessConnection()->sendSync(Messages::WebPageProxy::CreateNewPage(webFrame->frameID(), SecurityOriginData::fromFrame(frame), request.resourceRequest(), windowFeatures, navigationActionData), Messages::WebPageProxy::CreateNewPage::Reply(newPageID, parameters), m_page->pageID()))
         return nullptr;
 
@@ -509,11 +522,6 @@ void WebChromeClient::contentsSizeChanged(Frame* frame, const IntSize& size) con
     if (&frame->page()->mainFrame() != frame)
         return;
 
-#if USE(COORDINATED_GRAPHICS)
-    if (m_page->useFixedLayout())
-        m_page->drawingArea()->layerTreeHost()->sizeDidChange(size);
-#endif
-
     m_page->send(Messages::WebPageProxy::DidChangeContentSize(size));
 
     m_page->drawingArea()->mainFrameContentSizeChanged(size);
@@ -667,7 +675,7 @@ void WebChromeClient::reachedApplicationCacheOriginQuota(SecurityOrigin* origin,
     if (m_page->injectedBundleUIClient().didReachApplicationCacheOriginQuota(m_page, securityOrigin.get(), totalBytesNeeded))
         return;
 
-    auto& cacheStorage = ApplicationCacheStorage::singleton();
+    auto& cacheStorage = m_page->corePage()->applicationCacheStorage();
     int64_t currentQuota = 0;
     if (!cacheStorage.calculateQuotaForOrigin(origin, currentQuota))
         return;
@@ -701,7 +709,7 @@ String WebChromeClient::generateReplacementFile(const String& path)
 #if ENABLE(INPUT_TYPE_COLOR)
 std::unique_ptr<ColorChooser> WebChromeClient::createColorChooser(ColorChooserClient* client, const Color& initialColor)
 {
-    return std::unique_ptr<WebColorChooser>(new WebColorChooser(m_page, client, initialColor));
+    return std::make_unique<WebColorChooser>(m_page, client, initialColor);
 }
 #endif
 
@@ -717,7 +725,7 @@ void WebChromeClient::runOpenPanel(Frame* frame, PassRefPtr<FileChooser> prpFile
     WebFrame* webFrame = WebFrame::fromCoreFrame(*frame);
     ASSERT(webFrame);
 
-    m_page->send(Messages::WebPageProxy::RunOpenPanel(webFrame->frameID(), fileChooser->settings()));
+    m_page->send(Messages::WebPageProxy::RunOpenPanel(webFrame->frameID(), SecurityOriginData::fromFrame(frame), fileChooser->settings()));
 }
 
 void WebChromeClient::loadIconForFiles(const Vector<String>& filenames, FileIconLoader* loader)
@@ -849,22 +857,40 @@ PassRefPtr<ScrollingCoordinator> WebChromeClient::createScrollingCoordinator(Pag
 }
 #endif
 
-#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
-bool WebChromeClient::supportsVideoFullscreen(WebCore::HTMLMediaElementEnums::VideoFullscreenMode)
+#if (PLATFORM(IOS) && HAVE(AVKIT)) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
+bool WebChromeClient::supportsVideoFullscreen(WebCore::HTMLMediaElementEnums::VideoFullscreenMode mode)
 {
-    return m_page->videoFullscreenManager()->supportsVideoFullscreen();
+    return m_page->videoFullscreenManager().supportsVideoFullscreen(mode);
+}
+
+void WebChromeClient::setUpPlaybackControlsManager(WebCore::HTMLMediaElement& mediaElement)
+{
+    m_page->playbackSessionManager().setUpPlaybackControlsManager(mediaElement);
+}
+
+void WebChromeClient::clearPlaybackControlsManager()
+{
+    m_page->playbackSessionManager().clearPlaybackControlsManager();
 }
 
 void WebChromeClient::enterVideoFullscreenForVideoElement(WebCore::HTMLVideoElement& videoElement, WebCore::HTMLMediaElementEnums::VideoFullscreenMode mode)
 {
     ASSERT(mode != HTMLMediaElementEnums::VideoFullscreenModeNone);
-    m_page->videoFullscreenManager()->enterVideoFullscreenForVideoElement(videoElement, mode);
+    m_page->videoFullscreenManager().enterVideoFullscreenForVideoElement(videoElement, mode);
 }
 
 void WebChromeClient::exitVideoFullscreenForVideoElement(WebCore::HTMLVideoElement& videoElement)
 {
-    m_page->videoFullscreenManager()->exitVideoFullscreenForVideoElement(videoElement);
+    m_page->videoFullscreenManager().exitVideoFullscreenForVideoElement(videoElement);
 }
+
+#if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
+void WebChromeClient::exitVideoFullscreenToModeWithoutAnimation(WebCore::HTMLVideoElement& videoElement, HTMLMediaElementEnums::VideoFullscreenMode targetMode)
+{
+    m_page->videoFullscreenManager().exitVideoFullscreenToModeWithoutAnimation(videoElement, targetMode);
+}
+#endif
+
 #endif
     
 #if ENABLE(FULLSCREEN_API)

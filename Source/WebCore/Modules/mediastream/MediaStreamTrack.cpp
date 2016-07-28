@@ -32,6 +32,7 @@
 
 #include "Dictionary.h"
 #include "Event.h"
+#include "EventNames.h"
 #include "ExceptionCode.h"
 #include "ExceptionCodePlaceholder.h"
 #include "MediaConstraintsImpl.h"
@@ -41,7 +42,6 @@
 #include "MediaTrackConstraints.h"
 #include "NotImplemented.h"
 #include "ScriptExecutionContext.h"
-#include <wtf/Functional.h>
 #include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
@@ -111,12 +111,9 @@ bool MediaStreamTrack::remote() const
     return m_private->remote();
 }
 
-const AtomicString& MediaStreamTrack::readyState() const
+auto MediaStreamTrack::readyState() const -> State
 {
-    static NeverDestroyed<AtomicString> endedState("ended", AtomicString::ConstructFromLiteral);
-    static NeverDestroyed<AtomicString> liveState("live", AtomicString::ConstructFromLiteral);
-
-    return ended() ? endedState : liveState;
+    return ended() ? State::Ended : State::Live;
 }
 
 bool MediaStreamTrack::ended() const

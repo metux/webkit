@@ -118,7 +118,7 @@ inline VM* JSCell::vm() const
     return MarkedBlock::blockFor(this)->vm();
 }
 
-inline VM& ExecState::vm() const
+ALWAYS_INLINE VM& ExecState::vm() const
 {
     ASSERT(callee());
     ASSERT(callee()->vm());
@@ -145,11 +145,6 @@ void* allocateCell(Heap& heap)
     return allocateCell<T>(heap, sizeof(T));
 }
     
-inline bool isZapped(const JSCell* cell)
-{
-    return cell->isZapped();
-}
-
 inline bool JSCell::isObject() const
 {
     return TypeInfo::isObject(m_type);

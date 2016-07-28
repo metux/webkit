@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.12)
 include(WebKitCommon)
+set_property(DIRECTORY . PROPERTY FOLDER "JavaScriptCore")
 
 set(JavaScriptCore_INCLUDE_DIRECTORIES
     "${CMAKE_BINARY_DIR}"
@@ -53,7 +54,7 @@ set(JavaScriptCore_SOURCES
     API/JSClassRef.cpp
     API/JSContextRef.cpp
     API/JSObjectRef.cpp
-    API/JSProfilerPrivate.cpp
+    API/JSTypedArray.cpp
     API/JSScriptRef.cpp
     API/JSStringRef.cpp
     API/JSValueRef.cpp
@@ -75,6 +76,7 @@ set(JavaScriptCore_SOURCES
     b3/air/AirCCallingConvention.cpp
     b3/air/AirCode.cpp
     b3/air/AirCustom.cpp
+    b3/air/AirDumpAsJS.cpp
     b3/air/AirEliminateDeadCode.cpp
     b3/air/AirEmitShuffle.cpp
     b3/air/AirFixObviousSpills.cpp
@@ -87,6 +89,7 @@ set(JavaScriptCore_SOURCES
     b3/air/AirIteratedRegisterCoalescing.cpp
     b3/air/AirLogRegisterPressure.cpp
     b3/air/AirLowerAfterRegAlloc.cpp
+    b3/air/AirLowerEntrySwitch.cpp
     b3/air/AirLowerMacros.cpp
     b3/air/AirOptimizeBlockOrder.cpp
     b3/air/AirPhaseScope.cpp
@@ -106,6 +109,7 @@ set(JavaScriptCore_SOURCES
     b3/B3BlockInsertionSet.cpp
     b3/B3BreakCriticalEdges.cpp
     b3/B3CCallValue.cpp
+    b3/B3CaseCollection.cpp
     b3/B3CheckSpecial.cpp
     b3/B3CheckValue.cpp
     b3/B3Common.cpp
@@ -116,7 +120,6 @@ set(JavaScriptCore_SOURCES
     b3/B3ConstDoubleValue.cpp
     b3/B3ConstFloatValue.cpp
     b3/B3ConstrainedValue.cpp
-    b3/B3ControlValue.cpp
     b3/B3DataSection.cpp
     b3/B3DuplicateTails.cpp
     b3/B3Effects.cpp
@@ -126,6 +129,7 @@ set(JavaScriptCore_SOURCES
     b3/B3FrequencyClass.cpp
     b3/B3Generate.cpp
     b3/B3HeapRange.cpp
+    b3/B3InferSwitches.cpp
     b3/B3InsertionSet.cpp
     b3/B3LegalizeMemoryOffsets.cpp
     b3/B3LowerMacros.cpp
@@ -170,8 +174,10 @@ set(JavaScriptCore_SOURCES
     bindings/ScriptValue.cpp
 
     builtins/BuiltinExecutables.cpp
+    builtins/BuiltinExecutableCreator.cpp
 
     bytecode/AdaptiveInferredPropertyValueWatchpointBase.cpp
+    bytecode/ArithProfile.cpp
     bytecode/ArrayAllocationProfile.cpp
     bytecode/ArrayProfile.cpp
     bytecode/BytecodeBasicBlock.cpp
@@ -197,9 +203,11 @@ set(JavaScriptCore_SOURCES
     bytecode/ExitingJITType.cpp
     bytecode/GetByIdStatus.cpp
     bytecode/GetByIdVariant.cpp
+    bytecode/InlineAccess.cpp
     bytecode/InlineCallFrame.cpp
     bytecode/InlineCallFrameSet.cpp
     bytecode/JumpTable.cpp
+    bytecode/LLIntPrototypeLoadAdaptiveStructureWatchpoint.cpp
     bytecode/LazyOperandValueProfile.cpp
     bytecode/MethodOfGettingAValueProfile.cpp
     bytecode/ObjectPropertyCondition.cpp
@@ -212,12 +220,12 @@ set(JavaScriptCore_SOURCES
     bytecode/PutByIdStatus.cpp
     bytecode/PutByIdVariant.cpp
     bytecode/ReduceWhitespace.cpp
-    bytecode/SamplingTool.cpp
     bytecode/SpecialPointer.cpp
     bytecode/SpeculatedType.cpp
     bytecode/StructureSet.cpp
     bytecode/StructureStubClearingWatchpoint.cpp
     bytecode/StructureStubInfo.cpp
+    bytecode/SuperSampler.cpp
     bytecode/ToThisStatus.cpp
     bytecode/TrackedReferences.cpp
     bytecode/UnlinkedCodeBlock.cpp
@@ -234,6 +242,7 @@ set(JavaScriptCore_SOURCES
 
     debugger/Debugger.cpp
     debugger/DebuggerCallFrame.cpp
+    debugger/DebuggerLocation.cpp
     debugger/DebuggerScope.cpp
 
     dfg/DFGAbstractHeap.cpp
@@ -268,7 +277,6 @@ set(JavaScriptCore_SOURCES
     dfg/DFGCompilationMode.cpp
     dfg/DFGConstantFoldingPhase.cpp
     dfg/DFGConstantHoistingPhase.cpp
-    dfg/DFGCopyBarrierOptimizationPhase.cpp
     dfg/DFGCriticalEdgeBreakingPhase.cpp
     dfg/DFGDCEPhase.cpp
     dfg/DFGDesiredIdentifiers.cpp
@@ -287,7 +295,6 @@ set(JavaScriptCore_SOURCES
     dfg/DFGFlushedAt.cpp
     dfg/DFGLiveCatchVariablePreservationPhase.cpp
     dfg/DFGFrozenValue.cpp
-    dfg/DFGFunctionWhitelist.cpp
     dfg/DFGGraph.cpp
     dfg/DFGGraphSafepoint.cpp
     dfg/DFGHeapLocation.cpp
@@ -388,7 +395,6 @@ set(JavaScriptCore_SOURCES
 
     disassembler/udis86/udis86.c
     disassembler/udis86/udis86_decode.c
-    disassembler/udis86/udis86_input.c
     disassembler/udis86/udis86_itab_holder.c
     disassembler/udis86/udis86_syn-att.c
     disassembler/udis86/udis86_syn-intel.c
@@ -429,12 +435,14 @@ set(JavaScriptCore_SOURCES
     ftl/FTLThunks.cpp
     ftl/FTLValueRange.cpp
 
+    heap/AllocatorAttributes.cpp
     heap/CodeBlockSet.cpp
     heap/ConservativeRoots.cpp
     heap/CopiedBlock.cpp
     heap/CopiedSpace.cpp
     heap/CopyVisitor.cpp
     heap/DeferGC.cpp
+    heap/DestructionMode.cpp
     heap/EdenGCActivityCallback.cpp
     heap/FullGCActivityCallback.cpp
     heap/GCActivityCallback.cpp
@@ -442,7 +450,11 @@ set(JavaScriptCore_SOURCES
     heap/HandleSet.cpp
     heap/HandleStack.cpp
     heap/Heap.cpp
+    heap/HeapCell.cpp
     heap/HeapHelperPool.cpp
+    heap/HeapProfiler.cpp
+    heap/HeapSnapshot.cpp
+    heap/HeapSnapshotBuilder.cpp
     heap/HeapStatistics.cpp
     heap/HeapTimer.cpp
     heap/HeapVerifier.cpp
@@ -501,14 +513,16 @@ set(JavaScriptCore_SOURCES
     inspector/agents/JSGlobalObjectRuntimeAgent.cpp
 
     interpreter/AbstractPC.cpp
+    interpreter/CLoopStack.cpp
     interpreter/CallFrame.cpp
     interpreter/Interpreter.cpp
-    interpreter/JSStack.cpp
     interpreter/ProtoCallFrame.cpp
+    interpreter/ShadowChicken.cpp
     interpreter/StackVisitor.cpp
 
     jit/AssemblyHelpers.cpp
     jit/BinarySwitch.cpp
+    jit/CCallHelpers.cpp
     jit/CachedRecovery.cpp
     jit/CallFrameShuffleData.cpp
     jit/CallFrameShuffler.cpp
@@ -520,6 +534,7 @@ set(JavaScriptCore_SOURCES
     jit/GCAwareJITStubRoutine.cpp
     jit/GPRInfo.cpp
     jit/HostCallReturnValue.cpp
+    jit/ICStats.cpp
     jit/IntrinsicEmitter.cpp
     jit/JIT.cpp
     jit/JITAddGenerator.cpp
@@ -548,6 +563,7 @@ set(JavaScriptCore_SOURCES
     jit/JITSubGenerator.cpp
     jit/JITThunks.cpp
     jit/JITToDFGDeferredCompilationCallback.cpp
+    jit/JITWorklist.cpp
     jit/PCToCodeOriginMap.cpp
     jit/PolymorphicCallStubRoutine.cpp
     jit/Reg.cpp
@@ -557,6 +573,7 @@ set(JavaScriptCore_SOURCES
     jit/Repatch.cpp
     jit/ScratchRegisterAllocator.cpp
     jit/SetupVarargsFrame.cpp
+    jit/TagRegistersMode.cpp
     jit/TempRegisterSet.cpp
     jit/ThunkGenerators.cpp
 
@@ -579,10 +596,6 @@ set(JavaScriptCore_SOURCES
     parser/SourceProviderCache.cpp
     parser/VariableEnvironment.cpp
 
-    profiler/LegacyProfiler.cpp
-    profiler/Profile.cpp
-    profiler/ProfileGenerator.cpp
-    profiler/ProfileNode.cpp
     profiler/ProfilerBytecode.cpp
     profiler/ProfilerBytecodeSequence.cpp
     profiler/ProfilerBytecodes.cpp
@@ -590,12 +603,14 @@ set(JavaScriptCore_SOURCES
     profiler/ProfilerCompilationKind.cpp
     profiler/ProfilerCompiledBytecode.cpp
     profiler/ProfilerDatabase.cpp
+    profiler/ProfilerEvent.cpp
     profiler/ProfilerJettisonReason.cpp
     profiler/ProfilerOSRExit.cpp
     profiler/ProfilerOSRExitSite.cpp
     profiler/ProfilerOrigin.cpp
     profiler/ProfilerOriginStack.cpp
     profiler/ProfilerProfiledBytecodes.cpp
+    profiler/ProfilerUID.cpp
 
     runtime/ArgList.cpp
     runtime/ArrayBuffer.cpp
@@ -618,7 +633,7 @@ set(JavaScriptCore_SOURCES
     runtime/CompilationResult.cpp
     runtime/Completion.cpp
     runtime/ConsoleClient.cpp
-    runtime/ConsolePrototype.cpp
+    runtime/ConsoleObject.cpp
     runtime/ConstantMode.cpp
     runtime/ConstructData.cpp
     runtime/ControlFlowProfiler.cpp
@@ -631,6 +646,7 @@ set(JavaScriptCore_SOURCES
     runtime/DirectArguments.cpp
     runtime/DirectArgumentsOffset.cpp
     runtime/DumpContext.cpp
+    runtime/ECMAScriptSpecInternalFunctions.cpp
     runtime/Error.cpp
     runtime/ErrorConstructor.cpp
     runtime/ErrorHandlingScope.cpp
@@ -676,13 +692,11 @@ set(JavaScriptCore_SOURCES
     runtime/JSArrayBufferConstructor.cpp
     runtime/JSArrayBufferPrototype.cpp
     runtime/JSArrayBufferView.cpp
-    runtime/JSArrayIterator.cpp
     runtime/JSBoundFunction.cpp
-    runtime/JSBoundSlotBaseFunction.cpp
     runtime/JSCJSValue.cpp
     runtime/JSCallee.cpp
     runtime/JSCell.cpp
-    runtime/JSConsole.cpp
+    runtime/JSCustomGetterSetterFunction.cpp
     runtime/JSDataView.cpp
     runtime/JSDataViewPrototype.cpp
     runtime/JSDateMath.cpp
@@ -706,7 +720,6 @@ set(JavaScriptCore_SOURCES
     runtime/JSModuleNamespaceObject.cpp
     runtime/JSModuleRecord.cpp
     runtime/JSNativeStdFunction.cpp
-    runtime/JSNotAnObject.cpp
     runtime/JSONObject.cpp
     runtime/JSObject.cpp
     runtime/JSPromise.cpp
@@ -734,11 +747,13 @@ set(JavaScriptCore_SOURCES
     runtime/JSWeakSet.cpp
     runtime/JSWithScope.cpp
     runtime/JSWrapperObject.cpp
+    runtime/LazyClassStructure.cpp
     runtime/LiteralParser.cpp
     runtime/Lookup.cpp
     runtime/MapConstructor.cpp
     runtime/MapIteratorPrototype.cpp
     runtime/MapPrototype.cpp
+    runtime/MatchResult.cpp
     runtime/MathCommon.cpp
     runtime/MathObject.cpp
     runtime/MemoryStatistics.cpp
@@ -761,6 +776,7 @@ set(JavaScriptCore_SOURCES
     runtime/PrototypeMap.cpp
     runtime/ProxyConstructor.cpp
     runtime/ProxyObject.cpp
+    runtime/ProxyRevoke.cpp
     runtime/ReflectObject.cpp
     runtime/RegExp.cpp
     runtime/RegExpCache.cpp
@@ -818,6 +834,7 @@ set(JavaScriptCore_SOURCES
     tools/CodeProfile.cpp
     tools/CodeProfiling.cpp
     tools/FunctionOverrides.cpp
+    tools/FunctionWhitelist.cpp
     tools/JSDollarVM.cpp
     tools/JSDollarVMPrototype.cpp
 
@@ -833,6 +850,9 @@ set(JavaScriptCore_SOURCES
     yarr/YarrPattern.cpp
     yarr/YarrSyntaxChecker.cpp
 )
+
+# Extra flags for compile sources can go here.
+set_source_files_properties(runtime/ProxyObject.cpp PROPERTIES COMPILE_FLAGS -fno-optimize-sibling-calls)
 
 set(JavaScriptCore_OBJECT_LUT_SOURCES
     runtime/ArrayConstructor.cpp
@@ -909,14 +929,13 @@ endforeach ()
 
 set(UDIS_GEN_DEP
     disassembler/udis86/ud_opcode.py
-    disassembler/udis86/ud_optable.py
 )
 
 add_custom_command(
     OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/udis86_itab.c ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/udis86_itab.h
     DEPENDS ${UDIS_GEN_DEP}
     WORKING_DIRECTORY ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}
-    COMMAND ${PYTHON_EXECUTABLE} ${JAVASCRIPTCORE_DIR}/disassembler/udis86/itab.py ${JAVASCRIPTCORE_DIR}/disassembler/udis86/optable.xml
+    COMMAND ${PYTHON_EXECUTABLE} ${JAVASCRIPTCORE_DIR}/disassembler/udis86/ud_itab.py ${JAVASCRIPTCORE_DIR}/disassembler/udis86/optable.xml ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}
     VERBATIM)
 
 list(APPEND JavaScriptCore_HEADERS
@@ -1078,6 +1097,16 @@ add_custom_command(
     VERBATIM)
 ADD_SOURCE_DEPENDENCIES(${CMAKE_CURRENT_SOURCE_DIR}/yarr/YarrPattern.cpp ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/RegExpJitTables.h)
 
+add_custom_command(
+    OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/YarrCanonicalizeUnicode.cpp
+    MAIN_DEPENDENCY ${JAVASCRIPTCORE_DIR}/generateYarrCanonicalizeUnicode
+    DEPENDS ${JAVASCRIPTCORE_DIR}/ucd/CaseFolding.txt
+    COMMAND ${PYTHON_EXECUTABLE} ${JAVASCRIPTCORE_DIR}/generateYarrCanonicalizeUnicode ${JAVASCRIPTCORE_DIR}/ucd/CaseFolding.txt ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/YarrCanonicalizeUnicode.cpp
+    VERBATIM)
+
+list(APPEND JavaScriptCore_SOURCES
+    ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/YarrCanonicalizeUnicode.cpp
+)
 
 #GENERATOR: "KeywordLookup.h": keyword decision tree used by the lexer
 add_custom_command(
@@ -1183,6 +1212,10 @@ set(BUILTINS_GENERATOR_SCRIPTS
     ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_combined_implementation.py
     ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_separate_header.py
     ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_separate_implementation.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_wrapper_header.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_wrapper_implementation.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_internals_wrapper_header.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_internals_wrapper_implementation.py
     ${JavaScriptCore_SCRIPTS_DIR}/generate-js-builtins.py
     ${JavaScriptCore_SCRIPTS_DIR}/lazywriter.py
 )
@@ -1195,17 +1228,20 @@ set(JavaScriptCore_BUILTINS_SOURCES
     ${JAVASCRIPTCORE_DIR}/builtins/FunctionPrototype.js
     ${JAVASCRIPTCORE_DIR}/builtins/GeneratorPrototype.js
     ${JAVASCRIPTCORE_DIR}/builtins/GlobalObject.js
+    ${JAVASCRIPTCORE_DIR}/builtins/GlobalOperations.js
     ${JAVASCRIPTCORE_DIR}/builtins/InspectorInstrumentationObject.js
     ${JAVASCRIPTCORE_DIR}/builtins/InternalPromiseConstructor.js
     ${JAVASCRIPTCORE_DIR}/builtins/IteratorPrototype.js
     ${JAVASCRIPTCORE_DIR}/builtins/MapPrototype.js
     ${JAVASCRIPTCORE_DIR}/builtins/ModuleLoaderObject.js
+    ${JAVASCRIPTCORE_DIR}/builtins/NumberConstructor.js
     ${JAVASCRIPTCORE_DIR}/builtins/NumberPrototype.js
     ${JAVASCRIPTCORE_DIR}/builtins/ObjectConstructor.js
     ${JAVASCRIPTCORE_DIR}/builtins/PromiseConstructor.js
     ${JAVASCRIPTCORE_DIR}/builtins/PromiseOperations.js
     ${JAVASCRIPTCORE_DIR}/builtins/PromisePrototype.js
     ${JAVASCRIPTCORE_DIR}/builtins/ReflectObject.js
+    ${JAVASCRIPTCORE_DIR}/builtins/RegExpPrototype.js
     ${JAVASCRIPTCORE_DIR}/builtins/SetPrototype.js
     ${JAVASCRIPTCORE_DIR}/builtins/StringConstructor.js
     ${JAVASCRIPTCORE_DIR}/builtins/StringIteratorPrototype.js
@@ -1252,7 +1288,7 @@ add_custom_command(
     OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.h ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js
     MAIN_DEPENDENCY ${JAVASCRIPTCORE_DIR}/inspector/InjectedScriptSource.js
     DEPENDS ${JavaScriptCore_SCRIPTS_DIR}/xxd.pl ${JavaScriptCore_SCRIPTS_DIR}/jsmin.py
-    COMMAND ${CMAKE_COMMAND} -E echo "//# sourceURL=__WebInspectorInjectedScript__" > ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js
+    COMMAND ${CMAKE_COMMAND} -E echo "//# sourceURL=__InjectedScript_InjectedScriptSource.js" > ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js
     COMMAND ${PYTHON_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/jsmin.py < ${JAVASCRIPTCORE_DIR}/inspector/InjectedScriptSource.js >> ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js
     COMMAND ${PERL_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/xxd.pl InjectedScriptSource_js ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.h
     VERBATIM)
@@ -1310,29 +1346,14 @@ WEBKIT_CREATE_FORWARDING_HEADERS(JavaScriptCore DIRECTORIES ${JavaScriptCore_FOR
 add_subdirectory(shell)
 
 WEBKIT_WRAP_SOURCELIST(${JavaScriptCore_SOURCES})
-include_directories(${JavaScriptCore_INCLUDE_DIRECTORIES})
-include_directories(SYSTEM ${JavaScriptCore_SYSTEM_INCLUDE_DIRECTORIES})
-add_library(JavaScriptCore ${JavaScriptCore_LIBRARY_TYPE} ${JavaScriptCore_HEADERS} ${JavaScriptCore_SOURCES})
-target_link_libraries(JavaScriptCore ${JavaScriptCore_LIBRARIES})
-set_target_properties(JavaScriptCore PROPERTIES COMPILE_DEFINITIONS "BUILDING_JavaScriptCore")
-set_target_properties(JavaScriptCore PROPERTIES FOLDER "JavaScriptCore")
+WEBKIT_FRAMEWORK(JavaScriptCore)
 
-if (JavaScriptCore_PRE_BUILD_COMMAND)
-    add_custom_command(TARGET JavaScriptCore PRE_BUILD COMMAND ${JavaScriptCore_PRE_BUILD_COMMAND} VERBATIM)
-endif ()
-
-if (JavaScriptCore_POST_BUILD_COMMAND)
-    add_custom_command(TARGET JavaScriptCore POST_BUILD COMMAND ${JavaScriptCore_POST_BUILD_COMMAND} VERBATIM)
-endif ()
-
-if (JavaScriptCore_OUTPUT_NAME)
-    set_target_properties(JavaScriptCore PROPERTIES OUTPUT_NAME ${JavaScriptCore_OUTPUT_NAME})
-endif ()
-
-if (${JavaScriptCore_LIBRARY_TYPE} STREQUAL "SHARED")
-    POPULATE_LIBRARY_VERSION(JAVASCRIPTCORE)
-    set_target_properties(JavaScriptCore PROPERTIES VERSION ${JAVASCRIPTCORE_VERSION} SOVERSION ${JAVASCRIPTCORE_VERSION_MAJOR})
-    install(TARGETS JavaScriptCore DESTINATION "${LIB_INSTALL_DIR}")
+if (NOT "${PORT}" STREQUAL "Mac")
+    if (${JavaScriptCore_LIBRARY_TYPE} STREQUAL "SHARED")
+        POPULATE_LIBRARY_VERSION(JAVASCRIPTCORE)
+        set_target_properties(JavaScriptCore PROPERTIES VERSION ${JAVASCRIPTCORE_VERSION} SOVERSION ${JAVASCRIPTCORE_VERSION_MAJOR})
+        install(TARGETS JavaScriptCore DESTINATION "${LIB_INSTALL_DIR}")
+    endif ()
 endif ()
 
 # Force staging of shared scripts, even if they aren't directly used to build JavaScriptCore.
@@ -1340,4 +1361,16 @@ endif ()
 add_custom_target(stageSharedScripts DEPENDS ${JavaScriptCore_SCRIPTS})
 add_dependencies(JavaScriptCore stageSharedScripts)
 
-WEBKIT_FRAMEWORK(JavaScriptCore)
+if (MSVC)
+    add_custom_command(
+        TARGET JavaScriptCore
+        PRE_BUILD
+        COMMAND ${PERL_EXECUTABLE} ${WEBKIT_LIBRARIES_DIR}/tools/scripts/auto-version.pl ${DERIVED_SOURCES_DIR}
+        VERBATIM)
+
+    add_custom_command(
+        TARGET JavaScriptCore
+        POST_BUILD
+        COMMAND ${PERL_EXECUTABLE} ${WEBKIT_LIBRARIES_DIR}/tools/scripts/version-stamp.pl ${DERIVED_SOURCES_DIR} $<TARGET_FILE:JavaScriptCore>
+        VERBATIM)
+endif ()

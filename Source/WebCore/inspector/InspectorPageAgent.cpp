@@ -55,12 +55,14 @@
 #include "ImageBuffer.h"
 #include "InspectorClient.h"
 #include "InspectorDOMAgent.h"
+#include "InspectorNetworkAgent.h"
 #include "InspectorOverlay.h"
 #include "InspectorTimelineAgent.h"
 #include "InstrumentingAgents.h"
 #include "MainFrame.h"
 #include "MemoryCache.h"
 #include "Page.h"
+#include "RenderObject.h"
 #include "ScriptController.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
@@ -115,7 +117,10 @@ static bool prepareCachedResourceBuffer(CachedResource* cachedResource, bool* ha
 static bool hasTextContent(CachedResource* cachedResource)
 {
     InspectorPageAgent::ResourceType type = InspectorPageAgent::cachedResourceType(*cachedResource);
-    return type == InspectorPageAgent::DocumentResource || type == InspectorPageAgent::StylesheetResource || type == InspectorPageAgent::ScriptResource || type == InspectorPageAgent::XHRResource;
+    return type == InspectorPageAgent::DocumentResource
+        || type == InspectorPageAgent::StylesheetResource
+        || type == InspectorPageAgent::ScriptResource
+        || type == InspectorPageAgent::XHRResource;
 }
 
 static RefPtr<TextResourceDecoder> createXHRTextDecoder(const String& mimeType, const String& textEncodingName)
@@ -135,6 +140,7 @@ static RefPtr<TextResourceDecoder> createXHRTextDecoder(const String& mimeType, 
 
 bool InspectorPageAgent::cachedResourceContent(CachedResource* cachedResource, String* result, bool* base64Encoded)
 {
+    // FIXME: result should be a String& and base64Encoded should be a bool&.
     bool hasZeroSize;
     bool prepared = prepareCachedResourceBuffer(cachedResource, &hasZeroSize);
     if (!prepared)
@@ -142,11 +148,15 @@ bool InspectorPageAgent::cachedResourceContent(CachedResource* cachedResource, S
 
     *base64Encoded = !hasTextContent(cachedResource);
     if (*base64Encoded) {
-        RefPtr<SharedBuffer> buffer = hasZeroSize ? SharedBuffer::create() : cachedResource->resourceBuffer();
-        if (!buffer)
-            return false;
-        *result = base64Encode(buffer->data(), buffer->size());
-        return true;
+        if (hasZeroSize) {
+            *result = { };
+            return true;
+        }
+        if (auto* buffer = cachedResource->resourceBuffer()) {
+            *result = base64Encode(buffer->data(), buffer->size());
+            return true;
+        }
+        return false;
     }
 
     if (hasZeroSize) {
@@ -163,6 +173,7 @@ bool InspectorPageAgent::cachedResourceContent(CachedResource* cachedResource, S
         case CachedResource::Script:
             *result = downcast<CachedScript>(*cachedResource).script().toString();
             return true;
+        case CachedResource::MediaResource:
         case CachedResource::RawResource: {
             auto* buffer = cachedResource->resourceBuffer();
             if (!buffer)
@@ -314,6 +325,7 @@ InspectorPageAgent::ResourceType InspectorPageAgent::cachedResourceType(const Ca
         return InspectorPageAgent::StylesheetResource;
     case CachedResource::Script:
         return InspectorPageAgent::ScriptResource;
+    case CachedResource::MediaResource:
     case CachedResource::RawResource:
         return InspectorPageAgent::XHRResource;
     case CachedResource::MainResource:
@@ -407,13 +419,13 @@ void InspectorPageAgent::removeScriptToEvaluateOnLoad(ErrorString& error, const 
 
 void InspectorPageAgent::reload(ErrorString&, const bool* const optionalIgnoreCache, const String* optionalScriptToEvaluateOnLoad)
 {
-    m_pendingScriptToEvaluateOnLoadOnce = optionalScriptToEvaluateOnLoad ? *optionalScriptToEvaluateOnLoad : "";
+    m_pendingScriptToEvaluateOnLoadOnce = optionalScriptToEvaluateOnLoad ? *optionalScriptToEvaluateOnLoad : emptyString();
     m_page.mainFrame().loader().reload(optionalIgnoreCache ? *optionalIgnoreCache : false);
 }
 
 void InspectorPageAgent::navigate(ErrorString&, const String& url)
 {
-    UserGestureIndicator indicator(DefinitelyProcessingUserGesture);
+    UserGestureIndicator indicator(ProcessingUserGesture);
     Frame& frame = m_page.mainFrame();
 
     ResourceRequest resourceRequest(frame.document()->completeURL(url));
@@ -564,18 +576,25 @@ static bool textContentForCachedResource(CachedResource* cachedResource, String*
     return false;
 }
 
-void InspectorPageAgent::searchInResource(ErrorString&, const String& frameId, const String& url, const String& query, const bool* const optionalCaseSensitive, const bool* const optionalIsRegex, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::GenericTypes::SearchMatch>>& results)
+void InspectorPageAgent::searchInResource(ErrorString& errorString, const String& frameId, const String& url, const String& query, const bool* const optionalCaseSensitive, const bool* const optionalIsRegex, const String* optionalRequestId, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::GenericTypes::SearchMatch>>& results)
 {
     results = Inspector::Protocol::Array<Inspector::Protocol::GenericTypes::SearchMatch>::create();
 
     bool isRegex = optionalIsRegex ? *optionalIsRegex : false;
     bool caseSensitive = optionalCaseSensitive ? *optionalCaseSensitive : false;
 
-    Frame* frame = frameForId(frameId);
+    if (optionalRequestId) {
+        if (InspectorNetworkAgent* networkAgent = m_instrumentingAgents.inspectorNetworkAgent()) {
+            networkAgent->searchInRequest(errorString, *optionalRequestId, query, caseSensitive, isRegex, results);
+            return;
+        }
+    }
+
+    Frame* frame = assertFrame(errorString, frameId);
     if (!frame)
         return;
 
-    DocumentLoader* loader = frame->loader().documentLoader();
+    DocumentLoader* loader = assertDocumentLoader(errorString, frame);
     if (!loader)
         return;
 
@@ -632,6 +651,9 @@ void InspectorPageAgent::searchInResources(ErrorString&, const String& text, con
                 result->addItem(buildObjectForSearchResult(frameId(frame), frame->document()->url(), matchesCount));
         }
     }
+
+    if (InspectorNetworkAgent* networkAgent = m_instrumentingAgents.inspectorNetworkAgent())
+        networkAgent->searchOtherRequests(regex, result);
 }
 
 void InspectorPageAgent::setDocumentContent(ErrorString& errorString, const String& frameId, const String& html)
@@ -744,7 +766,7 @@ Frame* InspectorPageAgent::frameForId(const String& frameId)
 String InspectorPageAgent::frameId(Frame* frame)
 {
     if (!frame)
-        return "";
+        return emptyString();
     String identifier = m_frameToIdentifier.get(frame);
     if (identifier.isNull()) {
         identifier = IdentifiersFactory::createIdentifier();
@@ -762,7 +784,7 @@ bool InspectorPageAgent::hasIdForFrame(Frame* frame) const
 String InspectorPageAgent::loaderId(DocumentLoader* loader)
 {
     if (!loader)
-        return "";
+        return emptyString();
     String identifier = m_loaderToIdentifier.get(loader);
     if (identifier.isNull()) {
         identifier = IdentifiersFactory::createIdentifier();
@@ -904,7 +926,7 @@ Ref<Inspector::Protocol::Page::Frame> InspectorPageAgent::buildObjectForFrame(Fr
     if (frame->ownerElement()) {
         String name = frame->ownerElement()->getNameAttribute();
         if (name.isEmpty())
-            name = frame->ownerElement()->getAttribute(HTMLNames::idAttr);
+            name = frame->ownerElement()->attributeWithoutSynchronization(HTMLNames::idAttr);
         frameObject->setName(name);
     }
 
@@ -1045,7 +1067,7 @@ void InspectorPageAgent::archive(ErrorString& errorString, String* data)
 {
 #if ENABLE(WEB_ARCHIVE) && USE(CF)
     Frame& frame = mainFrame();
-    RefPtr<LegacyWebArchive> archive = LegacyWebArchive::create(&frame);
+    RefPtr<LegacyWebArchive> archive = LegacyWebArchive::create(frame);
     if (!archive) {
         errorString = ASCIILiteral("Could not create web archive for main frame");
         return;

@@ -320,13 +320,13 @@ bool JSCSSStyleDeclaration::getOwnPropertySlotDelegate(ExecState* exec, Property
     return true;
 }
 
-bool JSCSSStyleDeclaration::putDelegate(ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot&)
+bool JSCSSStyleDeclaration::putDelegate(ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot&, bool& putResult)
 {
     CSSPropertyInfo propertyInfo = cssPropertyIDForJSCSSPropertyName(propertyName);
     if (!propertyInfo.propertyID)
         return false;
 
-    String propValue = valueToStringWithNullCheck(exec, value);
+    String propValue = valueToStringTreatingNullAsEmptyString(exec, value);
     if (propertyInfo.hadPixelOrPosPrefix)
         propValue.append("px");
 
@@ -341,7 +341,7 @@ bool JSCSSStyleDeclaration::putDelegate(ExecState* exec, PropertyName propertyNa
 
     ExceptionCode ec = 0;
     CSSPropertyID propertyID = static_cast<CSSPropertyID>(propertyInfo.propertyID);
-    wrapped().setPropertyInternal(propertyID, propValue, important, ec);
+    putResult = wrapped().setPropertyInternal(propertyID, propValue, important, ec);
     setDOMException(exec, ec);
 
     return true;
@@ -349,7 +349,10 @@ bool JSCSSStyleDeclaration::putDelegate(ExecState* exec, PropertyName propertyNa
 
 JSValue JSCSSStyleDeclaration::getPropertyCSSValue(ExecState& state)
 {
-    const String& propertyName = state.argument(0).toString(&state)->value(&state);
+    if (UNLIKELY(state.argumentCount() < 1))
+        return state.vm().throwException(&state, createNotEnoughArgumentsError(&state));
+
+    String propertyName = state.uncheckedArgument(0).toWTFString(&state);
     if (state.hadException())
         return jsUndefined();
 
@@ -358,7 +361,7 @@ JSValue JSCSSStyleDeclaration::getPropertyCSSValue(ExecState& state)
         return jsNull();
 
     globalObject()->world().m_cssValueRoots.add(cssValue.get(), root(&wrapped())); // Balanced by JSCSSValueOwner::finalize().
-    return toJS(&state, globalObject(), WTF::getPtr(cssValue));
+    return toJS(&state, globalObject(), *cssValue);
 }
 
 void JSCSSStyleDeclaration::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)

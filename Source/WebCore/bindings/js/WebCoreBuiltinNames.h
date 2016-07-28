@@ -32,14 +32,25 @@
 namespace WebCore {
 
 #define WEBCORE_COMMON_PRIVATE_IDENTIFIERS_EACH_PROPERTY_NAME(macro)\
+    macro(addTrack) \
     macro(appendFromJS) \
+    macro(body) \
     macro(closeRequested) \
     macro(closedPromiseCapability) \
     macro(controlledReadableStream) \
     macro(controller) \
+    macro(createReadableStreamSource) \
     macro(disturbed) \
+    macro(fetchRequest) \
+    macro(fillFromJS) \
+    macro(firstReadCallback) \
     macro(getUserMediaFromJS) \
+    macro(getRemoteStreams) \
+    macro(getSenders) \
+    macro(getTracks) \
     macro(initializeWith) \
+    macro(isDisturbed) \
+    macro(localStreams) \
     macro(operations) \
     macro(ownerReadableStream) \
     macro(privateGetStats) \
@@ -54,6 +65,12 @@ namespace WebCore {
     macro(reader) \
     macro(readRequests) \
     macro(readyPromiseCapability) \
+    macro(removeTrack) \
+    macro(responseCacheIsValid) \
+    macro(retrieveResponse) \
+    macro(response) \
+    macro(setBody) \
+    macro(setStatus) \
     macro(state) \
     macro(started) \
     macro(startedPromise) \
@@ -68,12 +85,17 @@ namespace WebCore {
     macro(underlyingSink) \
     macro(underlyingSource) \
     macro(writing) \
+    macro(Headers) \
+    macro(MediaStream) \
     macro(MediaStreamTrack) \
     macro(ReadableStream) \
     macro(ReadableStreamReader) \
     macro(ReadableStreamController) \
+    macro(Request) \
+    macro(Response) \
     macro(RTCIceCandidate) \
     macro(RTCSessionDescription) \
+    macro(XMLHttpRequest)
 
 class WebCoreBuiltinNames {
 public:

@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2015 Andy VanWagoner (thetalecrafter@gmail.com)
  * Copyright (C) 2015 Sukolsak Sakshuwong (sukolsak@gmail.com)
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,6 +49,7 @@
 #include <unicode/unumsys.h>
 #include <wtf/Assertions.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/PlatformUserPreferredLanguages.h>
 
 namespace JSC {
 
@@ -112,14 +114,6 @@ void IntlObject::finishCreation(VM& vm, JSGlobalObject* globalObject)
 Structure* IntlObject::createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
 {
     return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
-}
-
-String defaultLocale()
-{
-    // 6.2.4 DefaultLocale ()
-    String locale = uloc_getDefault();
-    convertICULocaleToBCP47LanguageTag(locale);
-    return locale;
 }
 
 void convertICULocaleToBCP47LanguageTag(String& locale)
@@ -650,6 +644,32 @@ String bestAvailableLocale(const HashSet<String>& availableLocales, const String
     return String();
 }
 
+String defaultLocale(ExecState& state)
+{
+    // 6.2.4 DefaultLocale ()
+    
+    // WebCore's global objects will have their own ideas of how to determine the language. It may
+    // be determined by WebCore-specific logic like some WK settings. Usually this will return the
+    // same thing as platformUserPreferredLanguages()[0].
+    if (auto defaultLanguage = state.callee()->globalObject()->globalObjectMethodTable()->defaultLanguage) {
+        String locale = defaultLanguage();
+        if (!locale.isEmpty())
+            return canonicalizeLanguageTag(locale);
+    }
+    
+    // If WebCore isn't around to tell us how to get the language then fall back to our own way of
+    // doing it, which mostly follows what WebCore would have done.
+    Vector<String> languages = platformUserPreferredLanguages();
+    if (!languages.isEmpty() && !languages[0].isEmpty())
+        return canonicalizeLanguageTag(languages[0]);
+    
+    // If all else fails, ask ICU. It will probably say something bogus like en_us even if the user
+    // has configured some other language, but being wrong is better than crashing.
+    String locale = uloc_getDefault();
+    convertICULocaleToBCP47LanguageTag(locale);
+    return locale;
+}
+
 String removeUnicodeLocaleExtension(const String& locale)
 {
     Vector<String> parts;
@@ -672,7 +692,7 @@ String removeUnicodeLocaleExtension(const String& locale)
     return builder.toString();
 }
 
-static MatcherResult lookupMatcher(const HashSet<String>& availableLocales, const Vector<String>& requestedLocales)
+static MatcherResult lookupMatcher(ExecState& state, const HashSet<String>& availableLocales, const Vector<String>& requestedLocales)
 {
     // 9.2.3 LookupMatcher (availableLocales, requestedLocales) (ECMA-402 2.0)
     String locale;
@@ -709,25 +729,25 @@ static MatcherResult lookupMatcher(const HashSet<String>& availableLocales, cons
             result.extensionIndex = extensionIndex;
         }
     } else
-        result.locale = defaultLocale();
+        result.locale = defaultLocale(state);
     return result;
 }
 
-static MatcherResult bestFitMatcher(const HashSet<String>& availableLocales, const Vector<String>& requestedLocales)
+static MatcherResult bestFitMatcher(ExecState& state, const HashSet<String>& availableLocales, const Vector<String>& requestedLocales)
 {
     // 9.2.4 BestFitMatcher (availableLocales, requestedLocales) (ECMA-402 2.0)
     // FIXME: Implement something better than lookup.
-    return lookupMatcher(availableLocales, requestedLocales);
+    return lookupMatcher(state, availableLocales, requestedLocales);
 }
 
-HashMap<String, String> resolveLocale(const HashSet<String>& availableLocales, const Vector<String>& requestedLocales, const HashMap<String, String>& options, const char* const relevantExtensionKeys[], size_t relevantExtensionKeyCount, Vector<String> (*localeData)(const String&, size_t))
+HashMap<String, String> resolveLocale(ExecState& state, const HashSet<String>& availableLocales, const Vector<String>& requestedLocales, const HashMap<String, String>& options, const char* const relevantExtensionKeys[], size_t relevantExtensionKeyCount, Vector<String> (*localeData)(const String&, size_t))
 {
     // 9.2.5 ResolveLocale (availableLocales, requestedLocales, options, relevantExtensionKeys, localeData) (ECMA-402 2.0)
     // 1. Let matcher be the value of options.[[localeMatcher]].
     const String& matcher = options.get(ASCIILiteral("localeMatcher"));
 
     // 2. If matcher is "lookup", then
-    MatcherResult (*matcherOperation)(const HashSet<String>&, const Vector<String>&);
+    MatcherResult (*matcherOperation)(ExecState&, const HashSet<String>&, const Vector<String>&);
     if (matcher == "lookup") {
         // a. Let MatcherOperation be the abstract operation LookupMatcher.
         matcherOperation = lookupMatcher;
@@ -737,7 +757,7 @@ HashMap<String, String> resolveLocale(const HashSet<String>& availableLocales, c
     }
 
     // 4. Let r be MatcherOperation(availableLocales, requestedLocales).
-    MatcherResult matcherResult = matcherOperation(availableLocales, requestedLocales);
+    MatcherResult matcherResult = matcherOperation(state, availableLocales, requestedLocales);
 
     // 5. Let foundLocale be the value of r.[[locale]].
     String foundLocale = matcherResult.locale;
@@ -939,6 +959,8 @@ JSValue supportedLocales(ExecState& state, const HashSet<String>& availableLocal
     // 7. Let keys be subset.[[OwnPropertyKeys]]().
     PropertyNameArray keys(&state, PropertyNameMode::Strings);
     supportedLocales->getOwnPropertyNames(supportedLocales, &state, keys, EnumerationMode());
+    if (state.hadException())
+        return jsUndefined();
 
     PropertyDescriptor desc;
     desc.setConfigurable(false);
@@ -967,22 +989,20 @@ Vector<String> numberingSystemsForLocale(const String& locale)
     static NeverDestroyed<Vector<String>> cachedNumberingSystems;
     Vector<String>& availableNumberingSystems = cachedNumberingSystems.get();
     if (availableNumberingSystems.isEmpty()) {
-        UErrorCode status(U_ZERO_ERROR);
+        UErrorCode status = U_ZERO_ERROR;
         UEnumeration* numberingSystemNames = unumsys_openAvailableNames(&status);
         ASSERT(U_SUCCESS(status));
-        status = U_ZERO_ERROR;
 
         int32_t resultLength;
         // Numbering system names are always ASCII, so use char[].
         while (const char* result = uenum_next(numberingSystemNames, &resultLength, &status)) {
             ASSERT(U_SUCCESS(status));
-            status = U_ZERO_ERROR;
             availableNumberingSystems.append(String(result, resultLength));
         }
         uenum_close(numberingSystemNames);
     }
 
-    UErrorCode status(U_ZERO_ERROR);
+    UErrorCode status = U_ZERO_ERROR;
     UNumberingSystem* defaultSystem = unumsys_open(locale.utf8().data(), &status);
     ASSERT(U_SUCCESS(status));
     String defaultSystemName(unumsys_getName(defaultSystem));

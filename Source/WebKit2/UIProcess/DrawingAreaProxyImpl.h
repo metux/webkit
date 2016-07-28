@@ -44,7 +44,7 @@ public:
 
     void paint(BackingStore::PlatformGraphicsContext, const WebCore::IntRect&, WebCore::Region& unpaintedRegion);
 
-    bool isInAcceleratedCompositingMode() const { return !m_layerTreeContext.isEmpty(); }
+    bool isInAcceleratedCompositingMode() const { return alwaysUseCompositing() || !m_layerTreeContext.isEmpty(); }
 
     bool hasReceivedFirstUpdate() const { return m_hasReceivedFirstUpdate; }
 
@@ -53,23 +53,23 @@ public:
     void destroyNativeSurfaceHandleForCompositing();
 #endif
 
-    virtual void dispatchAfterEnsuringDrawing(std::function<void (CallbackBase::Error)>) override;
+    void dispatchAfterEnsuringDrawing(std::function<void (CallbackBase::Error)>) override;
 
 private:
     // DrawingAreaProxy
-    virtual void sizeDidChange() override;
-    virtual void deviceScaleFactorDidChange() override;
+    void sizeDidChange() override;
+    void deviceScaleFactorDidChange() override;
 
-    virtual void setBackingStoreIsDiscardable(bool) override;
-    virtual void waitForBackingStoreUpdateOnNextPaint() override;
+    void setBackingStoreIsDiscardable(bool) override;
+    void waitForBackingStoreUpdateOnNextPaint() override;
 
     // IPC message handlers
-    virtual void update(uint64_t backingStoreStateID, const UpdateInfo&) override;
-    virtual void didUpdateBackingStoreState(uint64_t backingStoreStateID, const UpdateInfo&, const LayerTreeContext&) override;
-    virtual void enterAcceleratedCompositingMode(uint64_t backingStoreStateID, const LayerTreeContext&) override;
-    virtual void exitAcceleratedCompositingMode(uint64_t backingStoreStateID, const UpdateInfo&) override;
-    virtual void updateAcceleratedCompositingMode(uint64_t backingStoreStateID, const LayerTreeContext&) override;
-    virtual void willEnterAcceleratedCompositingMode(uint64_t backingStoreStateID) override;
+    void update(uint64_t backingStoreStateID, const UpdateInfo&) override;
+    void didUpdateBackingStoreState(uint64_t backingStoreStateID, const UpdateInfo&, const LayerTreeContext&) override;
+    void enterAcceleratedCompositingMode(uint64_t backingStoreStateID, const LayerTreeContext&) override;
+    void exitAcceleratedCompositingMode(uint64_t backingStoreStateID, const UpdateInfo&) override;
+    void updateAcceleratedCompositingMode(uint64_t backingStoreStateID, const LayerTreeContext&) override;
+    void willEnterAcceleratedCompositingMode(uint64_t backingStoreStateID) override;
 
     void incorporateUpdate(const UpdateInfo&);
 
@@ -81,6 +81,7 @@ private:
     void enterAcceleratedCompositingMode(const LayerTreeContext&);
     void exitAcceleratedCompositingMode();
     void updateAcceleratedCompositingMode(const LayerTreeContext&);
+    bool alwaysUseCompositing() const;
 
     void discardBackingStoreSoon();
     void discardBackingStore();
@@ -108,6 +109,10 @@ private:
     std::unique_ptr<BackingStore> m_backingStore;
 
     RunLoop::Timer<DrawingAreaProxyImpl> m_discardBackingStoreTimer;
+
+#if USE(TEXTURE_MAPPER) && PLATFORM(GTK)
+    uint64_t m_pendingNativeSurfaceHandleForCompositing { 0 };
+#endif
 };
 
 } // namespace WebKit

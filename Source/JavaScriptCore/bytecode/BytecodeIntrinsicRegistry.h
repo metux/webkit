@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 Yusuke Suzuki <utatane.tea@gmail.com>.
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,21 +40,39 @@ class RegisterID;
 class Identifier;
 
 #define JSC_COMMON_BYTECODE_INTRINSIC_FUNCTIONS_EACH_NAME(macro) \
+    macro(argumentCount) \
     macro(assert) \
     macro(isObject) \
+    macro(isJSArray) \
+    macro(tailCallForwardArguments) \
+    macro(tryGetById) \
     macro(putByValDirect) \
+    macro(toNumber) \
     macro(toString)
 
 #define JSC_COMMON_BYTECODE_INTRINSIC_CONSTANTS_EACH_NAME(macro) \
     macro(undefined) \
+    macro(Infinity) \
     macro(arrayIterationKindKey) \
     macro(arrayIterationKindValue) \
     macro(arrayIterationKindKeyValue) \
+    macro(MAX_STRING_LENGTH) \
+    macro(MAX_SAFE_INTEGER) \
+    macro(ModuleFetch) \
+    macro(ModuleTranslate) \
+    macro(ModuleInstantiate) \
+    macro(ModuleResolveDependencies) \
+    macro(ModuleLink) \
+    macro(ModuleReady) \
     macro(promiseStatePending) \
     macro(promiseStateFulfilled) \
     macro(promiseStateRejected) \
-    macro(symbolIterator) \
-    macro(symbolSearch)
+    macro(GeneratorResumeModeNormal) \
+    macro(GeneratorResumeModeThrow) \
+    macro(GeneratorResumeModeReturn) \
+    macro(GeneratorStateCompleted) \
+    macro(GeneratorStateExecuting) \
+
 
 class BytecodeIntrinsicRegistry {
     WTF_MAKE_NONCOPYABLE(BytecodeIntrinsicRegistry);

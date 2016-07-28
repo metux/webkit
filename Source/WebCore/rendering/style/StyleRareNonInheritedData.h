@@ -32,6 +32,7 @@
 #include "CursorData.h"
 #include "DataRef.h"
 #include "FillLayer.h"
+#include "LengthPoint.h"
 #include "LineClampValue.h"
 #include "NinePieceImage.h"
 #include "ShapeValue.h"
@@ -154,6 +155,7 @@ public:
     NinePieceImage m_maskBoxImage;
 
     LengthSize m_pageSize;
+    LengthPoint m_objectPosition;
 
 #if ENABLE(CSS_SHAPES)
     RefPtr<ShapeValue> m_shapeOutside;
@@ -224,6 +226,10 @@ public:
     unsigned m_breakAfter : 4;
     unsigned m_breakInside : 3; // BreakInside
     unsigned m_resize : 2; // EResize
+
+    unsigned m_hasAttrContent : 1;
+
+    unsigned m_isPlaceholderStyle : 1;
 
 private:
     StyleRareNonInheritedData();

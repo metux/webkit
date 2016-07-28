@@ -88,7 +88,7 @@ void DocumentRuleSets::appendAuthorStyleSheets(const Vector<RefPtr<CSSStyleSheet
     // needs to be reconstructed. To handle insertions too the rule order numbers would need to be updated.
     for (auto& cssSheet : styleSheets) {
         ASSERT(!cssSheet->disabled());
-        if (cssSheet->mediaQueries() && !medium->eval(cssSheet->mediaQueries(), resolver))
+        if (cssSheet->mediaQueries() && !medium->evaluate(*cssSheet->mediaQueries(), resolver))
             continue;
         m_authorStyle->addRulesFromSheet(cssSheet->contents(), *medium, resolver);
         inspectorCSSOMWrappers.collectFromStyleSheetIfNeeded(cssSheet.get());
@@ -114,6 +114,9 @@ void DocumentRuleSets::collectFeatures() const
 
     m_siblingRuleSet = makeRuleSet(m_features.siblingRules);
     m_uncommonAttributeRuleSet = makeRuleSet(m_features.uncommonAttributeRules);
+
+    m_ancestorClassRuleSets.clear();
+    m_ancestorAttributeRuleSetsForHTML.clear();
 }
 
 RuleSet* DocumentRuleSets::ancestorClassRules(AtomicStringImpl* className) const

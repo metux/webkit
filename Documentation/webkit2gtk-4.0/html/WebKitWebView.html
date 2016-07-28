@@ -3237,9 +3237,8 @@ specifies a background color, it will take precedence over the <em class="parame
  color.
 By default the <em class="parameter"><code>web_view</code></em>
  background color is opaque white.
-If the <em class="parameter"><code>rgba</code></em>
- color is not fully opaque, the parent window must have a RGBA visual and
-<a href="../gtk2/GtkWidget.html#GtkWidget--app-paintable"><span class="type">“app-paintable”</span></a> property set to <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>, for the transparencies to work.</p>
+Note that the parent window must have a RGBA visual and
+<a href="../gtk2/GtkWidget.html#GtkWidget--app-paintable"><span class="type">“app-paintable”</span></a> property set to <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> for backgrounds colors to work.</p>
 <div class="informalexample">
   <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
     <tbody>
@@ -3259,25 +3258,19 @@ If the <em class="parameter"><code>rgba</code></em>
 13
 14
 15
-16
-17
-18
-19</pre></td>
+16</pre></td>
         <td class="listing_code"><pre class="programlisting"><span class="type">static</span> <span class="type">void</span> browser_window_set_background_color (BrowserWindow *window,
                                                  <span class="type">const</span> GdkRGBA *rgba)
 {
     WebKitWebView *web_view;
+    GdkScreen *screen = gtk_window_get_screen (GTK_WINDOW (window));
+    GdkVisual *rgba_visual = gdk_screen_get_rgba_visual (screen);
 
-    <span class="keyword">if</span> (rgba-&gt;alpha &lt; <span class="number">1</span>) {
-        GdkScreen *screen = gtk_window_get_screen (GTK_WINDOW (window));
-        GdkVisual *rgba_visual = gdk_screen_get_rgba_visual (screen);
+    <span class="keyword">if</span> (!rgba_visual)
+         <span class="keyword">return</span>;
 
-        <span class="keyword">if</span> (!rgba_visual)
-             <span class="keyword">return</span>;
-
-        gtk_widget_set_visual (GTK_WIDGET (window), rgba_visual);
-        gtk_widget_set_app_paintable (GTK_WIDGET (window), TRUE);
-    }
+    gtk_widget_set_visual (GTK_WIDGET (window), rgba_visual);
+    gtk_widget_set_app_paintable (GTK_WIDGET (window), TRUE);
 
     web_view = browser_window_get_web_view (window);
     webkit_web_view_set_background_color (web_view, rgba);

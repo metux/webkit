@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2007-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -89,6 +89,7 @@ public:
     void queueReload();
     void removeAllVisitedLinks();
     void setAcceptsEditing(bool);
+    void setFetchAPIEnabled(bool);
     void setAllowUniversalAccessFromFileURLs(bool);
     void setAllowFileAccessFromFileURLs(bool);
     void setAppCacheMaximumSize(unsigned long long quota);
@@ -126,6 +127,8 @@ public:
     void setPageVisibility(const char*);
     void resetPageVisibility();
 
+    static void setAllowsAnySSLCertificate(bool);
+
     void waitForPolicyDelegate();
     size_t webHistoryItemCount();
     int windowCount();
@@ -133,6 +136,8 @@ public:
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     void setTextAutosizingEnabled(bool);
 #endif
+
+    void setAccummulateLogsForChannel(JSStringRef);
 
     // Legacy here refers to the old TestRunner API for handling web notifications, not the legacy web notification API.
     void ignoreLegacyWebNotificationPermissionRequests();
@@ -209,9 +214,6 @@ public:
     bool dumpTitleChanges() const { return m_dumpTitleChanges; }
     void setDumpTitleChanges(bool dumpTitleChanges) { m_dumpTitleChanges = dumpTitleChanges; }
 
-    bool dumpIconChanges() const { return m_dumpIconChanges; }
-    void setDumpIconChanges(bool dumpIconChanges) { m_dumpIconChanges = dumpIconChanges; }
-
     bool dumpVisitedLinksCallback() const { return m_dumpVisitedLinksCallback; }
     void setDumpVisitedLinksCallback(bool dumpVisitedLinksCallback) { m_dumpVisitedLinksCallback = dumpVisitedLinksCallback; }
     
@@ -258,8 +260,13 @@ public:
     bool windowIsKey() const { return m_windowIsKey; }
     void setWindowIsKey(bool);
 
+    void setViewSize(double width, double height);
+
     bool alwaysAcceptCookies() const { return m_alwaysAcceptCookies; }
     void setAlwaysAcceptCookies(bool);
+    
+    bool rejectsProtectionSpaceAndContinueForAuthenticationChallenges() const { return m_rejectsProtectionSpaceAndContinueForAuthenticationChallenges; }
+    void setRejectsProtectionSpaceAndContinueForAuthenticationChallenges(bool value) { m_rejectsProtectionSpaceAndContinueForAuthenticationChallenges = value; }
     
     bool handlesAuthenticationChallenges() const { return m_handlesAuthenticationChallenges; }
     void setHandlesAuthenticationChallenges(bool handlesAuthenticationChallenges) { m_handlesAuthenticationChallenges = handlesAuthenticationChallenges; }
@@ -355,7 +362,10 @@ public:
     bool hasPendingWebNotificationClick() const { return m_hasPendingWebNotificationClick; }
 
     void setCustomTimeout(int duration) { m_timeout = duration; }
+    double timeout() { return m_timeout; }
 
+    unsigned imageCountInGeneralPasteboard() const;
+    
 private:
     TestRunner(const std::string& testURL, const std::string& expectedPixelHash);
 
@@ -382,7 +392,6 @@ private:
     bool m_dumpSourceAsWebArchive;
     bool m_dumpStatusCallbacks;
     bool m_dumpTitleChanges;
-    bool m_dumpIconChanges;
     bool m_dumpVisitedLinksCallback;
     bool m_dumpWillCacheResponse;
     bool m_generatePixelResults;
@@ -402,6 +411,7 @@ private:
     bool m_globalFlag;
     bool m_isGeolocationPermissionSet;
     bool m_geolocationPermission;
+    bool m_rejectsProtectionSpaceAndContinueForAuthenticationChallenges;
     bool m_handlesAuthenticationChallenges;
     bool m_isPrinting;
     bool m_deferMainResourceDataLoad;

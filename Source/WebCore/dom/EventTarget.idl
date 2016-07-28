@@ -20,13 +20,29 @@
 
 // Introduced in DOM Level 2:
 [
-    ObjCProtocol,
-    CPPPureInterface,
     CustomToJSObject,
-    JSCustomToNativeObject,
+    Exposed=(Window,Worker),
     JSCustomHeader,
+    JSCustomToNativeObject,
+    ObjCProtocol,
 ] interface EventTarget {
-    [ObjCLegacyUnnamedParameters] void addEventListener(DOMString type, EventListener listener, optional boolean useCapture);
-    [ObjCLegacyUnnamedParameters] void removeEventListener(DOMString type, EventListener listener, optional boolean useCapture);
+#if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
+    [ImplementedAs=addEventListenerForBindings] void addEventListener([AtomicString] DOMString type, EventListener? listener, optional AddEventListenerOptions options);
+    [ImplementedAs=removeEventListenerForBindings] void removeEventListener([AtomicString] DOMString type, EventListener? listener, optional EventListenerOptions options);
+#endif
+
+    [ObjCLegacyUnnamedParameters, ImplementedAs=addEventListenerForBindings] void addEventListener([AtomicString] DOMString type, EventListener? listener, optional boolean useCapture = false);
+    [ObjCLegacyUnnamedParameters, ImplementedAs=removeEventListenerForBindings] void removeEventListener([AtomicString] DOMString type, EventListener? listener, optional boolean useCapture = false);
+
     [ImplementedAs=dispatchEventForBindings, RaisesException] boolean dispatchEvent(Event event);
+};
+
+dictionary EventListenerOptions {
+    boolean capture = false;
+};
+
+dictionary AddEventListenerOptions {
+    boolean capture = false;
+    boolean passive = false;
+    boolean once = false;
 };

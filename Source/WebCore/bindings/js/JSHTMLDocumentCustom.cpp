@@ -37,6 +37,7 @@
 #include "JSDOMWindow.h"
 #include "JSDOMWindowCustom.h"
 #include "JSDOMWindowShell.h"
+#include "JSDocumentCustom.h"
 #include "JSHTMLCollection.h"
 #include "JSMainThreadExecState.h"
 #include "SegmentedString.h"
@@ -51,6 +52,23 @@ using namespace JSC;
 namespace WebCore {
 
 using namespace HTMLNames;
+
+JSValue toJSNewlyCreated(ExecState* state, JSDOMGlobalObject* globalObject, Ref<HTMLDocument>&& passedDocument)
+{
+    auto& document = passedDocument.get();
+    JSObject* wrapper = createWrapper<JSHTMLDocument>(globalObject, WTFMove(passedDocument));
+
+    reportMemoryForDocumentIfFrameless(*state, document);
+
+    return wrapper;
+}
+
+JSValue toJS(ExecState* state, JSDOMGlobalObject* globalObject, HTMLDocument& document)
+{
+    if (auto* wrapper = cachedDocumentWrapper(*state, *globalObject, document))
+        return wrapper;
+    return toJSNewlyCreated(state, globalObject, Ref<HTMLDocument>(document));
+}
 
 bool JSHTMLDocument::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
@@ -71,8 +89,6 @@ bool JSHTMLDocument::getOwnPropertySlot(JSObject* object, ExecState* exec, Prope
         return true;
     }
 
-    static_assert(!hasStaticPropertyTable, "This method does not handle static instance properties");
-
     return Base::getOwnPropertySlot(thisObject, exec, propertyName, slot);
 }
 
@@ -87,13 +103,13 @@ bool JSHTMLDocument::nameGetter(ExecState* exec, PropertyName propertyName, JSVa
     if (UNLIKELY(document.documentNamedItemContainsMultipleElements(*atomicPropertyName))) {
         Ref<HTMLCollection> collection = document.documentNamedItems(atomicPropertyName);
         ASSERT(collection->length() > 1);
-        value = toJS(exec, globalObject(), WTF::getPtr(collection));
+        value = toJS(exec, globalObject(), collection);
         return true;
     }
 
-    Element* element = document.documentNamedItem(*atomicPropertyName);
-    if (UNLIKELY(is<HTMLIFrameElement>(*element))) {
-        if (Frame* frame = downcast<HTMLIFrameElement>(*element).contentFrame()) {
+    Element& element = *document.documentNamedItem(*atomicPropertyName);
+    if (UNLIKELY(is<HTMLIFrameElement>(element))) {
+        if (Frame* frame = downcast<HTMLIFrameElement>(element).contentFrame()) {
             value = toJS(exec, frame);
             return true;
         }
@@ -144,7 +160,7 @@ JSValue JSHTMLDocument::open(ExecState& state)
                 JSValue function = wrapper->get(&state, Identifier::fromString(&state, "open"));
                 CallData callData;
                 CallType callType = ::getCallData(function, callData);
-                if (callType == CallTypeNone)
+                if (callType == CallType::None)
                     return throwTypeError(&state);
                 return JSC::call(&state, function, callType, callData, wrapper, ArgList(&state));
             }

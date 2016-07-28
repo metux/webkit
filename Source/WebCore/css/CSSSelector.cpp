@@ -299,9 +299,11 @@ PseudoId CSSSelector::pseudoId(PseudoElementType type)
 #if ENABLE(VIDEO_TRACK)
     case PseudoElementCue:
 #endif
+    case PseudoElementSlotted:
     case PseudoElementUnknown:
     case PseudoElementUserAgentCustom:
     case PseudoElementWebKitCustom:
+    case PseudoElementWebKitCustomLegacyPrefixed:
         return NOPSEUDO;
     }
 
@@ -495,6 +497,9 @@ String CSSSelector::selectorText(const String& rightSide) const
             case CSSSelector::PseudoClassFocus:
                 str.appendLiteral(":focus");
                 break;
+            case CSSSelector::PseudoClassFocusWithin:
+                str.appendLiteral(":focus-within");
+                break;
 #if ENABLE(VIDEO_TRACK)
             case CSSSelector::PseudoClassFuture:
                 str.appendLiteral(":future");
@@ -635,17 +640,32 @@ String CSSSelector::selectorText(const String& rightSide) const
             case CSSSelector::PseudoClassWindowInactive:
                 str.appendLiteral(":window-inactive");
                 break;
-#if ENABLE(SHADOW_DOM)
             case CSSSelector::PseudoClassHost:
                 str.appendLiteral(":host");
+                break;
+#if ENABLE(CUSTOM_ELEMENTS)
+            case CSSSelector::PseudoClassDefined:
+                str.appendLiteral(":defined");
                 break;
 #endif
             case CSSSelector::PseudoClassUnknown:
                 ASSERT_NOT_REACHED();
             }
         } else if (cs->match() == CSSSelector::PseudoElement) {
-            str.appendLiteral("::");
-            str.append(cs->value());
+            switch (cs->pseudoElementType()) {
+            case CSSSelector::PseudoElementSlotted:
+                str.appendLiteral("::slotted(");
+                cs->selectorList()->buildSelectorsText(str);
+                str.append(')');
+                break;
+            case CSSSelector::PseudoElementWebKitCustomLegacyPrefixed:
+                if (cs->value() == "placeholder")
+                    str.appendLiteral("::-webkit-input-placeholder");
+                break;
+            default:
+                str.appendLiteral("::");
+                str.append(cs->value());
+            }
         } else if (cs->isAttributeSelector()) {
             str.append('[');
             const AtomicString& prefix = cs->attribute().prefix();

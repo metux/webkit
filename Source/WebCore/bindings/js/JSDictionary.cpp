@@ -55,11 +55,20 @@
 #if ENABLE(MEDIA_STREAM)
 #include "JSMediaStream.h"
 #include "JSMediaStreamTrack.h"
-#include "JSRTCRtpReceiver.h"
 #endif
+
+#if ENABLE(WEB_RTC)
+#include "JSRTCRtpReceiver.h"
+#include "JSRTCRtpTransceiver.h"
+#endif
+
 
 #if ENABLE(GAMEPAD)
 #include "JSGamepad.h"
+#endif
+
+#if ENABLE(IOS_TOUCH_EVENTS) || ENABLE(TOUCH_EVENTS)
+#include "JSTouchList.h"
 #endif
 
 using namespace JSC;
@@ -70,19 +79,15 @@ JSDictionary::GetPropertyResult JSDictionary::tryGetProperty(const char* propert
 {
     ASSERT(isValid());
     Identifier identifier = Identifier::fromString(m_exec, propertyName);
-    PropertySlot slot(m_initializerObject.get(), PropertySlot::InternalMethodType::Get);
-
-    if (!m_initializerObject.get()->getPropertySlot(m_exec, identifier, slot))
-        return NoPropertyFound;
-
+    bool propertyFound = m_initializerObject.get()->getPropertySlot(m_exec, identifier, [&] (bool propertyFound, PropertySlot& slot) -> bool {
+        if (!propertyFound)
+            return false;
+        finalResult = slot.getValue(m_exec, identifier);
+        return true;
+    });
     if (m_exec->hadException())
         return ExceptionThrown;
-
-    finalResult = slot.getValue(m_exec, identifier);
-    if (m_exec->hadException())
-        return ExceptionThrown;
-
-    return PropertyFound;
+    return propertyFound ? PropertyFound : NoPropertyFound;
 }
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, bool& result)
@@ -91,6 +96,11 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, bool& result)
 }
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, int& result)
+{
+    result = value.toInt32(exec);
+}
+
+void JSDictionary::convertValue(ExecState* exec, JSValue value, long int& result)
 {
     result = value.toInt32(exec);
 }
@@ -116,6 +126,12 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, unsigned long lo
     doubleToInteger(d, result);
 }
 
+void JSDictionary::convertValue(ExecState* exec, JSValue value, long long& result)
+{
+    double d = value.toNumber(exec);
+    result = llrint(d);
+}
+
 void JSDictionary::convertValue(ExecState* exec, JSValue value, double& result)
 {
     result = value.toNumber(exec);
@@ -133,11 +149,12 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, String& result)
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, Vector<String>& result)
 {
+    ASSERT(exec);
     if (value.isUndefinedOrNull())
         return;
 
     unsigned length = 0;
-    JSObject* object = toJSSequence(exec, value, length);
+    JSObject* object = toJSSequence(*exec, value, length);
     if (exec->hadException())
         return;
 
@@ -159,14 +176,14 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, RefPtr<Serialize
     result = SerializedScriptValue::create(exec, value, 0, 0);
 }
 
-void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<DOMWindow>& result)
+void JSDictionary::convertValue(ExecState* state, JSValue value, RefPtr<DOMWindow>& result)
 {
-    result = JSDOMWindow::toWrapped(value);
+    result = JSDOMWindow::toWrapped(*state, value);
 }
 
-void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<EventTarget>& result)
+void JSDictionary::convertValue(ExecState* state, JSValue value, RefPtr<EventTarget>& result)
 {
-    result = JSEventTarget::toWrapped(value);
+    result = JSEventTarget::toWrapped(*state, value);
 }
 
 void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<Node>& result)
@@ -194,13 +211,14 @@ void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<TrackBase>& re
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, HashSet<AtomicString>& result)
 {
+    ASSERT(exec);
     result.clear();
 
     if (value.isUndefinedOrNull())
         return;
 
     unsigned length = 0;
-    JSObject* object = toJSSequence(exec, value, length);
+    JSObject* object = toJSSequence(*exec, value, length);
     if (exec->hadException())
         return;
 
@@ -249,10 +267,42 @@ void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Medi
 {
     result = JSMediaStreamTrack::toWrapped(value);
 }
+#endif
 
+#if ENABLE(WEB_RTC)
 void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<RTCRtpReceiver>& result)
 {
     result = JSRTCRtpReceiver::toWrapped(value);
+}
+
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<RTCRtpTransceiver>& result)
+{
+    result = JSRTCRtpTransceiver::toWrapped(value);
+}
+
+void JSDictionary::convertValue(ExecState* exec, JSValue value, Vector<RefPtr<MediaStream>>& result)
+{
+    ASSERT(exec);
+    if (value.isUndefinedOrNull())
+        return;
+
+    unsigned length = 0;
+    JSObject* object = toJSSequence(*exec, value, length);
+    if (exec->hadException())
+        return;
+
+    for (unsigned i = 0 ; i < length; ++i) {
+        JSValue itemValue = object->get(exec, i);
+        if (exec->hadException())
+            return;
+
+        auto stream = JSMediaStream::toWrapped(itemValue);
+        if (!stream) {
+            setDOMException(exec, TypeError);
+            return;
+        }
+        result.append(stream);
+    }
 }
 #endif
 
@@ -280,6 +330,13 @@ void JSDictionary::convertValue(JSC::ExecState* exec, JSC::JSValue value, RefPtr
 void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Gamepad>& result)
 {
     result = JSGamepad::toWrapped(value);
+}
+#endif
+
+#if ENABLE(IOS_TOUCH_EVENTS) || ENABLE(TOUCH_EVENTS)
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<TouchList>& result)
+{
+    result = JSTouchList::toWrapped(value);
 }
 #endif
 

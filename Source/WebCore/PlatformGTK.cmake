@@ -1,7 +1,10 @@
 include(platform/GStreamer.cmake)
 include(platform/ImageDecoders.cmake)
 include(platform/Linux.cmake)
-include(platform/TextureMapper.cmake)
+
+if (USE_TEXTURE_MAPPER)
+    include(platform/TextureMapper.cmake)
+endif ()
 
 set(WebCore_OUTPUT_NAME WebCoreGTK)
 
@@ -44,6 +47,7 @@ list(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/opentype"
     "${WEBCORE_DIR}/platform/graphics/wayland"
     "${WEBCORE_DIR}/platform/graphics/x11"
+    "${WEBCORE_DIR}/platform/mediastream/gtk"
     "${WEBCORE_DIR}/platform/mock/mediasource"
     "${WEBCORE_DIR}/platform/network/gtk"
     "${WEBCORE_DIR}/platform/network/soup"
@@ -70,29 +74,30 @@ list(APPEND WebCore_SOURCES
     accessibility/atk/WebKitAccessibleUtil.cpp
     accessibility/atk/WebKitAccessibleWrapperAtk.cpp
 
-    editing/SmartReplace.cpp
-
     editing/atk/FrameSelectionAtk.cpp
 
     loader/soup/CachedRawResourceSoup.cpp
     loader/soup/SubresourceLoaderSoup.cpp
 
     platform/KillRingNone.cpp
-    platform/PlatformStrategies.cpp
 
     platform/audio/glib/AudioBusGLib.cpp
+
+    platform/crypto/gnutls/CryptoDigestGnuTLS.cpp
 
     platform/geoclue/GeolocationProviderGeoclue1.cpp
     platform/geoclue/GeolocationProviderGeoclue2.cpp
 
+    platform/glib/EventLoopGlib.cpp
+    platform/glib/FileSystemGlib.cpp
+    platform/glib/GamepadsGlib.cpp
     platform/glib/KeyedDecoderGlib.cpp
     platform/glib/KeyedEncoderGlib.cpp
     platform/glib/MainThreadSharedTimerGLib.cpp
+    platform/glib/SharedBufferGlib.cpp
 
     platform/graphics/GLContext.cpp
     platform/graphics/GraphicsContext3DPrivate.cpp
-    platform/graphics/ImageSource.cpp
-    platform/graphics/WOFFFileFormat.cpp
 
     platform/graphics/cairo/BackingStoreBackendCairoImpl.cpp
     platform/graphics/cairo/BackingStoreBackendCairoX11.cpp
@@ -139,18 +144,14 @@ list(APPEND WebCore_SOURCES
     platform/graphics/x11/XUniqueResource.cpp
 
     platform/gtk/ErrorsGtk.cpp
-    platform/gtk/EventLoopGtk.cpp
-    platform/gtk/FileSystemGtk.cpp
-    platform/gtk/GamepadsGtk.cpp
-    platform/gtk/LanguageGtk.cpp
-    platform/gtk/LoggingGtk.cpp
     platform/gtk/MIMETypeRegistryGtk.cpp
     platform/gtk/ScrollAnimatorGtk.cpp
-    platform/gtk/SharedBufferGtk.cpp
     platform/gtk/TemporaryLinkStubs.cpp
     platform/gtk/UserAgentGtk.cpp
 
     platform/image-decoders/cairo/ImageDecoderCairo.cpp
+
+    platform/mediastream/gtk/SDPProcessorScriptResourceGtk.cpp
 
     platform/network/gtk/CredentialBackingStore.cpp
 
@@ -181,9 +182,9 @@ list(APPEND WebCore_SOURCES
 
     platform/text/enchant/TextCheckerEnchant.cpp
 
-    platform/text/gtk/TextBreakIteratorInternalICUGtk.cpp
-
     platform/text/hyphen/HyphenationLibHyphen.cpp
+
+    platform/unix/LoggingUnix.cpp
 )
 
 list(APPEND WebCorePlatformGTK_SOURCES
@@ -225,7 +226,7 @@ list(APPEND WebCorePlatformGTK_SOURCES
 )
 
 if (USE_GEOCLUE2)
-    list(APPEND WebCore_SOURCES
+    list(APPEND WebCore_DERIVED_SOURCES
         ${DERIVED_SOURCES_WEBCORE_DIR}/Geoclue2Interface.c
     )
     execute_process(COMMAND pkg-config --variable dbus_interface geoclue-2.0 OUTPUT_VARIABLE GEOCLUE_DBUS_INTERFACE)
@@ -247,6 +248,9 @@ set(WebCore_USER_AGENT_SCRIPTS
 
 set(WebCore_USER_AGENT_SCRIPTS_DEPENDENCIES ${WEBCORE_DIR}/platform/gtk/RenderThemeGtk.cpp)
 
+set(WebCore_SDP_PROCESSOR_SCRIPTS ${WEBCORE_DIR}/Modules/mediastream/sdp.js)
+set(WebCore_SDP_PROCESSOR_SCRIPTS_DEPENDENCIES ${WEBCORE_DIR}/platform/mediastream/gtk/SDPProcessorScriptResourceGtk.cpp)
+
 list(APPEND WebCore_LIBRARIES
     ${ATK_LIBRARIES}
     ${CAIRO_LIBRARIES}
@@ -258,6 +262,7 @@ list(APPEND WebCore_LIBRARIES
     ${GLIB_GMODULE_LIBRARIES}
     ${GLIB_GOBJECT_LIBRARIES}
     ${GLIB_LIBRARIES}
+    ${GNUTLS_LIBRARIES}
     ${GUDEV_LIBRARIES}
     ${HARFBUZZ_LIBRARIES}
     ${LIBSECRET_LIBRARIES}
@@ -272,7 +277,10 @@ list(APPEND WebCore_LIBRARIES
     ${X11_Xrender_LIB}
     ${X11_Xt_LIB}
     ${ZLIB_LIBRARIES}
+    WTF
 )
+
+list(APPEND WebCoreTestSupport_LIBRARIES WTF)
 
 list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
     ${ATK_INCLUDE_DIRS}
@@ -282,6 +290,7 @@ list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
     ${GEOCLUE_INCLUDE_DIRS}
     ${GIO_UNIX_INCLUDE_DIRS}
     ${GLIB_INCLUDE_DIRS}
+    ${GNUTLS_INCLUDE_DIRS}
     ${GUDEV_INCLUDE_DIRS}
     ${HARFBUZZ_INCLUDE_DIRS}
     ${LIBSECRET_INCLUDE_DIRS}
@@ -348,7 +357,8 @@ if (ENABLE_WAYLAND_TARGET)
         platform/graphics/wayland/PlatformDisplayWayland.cpp
         platform/graphics/wayland/WaylandEventSource.cpp
         platform/graphics/wayland/WaylandSurface.cpp
-
+    )
+    list(APPEND WebCore_DERIVED_SOURCES
         ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.c
     )
 
@@ -535,7 +545,7 @@ list(APPEND GObjectDOMBindingsUnstable_IDL_FILES
 
     Modules/webdatabase/Database.idl
 
-    css/DOMWindowCSS.idl
+    css/DOMCSSNamespace.idl
     css/MediaQueryList.idl
     css/StyleMedia.idl
 
@@ -580,6 +590,14 @@ list(APPEND GObjectDOMBindingsUnstable_IDL_FILES
 
     storage/Storage.idl
 )
+
+if (ENABLE_WEB_ANIMATIONS)
+    list(APPEND GObjectDOMBindingsUnstable_IDL_FILES
+        animation/AnimationTimeline.idl
+        animation/DocumentAnimation.idl
+        animation/DocumentTimeline.idl
+    )
+endif ()
 
 if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO)
     list(APPEND GObjectDOMBindingsUnstable_IDL_FILES
@@ -779,7 +797,7 @@ if (ENABLE_SUBTLE_CRYPTO)
         crypto/CryptoAlgorithmRegistry.cpp
         crypto/CryptoKey.cpp
         crypto/CryptoKeyPair.cpp
-        crypto/SubtleCrypto.cpp
+        crypto/WebKitSubtleCrypto.cpp
 
         crypto/algorithms/CryptoAlgorithmAES_CBC.cpp
         crypto/algorithms/CryptoAlgorithmAES_KW.cpp
@@ -800,7 +818,6 @@ if (ENABLE_SUBTLE_CRYPTO)
         crypto/gnutls/CryptoAlgorithmRSASSA_PKCS1_v1_5GnuTLS.cpp
         crypto/gnutls/CryptoAlgorithmRSA_OAEPGnuTLS.cpp
         crypto/gnutls/CryptoAlgorithmRegistryGnuTLS.cpp
-        crypto/gnutls/CryptoDigestGnuTLS.cpp
         crypto/gnutls/CryptoKeyRSAGnuTLS.cpp
         crypto/gnutls/SerializedCryptoKeyWrapGnuTLS.cpp
 
@@ -809,12 +826,5 @@ if (ENABLE_SUBTLE_CRYPTO)
         crypto/keys/CryptoKeyDataRSAComponents.cpp
         crypto/keys/CryptoKeyHMAC.cpp
         crypto/keys/CryptoKeySerializationRaw.cpp
-    )
-
-    list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
-        ${GNUTLS_INCLUDE_DIRS}
-    )
-    list(APPEND WebCore_LIBRARIES
-        ${GNUTLS_LIBRARIES}
     )
 endif ()

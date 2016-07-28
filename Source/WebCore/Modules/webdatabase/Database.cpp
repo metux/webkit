@@ -203,9 +203,9 @@ static DatabaseGuid guidForOriginAndName(const String& origin, const String& nam
     return guid;
 }
 
-Database::Database(PassRefPtr<DatabaseContext> databaseContext, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize)
+Database::Database(RefPtr<DatabaseContext>&& databaseContext, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize)
     : m_scriptExecutionContext(databaseContext->scriptExecutionContext())
-    , m_databaseContext(databaseContext)
+    , m_databaseContext(WTFMove(databaseContext))
     , m_deleted(false)
     , m_name(name.isolatedCopy())
     , m_expectedVersion(expectedVersion.isolatedCopy())
@@ -279,7 +279,32 @@ bool Database::openAndVerifyVersion(bool setVersionInNewDatabase, DatabaseError&
     return success;
 }
 
+void Database::interrupt()
+{
+    // It is safe to call this from any thread for an opened or closed database.
+    m_sqliteDatabase.interrupt();
+}
+
 void Database::close()
+{
+    if (!databaseContext()->databaseThread())
+        return;
+
+    DatabaseTaskSynchronizer synchronizer;
+    if (databaseContext()->databaseThread()->terminationRequested(&synchronizer)) {
+        LOG(StorageAPI, "Database handle %p is on a terminated DatabaseThread, cannot be marked for normal closure\n", this);
+        return;
+    }
+
+    databaseContext()->databaseThread()->scheduleImmediateTask(std::make_unique<DatabaseCloseTask>(*this, synchronizer));
+
+    // FIXME: iOS depends on this function blocking until the database is closed as part
+    // of closing all open databases from a process assertion expiration handler.
+    // See <https://bugs.webkit.org/show_bug.cgi?id=157184>.
+    synchronizer.waitForTaskCompletion();
+}
+
+void Database::performClose()
 {
     ASSERT(databaseContext()->databaseThread());
     ASSERT(currentThread() == databaseContext()->databaseThread()->getThreadID());
@@ -308,7 +333,7 @@ void Database::close()
     // to it with a local pointer here for a liitle longer, so that we can
     // unschedule any DatabaseTasks that refer to it before the database gets
     // deleted.
-    Ref<Database> protect(*this);
+    Ref<Database> protectedThis(*this);
     databaseContext()->databaseThread()->recordDatabaseClosed(this);
     databaseContext()->databaseThread()->unscheduleDatabaseTasks(this);
 }
@@ -415,7 +440,7 @@ bool Database::performOpenAndVerify(bool shouldSetVersionInNewDatabase, Database
 
     if (currentVersion.isNull()) {
         LOG(StorageAPI, "Database %s does not have its version set", databaseDebugName().ascii().data());
-        currentVersion = "";
+        currentVersion = emptyString();
     }
 
     // If the expected version isn't the empty string, ensure that the current database version we have matches that version. Otherwise, set an exception.
@@ -438,7 +463,7 @@ bool Database::performOpenAndVerify(bool shouldSetVersionInNewDatabase, Database
     onExitCaller.setOpenSucceeded();
 
     if (m_new && !shouldSetVersionInNewDatabase)
-        m_expectedVersion = ""; // The caller provided a creationCallback which will set the expected version.
+        m_expectedVersion = emptyString(); // The caller provided a creationCallback which will set the expected version.
 
     if (databaseContext()->databaseThread())
         databaseContext()->databaseThread()->recordDatabaseOpen(this);
@@ -546,7 +571,7 @@ void Database::scheduleTransaction()
         transaction = m_transactionQueue.takeFirst();
 
     if (transaction && databaseContext()->databaseThread()) {
-        auto task = std::make_unique<DatabaseTransactionTask>(transaction);
+        auto task = std::make_unique<DatabaseTransactionTask>(WTFMove(transaction));
         LOG(StorageAPI, "Scheduling DatabaseTransactionTask %p for transaction %p\n", task.get(), task->transaction());
         m_transactionInProgress = true;
         databaseContext()->databaseThread()->scheduleTask(WTFMove(task));
@@ -554,17 +579,17 @@ void Database::scheduleTransaction()
         m_transactionInProgress = false;
 }
 
-PassRefPtr<SQLTransactionBackend> Database::runTransaction(PassRefPtr<SQLTransaction> transaction, bool readOnly, const ChangeVersionData* data)
+RefPtr<SQLTransactionBackend> Database::runTransaction(Ref<SQLTransaction>&& transaction, bool readOnly, const ChangeVersionData* data)
 {
     LockHolder locker(m_transactionInProgressMutex);
     if (!m_isTransactionQueueEnabled)
-        return 0;
+        return nullptr;
 
     RefPtr<SQLTransactionWrapper> wrapper;
     if (data)
         wrapper = ChangeVersionWrapper::create(data->oldVersion(), data->newVersion());
 
-    RefPtr<SQLTransactionBackend> transactionBackend = SQLTransactionBackend::create(this, transaction, wrapper, readOnly);
+    RefPtr<SQLTransactionBackend> transactionBackend = SQLTransactionBackend::create(this, WTFMove(transaction), WTFMove(wrapper), readOnly);
     m_transactionQueue.append(transactionBackend);
     if (!m_transactionInProgress)
         scheduleTransaction();
@@ -624,33 +649,23 @@ void Database::markAsDeletedAndClose()
     LOG(StorageAPI, "Marking %s (%p) as deleted", stringIdentifier().ascii().data(), this);
     m_deleted = true;
 
-    DatabaseTaskSynchronizer synchronizer;
-    if (databaseContext()->databaseThread()->terminationRequested(&synchronizer)) {
-        LOG(StorageAPI, "Database handle %p is on a terminated DatabaseThread, cannot be marked for normal closure\n", this);
-        return;
-    }
-
-    auto task = std::make_unique<DatabaseCloseTask>(*this, synchronizer);
-    databaseContext()->databaseThread()->scheduleImmediateTask(WTFMove(task));
-    synchronizer.waitForTaskCompletion();
+    close();
 }
 
-void Database::changeVersion(const String& oldVersion, const String& newVersion,
-                             PassRefPtr<SQLTransactionCallback> callback, PassRefPtr<SQLTransactionErrorCallback> errorCallback,
-                             PassRefPtr<VoidCallback> successCallback)
+void Database::changeVersion(const String& oldVersion, const String& newVersion, RefPtr<SQLTransactionCallback>&& callback, RefPtr<SQLTransactionErrorCallback>&& errorCallback, RefPtr<VoidCallback>&& successCallback)
 {
     ChangeVersionData data(oldVersion, newVersion);
-    runTransaction(callback, errorCallback, successCallback, false, &data);
+    runTransaction(WTFMove(callback), WTFMove(errorCallback), WTFMove(successCallback), false, &data);
 }
 
-void Database::transaction(PassRefPtr<SQLTransactionCallback> callback, PassRefPtr<SQLTransactionErrorCallback> errorCallback, PassRefPtr<VoidCallback> successCallback)
+void Database::transaction(RefPtr<SQLTransactionCallback>&& callback, RefPtr<SQLTransactionErrorCallback>&& errorCallback, RefPtr<VoidCallback>&& successCallback)
 {
-    runTransaction(callback, errorCallback, successCallback, false);
+    runTransaction(WTFMove(callback), WTFMove(errorCallback), WTFMove(successCallback), false);
 }
 
-void Database::readTransaction(PassRefPtr<SQLTransactionCallback> callback, PassRefPtr<SQLTransactionErrorCallback> errorCallback, PassRefPtr<VoidCallback> successCallback)
+void Database::readTransaction(RefPtr<SQLTransactionCallback>&& callback, RefPtr<SQLTransactionErrorCallback>&& errorCallback, RefPtr<VoidCallback>&& successCallback)
 {
-    runTransaction(callback, errorCallback, successCallback, true);
+    runTransaction(WTFMove(callback), WTFMove(errorCallback), WTFMove(successCallback), true);
 }
 
 String Database::stringIdentifier() const
@@ -732,11 +747,11 @@ void Database::resetAuthorizer()
 
 void Database::runTransaction(RefPtr<SQLTransactionCallback>&& callback, RefPtr<SQLTransactionErrorCallback>&& errorCallback, RefPtr<VoidCallback>&& successCallback, bool readOnly, const ChangeVersionData* changeVersionData)
 {
-    RefPtr<SQLTransaction> transaction = SQLTransaction::create(*this, WTFMove(callback), WTFMove(successCallback), errorCallback.copyRef(), readOnly);
+    Ref<SQLTransaction> transaction = SQLTransaction::create(*this, WTFMove(callback), WTFMove(successCallback), errorCallback.copyRef(), readOnly);
 
-    RefPtr<SQLTransactionBackend> transactionBackend = runTransaction(transaction.release(), readOnly, changeVersionData);
+    RefPtr<SQLTransactionBackend> transactionBackend = runTransaction(WTFMove(transaction), readOnly, changeVersionData);
     if (!transactionBackend && errorCallback) {
-        WTF::RefPtr<SQLTransactionErrorCallback> errorCallbackProtector = WTFMove(errorCallback);
+        RefPtr<SQLTransactionErrorCallback> errorCallbackProtector = WTFMove(errorCallback);
         m_scriptExecutionContext->postTask([errorCallbackProtector](ScriptExecutionContext&) {
             errorCallbackProtector->handleEvent(SQLError::create(SQLError::UNKNOWN_ERR, "database has been closed").ptr());
         });

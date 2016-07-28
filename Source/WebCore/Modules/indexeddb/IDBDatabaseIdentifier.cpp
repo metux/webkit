@@ -59,16 +59,21 @@ IDBDatabaseIdentifier IDBDatabaseIdentifier::isolatedCopy() const
 
 String IDBDatabaseIdentifier::databaseDirectoryRelativeToRoot(const String& rootDirectory) const
 {
-    String mainFrameDirectory = pathByAppendingComponent(rootDirectory, m_mainFrameOrigin.securityOrigin()->databaseIdentifier());
-
-    // If the opening origin and main frame origins are the same, there is no partitioning.
-    if (m_openingOrigin == m_mainFrameOrigin)
-        return mainFrameDirectory;
-
-    return pathByAppendingComponent(mainFrameDirectory, m_openingOrigin.securityOrigin()->databaseIdentifier());
+    return databaseDirectoryRelativeToRoot(m_mainFrameOrigin, m_openingOrigin, rootDirectory);
 }
 
-#ifndef NDEBUG
+String IDBDatabaseIdentifier::databaseDirectoryRelativeToRoot(const SecurityOriginData& topLevelOrigin, const SecurityOriginData& openingOrigin, const String& rootDirectory)
+{
+    String mainFrameDirectory = pathByAppendingComponent(rootDirectory, topLevelOrigin.securityOrigin()->databaseIdentifier());
+
+    // If the opening origin and main frame origins are the same, there is no partitioning.
+    if (openingOrigin == topLevelOrigin)
+        return mainFrameDirectory;
+
+    return pathByAppendingComponent(mainFrameDirectory, openingOrigin.securityOrigin()->databaseIdentifier());
+}
+
+#if !LOG_DISABLED
 String IDBDatabaseIdentifier::debugString() const
 {
     return makeString(m_databaseName, "@", m_openingOrigin.debugString(), ":", m_mainFrameOrigin.debugString());

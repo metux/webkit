@@ -58,12 +58,14 @@ public:
 
     String data() const { return m_data; }
 
-    virtual EventInterface eventInterface() const override;
+    EventInterface eventInterface() const override;
 
 private:
     CompositionEvent();
     CompositionEvent(const AtomicString& type, AbstractView*, const String&);
     CompositionEvent(const AtomicString& type, const CompositionEventInit&);
+
+    bool isCompositionEvent() const override;
 
     String m_data;
 };

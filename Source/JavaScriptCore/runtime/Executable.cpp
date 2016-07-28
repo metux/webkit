@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2013, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2010, 2013, 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,6 +36,7 @@
 #include "Parser.h"
 #include "ProfilerDatabase.h"
 #include "TypeProfiler.h"
+#include "VMInlines.h"
 #include "WASMFunctionParser.h"
 #include <wtf/CommaPrinter.h>
 #include <wtf/Vector.h>
@@ -101,45 +102,56 @@ void ExecutableBase::clearCode()
     ASSERT(classInfo() == NativeExecutable::info());
 }
 
-#if ENABLE(DFG_JIT)
-Intrinsic ExecutableBase::intrinsic() const
-{
-    if (const NativeExecutable* nativeExecutable = jsDynamicCast<const NativeExecutable*>(this))
-        return nativeExecutable->intrinsic();
-    return NoIntrinsic;
-}
-#else
-Intrinsic ExecutableBase::intrinsic() const
-{
-    return NoIntrinsic;
-}
-#endif
-
 const ClassInfo NativeExecutable::s_info = { "NativeExecutable", &ExecutableBase::s_info, 0, CREATE_METHOD_TABLE(NativeExecutable) };
+
+NativeExecutable* NativeExecutable::create(VM& vm, PassRefPtr<JITCode> callThunk, NativeFunction function, PassRefPtr<JITCode> constructThunk, NativeFunction constructor, Intrinsic intrinsic, const String& name)
+{
+    NativeExecutable* executable;
+    executable = new (NotNull, allocateCell<NativeExecutable>(vm.heap)) NativeExecutable(vm, function, constructor, intrinsic);
+    executable->finishCreation(vm, callThunk, constructThunk, name);
+    return executable;
+}
 
 void NativeExecutable::destroy(JSCell* cell)
 {
     static_cast<NativeExecutable*>(cell)->NativeExecutable::~NativeExecutable();
 }
 
-#if ENABLE(DFG_JIT)
-Intrinsic NativeExecutable::intrinsic() const
+Structure* NativeExecutable::createStructure(VM& vm, JSGlobalObject* globalObject, JSValue proto)
 {
-    return m_intrinsic;
+    return Structure::create(vm, globalObject, proto, TypeInfo(CellType, StructureFlags), info());
 }
-#endif
+
+void NativeExecutable::finishCreation(VM& vm, PassRefPtr<JITCode> callThunk, PassRefPtr<JITCode> constructThunk, const String& name)
+{
+    Base::finishCreation(vm);
+    m_jitCodeForCall = callThunk;
+    m_jitCodeForConstruct = constructThunk;
+    m_jitCodeForCallWithArityCheck = m_jitCodeForCall->addressForCall(MustCheckArity);
+    m_jitCodeForConstructWithArityCheck = m_jitCodeForConstruct->addressForCall(MustCheckArity);
+    m_name = name;
+}
+
+NativeExecutable::NativeExecutable(VM& vm, NativeFunction function, NativeFunction constructor, Intrinsic intrinsic)
+    : ExecutableBase(vm, vm.nativeExecutableStructure.get(), NUM_PARAMETERS_IS_HOST, intrinsic)
+    , m_function(function)
+    , m_constructor(constructor)
+{
+}
 
 const ClassInfo ScriptExecutable::s_info = { "ScriptExecutable", &ExecutableBase::s_info, 0, CREATE_METHOD_TABLE(ScriptExecutable) };
 
-ScriptExecutable::ScriptExecutable(Structure* structure, VM& vm, const SourceCode& source, bool isInStrictContext, DerivedContextType derivedContextType, bool isInArrowFunctionContext)
-    : ExecutableBase(vm, structure, NUM_PARAMETERS_NOT_COMPILED)
+ScriptExecutable::ScriptExecutable(Structure* structure, VM& vm, const SourceCode& source, bool isInStrictContext, DerivedContextType derivedContextType, bool isInArrowFunctionContext, EvalContextType evalContextType, Intrinsic intrinsic)
+    : ExecutableBase(vm, structure, NUM_PARAMETERS_NOT_COMPILED, intrinsic)
     , m_features(isInStrictContext ? StrictModeFeature : 0)
     , m_didTryToEnterInLoop(false)
     , m_hasCapturedVariables(false)
     , m_neverInline(false)
     , m_neverOptimize(false)
+    , m_neverFTLOptimize(false)
     , m_isArrowFunctionContext(isInArrowFunctionContext)
     , m_derivedContextType(static_cast<unsigned>(derivedContextType))
+    , m_evalContextType(static_cast<unsigned>(evalContextType))
     , m_overrideLineNumber(-1)
     , m_firstLine(-1)
     , m_lastLine(-1)
@@ -164,6 +176,8 @@ void ScriptExecutable::installCode(CodeBlock* codeBlock)
 void ScriptExecutable::installCode(VM& vm, CodeBlock* genericCodeBlock, CodeType codeType, CodeSpecializationKind kind)
 {
     ASSERT(vm.heap.isDeferred());
+    
+    CODEBLOCK_LOG_EVENT(genericCodeBlock, "installCode", ());
     
     CodeBlock* oldCodeBlock = nullptr;
     
@@ -297,11 +311,10 @@ CodeBlock* ScriptExecutable::newCodeBlockFor(
     RELEASE_ASSERT(!executable->codeBlockFor(kind));
     JSGlobalObject* globalObject = scope->globalObject();
     ParserError error;
-    DebuggerMode debuggerMode = globalObject->hasDebugger() ? DebuggerOn : DebuggerOff;
-    ProfilerMode profilerMode = globalObject->hasLegacyProfiler() ? ProfilerOn : ProfilerOff;
+    DebuggerMode debuggerMode = globalObject->hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
     UnlinkedFunctionCodeBlock* unlinkedCodeBlock = 
         executable->m_unlinkedExecutable->unlinkedCodeBlockFor(
-            *vm, executable->m_source, kind, debuggerMode, profilerMode, error, 
+            *vm, executable->m_source, kind, debuggerMode, error, 
             executable->parseMode());
     recordParse(
         executable->m_unlinkedExecutable->features(), 
@@ -415,7 +428,7 @@ JSObject* ScriptExecutable::prepareForExecutionImpl(
 
 const ClassInfo EvalExecutable::s_info = { "EvalExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(EvalExecutable) };
 
-EvalExecutable* EvalExecutable::create(ExecState* exec, const SourceCode& source, bool isInStrictContext, ThisTDZMode thisTDZMode, DerivedContextType derivedContextType, bool isArrowFunctionContext, const VariableEnvironment* variablesUnderTDZ)
+EvalExecutable* EvalExecutable::create(ExecState* exec, const SourceCode& source, bool isInStrictContext, DerivedContextType derivedContextType, bool isArrowFunctionContext, EvalContextType evalContextType, const VariableEnvironment* variablesUnderTDZ)
 {
     JSGlobalObject* globalObject = exec->lexicalGlobalObject();
     if (!globalObject->evalEnabled()) {
@@ -423,10 +436,10 @@ EvalExecutable* EvalExecutable::create(ExecState* exec, const SourceCode& source
         return 0;
     }
 
-    EvalExecutable* executable = new (NotNull, allocateCell<EvalExecutable>(*exec->heap())) EvalExecutable(exec, source, isInStrictContext, derivedContextType, isArrowFunctionContext);
+    EvalExecutable* executable = new (NotNull, allocateCell<EvalExecutable>(*exec->heap())) EvalExecutable(exec, source, isInStrictContext, derivedContextType, isArrowFunctionContext, evalContextType);
     executable->finishCreation(exec->vm());
 
-    UnlinkedEvalCodeBlock* unlinkedEvalCode = globalObject->createEvalCodeBlock(exec, executable, thisTDZMode, isArrowFunctionContext, variablesUnderTDZ);
+    UnlinkedEvalCodeBlock* unlinkedEvalCode = globalObject->createEvalCodeBlock(exec, executable, variablesUnderTDZ);
     if (!unlinkedEvalCode)
         return 0;
 
@@ -435,8 +448,8 @@ EvalExecutable* EvalExecutable::create(ExecState* exec, const SourceCode& source
     return executable;
 }
 
-EvalExecutable::EvalExecutable(ExecState* exec, const SourceCode& source, bool inStrictContext, DerivedContextType derivedContextType, bool isArrowFunctionContext)
-    : ScriptExecutable(exec->vm().evalExecutableStructure.get(), exec->vm(), source, inStrictContext, derivedContextType, isArrowFunctionContext)
+EvalExecutable::EvalExecutable(ExecState* exec, const SourceCode& source, bool inStrictContext, DerivedContextType derivedContextType, bool isArrowFunctionContext, EvalContextType evalContextType)
+    : ScriptExecutable(exec->vm().evalExecutableStructure.get(), exec->vm(), source, inStrictContext, derivedContextType, isArrowFunctionContext, evalContextType, NoIntrinsic)
 {
 }
 
@@ -448,7 +461,7 @@ void EvalExecutable::destroy(JSCell* cell)
 const ClassInfo ProgramExecutable::s_info = { "ProgramExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(ProgramExecutable) };
 
 ProgramExecutable::ProgramExecutable(ExecState* exec, const SourceCode& source)
-    : ScriptExecutable(exec->vm().programExecutableStructure.get(), exec->vm(), source, false, DerivedContextType::None, false)
+    : ScriptExecutable(exec->vm().programExecutableStructure.get(), exec->vm(), source, false, DerivedContextType::None, false, EvalContextType::None, NoIntrinsic)
 {
     m_typeProfilingStartOffset = 0;
     m_typeProfilingEndOffset = source.length() - 1;
@@ -464,7 +477,7 @@ void ProgramExecutable::destroy(JSCell* cell)
 const ClassInfo ModuleProgramExecutable::s_info = { "ModuleProgramExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(ModuleProgramExecutable) };
 
 ModuleProgramExecutable::ModuleProgramExecutable(ExecState* exec, const SourceCode& source)
-    : ScriptExecutable(exec->vm().moduleProgramExecutableStructure.get(), exec->vm(), source, false, DerivedContextType::None, false)
+    : ScriptExecutable(exec->vm().moduleProgramExecutableStructure.get(), exec->vm(), source, false, DerivedContextType::None, false, EvalContextType::None, NoIntrinsic)
 {
     m_typeProfilingStartOffset = 0;
     m_typeProfilingEndOffset = source.length() - 1;
@@ -495,8 +508,8 @@ void ModuleProgramExecutable::destroy(JSCell* cell)
 
 const ClassInfo FunctionExecutable::s_info = { "FunctionExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(FunctionExecutable) };
 
-FunctionExecutable::FunctionExecutable(VM& vm, const SourceCode& source, UnlinkedFunctionExecutable* unlinkedExecutable, unsigned firstLine, unsigned lastLine, unsigned startColumn, unsigned endColumn)
-    : ScriptExecutable(vm.functionExecutableStructure.get(), vm, source, unlinkedExecutable->isInStrictContext(), unlinkedExecutable->derivedContextType(), false)
+FunctionExecutable::FunctionExecutable(VM& vm, const SourceCode& source, UnlinkedFunctionExecutable* unlinkedExecutable, unsigned firstLine, unsigned lastLine, unsigned startColumn, unsigned endColumn, Intrinsic intrinsic)
+    : ScriptExecutable(vm.functionExecutableStructure.get(), vm, source, unlinkedExecutable->isInStrictContext(), unlinkedExecutable->derivedContextType(), false, EvalContextType::None, intrinsic)
     , m_unlinkedExecutable(vm, this, unlinkedExecutable)
 {
     RELEASE_ASSERT(!source.isNull());
@@ -592,11 +605,25 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
         // Check if any new "let"/"const"/"class" will shadow any pre-existing global property names, or "var"/"let"/"const" variables.
         // It's an error to introduce a shadow.
         for (auto& entry : lexicalDeclarations) {
-            if (globalObject->hasProperty(exec, entry.key.get()))
-                return createSyntaxError(exec, makeString("Can't create duplicate variable that shadows a global property: '", String(entry.key.get()), "'"));
-
-            if (globalLexicalEnvironment->hasProperty(exec, entry.key.get()))
+            if (globalObject->hasProperty(exec, entry.key.get())) {
+                // The ES6 spec says that just RestrictedGlobalProperty can't be shadowed
+                // This carried out section 8.1.1.4.14 of the ES6 spec: http://www.ecma-international.org/ecma-262/6.0/index.html#sec-hasrestrictedglobalproperty
+                PropertyDescriptor descriptor;
+                globalObject->getOwnPropertyDescriptor(exec, entry.key.get(), descriptor);
+                
+                if (descriptor.value() != jsUndefined() && !descriptor.configurable())
+                    return createSyntaxError(exec, makeString("Can't create duplicate variable that shadows a global property: '", String(entry.key.get()), "'"));
+            }
+                
+            if (globalLexicalEnvironment->hasProperty(exec, entry.key.get())) {
+                if (UNLIKELY(entry.value.isConst() && !vm.globalConstRedeclarationShouldThrow() && !isStrictMode())) {
+                    // We only allow "const" duplicate declarations under this setting.
+                    // For example, we don't "let" variables to be overridden by "const" variables.
+                    if (globalLexicalEnvironment->isConstVariable(entry.key.get()))
+                        continue;
+                }
                 return createSyntaxError(exec, makeString("Can't create duplicate variable: '", String(entry.key.get()), "'"));
+            }
         }
 
         // Check if any new "var"s will shadow any previous "let"/"const"/"class" names.
@@ -635,6 +662,10 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
         SymbolTable* symbolTable = globalLexicalEnvironment->symbolTable();
         ConcurrentJITLocker locker(symbolTable->m_lock);
         for (auto& entry : lexicalDeclarations) {
+            if (UNLIKELY(entry.value.isConst() && !vm.globalConstRedeclarationShouldThrow() && !isStrictMode())) {
+                if (symbolTable->contains(locker, entry.key.get()))
+                    continue;
+            }
             ScopeOffset offset = symbolTable->takeNextScopeOffset(locker);
             SymbolTableEntry newEntry(VarOffset(offset), entry.value.isConst() ? ReadOnly : 0);
             newEntry.prepareToWatch();
@@ -712,7 +743,7 @@ FunctionExecutable* FunctionExecutable::fromGlobalCode(
 const ClassInfo WebAssemblyExecutable::s_info = { "WebAssemblyExecutable", &ExecutableBase::s_info, 0, CREATE_METHOD_TABLE(WebAssemblyExecutable) };
 
 WebAssemblyExecutable::WebAssemblyExecutable(VM& vm, const SourceCode& source, JSWASMModule* module, unsigned functionIndex)
-    : ExecutableBase(vm, vm.webAssemblyExecutableStructure.get(), NUM_PARAMETERS_NOT_COMPILED)
+    : ExecutableBase(vm, vm.webAssemblyExecutableStructure.get(), NUM_PARAMETERS_NOT_COMPILED, NoIntrinsic)
     , m_source(source)
     , m_module(vm, this, module)
     , m_functionIndex(functionIndex)

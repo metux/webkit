@@ -377,9 +377,12 @@
     <keyword type="function" name="webkit_settings_set_enable_mediasource ()" link="WebKitSettings.html#webkit-settings-set-enable-mediasource" since="2.4"/>
     <keyword type="function" name="webkit_settings_get_allow_file_access_from_file_urls ()" link="WebKitSettings.html#webkit-settings-get-allow-file-access-from-file-urls" since="2.10"/>
     <keyword type="function" name="webkit_settings_set_allow_file_access_from_file_urls ()" link="WebKitSettings.html#webkit-settings-set-allow-file-access-from-file-urls" since="2.10"/>
+    <keyword type="function" name="webkit_settings_get_allow_universal_access_from_file_urls ()" link="WebKitSettings.html#webkit-settings-get-allow-universal-access-from-file-urls" since="2.14"/>
+    <keyword type="function" name="webkit_settings_set_allow_universal_access_from_file_urls ()" link="WebKitSettings.html#webkit-settings-set-allow-universal-access-from-file-urls" since="2.14"/>
     <keyword type="struct" name="struct WebKitSettings" link="WebKitSettings.html#WebKitSettings-struct"/>
     <keyword type="property" name="The “allow-file-access-from-file-urls” property" link="WebKitSettings.html#WebKitSettings--allow-file-access-from-file-urls"/>
     <keyword type="property" name="The “allow-modal-dialogs” property" link="WebKitSettings.html#WebKitSettings--allow-modal-dialogs"/>
+    <keyword type="property" name="The “allow-universal-access-from-file-urls” property" link="WebKitSettings.html#WebKitSettings--allow-universal-access-from-file-urls"/>
     <keyword type="property" name="The “auto-load-images” property" link="WebKitSettings.html#WebKitSettings--auto-load-images"/>
     <keyword type="property" name="The “cursive-font-family” property" link="WebKitSettings.html#WebKitSettings--cursive-font-family"/>
     <keyword type="property" name="The “default-charset” property" link="WebKitSettings.html#WebKitSettings--default-charset"/>

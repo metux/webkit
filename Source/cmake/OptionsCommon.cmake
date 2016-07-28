@@ -24,11 +24,12 @@ if ("${AR_VERSION}" MATCHES "^GNU ar")
 endif ()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+define_property(TARGET PROPERTY FOLDER INHERITED BRIEF_DOCS "folder" FULL_DOCS "IDE folder name")
 
 if (CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -fno-exceptions -fno-strict-aliasing")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fno-exceptions -fno-strict-aliasing -fno-rtti")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y")
 endif ()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND CMAKE_GENERATOR STREQUAL "Ninja")
@@ -68,10 +69,29 @@ endif ()
 
 EXPOSE_VARIABLE_TO_BUILD(WTF_CPU_ARM64_CORTEXA53)
 
+set(ARM_TRADITIONAL_DETECTED FALSE)
+if (WTF_CPU_ARM)
+    set(ARM_THUMB2_TEST_SOURCE
+    "
+    #if !defined(thumb2) && !defined(__thumb2__)
+    #error \"Thumb2 instruction set isn't available\"
+    #endif
+    int main() {}
+   ")
+
+    include(CheckCXXSourceCompiles)
+    CHECK_CXX_SOURCE_COMPILES("${ARM_THUMB2_TEST_SOURCE}" ARM_THUMB2_DETECTED)
+    if (NOT ARM_THUMB2_DETECTED)
+        set(ARM_TRADITIONAL_DETECTED TRUE)
+        # See https://bugs.webkit.org/show_bug.cgi?id=159880#c4 for details.
+        message(STATUS "Disabling GNU gold linker, because it doesn't support ARM instruction set properly.")
+    endif ()
+endif ()
+
 # Use ld.gold if it is available and isn't disabled explicitly
 include(CMakeDependentOption)
 CMAKE_DEPENDENT_OPTION(USE_LD_GOLD "Use GNU gold linker" ON
-                       "NOT CXX_ACCEPTS_MFIX_CORTEX_A53_835769" OFF)
+                       "NOT CXX_ACCEPTS_MFIX_CORTEX_A53_835769;NOT ARM_TRADITIONAL_DETECTED" OFF)
 if (USE_LD_GOLD)
     execute_process(COMMAND ${CMAKE_C_COMPILER} -fuse-ld=gold -Wl,--version ERROR_QUIET OUTPUT_VARIABLE LD_VERSION)
     if ("${LD_VERSION}" MATCHES "GNU gold")

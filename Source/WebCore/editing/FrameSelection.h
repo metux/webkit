@@ -28,6 +28,7 @@
 
 #include "AXTextStateChangeIntent.h"
 #include "EditingStyle.h"
+#include "Element.h"
 #include "IntRect.h"
 #include "LayoutRect.h"
 #include "Range.h"
@@ -185,7 +186,7 @@ public:
     bool isCaretOrRange() const { return m_selection.isCaretOrRange(); }
     bool isAll(EditingBoundaryCrossingRule rule = CannotCrossEditingBoundary) const { return m_selection.isAll(rule); }
     
-    PassRefPtr<Range> toNormalizedRange() const { return m_selection.toNormalizedRange(); }
+    RefPtr<Range> toNormalizedRange() const { return m_selection.toNormalizedRange(); }
 
     void debugRenderer(RenderObject*, bool selected) const;
 
@@ -230,7 +231,7 @@ public:
     WEBCORE_EXPORT bool selectionAtWordStart() const;
     WEBCORE_EXPORT PassRefPtr<Range> rangeByMovingCurrentSelection(int amount) const;
     WEBCORE_EXPORT PassRefPtr<Range> rangeByExtendingCurrentSelection(int amount) const;
-    WEBCORE_EXPORT void selectRangeOnElement(unsigned location, unsigned length, Node*);
+    WEBCORE_EXPORT void selectRangeOnElement(unsigned location, unsigned length, Node&);
     WEBCORE_EXPORT void clearCurrentSelection();
     void setCaretBlinks(bool caretBlinks = true);
     WEBCORE_EXPORT void setCaretColor(const Color&);
@@ -266,7 +267,7 @@ public:
 
     WEBCORE_EXPORT HTMLFormElement* currentForm() const;
 
-    WEBCORE_EXPORT void revealSelection(const ScrollAlignment& = ScrollAlignment::alignCenterIfNeeded, RevealExtentOption = DoNotRevealExtent);
+    WEBCORE_EXPORT void revealSelection(SelectionRevealMode = SelectionRevealMode::Reveal, const ScrollAlignment& = ScrollAlignment::alignCenterIfNeeded, RevealExtentOption = DoNotRevealExtent);
     WEBCORE_EXPORT void setSelectionFromNone();
 
     bool shouldShowBlockCursor() const { return m_shouldShowBlockCursor; }
@@ -350,7 +351,7 @@ private:
     bool m_updateAppearanceEnabled : 1;
     bool m_caretBlinks : 1;
     Color m_caretColor;
-    int m_scrollingSuppressCount;
+    int m_scrollingSuppressCount { 0 };
 #endif
 };
 

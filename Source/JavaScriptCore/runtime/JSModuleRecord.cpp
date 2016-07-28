@@ -106,19 +106,14 @@ auto JSModuleRecord::tryGetExportEntry(UniquedStringImpl* exportName) -> Optiona
     return Optional<ExportEntry>(iterator->value);
 }
 
-auto JSModuleRecord::ExportEntry::createLocal(const Identifier& exportName, const Identifier& localName, const VariableEnvironmentEntry& variable) -> ExportEntry
+auto JSModuleRecord::ExportEntry::createLocal(const Identifier& exportName, const Identifier& localName) -> ExportEntry
 {
-    return ExportEntry { Type::Local, exportName, Identifier(), Identifier(), localName, variable };
-}
-
-auto JSModuleRecord::ExportEntry::createNamespace(const Identifier& exportName, const Identifier& moduleName) -> ExportEntry
-{
-    return ExportEntry { Type::Namespace, exportName, moduleName, Identifier(), Identifier(), VariableEnvironmentEntry() };
+    return ExportEntry { Type::Local, exportName, Identifier(), Identifier(), localName };
 }
 
 auto JSModuleRecord::ExportEntry::createIndirect(const Identifier& exportName, const Identifier& importName, const Identifier& moduleName) -> ExportEntry
 {
-    return ExportEntry { Type::Indirect, exportName, moduleName, importName, Identifier(), VariableEnvironmentEntry() };
+    return ExportEntry { Type::Indirect, exportName, moduleName, importName, Identifier() };
 }
 
 auto JSModuleRecord::Resolution::notFound() -> Resolution
@@ -581,8 +576,8 @@ auto JSModuleRecord::resolveExportImpl(ExecState* exec, const ResolveQuery& root
 
             const ExportEntry& exportEntry = *optionalExportEntry;
             switch (exportEntry.type) {
-            case ExportEntry::Type::Local:
-            case ExportEntry::Type::Namespace: {
+            case ExportEntry::Type::Local: {
+                ASSERT(!exportEntry.localName.isNull());
                 Resolution resolution { Resolution::Type::Resolved, moduleRecord, exportEntry.localName };
                 //  2. A module that has resolved a local binding is always cacheable.
                 cacheResolutionForQuery(query, resolution);
@@ -673,16 +668,8 @@ static void getExportedNames(ExecState* exec, JSModuleRecord* root, IdentifierSe
 
         for (const auto& pair : moduleRecord->exportEntries()) {
             const JSModuleRecord::ExportEntry& exportEntry = pair.value;
-            switch (exportEntry.type) {
-            case JSModuleRecord::ExportEntry::Type::Local:
-            case JSModuleRecord::ExportEntry::Type::Indirect:
-                if (moduleRecord == root || exec->propertyNames().defaultKeyword != exportEntry.exportName)
-                    exportedNames.add(exportEntry.exportName.impl());
-                break;
-
-            case JSModuleRecord::ExportEntry::Type::Namespace:
-                break;
-            }
+            if (moduleRecord == root || exec->propertyNames().defaultKeyword != exportEntry.exportName)
+                exportedNames.add(exportEntry.exportName.impl());
         }
 
         for (const auto& starModuleName : moduleRecord->starExportEntries()) {
@@ -786,7 +773,8 @@ void JSModuleRecord::instantiateDeclarations(ExecState* exec, ModuleProgramExecu
             JSModuleNamespaceObject* namespaceObject = importedModule->getModuleNamespace(exec);
             if (exec->hadException())
                 return;
-            symbolTablePutTouchWatchpointSet(moduleEnvironment, exec, importEntry.localName, namespaceObject, /* shouldThrowReadOnlyError */ false, /* ignoreReadOnlyErrors */ true);
+            bool putResult = false;
+            symbolTablePutTouchWatchpointSet(moduleEnvironment, exec, importEntry.localName, namespaceObject, /* shouldThrowReadOnlyError */ false, /* ignoreReadOnlyErrors */ true, putResult);
         } else {
             Resolution resolution = importedModule->resolveExport(exec, importEntry.importName);
             switch (resolution.type) {
@@ -816,8 +804,10 @@ void JSModuleRecord::instantiateDeclarations(ExecState* exec, ModuleProgramExecu
     for (const auto& variable : m_declaredVariables) {
         SymbolTableEntry entry = symbolTable->get(variable.key.get());
         VarOffset offset = entry.varOffset();
-        if (!offset.isStack())
-            symbolTablePutTouchWatchpointSet(moduleEnvironment, exec, Identifier::fromUid(exec, variable.key.get()), jsUndefined(), /* shouldThrowReadOnlyError */ false, /* ignoreReadOnlyErrors */ true);
+        if (!offset.isStack()) {
+            bool putResult = false;
+            symbolTablePutTouchWatchpointSet(moduleEnvironment, exec, Identifier::fromUid(exec, variable.key.get()), jsUndefined(), /* shouldThrowReadOnlyError */ false, /* ignoreReadOnlyErrors */ true, putResult);
+        }
     }
 
     // http://www.ecma-international.org/ecma-262/6.0/#sec-moduledeclarationinstantiation
@@ -837,7 +827,8 @@ void JSModuleRecord::instantiateDeclarations(ExecState* exec, ModuleProgramExecu
                     unlinkedFunctionExecutable->typeProfilingEndOffset());
             }
             JSFunction* function = JSFunction::create(vm, unlinkedFunctionExecutable->link(vm, moduleProgramExecutable->source()), moduleEnvironment);
-            symbolTablePutTouchWatchpointSet(moduleEnvironment, exec, unlinkedFunctionExecutable->name(), function, /* shouldThrowReadOnlyError */ false, /* ignoreReadOnlyErrors */ true);
+            bool putResult = false;
+            symbolTablePutTouchWatchpointSet(moduleEnvironment, exec, unlinkedFunctionExecutable->name(), function, /* shouldThrowReadOnlyError */ false, /* ignoreReadOnlyErrors */ true, putResult);
         }
     }
 
@@ -885,10 +876,6 @@ void JSModuleRecord::dump()
         switch (exportEntry.type) {
         case ExportEntry::Type::Local:
             dataLog("      [Local] ", "export(", printableName(exportEntry.exportName), "), local(", printableName(exportEntry.localName), ")\n");
-            break;
-
-        case ExportEntry::Type::Namespace:
-            dataLog("      [Namespace] ", "export(", printableName(exportEntry.exportName), "), module(", printableName(exportEntry.moduleName), ")\n");
             break;
 
         case ExportEntry::Type::Indirect:

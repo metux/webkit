@@ -36,7 +36,7 @@
 
 namespace WebCore {
 
-#if !PLATFORM(IOS)
+#if !PLATFORM(IOS) && !PLATFORM(MAC)
 static PlatformMediaSessionManager* platformMediaSessionManager = nullptr;
 
 PlatformMediaSessionManager& PlatformMediaSessionManager::sharedManager()
@@ -153,7 +153,6 @@ void PlatformMediaSessionManager::removeSession(PlatformMediaSession& session)
     LOG(Media, "PlatformMediaSessionManager::removeSession - %p", &session);
     
     size_t index = m_sessions.find(&session);
-    ASSERT(index != notFound);
     if (index == notFound)
         return;
     
@@ -278,10 +277,19 @@ PlatformMediaSession* PlatformMediaSessionManager::currentSession()
 
     return m_sessions[0];
 }
+
+PlatformMediaSession* PlatformMediaSessionManager::currentSessionMatching(std::function<bool(const PlatformMediaSession &)> filter)
+{
+    for (auto& session : m_sessions) {
+        if (filter(*session))
+            return session;
+    }
+    return nullptr;
+}
     
 bool PlatformMediaSessionManager::sessionCanLoadMedia(const PlatformMediaSession& session) const
 {
-    return session.state() == PlatformMediaSession::Playing || !session.isHidden() || session.isPlayingToWirelessPlaybackTarget();
+    return session.state() == PlatformMediaSession::Playing || !session.isHidden() || session.shouldOverrideBackgroundLoadingRestriction();
 }
 
 void PlatformMediaSessionManager::applicationWillEnterBackground() const
@@ -380,7 +388,7 @@ void PlatformMediaSessionManager::stopAllMediaPlaybackForProcess()
 {
     Vector<PlatformMediaSession*> sessions = m_sessions;
     for (auto* session : sessions)
-        session->pauseSession();
+        session->stopSession();
 }
 
 }

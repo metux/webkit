@@ -62,7 +62,7 @@ void WKBundlePostSynchronousMessage(WKBundleRef bundleRef, WKStringRef messageNa
     RefPtr<API::Object> returnData;
     toImpl(bundleRef)->postSynchronousMessage(toWTFString(messageNameRef), toImpl(messageBodyRef), returnData);
     if (returnDataRef)
-        *returnDataRef = toAPI(returnData.release().leakRef());
+        *returnDataRef = toAPI(returnData.leakRef());
 }
 
 WKConnectionRef WKBundleGetApplicationConnection(WKBundleRef bundleRef)
@@ -202,7 +202,7 @@ void WKBundleReportException(JSContextRef context, JSValueRef exception)
 
 void WKBundleClearAllDatabases(WKBundleRef)
 {
-    DatabaseManager::singleton().deleteAllDatabases();
+    DatabaseManager::singleton().deleteAllDatabasesImmediately();
 }
 
 void WKBundleSetDatabaseQuota(WKBundleRef bundleRef, uint64_t quota)

@@ -102,7 +102,7 @@ void ImageInputType::handleDOMActivateEvent(Event* event)
     event->setDefaultHandled();
 }
 
-RenderPtr<RenderElement> ImageInputType::createInputRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> ImageInputType::createInputRenderer(RenderStyle&& style)
 {
     return createRenderer<RenderImage>(element(), WTFMove(style));
 }
@@ -176,14 +176,13 @@ unsigned ImageInputType::height() const
 
     if (!element->renderer()) {
         // Check the attribute first for an explicit pixel value.
-        unsigned height;
-        if (parseHTMLNonNegativeInteger(element->fastGetAttribute(heightAttr), height))
-            return height;
+        if (Optional<int> height = parseHTMLNonNegativeInteger(element->attributeWithoutSynchronization(heightAttr)))
+            return height.value();
 
         // If the image is available, use its height.
         HTMLImageLoader* imageLoader = element->imageLoader();
         if (imageLoader && imageLoader->image())
-            return imageLoader->image()->imageSizeForRenderer(element->renderer(), 1).height();
+            return imageLoader->image()->imageSizeForRenderer(element->renderer(), 1).height().toUnsigned();
     }
 
     element->document().updateLayout();
@@ -198,14 +197,13 @@ unsigned ImageInputType::width() const
 
     if (!element->renderer()) {
         // Check the attribute first for an explicit pixel value.
-        unsigned width;
-        if (parseHTMLNonNegativeInteger(element->fastGetAttribute(widthAttr), width))
-            return width;
+        if (Optional<int> width = parseHTMLNonNegativeInteger(element->attributeWithoutSynchronization(widthAttr)))
+            return width.value();
 
         // If the image is available, use its width.
         HTMLImageLoader* imageLoader = element->imageLoader();
         if (imageLoader && imageLoader->image())
-            return imageLoader->image()->imageSizeForRenderer(element->renderer(), 1).width();
+            return imageLoader->image()->imageSizeForRenderer(element->renderer(), 1).width().toUnsigned();
     }
 
     element->document().updateLayout();

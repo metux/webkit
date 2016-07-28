@@ -58,6 +58,11 @@ DrawingAreaProxyImpl::~DrawingAreaProxyImpl()
         exitAcceleratedCompositingMode();
 }
 
+bool DrawingAreaProxyImpl::alwaysUseCompositing() const
+{
+    return m_webPageProxy.preferences().acceleratedCompositingEnabled() && m_webPageProxy.preferences().forceCompositingMode();
+}
+
 void DrawingAreaProxyImpl::paint(BackingStore::PlatformGraphicsContext context, const IntRect& rect, Region& unpaintedRegion)
 {
     unpaintedRegion = rect;
@@ -165,8 +170,16 @@ void DrawingAreaProxyImpl::didUpdateBackingStoreState(uint64_t backingStoreState
 
     if (m_nextBackingStoreStateID != m_currentBackingStoreStateID)
         sendUpdateBackingStoreState(RespondImmediately);
-    else
+    else {
         m_hasReceivedFirstUpdate = true;
+
+#if USE(TEXTURE_MAPPER) && PLATFORM(GTK)
+        if (m_pendingNativeSurfaceHandleForCompositing) {
+            setNativeSurfaceHandleForCompositing(m_pendingNativeSurfaceHandleForCompositing);
+            m_pendingNativeSurfaceHandleForCompositing = 0;
+        }
+#endif
+    }
 
     if (isInAcceleratedCompositingMode()) {
         ASSERT(!m_backingStore);
@@ -229,20 +242,13 @@ void DrawingAreaProxyImpl::incorporateUpdate(const UpdateInfo& updateInfo)
 
     m_backingStore->incorporateUpdate(updateInfo);
 
-    bool shouldScroll = !updateInfo.scrollRect.isEmpty();
-
-    if (shouldScroll)
-        m_webPageProxy.scrollView(updateInfo.scrollRect, updateInfo.scrollOffset);
-    
-    if (shouldScroll && !m_webPageProxy.canScrollView())
-        m_webPageProxy.setViewNeedsDisplay(IntRect(IntPoint(), m_webPageProxy.viewSize()));
-    else {
-        for (size_t i = 0; i < updateInfo.updateRects.size(); ++i)
-            m_webPageProxy.setViewNeedsDisplay(updateInfo.updateRects[i]);
-    }
-
-    if (shouldScroll)
-        m_webPageProxy.displayView();
+    Region damageRegion;
+    if (updateInfo.scrollRect.isEmpty()) {
+        for (const auto& rect : updateInfo.updateRects)
+            damageRegion.unite(rect);
+    } else
+        damageRegion = IntRect(IntPoint(), m_webPageProxy.viewSize());
+    m_webPageProxy.setViewNeedsDisplay(damageRegion);
 }
 
 void DrawingAreaProxyImpl::backingStoreStateDidChange(RespondImmediatelyOrNot respondImmediatelyOrNot)
@@ -302,7 +308,7 @@ void DrawingAreaProxyImpl::waitForAndDispatchDidUpdateBackingStoreState()
 
 void DrawingAreaProxyImpl::enterAcceleratedCompositingMode(const LayerTreeContext& layerTreeContext)
 {
-    ASSERT(!isInAcceleratedCompositingMode());
+    ASSERT(alwaysUseCompositing() || !isInAcceleratedCompositingMode());
 
     m_backingStore = nullptr;
     m_layerTreeContext = layerTreeContext;
@@ -312,11 +318,19 @@ void DrawingAreaProxyImpl::enterAcceleratedCompositingMode(const LayerTreeContex
 #if USE(TEXTURE_MAPPER) && PLATFORM(GTK)
 void DrawingAreaProxyImpl::setNativeSurfaceHandleForCompositing(uint64_t handle)
 {
-    m_webPageProxy.process().send(Messages::DrawingArea::SetNativeSurfaceHandleForCompositing(handle), m_webPageProxy.pageID());
+    if (!m_hasReceivedFirstUpdate) {
+        m_pendingNativeSurfaceHandleForCompositing = handle;
+        return;
+    }
+    m_webPageProxy.process().send(Messages::DrawingArea::SetNativeSurfaceHandleForCompositing(handle), m_webPageProxy.pageID(), IPC::DispatchMessageEvenWhenWaitingForSyncReply);
 }
 
 void DrawingAreaProxyImpl::destroyNativeSurfaceHandleForCompositing()
 {
+    if (m_pendingNativeSurfaceHandleForCompositing) {
+        m_pendingNativeSurfaceHandleForCompositing = 0;
+        return;
+    }
     bool handled;
     m_webPageProxy.process().sendSync(Messages::DrawingArea::DestroyNativeSurfaceHandleForCompositing(), Messages::DrawingArea::DestroyNativeSurfaceHandleForCompositing::Reply(handled), m_webPageProxy.pageID());
 }
@@ -336,8 +350,9 @@ void DrawingAreaProxyImpl::exitAcceleratedCompositingMode()
 {
     ASSERT(isInAcceleratedCompositingMode());
 
-    m_layerTreeContext = LayerTreeContext();    
-    m_webPageProxy.exitAcceleratedCompositingMode();
+    m_layerTreeContext = LayerTreeContext();
+    if (!alwaysUseCompositing())
+        m_webPageProxy.exitAcceleratedCompositingMode();
 }
 
 void DrawingAreaProxyImpl::updateAcceleratedCompositingMode(const LayerTreeContext& layerTreeContext)

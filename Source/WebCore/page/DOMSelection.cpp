@@ -35,12 +35,9 @@
 #include "ExceptionCode.h"
 #include "Frame.h"
 #include "FrameSelection.h"
-#include "Node.h"
 #include "Range.h"
 #include "TextIterator.h"
-#include "TreeScope.h"
 #include "htmlediting.h"
-#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -327,36 +324,31 @@ void DOMSelection::modify(const String& alterString, const String& directionStri
     m_frame->selection().modify(alter, direction, granularity);
 }
 
-void DOMSelection::extend(Node* node, int offset, ExceptionCode& ec)
+void DOMSelection::extend(Node& node, int offset, ExceptionCode& ec)
 {
     if (!m_frame)
         return;
 
-    if (!node) {
-        ec = TYPE_MISMATCH_ERR;
-        return;
-    }
-
-    if (offset < 0 || offset > (node->offsetInCharacters() ? caretMaxOffset(node) : static_cast<int>(node->countChildNodes()))) {
+    if (offset < 0 || offset > (node.offsetInCharacters() ? caretMaxOffset(node) : static_cast<int>(node.countChildNodes()))) {
         ec = INDEX_SIZE_ERR;
         return;
     }
 
-    if (!isValidForPosition(node))
+    if (!isValidForPosition(&node))
         return;
 
     // FIXME: Eliminate legacy editing positions
-    m_frame->selection().setExtent(createLegacyEditingPosition(node, offset), DOWNSTREAM);
+    m_frame->selection().setExtent(createLegacyEditingPosition(&node, offset), DOWNSTREAM);
 }
 
-PassRefPtr<Range> DOMSelection::getRangeAt(int index, ExceptionCode& ec)
+RefPtr<Range> DOMSelection::getRangeAt(int index, ExceptionCode& ec)
 {
     if (!m_frame)
-        return 0;
+        return nullptr;
 
     if (index < 0 || index >= rangeCount()) {
         ec = INDEX_SIZE_ERR;
-        return 0;
+        return nullptr;
     }
 
     // If you're hitting this, you've added broken multi-range selection support
@@ -393,10 +385,13 @@ void DOMSelection::addRange(Range* r)
     }
 
     RefPtr<Range> range = selection.selection().toNormalizedRange();
-    if (r->compareBoundaryPoints(Range::START_TO_START, range.get(), IGNORE_EXCEPTION) == -1) {
+    if (!range)
+        return;
+
+    if (r->compareBoundaryPoints(Range::START_TO_START, *range, IGNORE_EXCEPTION) == -1) {
         // We don't support discontiguous selection. We don't do anything if r and range don't intersect.
-        if (r->compareBoundaryPoints(Range::START_TO_END, range.get(), IGNORE_EXCEPTION) > -1) {
-            if (r->compareBoundaryPoints(Range::END_TO_END, range.get(), IGNORE_EXCEPTION) == -1) {
+        if (r->compareBoundaryPoints(Range::START_TO_END, *range, IGNORE_EXCEPTION) > -1) {
+            if (r->compareBoundaryPoints(Range::END_TO_END, *range, IGNORE_EXCEPTION) == -1) {
                 // The original range and r intersect.
                 selection.moveTo(r->startPosition(), range->endPosition(), DOWNSTREAM);
             } else {
@@ -407,8 +402,8 @@ void DOMSelection::addRange(Range* r)
     } else {
         // We don't support discontiguous selection. We don't do anything if r and range don't intersect.
         ExceptionCode ec = 0;
-        if (r->compareBoundaryPoints(Range::END_TO_START, range.get(), ec) < 1 && !ec) {
-            if (r->compareBoundaryPoints(Range::END_TO_END, range.get(), IGNORE_EXCEPTION) == -1) {
+        if (r->compareBoundaryPoints(Range::END_TO_START, *range, ec) < 1 && !ec) {
+            if (r->compareBoundaryPoints(Range::END_TO_END, *range, IGNORE_EXCEPTION) == -1) {
                 // The original range contains r.
                 selection.moveTo(range.get());
             } else {

@@ -41,30 +41,31 @@ namespace WebKit {
 
 class LayerTreeHostGtk final : public LayerTreeHost, WebCore::GraphicsLayerClient {
 public:
-    static PassRefPtr<LayerTreeHostGtk> create(WebPage*);
+    static Ref<LayerTreeHostGtk> create(WebPage&);
     virtual ~LayerTreeHostGtk();
 
-protected:
-    explicit LayerTreeHostGtk(WebPage*);
+private:
+    explicit LayerTreeHostGtk(WebPage&);
 
     WebCore::GraphicsLayer* rootLayer() const { return m_rootLayer.get(); }
 
-    void initialize();
-
     // LayerTreeHost
-    virtual void scheduleLayerFlush() override;
-    virtual void setLayerFlushSchedulingEnabled(bool layerFlushingEnabled) override;
-    virtual void setRootCompositingLayer(WebCore::GraphicsLayer*) override;
-    virtual void invalidate() override;
+    void scheduleLayerFlush() override;
+    void cancelPendingLayerFlush() override;
+    void setRootCompositingLayer(WebCore::GraphicsLayer*) override;
+    void invalidate() override;
 
-    virtual void forceRepaint() override;
-    virtual void sizeDidChange(const WebCore::IntSize& newSize) override;
-    virtual void deviceOrPageScaleFactorChanged() override;
-    virtual void pageBackgroundTransparencyChanged() override;
+    void forceRepaint() override;
+    void sizeDidChange(const WebCore::IntSize& newSize) override;
+    void deviceOrPageScaleFactorChanged() override;
+    void pageBackgroundTransparencyChanged() override;
 
-    virtual void setNativeSurfaceHandleForCompositing(uint64_t) override;
+    void setNonCompositedContentsNeedDisplay() override;
+    void setNonCompositedContentsNeedDisplayInRect(const WebCore::IntRect&) override;
+    void scrollNonCompositedContents(const WebCore::IntRect& scrollRect) override;
+    void setViewOverlayRootLayer(WebCore::GraphicsLayer*) override;
 
-private:
+    void setNativeSurfaceHandleForCompositing(uint64_t) override;
 
     class RenderFrameScheduler {
     public:
@@ -84,19 +85,10 @@ private:
         double m_lastImmediateFlushTime { 0 };
     };
 
-    // LayerTreeHost
-    virtual const LayerTreeContext& layerTreeContext() override;
-    virtual void setShouldNotifyAfterNextScheduledLayerFlush(bool) override;
-
-    virtual void setNonCompositedContentsNeedDisplay() override;
-    virtual void setNonCompositedContentsNeedDisplayInRect(const WebCore::IntRect&) override;
-    virtual void scrollNonCompositedContents(const WebCore::IntRect& scrollRect) override;
-    virtual void setViewOverlayRootLayer(WebCore::GraphicsLayer*) override;
-
     // GraphicsLayerClient
-    virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::FloatRect& clipRect) override;
-    virtual float deviceScaleFactor() const override;
-    virtual float pageScaleFactor() const override;
+    void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::FloatRect& clipRect) override;
+    float deviceScaleFactor() const override;
+    float pageScaleFactor() const override;
 
     bool flushPendingLayerChanges();
 
@@ -104,21 +96,13 @@ private:
     void compositeLayersToContext(CompositePurpose = NotForResize);
 
     void flushAndRenderLayers();
-    void cancelPendingLayerFlush();
-
     bool renderFrame();
-
     bool makeContextCurrent();
 
-    LayerTreeContext m_layerTreeContext;
-    bool m_isValid;
-    bool m_notifyAfterScheduledLayerFlush;
     std::unique_ptr<WebCore::GraphicsLayer> m_rootLayer;
     std::unique_ptr<WebCore::GraphicsLayer> m_nonCompositedContentLayer;
     std::unique_ptr<WebCore::TextureMapper> m_textureMapper;
     std::unique_ptr<WebCore::GLContext> m_context;
-    bool m_layerFlushSchedulingEnabled;
-    WebCore::GraphicsLayer* m_viewOverlayRootLayer;
     WebCore::TransformationMatrix m_scaleMatrix;
     RenderFrameScheduler m_renderFrameScheduler;
 };

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -126,6 +126,7 @@ public:
 
     void addMessageReceiver(IPC::StringReference messageReceiverName, IPC::MessageReceiver&);
     void addMessageReceiver(IPC::StringReference messageReceiverName, uint64_t destinationID, IPC::MessageReceiver&);
+    void removeMessageReceiver(IPC::StringReference messageReceiverName);
     void removeMessageReceiver(IPC::StringReference messageReceiverName, uint64_t destinationID);
 
     bool dispatchMessage(IPC::Connection&, IPC::MessageDecoder&);
@@ -187,6 +188,7 @@ public:
 #endif
 
     pid_t networkProcessIdentifier();
+    pid_t databaseProcessIdentifier();
 
     void setAlwaysUsesComplexTextCodePath(bool);
     void setShouldUseFontSmoothing(bool);
@@ -257,6 +259,7 @@ public:
 
     void updateAutomationCapabilities() const;
     void setAutomationSession(RefPtr<WebAutomationSession>&&);
+    WebAutomationSession* automationSession() const { return m_automationSession.get(); }
 
     // Defaults to false.
     void setHTTPPipeliningEnabled(bool);
@@ -333,17 +336,24 @@ public:
     void updateProcessSuppressionState() const { }
 #endif
 
+    void updateHiddenPageThrottlingAutoIncreaseLimit();
+
     void setMemoryCacheDisabled(bool);
     void setFontWhitelist(API::Array*);
 
-    UserObservablePageToken userObservablePageCount()
+    UserObservablePageCounter::Token userObservablePageCount()
     {
-        return m_userObservablePageCounter.token<UserObservablePageTokenType>();
+        return m_userObservablePageCounter.count();
     }
 
     ProcessSuppressionDisabledToken processSuppressionDisabledForPageCount()
     {
-        return m_processSuppressionDisabledForPageCounter.token<ProcessSuppressionDisabledTokenType>();
+        return m_processSuppressionDisabledForPageCounter.count();
+    }
+
+    HiddenPageThrottlingAutoIncreasesCounter::Token hiddenPageThrottlingAutoIncreasesCount()
+    {
+        return m_hiddenPageThrottlingAutoIncreasesCounter.count();
     }
 
     // FIXME: Move these to API::WebsiteDataStore.
@@ -351,9 +361,13 @@ public:
     static String legacyPlatformDefaultIndexedDBDatabaseDirectory();
     static String legacyPlatformDefaultWebSQLDatabaseDirectory();
     static String legacyPlatformDefaultMediaKeysStorageDirectory();
+    static String legacyPlatformDefaultMediaCacheDirectory();
     static String legacyPlatformDefaultApplicationCacheDirectory();
     static String legacyPlatformDefaultNetworkCacheDirectory();
     static bool isNetworkCacheEnabled();
+
+    bool resourceLoadStatisticsEnabled() { return m_resourceLoadStatisticsEnabled; }
+    void setResourceLoadStatisticsEnabled(bool enabled) { m_resourceLoadStatisticsEnabled = enabled; }
 
 private:
     void platformInitialize();
@@ -375,15 +389,15 @@ private:
 
     // IPC::MessageReceiver.
     // Implemented in generated WebProcessPoolMessageReceiver.cpp
-    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
-    virtual void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
+    void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
+    void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
 
     static void languageChanged(void* context);
     void languageChanged();
 
     String platformDefaultIconDatabasePath() const;
 
-#if PLATFORM(IOS) || ENABLE(SECCOMP_FILTERS)
+#if PLATFORM(IOS)
     String cookieStorageDirectory() const;
 #endif
 
@@ -406,7 +420,7 @@ private:
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     // PluginInfoStoreClient:
-    virtual void pluginInfoStoreDidLoadPlugins(PluginInfoStore*) override;
+    void pluginInfoStoreDidLoadPlugins(PluginInfoStore*) override;
 #endif
 
     Ref<API::ProcessPoolConfiguration> m_configuration;
@@ -506,9 +520,12 @@ private:
 #endif
 
     bool m_memoryCacheDisabled;
+    bool m_resourceLoadStatisticsEnabled { false };
 
-    RefCounter m_userObservablePageCounter;
-    RefCounter m_processSuppressionDisabledForPageCounter;
+    UserObservablePageCounter m_userObservablePageCounter;
+    ProcessSuppressionDisabledCounter m_processSuppressionDisabledForPageCounter;
+    HiddenPageThrottlingAutoIncreasesCounter m_hiddenPageThrottlingAutoIncreasesCounter;
+    RunLoop::Timer<WebProcessPool> m_hiddenPageThrottlingTimer;
 
 #if PLATFORM(COCOA)
     RetainPtr<NSMutableDictionary> m_bundleParameters;

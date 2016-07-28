@@ -107,21 +107,7 @@ void ModuleLoaderObject::finishCreation(VM& vm, JSGlobalObject* globalObject)
 {
     Base::finishCreation(vm);
     ASSERT(inherits(info()));
-
-    // Constant values for the state.
-    putDirectWithoutTransition(vm, Identifier::fromString(&vm, "Fetch"), jsNumber(Status::Fetch));
-    putDirectWithoutTransition(vm, Identifier::fromString(&vm, "Translate"), jsNumber(Status::Translate));
-    putDirectWithoutTransition(vm, Identifier::fromString(&vm, "Instantiate"), jsNumber(Status::Instantiate));
-    putDirectWithoutTransition(vm, Identifier::fromString(&vm, "ResolveDependencies"), jsNumber(Status::ResolveDependencies));
-    putDirectWithoutTransition(vm, Identifier::fromString(&vm, "Link"), jsNumber(Status::Link));
-    putDirectWithoutTransition(vm, Identifier::fromString(&vm, "Ready"), jsNumber(Status::Ready));
-
     putDirectWithoutTransition(vm, Identifier::fromString(&vm, "registry"), JSMap::create(vm, globalObject->mapStructure()));
-}
-
-bool ModuleLoaderObject::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
-{
-    return getStaticFunctionSlot<Base>(exec, moduleLoaderObjectTable, jsCast<ModuleLoaderObject*>(object), propertyName, slot);
 }
 
 // ------------------------------ Functions --------------------------------
@@ -138,7 +124,7 @@ JSValue ModuleLoaderObject::provide(ExecState* exec, JSValue key, Status status,
     JSObject* function = jsCast<JSObject*>(get(exec, exec->propertyNames().builtinNames().providePublicName()));
     CallData callData;
     CallType callType = JSC::getCallData(function, callData);
-    ASSERT(callType != CallTypeNone);
+    ASSERT(callType != CallType::None);
 
     MarkedArgumentBuffer arguments;
     arguments.append(key);
@@ -153,7 +139,7 @@ JSInternalPromise* ModuleLoaderObject::loadAndEvaluateModule(ExecState* exec, JS
     JSObject* function = jsCast<JSObject*>(get(exec, exec->propertyNames().builtinNames().loadAndEvaluateModulePublicName()));
     CallData callData;
     CallType callType = JSC::getCallData(function, callData);
-    ASSERT(callType != CallTypeNone);
+    ASSERT(callType != CallType::None);
 
     MarkedArgumentBuffer arguments;
     arguments.append(moduleName);
@@ -167,7 +153,7 @@ JSInternalPromise* ModuleLoaderObject::loadModule(ExecState* exec, JSValue modul
     JSObject* function = jsCast<JSObject*>(get(exec, exec->propertyNames().builtinNames().loadModulePublicName()));
     CallData callData;
     CallType callType = JSC::getCallData(function, callData);
-    ASSERT(callType != CallTypeNone);
+    ASSERT(callType != CallType::None);
 
     MarkedArgumentBuffer arguments;
     arguments.append(moduleName);
@@ -181,7 +167,7 @@ JSInternalPromise* ModuleLoaderObject::linkAndEvaluateModule(ExecState* exec, JS
     JSObject* function = jsCast<JSObject*>(get(exec, exec->propertyNames().builtinNames().linkAndEvaluateModulePublicName()));
     CallData callData;
     CallType callType = JSC::getCallData(function, callData);
-    ASSERT(callType != CallTypeNone);
+    ASSERT(callType != CallType::None);
 
     MarkedArgumentBuffer arguments;
     arguments.append(moduleKey);
@@ -302,6 +288,8 @@ EncodedJSValue JSC_HOST_CALL moduleLoaderObjectRequestedModules(ExecState* exec)
         return JSValue::encode(constructEmptyArray(exec, nullptr));
 
     JSArray* result = constructEmptyArray(exec, nullptr, moduleRecord->requestedModules().size());
+    if (UNLIKELY(exec->hadException()))
+        JSValue::encode(jsUndefined());
     size_t i = 0;
     for (auto& key : moduleRecord->requestedModules())
         result->putDirectIndex(exec, i++, jsString(exec, key.get()));

@@ -42,6 +42,7 @@
 #include "DFGNodeOrigin.h"
 #include "DFGNodeType.h"
 #include "DFGObjectMaterializationData.h"
+#include "DFGOpInfo.h"
 #include "DFGTransition.h"
 #include "DFGUseKind.h"
 #include "DFGVariableAccessData.h"
@@ -55,7 +56,13 @@
 #include "ValueProfile.h"
 #include <wtf/ListDump.h>
 
-namespace JSC { namespace DFG {
+namespace JSC {
+
+namespace Profiler {
+class ExecutionCounter;
+}
+
+namespace DFG {
 
 class Graph;
 class PromotedLocationDescriptor;
@@ -217,20 +224,6 @@ struct StackAccessData {
     FlushFormat format;
     
     FlushedAt flushedAt() { return FlushedAt(format, machineLocal); }
-};
-
-// This type used in passing an immediate argument to Node constructor;
-// distinguishes an immediate value (typically an index into a CodeBlock data structure - 
-// a constant index, argument, or identifier) from a Node*.
-struct OpInfo {
-    OpInfo() : m_value(0) { }
-    explicit OpInfo(int32_t value) : m_value(static_cast<uintptr_t>(value)) { }
-    explicit OpInfo(uint32_t value) : m_value(static_cast<uintptr_t>(value)) { }
-#if OS(DARWIN) || USE(JSVALUE64)
-    explicit OpInfo(size_t value) : m_value(static_cast<uintptr_t>(value)) { }
-#endif
-    explicit OpInfo(void* value) : m_value(reinterpret_cast<uintptr_t>(value)) { }
-    uintptr_t m_value;
 };
 
 // === Node ===
@@ -494,6 +487,8 @@ struct Node {
         m_opInfo = bitwise_cast<uintptr_t>(value);
         children.reset();
     }
+
+    void convertToLazyJSConstant(Graph&, LazyJSValue);
     
     void convertToConstantStoragePointer(void* pointer)
     {
@@ -529,13 +524,12 @@ struct Node {
         children.reset();
     }
     
-    void convertToGetByOffset(StorageAccessData& data, Edge storage)
+    void convertToGetByOffset(StorageAccessData& data, Edge storage, Edge base)
     {
         ASSERT(m_op == GetById || m_op == GetByIdFlush || m_op == MultiGetByOffset);
         m_opInfo = bitwise_cast<uintptr_t>(&data);
-        children.setChild2(children.child1());
-        children.child2().setUseKind(KnownCellUse);
         children.setChild1(storage);
+        children.setChild2(base);
         m_op = GetByOffset;
         m_flags &= ~NodeMustGenerate;
     }
@@ -549,12 +543,12 @@ struct Node {
         ASSERT(m_flags & NodeMustGenerate);
     }
     
-    void convertToPutByOffset(StorageAccessData& data, Edge storage)
+    void convertToPutByOffset(StorageAccessData& data, Edge storage, Edge base)
     {
         ASSERT(m_op == PutById || m_op == PutByIdDirect || m_op == PutByIdFlush || m_op == MultiPutByOffset);
         m_opInfo = bitwise_cast<uintptr_t>(&data);
         children.setChild3(children.child2());
-        children.setChild2(children.child1());
+        children.setChild2(base);
         children.setChild1(storage);
         m_op = PutByOffset;
     }
@@ -585,7 +579,7 @@ struct Node {
 
     void convertToPhantomNewFunction()
     {
-        ASSERT(m_op == NewFunction || m_op == NewArrowFunction || m_op == NewGeneratorFunction);
+        ASSERT(m_op == NewFunction || m_op == NewGeneratorFunction);
         m_op = PhantomNewFunction;
         m_flags |= NodeMustGenerate;
         m_opInfo = 0;
@@ -644,13 +638,6 @@ struct Node {
         m_op = ToString;
     }
 
-    void convertToArithSqrt()
-    {
-        ASSERT(m_op == ArithPow);
-        child2() = Edge();
-        m_op = ArithSqrt;
-    }
-
     void convertToArithNegate()
     {
         ASSERT(m_op == ArithAbs && child1().useKind() == Int32Use);
@@ -692,14 +679,14 @@ struct Node {
         return asJSValue().asNumber();
     }
      
-    bool isMachineIntConstant()
+    bool isAnyIntConstant()
     {
-        return isConstant() && constant()->value().isMachineInt();
+        return isConstant() && constant()->value().isAnyInt();
     }
      
-    int64_t asMachineInt()
+    int64_t asAnyInt()
     {
-        return asJSValue().asMachineInt();
+        return asJSValue().asAnyInt();
     }
      
     bool isBooleanConstant()
@@ -743,12 +730,69 @@ struct Node {
         return result;
     }
 
+    bool hasLazyJSValue()
+    {
+        return op() == LazyJSConstant;
+    }
+
+    LazyJSValue lazyJSValue()
+    {
+        ASSERT(hasLazyJSValue());
+        return *bitwise_cast<LazyJSValue*>(m_opInfo);
+    }
+
+    String tryGetString(Graph&);
+
     JSValue initializationValueForActivation() const
     {
         ASSERT(op() == CreateActivation);
         return bitwise_cast<FrozenValue*>(m_opInfo2)->value();
     }
-     
+
+    bool hasArgumentsChild()
+    {
+        switch (op()) {
+        case GetMyArgumentByVal:
+        case GetMyArgumentByValOutOfBounds:
+        case LoadVarargs:
+        case ForwardVarargs:
+        case CallVarargs:
+        case CallForwardVarargs:
+        case ConstructVarargs:
+        case ConstructForwardVarargs:
+        case TailCallVarargs:
+        case TailCallForwardVarargs:
+        case TailCallVarargsInlinedCaller:
+        case TailCallForwardVarargsInlinedCaller:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    Edge& argumentsChild()
+    {
+        switch (op()) {
+        case GetMyArgumentByVal:
+        case GetMyArgumentByValOutOfBounds:
+        case LoadVarargs:
+        case ForwardVarargs:
+            return child1();
+        case CallVarargs:
+        case CallForwardVarargs:
+        case ConstructVarargs:
+        case ConstructForwardVarargs:
+        case TailCallVarargs:
+        case TailCallForwardVarargs:
+        case TailCallVarargsInlinedCaller:
+        case TailCallForwardVarargsInlinedCaller:
+            return child3();
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+            return child1();
+        }
+    }
+
     bool containsMovHint()
     {
         switch (op()) {
@@ -864,14 +908,21 @@ struct Node {
     bool hasIdentifier()
     {
         switch (op()) {
+        case TryGetById:
         case GetById:
         case GetByIdFlush:
+        case GetByIdWithThis:
         case PutById:
         case PutByIdFlush:
         case PutByIdDirect:
+        case PutByIdWithThis:
         case PutGetterById:
         case PutSetterById:
         case PutGetterSetterById:
+        case DeleteById:
+        case GetDynamicVar:
+        case PutDynamicVar:
+        case ResolveScope:
             return true;
         default:
             return false;
@@ -882,6 +933,23 @@ struct Node {
     {
         ASSERT(hasIdentifier());
         return m_opInfo;
+    }
+
+    bool hasGetPutInfo()
+    {
+        switch (op()) {
+        case GetDynamicVar:
+        case PutDynamicVar:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    unsigned getPutInfo()
+    {
+        ASSERT(hasGetPutInfo());
+        return m_opInfo2;
     }
 
     bool hasAccessorAttributes()
@@ -928,7 +996,7 @@ struct Node {
     NodeFlags arithNodeFlags()
     {
         NodeFlags result = m_flags & NodeArithFlagsMask;
-        if (op() == ArithMul || op() == ArithDiv || op() == ArithMod || op() == ArithNegate || op() == ArithPow || op() == ArithRound || op() == ArithFloor || op() == ArithCeil || op() == DoubleAsInt32)
+        if (op() == ArithMul || op() == ArithDiv || op() == ArithMod || op() == ArithNegate || op() == ArithPow || op() == ArithRound || op() == ArithFloor || op() == ArithCeil || op() == ArithTrunc || op() == DoubleAsInt32)
             return result;
         return result & ~NodeBytecodeNeedsNegZero;
     }
@@ -936,6 +1004,16 @@ struct Node {
     bool mayHaveNonIntResult()
     {
         return m_flags & NodeMayHaveNonIntResult;
+    }
+    
+    bool mayHaveDoubleResult()
+    {
+        return m_flags & NodeMayHaveDoubleResult;
+    }
+    
+    bool mayHaveNonNumberResult()
+    {
+        return m_flags & NodeMayHaveNonNumberResult;
     }
 
     bool hasConstantBuffer()
@@ -1336,6 +1414,7 @@ struct Node {
         case ArithRound:
         case ArithFloor:
         case ArithCeil:
+        case ArithTrunc:
         case GetDirectPname:
         case GetById:
         case GetByIdFlush:
@@ -1344,6 +1423,7 @@ struct Node {
         case TailCallInlinedCaller:
         case Construct:
         case CallVarargs:
+        case CallEval:
         case TailCallVarargsInlinedCaller:
         case ConstructVarargs:
         case CallForwardVarargs:
@@ -1359,6 +1439,8 @@ struct Node {
         case GetGlobalVar:
         case GetGlobalLexicalVariable:
         case StringReplace:
+        case StringReplaceRegExp:
+        case ToNumber:
             return true;
         default:
             return false;
@@ -1383,10 +1465,10 @@ struct Node {
         case CheckCell:
         case OverridesHasInstance:
         case NewFunction:
-        case NewArrowFunction:
         case NewGeneratorFunction:
         case CreateActivation:
         case MaterializeCreateActivation:
+        case CompareEqPtr:
             return true;
         default:
             return false;
@@ -1612,7 +1694,6 @@ struct Node {
     bool isFunctionAllocation()
     {
         switch (op()) {
-        case NewArrowFunction:
         case NewFunction:
         case NewGeneratorFunction:
             return true;
@@ -1718,7 +1799,7 @@ struct Node {
 
     bool hasArithRoundingMode()
     {
-        return op() == ArithRound || op() == ArithFloor || op() == ArithCeil;
+        return op() == ArithRound || op() == ArithFloor || op() == ArithCeil || op() == ArithTrunc;
     }
 
     Arith::RoundingMode arithRoundingMode()
@@ -1897,9 +1978,9 @@ struct Node {
         return isInt32OrBooleanSpeculationExpectingDefined(prediction());
     }
     
-    bool shouldSpeculateMachineInt()
+    bool shouldSpeculateAnyInt()
     {
-        return isMachineIntSpeculation(prediction());
+        return isAnyIntSpeculation(prediction());
     }
     
     bool shouldSpeculateDouble()
@@ -2130,9 +2211,9 @@ struct Node {
             && op2->shouldSpeculateInt32OrBooleanExpectingDefined();
     }
     
-    static bool shouldSpeculateMachineInt(Node* op1, Node* op2)
+    static bool shouldSpeculateAnyInt(Node* op1, Node* op2)
     {
-        return op1->shouldSpeculateMachineInt() && op2->shouldSpeculateMachineInt();
+        return op1->shouldSpeculateAnyInt() && op2->shouldSpeculateAnyInt();
     }
     
     static bool shouldSpeculateNumber(Node* op1, Node* op2)
@@ -2264,7 +2345,7 @@ struct Node {
 
 private:
     unsigned m_op : 10; // real type is NodeType
-    unsigned m_flags : 22;
+    unsigned m_flags : 20;
     // The virtual register number (spill location) associated with this .
     VirtualRegister m_virtualRegister;
     // The number of uses of the result of this operation (+1 for 'must generate' nodes, which have side-effects).
@@ -2323,6 +2404,22 @@ CString nodeMapDump(const T& nodeMap, DumpContext* context = 0)
     CommaPrinter comma;
     for(unsigned i = 0; i < keys.size(); ++i)
         out.print(comma, keys[i], "=>", inContext(nodeMap.get(keys[i]), context));
+    return out.toCString();
+}
+
+template<typename T>
+CString nodeValuePairListDump(const T& nodeValuePairList, DumpContext* context = 0)
+{
+    using V = typename T::ValueType;
+    T sortedList = nodeValuePairList;
+    std::sort(sortedList.begin(), sortedList.end(), [](const V& a, const V& b) {
+        return nodeComparator(a.node, b.node);
+    });
+
+    StringPrintStream out;
+    CommaPrinter comma;
+    for (const auto& pair : sortedList)
+        out.print(comma, pair.node, "=>", inContext(pair.value, context));
     return out.toCString();
 }
 

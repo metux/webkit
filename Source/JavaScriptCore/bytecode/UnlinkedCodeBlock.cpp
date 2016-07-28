@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013, 2015 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2012-2013, 2015-2016 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,7 +51,7 @@ const ClassInfo UnlinkedModuleProgramCodeBlock::s_info = { "UnlinkedModuleProgra
 const ClassInfo UnlinkedEvalCodeBlock::s_info = { "UnlinkedEvalCodeBlock", &Base::s_info, 0, CREATE_METHOD_TABLE(UnlinkedEvalCodeBlock) };
 const ClassInfo UnlinkedFunctionCodeBlock::s_info = { "UnlinkedFunctionCodeBlock", &Base::s_info, 0, CREATE_METHOD_TABLE(UnlinkedFunctionCodeBlock) };
 
-UnlinkedCodeBlock::UnlinkedCodeBlock(VM* vm, Structure* structure, CodeType codeType, const ExecutableInfo& info)
+UnlinkedCodeBlock::UnlinkedCodeBlock(VM* vm, Structure* structure, CodeType codeType, const ExecutableInfo& info, DebuggerMode debuggerMode)
     : Base(*vm, structure)
     , m_numVars(0)
     , m_numCalleeLocals(0)
@@ -65,11 +65,14 @@ UnlinkedCodeBlock::UnlinkedCodeBlock(VM* vm, Structure* structure, CodeType code
     , m_constructorKind(static_cast<unsigned>(info.constructorKind()))
     , m_superBinding(static_cast<unsigned>(info.superBinding()))
     , m_derivedContextType(static_cast<unsigned>(info.derivedContextType()))
+    , m_evalContextType(static_cast<unsigned>(info.evalContextType()))
     , m_isArrowFunctionContext(info.isArrowFunctionContext())
     , m_isClassContext(info.isClassContext())
+    , m_wasCompiledWithDebuggingOpcodes(debuggerMode == DebuggerMode::DebuggerOn || Options::forceDebuggerBytecodeGeneration())
     , m_firstLine(0)
     , m_lineCount(0)
     , m_endColumn(UINT_MAX)
+    , m_didOptimize(MixedTriState)
     , m_parseMode(info.parseMode())
     , m_features(0)
     , m_codeType(codeType)
@@ -126,8 +129,8 @@ int UnlinkedCodeBlock::lineNumberForBytecodeOffset(unsigned bytecodeOffset)
     return line;
 }
 
-inline void UnlinkedCodeBlock::getLineAndColumn(ExpressionRangeInfo& info,
-    unsigned& line, unsigned& column)
+inline void UnlinkedCodeBlock::getLineAndColumn(const ExpressionRangeInfo& info,
+    unsigned& line, unsigned& column) const
 {
     switch (info.mode) {
     case ExpressionRangeInfo::FatLineMode:
@@ -183,7 +186,7 @@ void UnlinkedCodeBlock::dumpExpressionRangeInfo()
 #endif
 
 void UnlinkedCodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset,
-    int& divot, int& startOffset, int& endOffset, unsigned& line, unsigned& column)
+    int& divot, int& startOffset, int& endOffset, unsigned& line, unsigned& column) const
 {
     ASSERT(bytecodeOffset < instructions().count());
 
@@ -196,7 +199,7 @@ void UnlinkedCodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset
         return;
     }
 
-    Vector<ExpressionRangeInfo>& expressionInfo = m_expressionInfo;
+    const Vector<ExpressionRangeInfo>& expressionInfo = m_expressionInfo;
 
     int low = 0;
     int high = expressionInfo.size();
@@ -211,7 +214,7 @@ void UnlinkedCodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset
     if (!low)
         low = 1;
 
-    ExpressionRangeInfo& info = expressionInfo[low - 1];
+    const ExpressionRangeInfo& info = expressionInfo[low - 1];
     startOffset = info.startOffset;
     endOffset = info.endOffset;
     divot = info.divotPoint;

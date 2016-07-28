@@ -522,7 +522,7 @@
 #define USE_NETWORK_CFDATA_ARRAY_CALLBACK 1
 #define ENABLE_USER_MESSAGE_HANDLERS 1
 #define HAVE_OUT_OF_PROCESS_LAYER_HOSTING 1
-#define HAVE_DTRACE 1
+#define HAVE_DTRACE 0
 
 #if !PLATFORM(WATCHOS) && !PLATFORM(APPLETV)
 #define HAVE_AVKIT 1
@@ -532,6 +532,12 @@
 #endif
 
 #if PLATFORM(MAC)
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED < 101200
+#define USE_QTKIT 1
+#else
+#define USE_QTKIT 0
+#endif
 
 #define USE_APPKIT 1
 #define HAVE_RUNLOOP_TIMER 1
@@ -553,11 +559,12 @@
 
 #if PLATFORM(IOS)
 
-#define HAVE_NETWORK_EXTENSION 1
-#define HAVE_READLINE 1
-#if USE(APPLE_INTERNAL_SDK)
+#if USE(APPLE_INTERNAL_SDK) && __IPHONE_OS_VERSION_MIN_REQUIRED < 100000
 #define USE_CFNETWORK 1
 #endif
+
+#define HAVE_NETWORK_EXTENSION 1
+#define HAVE_READLINE 1
 #define USE_UIKIT_EDITING 1
 #define USE_WEB_THREAD 1
 
@@ -667,6 +674,10 @@
 #define HAVE_VIRTUALALLOC 1
 #endif
 
+#if (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200) || (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000)
+#define HAVE_CFNETWORK_STORAGE_PARTITIONING 1
+#endif
+
 /* ENABLE macro defaults */
 
 /* FIXME: move out all ENABLE() defines from here to FeatureDefines.h */
@@ -676,19 +687,6 @@
 
 #if OS(WINDOWS)
 #define USE_SYSTEM_MALLOC 1
-#endif
-
-#define ENABLE_DEBUG_WITH_BREAKPOINT 0
-#define ENABLE_SAMPLING_COUNTERS 0
-#define ENABLE_SAMPLING_FLAGS 0
-#define ENABLE_SAMPLING_REGIONS 0
-#define ENABLE_OPCODE_SAMPLING 0
-#define ENABLE_CODEBLOCK_SAMPLING 0
-#if ENABLE(CODEBLOCK_SAMPLING) && !ENABLE(OPCODE_SAMPLING)
-#error "CODEBLOCK_SAMPLING requires OPCODE_SAMPLING"
-#endif
-#if ENABLE(OPCODE_SAMPLING) || ENABLE(SAMPLING_FLAGS) || ENABLE(SAMPLING_REGIONS)
-#define ENABLE_SAMPLING_THREAD 1
 #endif
 
 #if !defined(USE_JSVALUE64) && !defined(USE_JSVALUE32_64)
@@ -768,7 +766,7 @@
    values get stored to atomically. This is trivially true on 64-bit platforms,
    but not true at all on 32-bit platforms where values are composed of two
    separate sub-values. */
-#if (OS(DARWIN) || PLATFORM(EFL) || PLATFORM(GTK) || PLATFORM(WIN)) && ENABLE(DFG_JIT) && USE(JSVALUE64)
+#if ENABLE(DFG_JIT) && USE(JSVALUE64)
 #define ENABLE_CONCURRENT_JIT 1
 #endif
 
@@ -832,6 +830,38 @@
 #define JSC_HOST_CALL __attribute__ ((fastcall))
 #else
 #define JSC_HOST_CALL
+#endif
+
+#if CPU(X86) && OS(WINDOWS)
+#define CALLING_CONVENTION_IS_STDCALL 1
+#ifndef CDECL
+#if COMPILER(MSVC)
+#define CDECL __cdecl
+#else
+#define CDECL __attribute__ ((__cdecl))
+#endif
+#endif
+#else
+#define CALLING_CONVENTION_IS_STDCALL 0
+#endif
+
+#if CPU(X86)
+#define WTF_COMPILER_SUPPORTS_FASTCALL_CALLING_CONVENTION 1
+#ifndef FASTCALL
+#if COMPILER(MSVC)
+#define FASTCALL __fastcall
+#else
+#define FASTCALL  __attribute__ ((fastcall))
+#endif
+#endif
+#else
+#define WTF_COMPILER_SUPPORTS_FASTCALL_CALLING_CONVENTION 0
+#endif
+
+#if ENABLE(JIT) && CALLING_CONVENTION_IS_STDCALL
+#define JIT_OPERATION CDECL
+#else
+#define JIT_OPERATION
 #endif
 
 /* Configure the interpreter */
@@ -1094,6 +1124,10 @@
 #define ENABLE_CSS3_TEXT_DECORATION_SKIP_INK 1
 #endif
 
+#if PLATFORM(GTK)
+#define USE_WOFF2 1
+#endif
+
 #if PLATFORM(COCOA)
 #define ENABLE_CSS3_TEXT_DECORATION_SKIP_INK 1
 #endif
@@ -1103,6 +1137,8 @@
 #endif
 
 #if COMPILER(MSVC)
+#undef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
 #undef __STDC_LIMIT_MACROS
 #define __STDC_LIMIT_MACROS
 #if _MSC_VER < 1900
@@ -1133,6 +1169,50 @@
 /* While 10.10 has support for fences, it is missing some API important for our integration of them. */
 #if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
 #define HAVE_COREANIMATION_FENCES 1
+#endif
+
+#if (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200) || (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000)
+#define USE_OS_LOG 1
+#if USE(APPLE_INTERNAL_SDK)
+#define USE_OS_STATE 1
+#endif
+#endif
+
+#if (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200) || (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000)
+#define HAVE_SEC_TRUST_SERIALIZATION 1
+#endif
+
+#if !defined(WTF_DEFAULT_EVENT_LOOP)
+#define WTF_DEFAULT_EVENT_LOOP 1
+#endif
+
+#if WTF_DEFAULT_EVENT_LOOP
+#if PLATFORM(WIN)
+/* Use Windows message pump abstraction.
+ * Even if the port is AppleWin, we use the Windows message pump system for the event loop,
+ * so that USE(WINDOWS_EVENT_LOOP) && USE(CF) can be true.
+ * And PLATFORM(WIN), PLATFORM(EFL) and PLATFORM(GTK) are exclusive. If the port is GTK,
+ * PLATFORM(WIN) should be false. And in that case, GLib's event loop is used.
+ */
+#define USE_WINDOWS_EVENT_LOOP 1
+#elif PLATFORM(COCOA)
+/* OS X and IOS. Use CoreFoundation & GCD abstraction. */
+#define USE_COCOA_EVENT_LOOP 1
+#elif PLATFORM(EFL)
+/* EFL port uses GLib. But it uses its own event loop abstraction.
+ * Thus, USE(EFL_EVENT_LOOP) && USE(GLIB) can be true.
+ */
+#define USE_EFL_EVENT_LOOP 1
+#elif USE(GLIB)
+/* Use GLib's event loop abstraction. Primarily GTK port uses it. */
+#define USE_GLIB_EVENT_LOOP 1
+#else
+#define USE_GENERIC_EVENT_LOOP 1
+#endif
+#endif
+
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#define USE_MEDIAREMOTE 1
 #endif
 
 #endif /* WTF_Platform_h */

@@ -24,6 +24,7 @@
  */
 
 var emDash = "\u2014";
+var enDash = "\u2013";
 var ellipsis = "\u2026";
 
 Object.defineProperty(Object, "shallowCopy",
@@ -90,6 +91,17 @@ Object.defineProperty(Object.prototype, "valueForCaseInsensitiveKey",
         }
 
         return undefined;
+    }
+});
+
+Object.defineProperty(Map, "fromObject",
+{
+    value: function(object)
+    {
+        let map = new Map;
+        for (let key in object)
+            map.set(key, object[key]);
+        return map;
     }
 });
 
@@ -412,6 +424,27 @@ Object.defineProperty(DocumentFragment.prototype, "createChild",
     value: Element.prototype.createChild
 });
 
+Object.defineProperty(Array, "shallowEqual",
+{
+    value: function(a, b)
+    {
+        if (a === b)
+            return true;
+
+        let length = a.length;
+
+        if (length !== b.length)
+            return false;
+
+        for (var i = 0; i < length; ++i) {
+            if (a[i] !== b[i])
+                return false;
+        }
+
+        return true;
+    }
+});
+
 Object.defineProperty(Array.prototype, "lastValue",
 {
     get: function()
@@ -472,6 +505,22 @@ Object.defineProperty(Array.prototype, "partition",
     }
 });
 
+Object.defineProperty(String.prototype, "isLowerCase",
+{
+    value: function()
+    {
+        return String(this) === this.toLowerCase();
+    }
+});
+
+Object.defineProperty(String.prototype, "isUpperCase",
+{
+    value: function()
+    {
+        return String(this) === this.toUpperCase();
+    }
+});
+
 Object.defineProperty(String.prototype, "trimMiddle",
 {
     value: function(maxLength)
@@ -517,6 +566,14 @@ Object.defineProperty(String.prototype, "collapseWhitespace",
     value: function()
     {
         return this.replace(/[\s\xA0]+/g, " ");
+    }
+});
+
+Object.defineProperty(String.prototype, "removeWhitespace",
+{
+    value: function()
+    {
+        return this.replace(/[\s\xA0]+/g, "");
     }
 });
 
@@ -604,15 +661,17 @@ Object.defineProperty(String, "tokenizeFormatString",
                 }
             }
 
-            var precision = -1;
+            const defaultPrecision = 6;
+
+            let precision = defaultPrecision;
             if (format[index] === ".") {
                 // This is a precision specifier. If no digit follows the ".",
-                // then the precision should be zero.
+                // then use the default precision of six digits (ISO C99 specification).
                 ++index;
 
                 precision = parseInt(format.substring(index), 10);
                 if (isNaN(precision))
-                    precision = 0;
+                    precision = defaultPrecision;
 
                 while (!isNaN(format[index]))
                     ++index;
@@ -679,14 +738,21 @@ Object.defineProperty(String, "standardFormatters",
     value: {
         d: function(substitution)
         {
-            return !isNaN(substitution) ? substitution : 0;
+            return parseInt(substitution);
         },
 
         f: function(substitution, token)
         {
-            if (substitution && token.precision > -1)
-                substitution = substitution.toFixed(token.precision);
-            return !isNaN(substitution) ? substitution : (token.precision > -1 ? Number(0).toFixed(token.precision) : 0);
+            let value = parseFloat(substitution);
+            if (isNaN(value))
+                return NaN;
+
+            let options = {
+                minimumFractionDigits: token.precision,
+                maximumFractionDigits: token.precision,
+                useGrouping: false
+            };
+            return value.toLocaleString(undefined, options);
         },
 
         s: function(substitution)
@@ -705,7 +771,7 @@ Object.defineProperty(String, "format",
 
         function prettyFunctionName()
         {
-            return "String.format(\"" + format + "\", \"" + substitutions.join("\", \"") + "\")";
+            return "String.format(\"" + format + "\", \"" + Array.from(substitutions).join("\", \"") + "\")";
         }
 
         function warn(msg)
@@ -874,11 +940,34 @@ Object.defineProperty(Number, "constrain",
     }
 });
 
+Object.defineProperty(Number, "percentageString",
+{
+    value: function(fraction, precision = 1)
+    {
+        console.assert(fraction >= 0 && fraction <= 1);
+        return fraction.toLocaleString(undefined, {minimumFractionDigits: precision, style: "percent"});
+    }
+});
+
+Object.defineProperty(Number, "secondsToMillisecondsString",
+{
+    value: function(seconds, higherResolution)
+    {
+        let ms = seconds * 1000;
+
+        if (higherResolution)
+            return WebInspector.UIString("%.2fms").format(ms);
+        return WebInspector.UIString("%.1fms").format(ms);
+    }
+});
+
 Object.defineProperty(Number, "secondsToString",
 {
     value: function(seconds, higherResolution)
     {
         let ms = seconds * 1000;
+        if (!ms)
+            return WebInspector.UIString("%.0fms").format(0);
 
         if (Math.abs(ms) < 10) {
             if (higherResolution)
@@ -1126,26 +1215,110 @@ Object.defineProperty(Array.prototype, "binaryIndexOf",
 });
 
 (function() {
-    const debounceSymbol = Symbol("function-debounce-timeout");
-    Object.defineProperty(Function.prototype, "debounce",
+    // The `debounce` function lets you call any function on an object with a delay
+    // and if the function keeps getting called, the delay gets reset. Since `debounce`
+    // returns a Proxy, you can cache it and call multiple functions with the same delay.
+
+    // Use: object.debounce(200).foo("Argument 1", "Argument 2")
+    // Note: The last call's arguments get used for the delayed call.
+
+    const debounceTimeoutSymbol = Symbol("debounce-timeout");
+    const debounceSoonProxySymbol = Symbol("debounce-soon-proxy");
+
+    Object.defineProperty(Object.prototype, "soon",
     {
-        value: function(delay, thisObject)
+        get: function()
         {
-            let callback = this.bind(thisObject);
-            return function() {
-                clearTimeout(callback[debounceSymbol]);
-                let args = arguments;
-                callback[debounceSymbol] = setTimeout(() => {
-                    callback.apply(null, args);
-                }, delay);
-            };
+            if (!this[debounceSoonProxySymbol])
+                this[debounceSoonProxySymbol] = this.debounce(0);
+            return this[debounceSoonProxySymbol];
+        }
+    });
+
+    Object.defineProperty(Object.prototype, "debounce",
+    {
+        value: function(delay)
+        {
+            console.assert(delay >= 0);
+
+            return new Proxy(this, {
+                get(target, property, receiver) {
+                    return (...args) => {
+                        let original = target[property];
+                        console.assert(typeof original === "function");
+
+                        if (original[debounceTimeoutSymbol])
+                            clearTimeout(original[debounceTimeoutSymbol]);
+
+                        let performWork = () => {
+                            original[debounceTimeoutSymbol] = undefined;
+                            original.apply(target, args);
+                        };
+
+                        original[debounceTimeoutSymbol] = setTimeout(performWork, delay);
+                    };
+                }
+            });
+        }
+    });
+
+    Object.defineProperty(Function.prototype, "cancelDebounce",
+    {
+        value: function()
+        {
+            if (!this[debounceTimeoutSymbol])
+                return;
+
+            clearTimeout(this[debounceTimeoutSymbol]);
+            this[debounceTimeoutSymbol] = undefined;
+        }
+    });
+
+    const requestAnimationFrameSymbol = Symbol("peform-on-animation-frame");
+    const requestAnimationFrameProxySymbol = Symbol("perform-on-animation-frame-proxy");
+
+    Object.defineProperty(Object.prototype, "onNextFrame",
+    {
+        get: function()
+        {
+            if (!this[requestAnimationFrameProxySymbol]) {
+                this[requestAnimationFrameProxySymbol] = new Proxy(this, {
+                    get(target, property, receiver) {
+                        return (...args) => {
+                            let original = target[property];
+                            console.assert(typeof original === "function");
+
+                            if (original[requestAnimationFrameSymbol])
+                                return;
+
+                            let performWork = () => {
+                                original[requestAnimationFrameSymbol] = undefined;
+                                original.apply(target, args);
+                            };
+
+                            original[requestAnimationFrameSymbol] = requestAnimationFrame(performWork);
+                        };
+                    }
+                });
+            }
+
+            return this[requestAnimationFrameProxySymbol];
         }
     });
 })();
 
 function appendWebInspectorSourceURL(string)
 {
+    if (string.includes("//# sourceURL"))
+        return string;
     return "\n//# sourceURL=__WebInspectorInternal__\n" + string;
+}
+
+function appendWebInspectorConsoleEvaluationSourceURL(string)
+{
+    if (string.includes("//# sourceURL"))
+        return string;
+    return "\n//# sourceURL=__WebInspectorConsoleEvaluation__\n" + string;
 }
 
 function isWebInspectorInternalScript(url)
@@ -1153,9 +1326,25 @@ function isWebInspectorInternalScript(url)
     return url === "__WebInspectorInternal__";
 }
 
-function isWebInspectorDebugScript(url)
+function isWebInspectorConsoleEvaluationScript(url)
 {
-    return url && url.startsWith("__WebInspector");
+    return url === "__WebInspectorConsoleEvaluation__";
+}
+
+function isWebKitInjectedScript(url)
+{
+    return url && url.startsWith("__InjectedScript_") && url.endsWith(".js");
+}
+
+function isWebKitInternalScript(url)
+{
+    if (isWebInspectorConsoleEvaluationScript(url))
+        return false;
+
+    if (isWebKitInjectedScript(url))
+        return true;
+
+    return url && url.startsWith("__Web") && url.endsWith("__");
 }
 
 function isFunctionStringNativeCode(str)
@@ -1165,7 +1354,7 @@ function isFunctionStringNativeCode(str)
 
 function doubleQuotedString(str)
 {
-    return "\"" + str.replace(/"/g, "\\\"") + "\"";
+    return "\"" + str.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\"";
 }
 
 function insertionIndexForObjectInListSortedByFunction(object, list, comparator, insertionIndexAfter)
@@ -1210,4 +1399,11 @@ function decodeBase64ToBlob(base64Data, mimeType)
 function timestamp()
 {
     return window.performance ? performance.now() : Date.now();
+}
+
+if (!window.handlePromiseException) {
+    window.handlePromiseException = function handlePromiseException(error)
+    {
+        console.error("Uncaught exception in Promise", error);
+    };
 }

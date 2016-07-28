@@ -24,6 +24,7 @@
 #include "JSLocation.h"
 
 #include "JSDOMBinding.h"
+#include "RuntimeApplicationChecks.h"
 #include <runtime/JSFunction.h>
 
 using namespace JSC;
@@ -59,8 +60,9 @@ bool JSLocation::getOwnPropertySlotDelegate(ExecState* exec, PropertyName proper
     return true;
 }
 
-bool JSLocation::putDelegate(ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot& slot)
+bool JSLocation::putDelegate(ExecState* exec, PropertyName propertyName, JSValue, PutPropertySlot&, bool& putResult)
 {
+    putResult = false;
     Frame* frame = wrapped().frame();
     if (!frame)
         return true;
@@ -68,23 +70,13 @@ bool JSLocation::putDelegate(ExecState* exec, PropertyName propertyName, JSValue
     if (propertyName == exec->propertyNames().toString || propertyName == exec->propertyNames().valueOf)
         return true;
 
-    bool sameDomainAccess = shouldAllowAccessToFrame(exec, frame);
-
-    static_assert(hasStaticPropertyTable, "The implementation dereferences ClassInfo::staticPropHashTable without null check");
-    const HashTableValue* entry = JSLocation::info()->staticPropHashTable->entry(propertyName);
-    if (!entry) {
-        if (sameDomainAccess)
-            JSObject::put(this, exec, propertyName, value, slot);
-        return true;
-    }
+    if (shouldAllowAccessToFrame(exec, frame))
+        return false;
 
     // Cross-domain access to the location is allowed when assigning the whole location,
-    // but not when assigning the individual pieces, since that might inadvertently
+    //but not when assigning the individual pieces, since that might inadvertently
     // disclose other parts of the original location.
-    if (propertyName != exec->propertyNames().href && !sameDomainAccess)
-        return true;
-
-    return false;
+    return propertyName != exec->propertyNames().href;
 }
 
 bool JSLocation::deleteProperty(JSCell* cell, ExecState* exec, PropertyName propertyName)
@@ -130,8 +122,9 @@ JSValue JSLocation::toStringFunction(ExecState& state)
     return jsStringWithCache(&state, wrapped().toString());
 }
 
-bool JSLocationPrototype::putDelegate(ExecState* exec, PropertyName propertyName, JSValue, PutPropertySlot&)
+bool JSLocationPrototype::putDelegate(ExecState* exec, PropertyName propertyName, JSValue, PutPropertySlot&, bool& putResult)
 {
+    putResult = false;
     return (propertyName == exec->propertyNames().toString || propertyName == exec->propertyNames().valueOf);
 }
 

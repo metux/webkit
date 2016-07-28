@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@
 #include "CustomProtocolManagerMessages.h"
 #include "DownloadProxy.h"
 #include "DownloadProxyMessages.h"
-#include "Logging.h"
+#include "LogInitialization.h"
 #include "NetworkProcessCreationParameters.h"
 #include "NetworkProcessMessages.h"
 #include "NetworkProcessProxy.h"
@@ -63,7 +63,7 @@
 #include <WebCore/ApplicationCacheStorage.h>
 #include <WebCore/Language.h>
 #include <WebCore/LinkHash.h>
-#include <WebCore/Logging.h>
+#include <WebCore/LogInitialization.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/SessionID.h>
 #include <runtime/JSCInlines.h>
@@ -91,6 +91,10 @@
 
 #if USE(SOUP)
 #include "WebSoupCustomProtocolRequestManager.h"
+#endif
+
+#if OS(LINUX)
+#include "MemoryPressureMonitor.h"
 #endif
 
 #ifndef NDEBUG
@@ -127,9 +131,14 @@ static WebsiteDataStore::Configuration legacyWebsiteDataStoreConfiguration(API::
 
     configuration.localStorageDirectory = processPoolConfiguration.localStorageDirectory();
     configuration.webSQLDatabaseDirectory = processPoolConfiguration.webSQLDatabaseDirectory();
-    configuration.applicationCacheDirectory = WebProcessPool::legacyPlatformDefaultApplicationCacheDirectory();
-    configuration.mediaKeysStorageDirectory = WebProcessPool::legacyPlatformDefaultMediaKeysStorageDirectory();
-    configuration.networkCacheDirectory = WebProcessPool::legacyPlatformDefaultNetworkCacheDirectory();
+    configuration.applicationCacheDirectory = processPoolConfiguration.applicationCacheDirectory();
+    configuration.applicationCacheFlatFileSubdirectoryName = processPoolConfiguration.applicationCacheFlatFileSubdirectoryName();
+    configuration.mediaCacheDirectory = processPoolConfiguration.mediaCacheDirectory();
+    configuration.mediaKeysStorageDirectory = processPoolConfiguration.mediaKeysStorageDirectory();
+    configuration.networkCacheDirectory = processPoolConfiguration.diskCacheDirectory();
+
+    // This is needed to support legacy WK2 clients, which did not have resource load statistics.
+    configuration.resourceLoadStatisticsDirectory = API::WebsiteDataStore::defaultResourceLoadStatisticsDirectory();
 
     return configuration;
 }
@@ -158,8 +167,10 @@ WebProcessPool::WebProcessPool(API::ProcessPoolConfiguration& configuration)
     , m_canHandleHTTPSServerTrustEvaluation(true)
     , m_didNetworkProcessCrash(false)
     , m_memoryCacheDisabled(false)
-    , m_userObservablePageCounter([this](bool) { updateProcessSuppressionState(); })
-    , m_processSuppressionDisabledForPageCounter([this](bool) { updateProcessSuppressionState(); })
+    , m_userObservablePageCounter([this](RefCounterEvent) { updateProcessSuppressionState(); })
+    , m_processSuppressionDisabledForPageCounter([this](RefCounterEvent) { updateProcessSuppressionState(); })
+    , m_hiddenPageThrottlingAutoIncreasesCounter([this](RefCounterEvent) { m_hiddenPageThrottlingTimer.startOneShot(0); })
+    , m_hiddenPageThrottlingTimer(RunLoop::main(), this, &WebProcessPool::updateHiddenPageThrottlingAutoIncreaseLimit)
 {
     for (auto& scheme : m_configuration->alwaysRevalidatedURLSchemes())
         m_schemesToRegisterAsAlwaysRevalidated.add(scheme);
@@ -194,7 +205,7 @@ WebProcessPool::WebProcessPool(API::ProcessPoolConfiguration& configuration)
     addLanguageChangeObserver(this, languageChanged);
 
 #if !LOG_DISABLED
-    WebCore::initializeLoggingChannelsIfNecessary();
+    WebCore::initializeLogChannelsIfNecessary();
     WebKit::initializeLogChannelsIfNecessary();
 #endif // !LOG_DISABLED
 
@@ -231,7 +242,7 @@ WebProcessPool::~WebProcessPool()
 
     m_iconDatabase->invalidate();
     m_iconDatabase->clearProcessPool();
-    WebIconDatabase* rawIconDatabase = m_iconDatabase.release().leakRef();
+    WebIconDatabase* rawIconDatabase = m_iconDatabase.leakRef();
     rawIconDatabase->derefWhenAppropriate();
 
     invalidateCallbackMap(m_dictionaryCallbacks, CallbackBase::Error::OwnerWasInvalidated);
@@ -345,9 +356,8 @@ NetworkProcessProxy& WebProcessPool::ensureNetworkProcess()
     parameters.diskCacheDirectory = m_configuration->diskCacheDirectory();
     if (!parameters.diskCacheDirectory.isEmpty())
         SandboxExtension::createHandleForReadWriteDirectory(parameters.diskCacheDirectory, parameters.diskCacheDirectoryExtensionHandle);
-
-#if ENABLE(SECCOMP_FILTERS)
-    parameters.cookieStorageDirectory = this->cookieStorageDirectory();
+#if ENABLE(NETWORK_CACHE_SPECULATIVE_REVALIDATION)
+    parameters.shouldEnableNetworkCacheSpeculativeRevalidation = m_configuration->diskCacheSpeculativeValidationEnabled();
 #endif
 
 #if PLATFORM(IOS)
@@ -362,6 +372,11 @@ NetworkProcessProxy& WebProcessPool::ensureNetworkProcess()
     String parentBundleDirectory = this->parentBundleDirectory();
     if (!parentBundleDirectory.isEmpty())
         SandboxExtension::createHandle(parentBundleDirectory, SandboxExtension::ReadOnly, parameters.parentBundleDirectoryExtensionHandle);
+#endif
+
+#if OS(LINUX)
+    if (MemoryPressureMonitor::isEnabled())
+        parameters.memoryPressureMonitorHandle = MemoryPressureMonitor::singleton().createHandle();
 #endif
 
     parameters.shouldUseTestingNetworkSession = m_shouldUseTestingNetworkSession;
@@ -451,6 +466,7 @@ void WebProcessPool::databaseProcessCrashed(DatabaseProcessProxy* databaseProces
     for (auto& supplement : m_supplements)
         supplement.value->processDidClose(databaseProcessProxy);
 
+    m_client.databaseProcessDidCrash(this);
     m_databaseProcess = nullptr;
 }
 #endif
@@ -531,6 +547,8 @@ WebProcessProxy& WebProcessPool::createNewWebProcess()
         SandboxExtension::createHandle(parameters.injectedBundlePath, SandboxExtension::ReadOnly, parameters.injectedBundlePathExtensionHandle);
 
     parameters.applicationCacheDirectory = m_configuration->applicationCacheDirectory();
+    parameters.applicationCacheFlatFileSubdirectoryName = m_configuration->applicationCacheFlatFileSubdirectoryName();
+
     if (!parameters.applicationCacheDirectory.isEmpty())
         SandboxExtension::createHandleForReadWriteDirectory(parameters.applicationCacheDirectory, parameters.applicationCacheDirectoryExtensionHandle);
 
@@ -538,9 +556,9 @@ WebProcessProxy& WebProcessPool::createNewWebProcess()
     if (!parameters.webSQLDatabaseDirectory.isEmpty())
         SandboxExtension::createHandleForReadWriteDirectory(parameters.webSQLDatabaseDirectory, parameters.webSQLDatabaseDirectoryExtensionHandle);
 
-#if ENABLE(SECCOMP_FILTERS)
-    parameters.cookieStorageDirectory = this->cookieStorageDirectory();
-#endif
+    parameters.mediaCacheDirectory = m_configuration->mediaCacheDirectory();
+    if (!parameters.mediaCacheDirectory.isEmpty())
+        SandboxExtension::createHandleForReadWriteDirectory(parameters.mediaCacheDirectory, parameters.mediaCacheDirectoryExtensionHandle);
 
 #if PLATFORM(IOS)
     String cookieStorageDirectory = this->cookieStorageDirectory();
@@ -617,7 +635,11 @@ WebProcessProxy& WebProcessPool::createNewWebProcess()
 
 #if OS(LINUX)
     parameters.shouldEnableMemoryPressureReliefLogging = true;
+    if (MemoryPressureMonitor::isEnabled())
+        parameters.memoryPressureMonitorHandle = MemoryPressureMonitor::singleton().createHandle();
 #endif
+
+    parameters.resourceLoadStatisticsEnabled = resourceLoadStatisticsEnabled();
 
     // Add any platform specific parameters
     platformInitializeWebProcess(parameters);
@@ -632,12 +654,12 @@ WebProcessProxy& WebProcessPool::createNewWebProcess()
 #if PLATFORM(COCOA)
     process->send(Messages::WebProcess::SetQOS(webProcessLatencyQOS(), webProcessThroughputQOS()), 0);
 #endif
-#if PLATFORM(IOS)
-    ApplicationCacheStorage::singleton().setDefaultOriginQuota(25ULL * 1024 * 1024);
-#endif
 
     if (WebPreferences::anyPagesAreUsingPrivateBrowsing())
         process->send(Messages::WebProcess::EnsurePrivateBrowsingSession(SessionID::legacyPrivateSessionID()), 0);
+
+    if (m_automationSession)
+        process->send(Messages::WebProcess::EnsureAutomationSessionProxy(m_automationSession->sessionIdentifier()), 0);
 
     m_processes.append(process.ptr());
 
@@ -748,6 +770,8 @@ Ref<WebPageProxy> WebProcessPool::createWebPage(PageClient& pageClient, Ref<API:
         pageConfiguration->setPageGroup(m_defaultPageGroup.ptr());
     if (!pageConfiguration->preferences())
         pageConfiguration->setPreferences(&pageConfiguration->pageGroup()->preferences());
+    if (!pageConfiguration->userContentController())
+        pageConfiguration->setUserContentController(&pageConfiguration->pageGroup()->userContentController());
     if (!pageConfiguration->visitedLinkStore())
         pageConfiguration->setVisitedLinkStore(m_visitedLinkStore.ptr());
     if (!pageConfiguration->websiteDataStore()) {
@@ -775,8 +799,14 @@ DownloadProxy* WebProcessPool::download(WebPageProxy* initiatingPage, const Reso
     SessionID sessionID = initiatingPage ? initiatingPage->sessionID() : SessionID::defaultSessionID();
 
     if (networkProcess()) {
-        // FIXME (NetworkProcess): Replicate whatever FrameLoader::setOriginalURLForDownloadRequest does with the request here.
-        networkProcess()->send(Messages::NetworkProcess::DownloadRequest(sessionID, downloadProxy->downloadID(), request), 0);
+        ResourceRequest updatedRequest(request);
+        // Request's firstPartyForCookies will be used as Original URL of the download request.
+        // We set the value to top level document's URL.
+        if (initiatingPage)
+            updatedRequest.setFirstPartyForCookies(URL(URL(), initiatingPage->pageLoadState().url()));
+        else
+            updatedRequest.setFirstPartyForCookies(URL());
+        networkProcess()->send(Messages::NetworkProcess::DownloadRequest(sessionID, downloadProxy->downloadID(), updatedRequest), 0);
         return downloadProxy;
     }
 
@@ -836,6 +866,18 @@ pid_t WebProcessPool::networkProcessIdentifier()
         return 0;
 
     return m_networkProcess->processIdentifier();
+}
+
+pid_t WebProcessPool::databaseProcessIdentifier()
+{
+#if ENABLE(DATABASE_PROCESS)
+    if (!m_databaseProcess)
+        return 0;
+
+    return m_databaseProcess->processIdentifier();
+#else
+    return 0;
+#endif
 }
 
 void WebProcessPool::setAlwaysUsesComplexTextCodePath(bool alwaysUseComplexText)
@@ -970,6 +1012,11 @@ void WebProcessPool::addMessageReceiver(IPC::StringReference messageReceiverName
     m_messageReceiverMap.addMessageReceiver(messageReceiverName, destinationID, messageReceiver);
 }
 
+void WebProcessPool::removeMessageReceiver(IPC::StringReference messageReceiverName)
+{
+    m_messageReceiverMap.removeMessageReceiver(messageReceiverName);
+}
+
 void WebProcessPool::removeMessageReceiver(IPC::StringReference messageReceiverName, uint64_t destinationID)
 {
     m_messageReceiverMap.removeMessageReceiver(messageReceiverName, destinationID);
@@ -1040,17 +1087,6 @@ String WebProcessPool::iconDatabasePath() const
     return platformDefaultIconDatabasePath();
 }
 
-#if ENABLE(SECCOMP_FILTERS)
-String WebProcessPool::cookieStorageDirectory() const
-{
-    if (!m_overrideCookieStorageDirectory.isEmpty())
-        return m_overrideCookieStorageDirectory;
-
-    // FIXME: This doesn't make much sense. Is this function used at all? We used to call platform code, but no existing platforms implemented that function.
-    return emptyString();
-}
-#endif
-
 void WebProcessPool::useTestingNetworkSession()
 {
     ASSERT(m_processes.isEmpty());
@@ -1075,7 +1111,6 @@ void WebProcessPool::clearCachedCredentials()
 void WebProcessPool::terminateDatabaseProcess()
 {
 #if ENABLE(DATABASE_PROCESS)
-    ASSERT(m_processes.isEmpty());
     if (!m_databaseProcess)
         return;
 
@@ -1102,8 +1137,13 @@ void WebProcessPool::setAutomationSession(RefPtr<WebAutomationSession>&& automat
     m_automationSession = WTFMove(automationSession);
 
 #if ENABLE(REMOTE_INSPECTOR)
-    if (m_automationSession)
+    if (m_automationSession) {
         m_automationSession->init();
+        m_automationSession->setProcessPool(this);
+
+        sendToAllProcesses(Messages::WebProcess::EnsureAutomationSessionProxy(m_automationSession->sessionIdentifier()));
+    } else
+        sendToAllProcesses(Messages::WebProcess::DestroyAutomationSessionProxy());
 #endif
 }
 
@@ -1318,6 +1358,17 @@ void WebProcessPool::setFontWhitelist(API::Array* array)
                 m_fontWhitelist.append(font->string());
         }
     }
+}
+
+void WebProcessPool::updateHiddenPageThrottlingAutoIncreaseLimit()
+{
+    // We're estimating an upper bound for a set of background timer fires for a page to be 200ms
+    // (including all timer fires, all paging-in, and any resulting GC). To ensure this does not
+    // result in more than 1% CPU load allow for one timer fire per 100x this duration.
+    static int maximumTimerThrottlePerPageInMS = 200 * 100;
+
+    int limitInMilliseconds = maximumTimerThrottlePerPageInMS * m_hiddenPageThrottlingAutoIncreasesCounter.value();
+    sendToAllProcesses(Messages::WebProcess::SetHiddenPageTimerThrottlingIncreaseLimit(limitInMilliseconds));
 }
 
 } // namespace WebKit

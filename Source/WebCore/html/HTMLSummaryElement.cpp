@@ -23,6 +23,7 @@
 
 #if ENABLE(DETAILS_ELEMENT)
 #include "DetailsMarkerControl.h"
+#include "EventNames.h"
 #include "HTMLDetailsElement.h"
 #include "HTMLFormControlElement.h"
 #include "HTMLSlotElement.h"
@@ -49,7 +50,7 @@ HTMLSummaryElement::HTMLSummaryElement(const QualifiedName& tagName, Document& d
     ASSERT(hasTagName(summaryTag));
 }
 
-RenderPtr<RenderElement> HTMLSummaryElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> HTMLSummaryElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderBlockFlow>(*this, WTFMove(style));
 }

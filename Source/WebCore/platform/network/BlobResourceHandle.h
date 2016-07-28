@@ -28,12 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef BlobResourceHandle_h
-#define BlobResourceHandle_h
+#pragma once
 
 #include "FileStreamClient.h"
 #include "ResourceHandle.h"
-#include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
@@ -48,7 +46,7 @@ class BlobDataItem;
 
 class BlobResourceHandle final : public FileStreamClient, public ResourceHandle  {
 public:
-    static PassRefPtr<BlobResourceHandle> createAsync(BlobData*, const ResourceRequest&, ResourceHandleClient*);
+    static Ref<BlobResourceHandle> createAsync(BlobData*, const ResourceRequest&, ResourceHandleClient*);
 
     static void loadResourceSynchronously(BlobData*, const ResourceRequest&, ResourceError&, ResourceResponse&, Vector<char>& data);
 
@@ -62,13 +60,13 @@ private:
     virtual ~BlobResourceHandle();
 
     // FileStreamClient methods.
-    virtual void didGetSize(long long) override;
-    virtual void didOpen(bool) override;
-    virtual void didRead(int) override;
+    void didGetSize(long long) override;
+    void didOpen(bool) override;
+    void didRead(int) override;
 
     // ResourceHandle methods.
-    virtual void cancel() override;
-    virtual void continueDidReceiveResponse() override;
+    void cancel() override;
+    void continueDidReceiveResponse() override;
 
     void doStart();
     void getSizeForNext();
@@ -112,5 +110,3 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // BlobResourceHandle_h

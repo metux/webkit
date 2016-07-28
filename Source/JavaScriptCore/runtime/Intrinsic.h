@@ -28,7 +28,7 @@
 
 namespace JSC {
 
-enum Intrinsic {
+enum JS_EXPORT_PRIVATE Intrinsic {
     // Call intrinsics.
     NoIntrinsic,
     AbsIntrinsic,
@@ -51,11 +51,17 @@ enum Intrinsic {
     LogIntrinsic,
     RegExpExecIntrinsic,
     RegExpTestIntrinsic,
+    RegExpTestFastIntrinsic,
     StringPrototypeValueOfIntrinsic,
     StringPrototypeReplaceIntrinsic,
+    StringPrototypeReplaceRegExpIntrinsic,
     IMulIntrinsic,
     RandomIntrinsic,
     FRoundIntrinsic,
+    TruncIntrinsic,
+    IsRegExpObjectIntrinsic,
+    IsTypedArrayViewIntrinsic,
+    BoundThisNoArgsFunctionCallIntrinsic,
 
     // Getter intrinsics.
     TypedArrayLengthIntrinsic,

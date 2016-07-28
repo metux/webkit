@@ -51,6 +51,7 @@ static void get3DContextAttributes(ExecState& state, RefPtr<CanvasContextAttribu
         return;
     
     JSObject* initializerObject = initializerValue.toObject(&state);
+    ASSERT(!state.hadException());
     JSDictionary dictionary(&state, initializerObject);
     
     GraphicsContext3D::Attributes graphicsAttrs;
@@ -83,7 +84,7 @@ JSValue JSHTMLCanvasElement::getContext(ExecState& state)
     CanvasRenderingContext* context = canvas.getContext(contextId, attrs.get());
     if (!context)
         return jsNull();
-    return toJS(&state, globalObject(), WTF::getPtr(context));
+    return toJS(&state, globalObject(), *context);
 }
 
 JSValue JSHTMLCanvasElement::probablySupportsContext(ExecState& state)

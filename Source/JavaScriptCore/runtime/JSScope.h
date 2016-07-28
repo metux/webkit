@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2015  Apple Inc. All Rights Reserved.
+ * Copyright (C) 2012-2016 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,11 +28,12 @@
 
 #include "GetPutInfo.h"
 #include "JSObject.h"
-#include "VariableEnvironment.h"
 
 namespace JSC {
 
 class ScopeChainIterator;
+class SymbolTable;
+class VariableEnvironment;
 class WatchpointSet;
 
 class JSScope : public JSNonFinalObject {
@@ -45,7 +46,7 @@ public:
 
     static JSObject* objectAtScope(JSScope*);
 
-    static JSValue resolve(ExecState*, JSScope*, const Identifier&);
+    static JSObject* resolve(ExecState*, JSScope*, const Identifier&);
     static ResolveOp abstractResolve(ExecState*, size_t depthOffset, JSScope*, const Identifier&, GetOrPut, ResolveType, InitializationMode);
 
     static bool hasConstantScope(ResolveType);
@@ -58,7 +59,6 @@ public:
     bool isVarScope();
     bool isLexicalScope();
     bool isModuleScope();
-    bool isGlobalLexicalEnvironment();
     bool isCatchScope();
     bool isFunctionNameScopeObject();
 
@@ -71,6 +71,8 @@ public:
     JSGlobalObject* globalObject();
     VM* vm();
     JSObject* globalThis();
+
+    SymbolTable* symbolTable();
 
 protected:
     JSScope(VM&, Structure*, JSScope* next);
@@ -140,7 +142,7 @@ inline Register& Register::operator=(JSScope* scope)
 
 inline JSScope* Register::scope() const
 {
-    return jsCast<JSScope*>(jsValue());
+    return jsCast<JSScope*>(unboxedCell());
 }
 
 inline JSGlobalObject* ExecState::lexicalGlobalObject() const

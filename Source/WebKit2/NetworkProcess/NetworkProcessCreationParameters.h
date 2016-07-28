@@ -26,6 +26,7 @@
 #ifndef NetworkProcessCreationParameters_h
 #define NetworkProcessCreationParameters_h
 
+#include "Attachment.h"
 #include "CacheModel.h"
 #include "SandboxExtension.h"
 #include <wtf/Vector.h>
@@ -62,9 +63,6 @@ struct NetworkProcessCreationParameters {
     bool shouldEnableNetworkCacheSpeculativeRevalidation;
 #endif
 #endif
-#if ENABLE(SECCOMP_FILTERS)
-    String cookieStorageDirectory;
-#endif
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
     Vector<uint8_t> uiProcessCookieStorageIdentifier;
 #endif
@@ -73,6 +71,7 @@ struct NetworkProcessCreationParameters {
     SandboxExtension::Handle containerCachesDirectoryExtensionHandle;
     SandboxExtension::Handle parentBundleDirectoryExtensionHandle;
 #endif
+    bool shouldSuppressMemoryPressureHandler { false };
     bool shouldUseTestingNetworkSession;
 
     Vector<String> urlSchemesRegisteredForCustomProtocols;
@@ -96,6 +95,10 @@ struct NetworkProcessCreationParameters {
     HTTPCookieAcceptPolicy cookieAcceptPolicy;
     bool ignoreTLSErrors;
     Vector<String> languages;
+#endif
+
+#if OS(LINUX)
+    IPC::Attachment memoryPressureMonitorHandle;
 #endif
 };
 

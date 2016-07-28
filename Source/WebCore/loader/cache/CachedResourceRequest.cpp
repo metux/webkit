@@ -27,6 +27,7 @@
 #include "CachedResourceRequest.h"
 
 #include "CachedResourceLoader.h"
+#include "CrossOriginAccessControl.h"
 #include "Document.h"
 #include "Element.h"
 #include <wtf/NeverDestroyed.h>
@@ -90,6 +91,19 @@ const AtomicString& CachedResourceRequest::initiatorName() const
 
     static NeverDestroyed<AtomicString> defaultName("resource", AtomicString::ConstructFromLiteral);
     return defaultName;
+}
+
+void CachedResourceRequest::setAsPotentiallyCrossOrigin(const String& mode, Document& document)
+{
+    ASSERT(m_options.mode == FetchOptions::Mode::NoCors);
+    if (mode.isNull())
+        return;
+    m_options.mode = FetchOptions::Mode::Cors;
+    m_options.credentials = equalLettersIgnoringASCIICase(mode, "use-credentials") ? FetchOptions::Credentials::Include : FetchOptions::Credentials::SameOrigin;
+    m_options.setAllowCredentials(equalLettersIgnoringASCIICase(mode, "use-credentials") ? AllowStoredCredentials : DoNotAllowStoredCredentials);
+
+    ASSERT(document.securityOrigin());
+    updateRequestForAccessControl(m_resourceRequest, *document.securityOrigin(), m_options.allowCredentials());
 }
 
 } // namespace WebCore

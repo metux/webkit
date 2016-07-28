@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2006, 2007, 2008, 2009, 2011, 2012, 2013 Apple Inc. All Rights Reserved.
+ *  Copyright (C) 2006-2009, 2011-2013, 2016 Apple Inc. All Rights Reserved.
  *  Copyright (C) 2007 Cameron Zwarich (cwzwarich@uwaterloo.ca)
  *  Copyright (C) 2010 Zoltan Herczeg (zherczeg@inf.u-szeged.hu)
  *  Copyright (C) 2012 Mathias Bynens (mathias@qiwi.be)
@@ -939,7 +939,7 @@ template <bool shouldCreateIdentifier> ALWAYS_INLINE JSTokenType Lexer<LChar>::p
             if (isPrivateName)
                 ident = m_vm->propertyNames->lookUpPrivateName(*ident);
             else if (*ident == m_vm->propertyNames->undefinedKeyword)
-                tokenData->ident = &m_vm->propertyNames->undefinedPrivateName;
+                tokenData->ident = &m_vm->propertyNames->builtinNames().undefinedPrivateName();
             if (!ident)
                 return INVALID_PRIVATE_NAME_ERRORTOK;
         }
@@ -1016,7 +1016,7 @@ template <bool shouldCreateIdentifier> ALWAYS_INLINE JSTokenType Lexer<UChar>::p
             if (isPrivateName)
                 ident = m_vm->propertyNames->lookUpPrivateName(*ident);
             else if (*ident == m_vm->propertyNames->undefinedKeyword)
-                tokenData->ident = &m_vm->propertyNames->undefinedPrivateName;
+                tokenData->ident = &m_vm->propertyNames->builtinNames().undefinedPrivateName();
             if (!ident)
                 return INVALID_PRIVATE_NAME_ERRORTOK;
         }
@@ -1393,13 +1393,25 @@ template <bool shouldBuildStrings> typename Lexer<T>::StringParseResult Lexer<T>
                     record16(escape);
                 shift();
             } else if (UNLIKELY(isLineTerminator(m_current))) {
+                // Normalize <CR>, <CR><LF> to <LF>.
                 if (m_current == '\r') {
+                    if (shouldBuildStrings) {
+                        ASSERT_WITH_MESSAGE(rawStringStart != currentSourcePtr(), "We should have at least shifted the escape.");
+
+                        if (rawStringsBuildMode == RawStringsBuildMode::BuildRawStrings) {
+                            m_bufferForRawTemplateString16.append(rawStringStart, currentSourcePtr() - rawStringStart);
+                            m_bufferForRawTemplateString16.append('\n');
+                        }
+                    }
+
                     lineNumberAdder.add(m_current);
                     shift();
                     if (m_current == '\n') {
                         lineNumberAdder.add(m_current);
                         shift();
                     }
+
+                    rawStringStart = currentSourcePtr();
                 } else {
                     lineNumberAdder.add(m_current);
                     shift();
@@ -1568,8 +1580,10 @@ ALWAYS_INLINE bool Lexer<T>::parseBinary(double& returnValue)
         shift();
     }
 
-    if (isASCIIDigit(m_current))
+    if (isASCIIDigit(m_current)) {
+        returnValue = 0;
         return false;
+    }
 
     returnValue = parseIntOverflow(m_buffer8.data(), m_buffer8.size(), 2);
     return true;
@@ -1606,8 +1620,10 @@ ALWAYS_INLINE bool Lexer<T>::parseOctal(double& returnValue)
         shift();
     }
 
-    if (isASCIIDigit(m_current))
+    if (isASCIIDigit(m_current)) {
+        returnValue = 0;
         return false;
+    }
 
     returnValue = parseIntOverflow(m_buffer8.data(), m_buffer8.size(), 8);
     return true;
@@ -1766,21 +1782,11 @@ bool Lexer<T>::nextTokenIsColon()
 }
 
 template <typename T>
-void Lexer<T>::setTokenPosition(JSToken* tokenRecord)
-{
-    JSTokenData* tokenData = &tokenRecord->m_data;
-    tokenData->line = lineNumber();
-    tokenData->offset = currentOffset();
-    tokenData->lineStartOffset = currentLineStartOffset();
-    ASSERT(tokenData->offset >= tokenData->lineStartOffset);
-}
-
-template <typename T>
 JSTokenType Lexer<T>::lex(JSToken* tokenRecord, unsigned lexerFlags, bool strictMode)
 {
     JSTokenData* tokenData = &tokenRecord->m_data;
     JSTokenLocation* tokenLocation = &tokenRecord->m_location;
-    m_lastTockenLocation = JSTokenLocation(tokenRecord->m_location);
+    m_lastTokenLocation = JSTokenLocation(tokenRecord->m_location);
     
     ASSERT(!m_error);
     ASSERT(m_buffer8.isEmpty());
@@ -1788,6 +1794,15 @@ JSTokenType Lexer<T>::lex(JSToken* tokenRecord, unsigned lexerFlags, bool strict
 
     JSTokenType token = ERRORTOK;
     m_terminator = false;
+
+    auto fillTokenInfo = [&] (int lineNumber, int endOffset, int lineStartOffset, JSTextPosition endPosition) {
+        tokenLocation->line = lineNumber;
+        tokenLocation->endOffset = endOffset;
+        tokenLocation->lineStartOffset = lineStartOffset;
+        ASSERT(tokenLocation->endOffset >= tokenLocation->lineStartOffset);
+        tokenRecord->m_endPosition = endPosition;
+        m_lastToken = token;
+    };
 
 start:
     skipWhitespace();
@@ -1941,6 +1956,16 @@ start:
             token = MULTEQUAL;
             break;
         }
+        if (m_current == '*') {
+            shift();
+            if (m_current == '=') {
+                shift();
+                token = POWEQUAL;
+                break;
+            }
+            token = POW;
+            break;
+        }
         token = TIMES;
         break;
     case CharacterSlash:
@@ -2012,6 +2037,9 @@ start:
         break;
     case CharacterOpenParen:
         token = OPENPAREN;
+        tokenData->line = lineNumber();
+        tokenData->offset = currentOffset();
+        tokenData->lineStartOffset = currentLineStartOffset();
         shift();
         break;
     case CharacterCloseParen:
@@ -2260,37 +2288,36 @@ inSingleLineCommentCheckForDirectives:
     // Fall through to complete single line comment parsing.
 
 inSingleLineComment:
-    while (!isLineTerminator(m_current)) {
-        if (atEnd())
-            return EOFTOK;
-        shift();
-    }
-    shiftLineTerminator();
-    m_atLineStart = true;
-    m_terminator = true;
-    m_lineStart = m_code;
-    if (!lastTokenWasRestrKeyword())
-        goto start;
+    {
+        auto lineNumber = m_lineNumber;
+        auto endOffset = currentOffset();
+        auto lineStartOffset = currentLineStartOffset();
+        auto endPosition = currentPosition();
 
-    token = SEMICOLON;
-    // Fall through into returnToken.
+        while (!isLineTerminator(m_current)) {
+            if (atEnd())
+                return EOFTOK;
+            shift();
+        }
+        shiftLineTerminator();
+        m_atLineStart = true;
+        m_terminator = true;
+        m_lineStart = m_code;
+        if (!lastTokenWasRestrKeyword())
+            goto start;
+
+        token = SEMICOLON;
+        fillTokenInfo(lineNumber, endOffset, lineStartOffset, endPosition);
+        return token;
+    }
 
 returnToken:
-    tokenLocation->line = m_lineNumber;
-    tokenLocation->endOffset = currentOffset();
-    tokenLocation->lineStartOffset = currentLineStartOffset();
-    ASSERT(tokenLocation->endOffset >= tokenLocation->lineStartOffset);
-    tokenRecord->m_endPosition = currentPosition();
-    m_lastToken = token;
+    fillTokenInfo(m_lineNumber, currentOffset(), currentLineStartOffset(), currentPosition());
     return token;
 
 returnError:
     m_error = true;
-    tokenLocation->line = m_lineNumber;
-    tokenLocation->endOffset = currentOffset();
-    tokenLocation->lineStartOffset = currentLineStartOffset();
-    ASSERT(tokenLocation->endOffset >= tokenLocation->lineStartOffset);
-    tokenRecord->m_endPosition = currentPosition();
+    fillTokenInfo(m_lineNumber, currentOffset(), currentLineStartOffset(), currentPosition());
     RELEASE_ASSERT(token & ErrorTokenFlag);
     return token;
 }
