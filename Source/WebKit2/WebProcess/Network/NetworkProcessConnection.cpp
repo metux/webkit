@@ -42,8 +42,8 @@ using namespace WebCore;
 namespace WebKit {
 
 NetworkProcessConnection::NetworkProcessConnection(IPC::Connection::Identifier connectionIdentifier)
+    : m_connection(IPC::Connection::createClientConnection(connectionIdentifier, *this))
 {
-    m_connection = IPC::Connection::createClientConnection(connectionIdentifier, *this);
     m_connection->open();
 }
 
@@ -71,11 +71,35 @@ void NetworkProcessConnection::didReceiveSyncMessage(IPC::Connection&, IPC::Mess
 void NetworkProcessConnection::didClose(IPC::Connection&)
 {
     // The NetworkProcess probably crashed.
+    Ref<NetworkProcessConnection> protector(*this);
     WebProcess::singleton().networkProcessConnectionClosed(this);
+
+    Vector<String> dummyFilenames;
+    for (auto& handler : m_writeBlobToFileCompletionHandlers.values())
+        handler(dummyFilenames);
+
+    m_writeBlobToFileCompletionHandlers.clear();
 }
 
 void NetworkProcessConnection::didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference)
 {
+}
+
+void NetworkProcessConnection::writeBlobsToTemporaryFiles(const Vector<String>& blobURLs, Function<void (const Vector<String>& filePaths)>&& completionHandler)
+{
+    static uint64_t writeBlobToFileIdentifier;
+    uint64_t requestIdentifier = ++writeBlobToFileIdentifier;
+
+    m_writeBlobToFileCompletionHandlers.set(requestIdentifier, WTFMove(completionHandler));
+
+    WebProcess::singleton().networkConnection().connection().send(Messages::NetworkConnectionToWebProcess::WriteBlobsToTemporaryFiles(blobURLs, requestIdentifier), 0);
+}
+
+void NetworkProcessConnection::didWriteBlobsToTemporaryFiles(uint64_t requestIdentifier, const Vector<String>& filenames)
+{
+    auto handler = m_writeBlobToFileCompletionHandlers.take(requestIdentifier);
+    if (handler)
+        handler(filenames);
 }
 
 #if ENABLE(SHAREABLE_RESOURCE)

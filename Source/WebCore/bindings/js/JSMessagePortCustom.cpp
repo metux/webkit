@@ -69,7 +69,7 @@ void fillMessagePortArray(JSC::ExecState& state, JSC::JSValue value, MessagePort
 
     // Validation of sequence types, per WebIDL spec 4.1.13.
     unsigned length = 0;
-    JSObject* object = toJSSequence(&state, value, length);
+    JSObject* object = toJSSequence(state, value, length);
     if (state.hadException())
         return;
 
@@ -84,18 +84,16 @@ void fillMessagePortArray(JSC::ExecState& state, JSC::JSValue value, MessagePort
         }
 
         // Validation of Objects implementing an interface, per WebIDL spec 4.1.15.
-        RefPtr<MessagePort> port = JSMessagePort::toWrapped(value);
-        if (port) {
+        if (RefPtr<MessagePort> port = JSMessagePort::toWrapped(value)) {
             // Check for duplicate ports.
             if (portArray.contains(port)) {
                 setDOMException(&state, INVALID_STATE_ERR);
                 return;
             }
-            portArray.append(port.release());
+            portArray.append(WTFMove(port));
         } else {
-            RefPtr<ArrayBuffer> arrayBuffer = toArrayBuffer(value);
-            if (arrayBuffer)
-                arrayBuffers.append(arrayBuffer);
+            if (RefPtr<ArrayBuffer> arrayBuffer = toArrayBuffer(value))
+                arrayBuffers.append(WTFMove(arrayBuffer));
             else {
                 throwTypeError(&state);
                 return;

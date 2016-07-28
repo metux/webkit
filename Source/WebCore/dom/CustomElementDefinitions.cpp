@@ -39,65 +39,59 @@
 
 namespace WebCore {
 
-CustomElementDefinitions::NameStatus CustomElementDefinitions::checkName(const AtomicString& tagName)
+void CustomElementDefinitions::addElementDefinition(Ref<JSCustomElementInterface>&& elementInterface)
 {
-    bool containsHyphen = false;
-    for (unsigned i = 0; i < tagName.length(); i++) {
-        if (isASCIIUpper(tagName[i]))
-            return NameStatus::ContainsUpperCase;
-        if (tagName[i] == '-')
-            containsHyphen = true;
+    AtomicString localName = elementInterface->name().localName();
+    ASSERT(!m_nameMap.contains(localName));
+    m_constructorMap.add(elementInterface->constructor(), elementInterface.ptr());
+    m_nameMap.add(localName, elementInterface.copyRef());
+
+    auto candidateList = m_upgradeCandidatesMap.find(localName);
+    if (candidateList == m_upgradeCandidatesMap.end())
+        return;
+
+    Vector<RefPtr<Element>> list(WTFMove(candidateList->value));
+
+    m_upgradeCandidatesMap.remove(localName);
+
+    for (auto& candidate : list) {
+        ASSERT(candidate);
+        elementInterface->upgradeElement(*candidate);
     }
 
-    if (!containsHyphen)
-        return NameStatus::NoHyphen;
-
-    // FIXME: We should be taking the advantage of QualifiedNames in SVG and MathML.
-    if (tagName == SVGNames::color_profileTag.localName()
-        || tagName == SVGNames::font_faceTag.localName()
-        || tagName == SVGNames::font_face_formatTag.localName()
-        || tagName == SVGNames::font_face_nameTag.localName()
-        || tagName == SVGNames::font_face_srcTag.localName()
-        || tagName == SVGNames::font_face_uriTag.localName()
-        || tagName == SVGNames::missing_glyphTag.localName()
-#if ENABLE(MATHML)
-        || tagName == MathMLNames::annotation_xmlTag.localName()
-#endif
-        )
-        return NameStatus::ConflictsWithBuiltinNames;
-
-    return NameStatus::Valid;
+    // We should not be adding more upgrade candidate for this local name.
+    ASSERT(!m_upgradeCandidatesMap.contains(localName));
 }
 
-bool CustomElementDefinitions::defineElement(const QualifiedName& fullName, Ref<JSCustomElementInterface>&& interface)
+void CustomElementDefinitions::addUpgradeCandidate(Element& candidate)
 {
-    ASSERT(!m_nameMap.contains(fullName.localName()));
-    auto* constructor = interface->constructor();
-    m_nameMap.add(fullName.localName(), CustomElementInfo(fullName, WTFMove(interface)));
-
-    auto addResult = m_constructorMap.add(constructor, fullName);
-    if (!addResult.isNewEntry)
-        addResult.iterator->value = nullQName(); // The interface has multiple tag names associated with it.
-
-    return true;
+    auto result = m_upgradeCandidatesMap.ensure(candidate.localName(), [] {
+        return Vector<RefPtr<Element>>();
+    });
+    auto& nodeVector = result.iterator->value;
+    ASSERT(!nodeVector.contains(&candidate));
+    nodeVector.append(&candidate);
 }
 
 JSCustomElementInterface* CustomElementDefinitions::findInterface(const QualifiedName& name) const
 {
     auto it = m_nameMap.find(name.localName());
-    return it == m_nameMap.end() || it->value.fullName != name ? nullptr : it->value.interface.get();
+    return it == m_nameMap.end() || it->value->name() != name ? nullptr : it->value.get();
 }
 
 JSCustomElementInterface* CustomElementDefinitions::findInterface(const AtomicString& name) const
 {
-    auto it = m_nameMap.find(name);
-    return it == m_nameMap.end() ? nullptr : it->value.interface.get();
+    return m_nameMap.get(name);
 }
 
-const QualifiedName& CustomElementDefinitions::findName(const JSC::JSObject* constructor) const
+JSCustomElementInterface* CustomElementDefinitions::findInterface(const JSC::JSObject* constructor) const
 {
-    auto it = m_constructorMap.find(constructor);
-    return it == m_constructorMap.end() ? nullQName() : it->value;
+    return m_constructorMap.get(constructor);
+}
+
+bool CustomElementDefinitions::containsConstructor(const JSC::JSObject* constructor) const
+{
+    return m_constructorMap.contains(constructor);
 }
 
 }

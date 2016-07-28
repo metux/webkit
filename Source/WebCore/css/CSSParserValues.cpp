@@ -46,29 +46,26 @@ void destroy(const CSSParserValue& value)
 
 CSSParserValueList::~CSSParserValueList()
 {
-    for (size_t i = 0, size = m_values.size(); i < size; i++)
-        destroy(m_values[i]);
+    for (auto& value : m_values)
+        destroy(value);
 }
 
-void CSSParserValueList::addValue(const CSSParserValue& v)
+void CSSParserValueList::addValue(const CSSParserValue& value)
 {
-    m_values.append(v);
+    m_values.append(value);
 }
 
-void CSSParserValueList::insertValueAt(unsigned i, const CSSParserValue& v)
+void CSSParserValueList::insertValueAt(unsigned i, const CSSParserValue& value)
 {
-    m_values.insert(i, v);
+    m_values.insert(i, value);
 }
 
-void CSSParserValueList::deleteValueAt(unsigned i)
+void CSSParserValueList::extend(CSSParserValueList& other)
 {
-    m_values.remove(i);
-}
-
-void CSSParserValueList::extend(CSSParserValueList& valueList)
-{
-    for (unsigned int i = 0; i < valueList.size(); ++i)
-        m_values.append(*(valueList.valueAt(i)));
+    for (auto& value : other.m_values) {
+        m_values.append(value);
+        value.unit = 0; // We moved the CSSParserValue from the other list; this acts like std::move.
+    }
 }
 
 bool CSSParserValueList::containsVariables() const
@@ -86,16 +83,16 @@ bool CSSParserValueList::containsVariables() const
     return false;
 }
 
-PassRefPtr<CSSValue> CSSParserValue::createCSSValue()
+RefPtr<CSSValue> CSSParserValue::createCSSValue()
 {
     RefPtr<CSSValue> parsedValue;
     if (id)
         return CSSPrimitiveValue::createIdentifier(id);
     
     if (unit == CSSParserValue::Operator) {
-        RefPtr<CSSPrimitiveValue> primitiveValue = CSSPrimitiveValue::createParserOperator(iValue);
+        auto primitiveValue = CSSPrimitiveValue::createParserOperator(iValue);
         primitiveValue->setPrimitiveType(CSSPrimitiveValue::CSS_PARSER_OPERATOR);
-        return primitiveValue.release();
+        return WTFMove(primitiveValue);
     }
     if (unit == CSSParserValue::Function)
         return CSSFunctionValue::create(function);
@@ -172,11 +169,11 @@ PassRefPtr<CSSValue> CSSParserValue::createCSSValue()
     case CSSPrimitiveValue::CSS_CALC:
     case CSSPrimitiveValue::CSS_CALC_PERCENTAGE_WITH_NUMBER:
     case CSSPrimitiveValue::CSS_CALC_PERCENTAGE_WITH_LENGTH:
-        return 0;
+        return nullptr;
     }
 
     ASSERT_NOT_REACHED();
-    return 0;
+    return nullptr;
 }
 
 CSSParserSelector* CSSParserSelector::parsePagePseudoSelector(const CSSParserString& pseudoTypeString)
@@ -209,6 +206,11 @@ CSSParserSelector* CSSParserSelector::parsePseudoElementSelector(CSSParserString
     auto selector = std::make_unique<CSSParserSelector>();
     selector->m_selector->setMatch(CSSSelector::PseudoElement);
     selector->m_selector->setPseudoElementType(pseudoType);
+    if (pseudoType == CSSSelector::PseudoElementWebKitCustomLegacyPrefixed) {
+        ASSERT_WITH_MESSAGE(name == "-webkit-input-placeholder", "-webkit-input-placeholder is the only LegacyPrefix pseudo type.");
+        if (name == "-webkit-input-placeholder")
+            name = AtomicString("placeholder", AtomicString::ConstructFromLiteral);
+    }
     selector->m_selector->setValue(name);
     return selector.release();
 }
@@ -230,6 +232,54 @@ CSSParserSelector* CSSParserSelector::parsePseudoElementCueFunctionSelector(cons
     return selector.release();
 }
 #endif
+
+CSSParserSelector* CSSParserSelector::parsePseudoElementSlottedFunctionSelector(const CSSParserString& functionIdentifier, CSSParserSelector* parsedSelector)
+{
+    ASSERT_UNUSED(functionIdentifier, String(functionIdentifier) == "slotted(");
+
+    if (!parsedSelector)
+        return nullptr;
+
+    std::unique_ptr<CSSParserSelector> ownedParsedSelector(parsedSelector);
+
+    for (auto* component = parsedSelector; component; component = component->tagHistory()) {
+        if (component->matchesPseudoElement())
+            return nullptr;
+    }
+
+    auto selectorVector = std::make_unique<Vector<std::unique_ptr<CSSParserSelector>>>();
+    selectorVector->append(WTFMove(ownedParsedSelector));
+
+    auto selector = std::make_unique<CSSParserSelector>();
+    selector->m_selector->setMatch(CSSSelector::PseudoElement);
+    selector->m_selector->setPseudoElementType(CSSSelector::PseudoElementSlotted);
+    selector->adoptSelectorVector(*selectorVector);
+    return selector.release();
+}
+
+CSSParserSelector* CSSParserSelector::parsePseudoClassHostFunctionSelector(const CSSParserString& functionIdentifier, CSSParserSelector* parsedSelector)
+{
+    ASSERT_UNUSED(functionIdentifier, String(functionIdentifier) == "host(");
+
+    if (!parsedSelector)
+        return nullptr;
+
+    std::unique_ptr<CSSParserSelector> ownedParsedSelector(parsedSelector);
+
+    for (auto* component = parsedSelector; component; component = component->tagHistory()) {
+        if (component->matchesPseudoElement())
+            return nullptr;
+    }
+
+    auto selectorVector = std::make_unique<Vector<std::unique_ptr<CSSParserSelector>>>();
+    selectorVector->append(WTFMove(ownedParsedSelector));
+
+    auto selector = std::make_unique<CSSParserSelector>();
+    selector->m_selector->setMatch(CSSSelector::PseudoClass);
+    selector->m_selector->setPseudoClassType(CSSSelector::PseudoClassHost);
+    selector->adoptSelectorVector(*selectorVector);
+    return selector.release();
+}
 
 CSSParserSelector* CSSParserSelector::parsePseudoClassAndCompatibilityElementSelector(CSSParserString& pseudoTypeString)
 {

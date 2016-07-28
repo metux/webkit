@@ -36,12 +36,14 @@
 namespace WebCore {
 
 class DataTransfer;
+class EventPath;
 class EventTarget;
 class HTMLIFrameElement;
 
 struct EventInit {
     bool bubbles { false };
     bool cancelable { false };
+    bool composed { false };
 };
 
 enum EventInterface {
@@ -114,7 +116,13 @@ public:
 
     bool bubbles() const { return m_canBubble; }
     bool cancelable() const { return m_cancelable; }
+    bool composed() const;
+
     DOMTimeStamp timeStamp() const { return m_createTime; }
+
+    void setEventPath(const EventPath& path) { m_eventPath = &path; }
+    void clearEventPath() { m_eventPath = nullptr; }
+    Vector<EventTarget*> composedPath() const;
 
     void stopPropagation() { m_propagationStopped = true; }
     void stopImmediatePropagation() { m_immediatePropagationStopped = true; }
@@ -137,6 +145,7 @@ public:
     virtual bool isMouseEvent() const;
     virtual bool isFocusEvent() const;
     virtual bool isKeyboardEvent() const;
+    virtual bool isCompositionEvent() const;
     virtual bool isTouchEvent() const;
 
     // Drag events are a subset of mouse events.
@@ -162,13 +171,15 @@ public:
     bool defaultPrevented() const { return m_defaultPrevented; }
     void preventDefault()
     {
-        if (m_cancelable)
+        if (m_cancelable && !m_isExecutingPassiveEventListener)
             m_defaultPrevented = true;
     }
     void setDefaultPrevented(bool defaultPrevented) { m_defaultPrevented = defaultPrevented; }
 
     bool defaultHandled() const { return m_defaultHandled; }
     void setDefaultHandled() { m_defaultHandled = true; }
+
+    void setInPassiveListener(bool value) { m_isExecutingPassiveEventListener = value; }
 
     bool cancelBubble() const { return m_cancelBubble; }
     void setCancelBubble(bool cancel) { m_cancelBubble = cancel; }
@@ -194,10 +205,12 @@ protected:
     bool dispatched() const { return m_target; }
 
 private:
-    bool m_isInitialized { false };
     AtomicString m_type;
+
+    bool m_isInitialized { false };
     bool m_canBubble { false };
     bool m_cancelable { false };
+    bool m_composed { false };
 
     bool m_propagationStopped { false };
     bool m_immediatePropagationStopped { false };
@@ -205,9 +218,11 @@ private:
     bool m_defaultHandled { false };
     bool m_cancelBubble { false };
     bool m_isTrusted { false };
+    bool m_isExecutingPassiveEventListener { false };
 
     unsigned short m_eventPhase { 0 };
     EventTarget* m_currentTarget { nullptr };
+    const EventPath* m_eventPath { nullptr };
     RefPtr<EventTarget> m_target;
     DOMTimeStamp m_createTime;
 

@@ -51,7 +51,7 @@
     height: 7px;
     margin: 4px 6px;
     border-radius: 50%;
-    background-color: hsl(212, 92%, 54%);
+    background-color: var(--selected-background-color);
     opacity: 0.5;
     content: "";
 }
@@ -91,6 +91,11 @@
 
 .sidebar > .panel.details.css-style .visual > .details-section .details-section > .content .group > .row > .visual-style-property-container:not(.layout-reversed):last-child {
     margin-right: 11px;
+}
+
+.visual-style-property-container.transition,
+.visual-style-property-container.animation {
+    margin-left: 11px;
 }
 
 .sidebar > .panel.details.css-style .visual.disabled > .details-section:not(.visual-style-selector-section) {

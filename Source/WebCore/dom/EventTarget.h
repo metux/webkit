@@ -32,7 +32,6 @@
 #define EventTarget_h
 
 #include "EventListenerMap.h"
-#include "EventNames.h"
 #include "EventTargetInterfaces.h"
 #include "ScriptWrappable.h"
 #include <memory>
@@ -121,21 +120,46 @@ public:
     virtual DOMWindow* toDOMWindow();
     virtual bool isMessagePort() const;
 
-    virtual bool addEventListener(const AtomicString& eventType, RefPtr<EventListener>&&, bool useCapture);
-    virtual bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture);
+    struct ListenerOptions {
+        ListenerOptions(bool capture = false)
+            : capture(capture)
+        { }
+
+        bool capture;
+    };
+
+    struct AddEventListenerOptions : public ListenerOptions {
+        AddEventListenerOptions(bool capture = false, bool passive = false, bool once = false)
+            : ListenerOptions(capture)
+            , passive(passive)
+            , once(once)
+        { }
+
+        bool passive;
+        bool once;
+    };
+
+    void addEventListenerForBindings(const AtomicString& eventType, RefPtr<EventListener>&&, bool useCapture);
+    void removeEventListenerForBindings(const AtomicString& eventType, RefPtr<EventListener>&&, bool useCapture);
+    void addEventListenerForBindings(const AtomicString& eventType, RefPtr<EventListener>&&, const AddEventListenerOptions&);
+    void removeEventListenerForBindings(const AtomicString& eventType, RefPtr<EventListener>&&, const ListenerOptions&);
+    virtual bool addEventListener(const AtomicString& eventType, Ref<EventListener>&&, const AddEventListenerOptions& = { });
+    virtual bool removeEventListener(const AtomicString& eventType, EventListener&, const ListenerOptions&);
+
     virtual void removeAllEventListeners();
     virtual bool dispatchEvent(Event&);
-    bool dispatchEventForBindings(Event*, ExceptionCode&); // DOM API
+    bool dispatchEventForBindings(Event&, ExceptionCode&); // DOM API
     virtual void uncaughtExceptionInEventHandler();
 
     // Used for legacy "onEvent" attribute APIs.
-    bool setAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener>);
+    bool setAttributeEventListener(const AtomicString& eventType, RefPtr<EventListener>&&);
     bool clearAttributeEventListener(const AtomicString& eventType);
     EventListener* getAttributeEventListener(const AtomicString& eventType);
 
     bool hasEventListeners() const;
-    bool hasEventListeners(const AtomicString& eventType);
+    bool hasEventListeners(const AtomicString& eventType) const;
     bool hasCapturingEventListeners(const AtomicString& eventType);
+    bool hasActiveEventListeners(const AtomicString& eventType) const;
     const EventListenerVector& getEventListeners(const AtomicString& eventType);
 
     bool fireEventListeners(Event&);
@@ -149,6 +173,10 @@ protected:
     
     virtual EventTargetData* eventTargetData() = 0;
     virtual EventTargetData& ensureEventTargetData() = 0;
+    const EventTargetData* eventTargetData() const
+    {
+        return const_cast<EventTarget*>(this)->eventTargetData();
+    }
 
 private:
     virtual void refEventTarget() = 0;
@@ -161,8 +189,8 @@ private:
 
 class EventTargetWithInlineData : public EventTarget {
 protected:
-    virtual EventTargetData* eventTargetData() override final { return &m_eventTargetData; }
-    virtual EventTargetData& ensureEventTargetData() override final { return m_eventTargetData; }
+    EventTargetData* eventTargetData() final { return &m_eventTargetData; }
+    EventTargetData& ensureEventTargetData() final { return m_eventTargetData; }
 private:
     EventTargetData m_eventTargetData;
 };
@@ -190,9 +218,9 @@ inline bool EventTarget::hasEventListeners() const
     return !d->eventListenerMap.isEmpty();
 }
 
-inline bool EventTarget::hasEventListeners(const AtomicString& eventType)
+inline bool EventTarget::hasEventListeners(const AtomicString& eventType) const
 {
-    EventTargetData* d = eventTargetData();
+    const EventTargetData* d = eventTargetData();
     if (!d)
         return false;
     return d->eventListenerMap.contains(eventType);
@@ -204,6 +232,16 @@ inline bool EventTarget::hasCapturingEventListeners(const AtomicString& eventTyp
     if (!d)
         return false;
     return d->eventListenerMap.containsCapturing(eventType);
+}
+
+inline void EventTarget::addEventListenerForBindings(const AtomicString& eventType, RefPtr<EventListener>&& listener, bool useCapture)
+{
+    addEventListenerForBindings(eventType, WTFMove(listener), AddEventListenerOptions(useCapture));
+}
+
+inline void EventTarget::removeEventListenerForBindings(const AtomicString& eventType, RefPtr<EventListener>&& listener, bool useCapture)
+{
+    removeEventListenerForBindings(eventType, WTFMove(listener), ListenerOptions(useCapture));
 }
 
 } // namespace WebCore

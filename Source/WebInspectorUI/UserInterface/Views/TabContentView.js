@@ -28,10 +28,10 @@ WebInspector.TabContentView = class TabContentView extends WebInspector.ContentV
     constructor(identifier, styleClassNames, tabBarItem, navigationSidebarPanel, detailsSidebarPanels)
     {
         console.assert(typeof identifier === "string");
-        console.assert(typeof styleClassNames === "string" || styleClassNames.every(function(className) { return typeof className === "string"; }));
+        console.assert(typeof styleClassNames === "string" || styleClassNames.every((className) => typeof className === "string"));
         console.assert(tabBarItem instanceof WebInspector.TabBarItem);
         console.assert(!navigationSidebarPanel || navigationSidebarPanel instanceof WebInspector.NavigationSidebarPanel);
-        console.assert(!detailsSidebarPanels || detailsSidebarPanels.every(function(detailsSidebarPanel) { return detailsSidebarPanel instanceof WebInspector.DetailsSidebarPanel; }));
+        console.assert(!detailsSidebarPanels || detailsSidebarPanels.every((detailsSidebarPanel) => detailsSidebarPanel instanceof WebInspector.DetailsSidebarPanel));
 
         super(null);
 
@@ -131,9 +131,6 @@ WebInspector.TabContentView = class TabContentView extends WebInspector.ContentV
 
     restoreStateFromCookie(restorationType)
     {
-        if (!this.navigationSidebarPanel)
-            return;
-
         if (!this.visible) {
             this._shouldRestoreStateWhenShown = true;
             return;
@@ -147,19 +144,26 @@ WebInspector.TabContentView = class TabContentView extends WebInspector.ContentV
         else if (restorationType === WebInspector.StateRestorationType.Navigation)
             relaxMatchDelay = 2000;
 
-        this.navigationSidebarPanel.restoreStateFromCookie(this._cookieSetting.value || {}, relaxMatchDelay);
+        let cookie = this._cookieSetting.value || {};
+
+        if (this.navigationSidebarPanel)
+            this.navigationSidebarPanel.restoreStateFromCookie(cookie, relaxMatchDelay);
+
+        this.restoreFromCookie(cookie);
     }
 
-    saveStateToCookie()
+    saveStateToCookie(cookie)
     {
-        if (!this.navigationSidebarPanel)
-            return;
-
         if (this._shouldRestoreStateWhenShown)
             return;
 
-        var cookie = {};
-        this.navigationSidebarPanel.saveStateToCookie(cookie);
+        cookie = cookie || {};
+
+        if (this.navigationSidebarPanel)
+            this.navigationSidebarPanel.saveStateToCookie(cookie);
+
+        this.saveToCookie(cookie);
+
         this._cookieSetting.value = cookie;
     }
 

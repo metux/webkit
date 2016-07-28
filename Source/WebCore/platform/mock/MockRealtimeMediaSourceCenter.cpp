@@ -81,8 +81,8 @@ void MockRealtimeMediaSourceCenter::validateRequestConstraints(MediaStreamCreati
             return;
         }
 
-        RefPtr<RealtimeMediaSource> audioSource = MockRealtimeAudioSource::create();
-        audioSources.append(audioSource.release());
+        auto audioSource = MockRealtimeAudioSource::create();
+        audioSources.append(WTFMove(audioSource));
     }
 
     if (videoConstraints) {
@@ -92,8 +92,8 @@ void MockRealtimeMediaSourceCenter::validateRequestConstraints(MediaStreamCreati
             return;
         }
 
-        RefPtr<RealtimeMediaSource> videoSource = MockRealtimeVideoSource::create();
-        videoSources.append(videoSource.release());
+        auto videoSource = MockRealtimeVideoSource::create();
+        videoSources.append(WTFMove(videoSource));
     }
 
     client->constraintsValidated(audioSources, videoSources);
@@ -115,8 +115,8 @@ void MockRealtimeMediaSourceCenter::createMediaStream(PassRefPtr<MediaStreamCrea
             return;
         }
 
-        RefPtr<RealtimeMediaSource> audioSource = MockRealtimeAudioSource::create();
-        audioSources.append(audioSource.release());
+        auto audioSource = MockRealtimeAudioSource::create();
+        audioSources.append(WTFMove(audioSource));
     }
 
     if (videoConstraints) {
@@ -126,8 +126,8 @@ void MockRealtimeMediaSourceCenter::createMediaStream(PassRefPtr<MediaStreamCrea
             return;
         }
 
-        RefPtr<RealtimeMediaSource> videoSource = MockRealtimeVideoSource::create();
-        videoSources.append(videoSource.release());
+        auto videoSource = MockRealtimeVideoSource::create();
+        videoSources.append(WTFMove(videoSource));
     }
     
     client->didCreateStream(MediaStreamPrivate::create(audioSources, videoSources));
@@ -140,12 +140,12 @@ void MockRealtimeMediaSourceCenter::createMediaStream(MediaStreamCreationClient*
     Vector<RefPtr<RealtimeMediaSource>> videoSources;
 
     if (!audioDeviceID.isEmpty() && audioDeviceID == MockRealtimeMediaSource::mockAudioSourcePersistentID()) {
-        RefPtr<RealtimeMediaSource> audioSource = MockRealtimeAudioSource::create();
-        audioSources.append(audioSource.release());
+        auto audioSource = MockRealtimeAudioSource::create();
+        audioSources.append(WTFMove(audioSource));
     }
     if (!videoDeviceID.isEmpty() && videoDeviceID == MockRealtimeMediaSource::mockVideoSourcePersistentID()) {
-        RefPtr<RealtimeMediaSource> videoSource = MockRealtimeVideoSource::create();
-        videoSources.append(videoSource.release());
+        auto videoSource = MockRealtimeVideoSource::create();
+        videoSources.append(WTFMove(videoSource));
     }
 
     client->didCreateStream(MediaStreamPrivate::create(audioSources, videoSources));
@@ -159,8 +159,8 @@ bool MockRealtimeMediaSourceCenter::getMediaStreamTrackSources(PassRefPtr<MediaS
     sources.append(MockRealtimeMediaSource::trackSourceWithUID(MockRealtimeMediaSource::mockAudioSourcePersistentID(), nullptr));
     sources.append(MockRealtimeMediaSource::trackSourceWithUID(MockRealtimeMediaSource::mockVideoSourcePersistentID(), nullptr));
 
-    callOnMainThread([this, requestClient, sources] {
-        requestClient->didCompleteRequest(sources);
+    callOnMainThread([this, requestClient = WTFMove(requestClient), sources = WTFMove(sources)] {
+        requestClient->didCompleteTrackSourceInfoRequest(sources);
     });
 
     return true;

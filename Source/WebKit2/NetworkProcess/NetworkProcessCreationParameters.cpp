@@ -53,9 +53,6 @@ void NetworkProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) con
     encoder << shouldEnableNetworkCacheSpeculativeRevalidation;
 #endif
 #endif
-#if ENABLE(SECCOMP_FILTERS)
-    encoder << cookieStorageDirectory;
-#endif
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
     encoder << uiProcessCookieStorageIdentifier;
 #endif
@@ -64,6 +61,7 @@ void NetworkProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) con
     encoder << containerCachesDirectoryExtensionHandle;
     encoder << parentBundleDirectoryExtensionHandle;
 #endif
+    encoder << shouldSuppressMemoryPressureHandler;
     encoder << shouldUseTestingNetworkSession;
     encoder << urlSchemesRegisteredForCustomProtocols;
 #if PLATFORM(COCOA)
@@ -83,6 +81,9 @@ void NetworkProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) con
     encoder.encodeEnum(cookieAcceptPolicy);
     encoder << ignoreTLSErrors;
     encoder << languages;
+#endif
+#if OS(LINUX)
+    encoder << memoryPressureMonitorHandle;
 #endif
 }
 
@@ -110,10 +111,6 @@ bool NetworkProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, Net
         return false;
 #endif
 #endif
-#if ENABLE(SECCOMP_FILTERS)
-    if (!decoder.decode(result.cookieStorageDirectory))
-        return false;
-#endif
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
     if (!decoder.decode(result.uiProcessCookieStorageIdentifier))
         return false;
@@ -126,6 +123,8 @@ bool NetworkProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, Net
     if (!decoder.decode(result.parentBundleDirectoryExtensionHandle))
         return false;
 #endif
+    if (!decoder.decode(result.shouldSuppressMemoryPressureHandler))
+        return false;
     if (!decoder.decode(result.shouldUseTestingNetworkSession))
         return false;
     if (!decoder.decode(result.urlSchemesRegisteredForCustomProtocols))
@@ -159,6 +158,11 @@ bool NetworkProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, Net
     if (!decoder.decode(result.ignoreTLSErrors))
         return false;
     if (!decoder.decode(result.languages))
+        return false;
+#endif
+
+#if OS(LINUX)
+    if (!decoder.decode(result.memoryPressureMonitorHandle))
         return false;
 #endif
 

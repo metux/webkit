@@ -105,6 +105,7 @@ const char* landmarkStringComplementary = "AXLandmarkComplementary";
 const char* landmarkStringContentinfo = "AXLandmarkContentInfo";
 const char* landmarkStringMain = "AXLandmarkMain";
 const char* landmarkStringNavigation = "AXLandmarkNavigation";
+const char* landmarkStringRegion = "AXLandmarkRegion";
 const char* landmarkStringSearch = "AXLandmarkSearch";
 #endif
 
@@ -331,6 +332,8 @@ const gchar* roleToString(AtkObject* object)
             return landmarkStringMain;
         if (equalLettersIgnoringASCIICase(xmlRolesValue, "navigation"))
             return landmarkStringNavigation;
+        if (equalLettersIgnoringASCIICase(xmlRolesValue, "region"))
+            return landmarkStringRegion;
         if (equalLettersIgnoringASCIICase(xmlRolesValue, "search"))
             return landmarkStringSearch;
     }
@@ -379,6 +382,8 @@ const gchar* roleToString(AtkObject* object)
         return "AXInvalid";
     case ATK_ROLE_LABEL:
         return "AXLabel";
+    case ATK_ROLE_LEVEL_BAR:
+        return "AXProgressIndicator";
     case ATK_ROLE_LINK:
         return "AXLink";
     case ATK_ROLE_LIST:
@@ -1025,7 +1030,19 @@ JSValueRef AccessibilityUIElement::columnHeaders() const
 
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::uiElementAttributeValue(JSStringRef attribute) const
 {
-    // FIXME: implement
+    if (!ATK_IS_OBJECT(m_element.get()))
+        return nullptr;
+
+    // ATK does not have this API. So we're "faking it" here on a case-by-case basis.
+    String attributeString = jsStringToWTFString(attribute);
+    AtkRole role = atk_object_get_role(ATK_OBJECT(m_element.get()));
+    if (role == ATK_ROLE_SPIN_BUTTON && const_cast<AccessibilityUIElement*>(this)->childrenCount() == 2) {
+        if (attributeString == "AXDecrementButton")
+            return const_cast<AccessibilityUIElement*>(this)->childAtIndex(0);
+        if (attributeString == "AXIncrementButton")
+            return const_cast<AccessibilityUIElement*>(this)->childAtIndex(1);
+    }
+
     return nullptr;
 }
 
@@ -1130,8 +1147,10 @@ JSRetainPtr<JSStringRef> AccessibilityUIElement::subrole()
 
 JSRetainPtr<JSStringRef> AccessibilityUIElement::roleDescription()
 {
-    // FIXME: implement
-    return JSStringCreateWithCharacters(0, 0);
+    String roleDescription = getAttributeSetValueForId(ATK_OBJECT(m_element.get()), ObjectAttributeType, "roledescription");
+    GUniquePtr<gchar> axRoleDescription(g_strdup_printf("AXRoleDescription: %s", roleDescription.utf8().data()));
+
+    return JSStringCreateWithUTF8CString(axRoleDescription.get());
 }
 
 JSRetainPtr<JSStringRef> AccessibilityUIElement::computedRoleString()
@@ -1217,15 +1236,15 @@ JSRetainPtr<JSStringRef> AccessibilityUIElement::helpText() const
 
     AtkRelationSet* relationSet = atk_object_ref_relation_set(ATK_OBJECT(m_element.get()));
     if (!relationSet)
-        return nullptr;
+        return JSStringCreateWithCharacters(0, 0);
 
     AtkRelation* relation = atk_relation_set_get_relation_by_type(relationSet, ATK_RELATION_DESCRIBED_BY);
     if (!relation)
-        return nullptr;
+        return JSStringCreateWithCharacters(0, 0);
 
     GPtrArray* targetList = atk_relation_get_target(relation);
     if (!targetList || !targetList->len)
-        return nullptr;
+        return JSStringCreateWithCharacters(0, 0);
 
     StringBuilder builder;
     builder.append("AXHelp: ");
@@ -1400,8 +1419,9 @@ double AccessibilityUIElement::maxValue()
 
 JSRetainPtr<JSStringRef> AccessibilityUIElement::valueDescription()
 {
-    // FIXME: implement
-    return JSStringCreateWithCharacters(0, 0);
+    String valueText = getAttributeSetValueForId(ATK_OBJECT(m_element.get()), ObjectAttributeType, "valuetext");
+    GUniquePtr<gchar> valueDescription(g_strdup_printf("AXValueDescription: %s", valueText.utf8().data()));
+    return JSStringCreateWithUTF8CString(valueDescription.get());
 }
 
 int AccessibilityUIElement::insertionPointLineNumber()
@@ -1788,7 +1808,7 @@ JSRetainPtr<JSStringRef> AccessibilityUIElement::documentEncoding()
         return JSStringCreateWithCharacters(0, 0);
 
     AtkRole role = atk_object_get_role(ATK_OBJECT(m_element.get()));
-    if (role != ATK_ROLE_DOCUMENT_FRAME)
+    if (role != ATK_ROLE_DOCUMENT_WEB)
         return JSStringCreateWithCharacters(0, 0);
 
     return JSStringCreateWithUTF8CString(atk_document_get_attribute_value(ATK_DOCUMENT(m_element.get()), "Encoding"));
@@ -1800,7 +1820,7 @@ JSRetainPtr<JSStringRef> AccessibilityUIElement::documentURI()
         return JSStringCreateWithCharacters(0, 0);
 
     AtkRole role = atk_object_get_role(ATK_OBJECT(m_element.get()));
-    if (role != ATK_ROLE_DOCUMENT_FRAME)
+    if (role != ATK_ROLE_DOCUMENT_WEB)
         return JSStringCreateWithCharacters(0, 0);
 
     return JSStringCreateWithUTF8CString(atk_document_get_attribute_value(ATK_DOCUMENT(m_element.get()), "URI"));

@@ -123,9 +123,11 @@ public:
             m_height = minimumSize.height();
     }
 
-    int area() const
+    IntSize constrainedBetween(const IntSize& min, const IntSize& max) const;
+
+    unsigned area() const
     {
-        return m_width * m_height;
+        return abs(m_width) * abs(m_height);
     }
 
     int diagonalLengthSquared() const

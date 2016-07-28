@@ -288,7 +288,8 @@ private:
                 break;
             }
                 
-            case GetMyArgumentByVal: {
+            case GetMyArgumentByVal:
+            case GetMyArgumentByValOutOfBounds: {
                 JSValue index = m_state.forNode(node->child2()).value();
                 if (!index || !index.isInt32())
                     break;
@@ -337,6 +338,9 @@ private:
                     eliminated = true;
                     break;
                 }
+                
+                if (node->op() == GetMyArgumentByValOutOfBounds)
+                    break;
                 
                 Node* length = emitCodeToGetArgumentsArrayLength(
                     m_insertionSet, arguments, indexInBlock, node->origin);
@@ -553,6 +557,24 @@ private:
                 break;
             }
 
+            case ToThis: {
+                if (!isToThisAnIdentity(m_graph.executableFor(node->origin.semantic)->isStrictMode(), m_state.forNode(node->child1())))
+                    break;
+
+                node->convertToIdentity();
+                changed = true;
+                break;
+            }
+
+            case ToNumber: {
+                if (m_state.forNode(node->child1()).m_type & ~SpecBytecodeNumber)
+                    break;
+
+                node->convertToIdentity();
+                changed = true;
+                break;
+            }
+
             case Check: {
                 alreadyHandled = true;
                 m_interpreter.execute(indexInBlock);
@@ -694,7 +716,7 @@ private:
         data.identifierNumber = identifierNumber;
         data.inferredType = inferredType;
         
-        node->convertToGetByOffset(data, propertyStorage);
+        node->convertToGetByOffset(data, propertyStorage, childEdge);
     }
 
     void emitPutByOffset(unsigned indexInBlock, Node* node, const AbstractValue& baseValue, const PutByIdVariant& variant, unsigned identifierNumber)
@@ -749,7 +771,7 @@ private:
         data.offset = variant.offset();
         data.identifierNumber = identifierNumber;
         
-        node->convertToPutByOffset(data, propertyStorage);
+        node->convertToPutByOffset(data, propertyStorage, childEdge);
         node->origin.exitOK = canExit;
 
         if (variant.kind() == PutByIdVariant::Transition) {
@@ -824,7 +846,6 @@ private:
 
 bool performConstantFolding(Graph& graph)
 {
-    SamplingRegion samplingRegion("DFG Constant Folding Phase");
     return runPhase<ConstantFoldingPhase>(graph);
 }
 

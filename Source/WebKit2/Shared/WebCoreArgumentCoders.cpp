@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@
 #include <WebCore/DictationAlternative.h>
 #include <WebCore/DictionaryPopupInfo.h>
 #include <WebCore/Editor.h>
+#include <WebCore/EventTrackingRegions.h>
 #include <WebCore/FileChooser.h>
 #include <WebCore/FilterOperation.h>
 #include <WebCore/FilterOperations.h>
@@ -52,6 +53,7 @@
 #include <WebCore/ProtectionSpace.h>
 #include <WebCore/Region.h>
 #include <WebCore/ResourceError.h>
+#include <WebCore/ResourceLoadStatistics.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/ResourceResponse.h>
 #include <WebCore/ScrollingConstraints.h>
@@ -104,6 +106,25 @@ void ArgumentCoder<AffineTransform>::encode(ArgumentEncoder& encoder, const Affi
 bool ArgumentCoder<AffineTransform>::decode(ArgumentDecoder& decoder, AffineTransform& affineTransform)
 {
     return SimpleArgumentCoder<AffineTransform>::decode(decoder, affineTransform);
+}
+
+void ArgumentCoder<EventTrackingRegions>::encode(ArgumentEncoder& encoder, const EventTrackingRegions& eventTrackingRegions)
+{
+    encoder << eventTrackingRegions.asynchronousDispatchRegion;
+    encoder << eventTrackingRegions.eventSpecificSynchronousDispatchRegions;
+}
+
+bool ArgumentCoder<EventTrackingRegions>::decode(ArgumentDecoder& decoder, EventTrackingRegions& eventTrackingRegions)
+{
+    Region asynchronousDispatchRegion;
+    if (!decoder.decode(asynchronousDispatchRegion))
+        return false;
+    HashMap<String, Region> eventSpecificSynchronousDispatchRegions;
+    if (!decoder.decode(eventSpecificSynchronousDispatchRegions))
+        return false;
+    eventTrackingRegions.asynchronousDispatchRegion = WTFMove(asynchronousDispatchRegion);
+    eventTrackingRegions.eventSpecificSynchronousDispatchRegions = WTFMove(eventSpecificSynchronousDispatchRegions);
+    return true;
 }
 
 void ArgumentCoder<TransformationMatrix>::encode(ArgumentEncoder& encoder, const TransformationMatrix& transformationMatrix)
@@ -260,6 +281,40 @@ bool ArgumentCoder<StepsTimingFunction>::decode(ArgumentDecoder& decoder, StepsT
 
     timingFunction.setNumberOfSteps(numSteps);
     timingFunction.setStepAtStart(stepAtStart);
+
+    return true;
+}
+
+void ArgumentCoder<SpringTimingFunction>::encode(ArgumentEncoder& encoder, const SpringTimingFunction& timingFunction)
+{
+    encoder.encodeEnum(timingFunction.type());
+    
+    encoder << timingFunction.mass();
+    encoder << timingFunction.stiffness();
+    encoder << timingFunction.damping();
+    encoder << timingFunction.initialVelocity();
+}
+
+bool ArgumentCoder<SpringTimingFunction>::decode(ArgumentDecoder& decoder, SpringTimingFunction& timingFunction)
+{
+    // Type is decoded by the caller.
+    double mass;
+    if (!decoder.decode(mass))
+        return false;
+
+    double stiffness;
+    if (!decoder.decode(stiffness))
+        return false;
+
+    double damping;
+    if (!decoder.decode(damping))
+        return false;
+
+    double initialVelocity;
+    if (!decoder.decode(initialVelocity))
+        return false;
+
+    timingFunction.setValues(mass, stiffness, damping, initialVelocity);
 
     return true;
 }
@@ -1867,10 +1922,10 @@ bool ArgumentCoder<BlobPart>::decode(ArgumentDecoder& decoder, BlobPart& blobPar
         break;
     }
     case BlobPart::Blob: {
-        String url;
+        URL url;
         if (!decoder.decode(url))
             return false;
-        blobPart = BlobPart(URL(URL(), url));
+        blobPart = BlobPart(url);
         break;
     }
     default:
@@ -2043,5 +2098,126 @@ bool ArgumentCoder<ExceptionDetails>::decode(IPC::ArgumentDecoder& decoder, Exce
 
     return true;
 }
+
+void ArgumentCoder<ResourceLoadStatistics>::encode(ArgumentEncoder& encoder, const WebCore::ResourceLoadStatistics& statistics)
+{
+    encoder << statistics.highLevelDomain;
+    
+    // User interaction
+    encoder << statistics.hadUserInteraction;
+    
+    // Top frame stats
+    encoder << statistics.topFrameHasBeenNavigatedToBefore;
+    encoder << statistics.topFrameHasBeenRedirectedTo;
+    encoder << statistics.topFrameHasBeenRedirectedFrom;
+    encoder << statistics.topFrameInitialLoadCount;
+    encoder << statistics.topFrameHasBeenNavigatedTo;
+    encoder << statistics.topFrameHasBeenNavigatedFrom;
+    
+    // Subframe stats
+    encoder << statistics.subframeHasBeenLoadedBefore;
+    encoder << statistics.subframeHasBeenRedirectedTo;
+    encoder << statistics.subframeHasBeenRedirectedFrom;
+    encoder << statistics.subframeSubResourceCount;
+    encoder << statistics.subframeUnderTopFrameOrigins;
+    encoder << statistics.subframeUniqueRedirectsTo;
+    encoder << statistics.subframeHasBeenNavigatedTo;
+    encoder << statistics.subframeHasBeenNavigatedFrom;
+    
+    // Subresource stats
+    encoder << statistics.subresourceHasBeenRedirectedFrom;
+    encoder << statistics.subresourceHasBeenRedirectedTo;
+    encoder << statistics.subresourceHasBeenSubresourceCount;
+    encoder << statistics.subresourceHasBeenSubresourceCountDividedByTotalNumberOfOriginsVisited;
+    encoder << statistics.subresourceUnderTopFrameOrigins;
+    encoder << statistics.subresourceUniqueRedirectsTo;
+    
+    // Prevalent Resource
+    encoder << statistics.redirectedToOtherPrevalentResourceOrigins;
+    encoder << statistics.isPrevalentResource;
+}
+
+bool ArgumentCoder<ResourceLoadStatistics>::decode(ArgumentDecoder& decoder, WebCore::ResourceLoadStatistics& statistics)
+{
+    if (!decoder.decode(statistics.highLevelDomain))
+        return false;
+    
+    // User interaction
+    if (!decoder.decode(statistics.hadUserInteraction))
+        return false;
+    
+    // Top frame stats
+    if (!decoder.decode(statistics.topFrameHasBeenNavigatedToBefore))
+        return false;
+    
+    if (!decoder.decode(statistics.topFrameHasBeenRedirectedTo))
+        return false;
+    
+    if (!decoder.decode(statistics.topFrameHasBeenRedirectedFrom))
+        return false;
+    
+    if (!decoder.decode(statistics.topFrameInitialLoadCount))
+        return false;
+    
+    if (!decoder.decode(statistics.topFrameHasBeenNavigatedTo))
+        return false;
+    
+    if (!decoder.decode(statistics.topFrameHasBeenNavigatedFrom))
+        return false;
+    
+    // Subframe stats
+    if (!decoder.decode(statistics.subframeHasBeenLoadedBefore))
+        return false;
+    
+    if (!decoder.decode(statistics.subframeHasBeenRedirectedTo))
+        return false;
+    
+    if (!decoder.decode(statistics.subframeHasBeenRedirectedFrom))
+        return false;
+    
+    if (!decoder.decode(statistics.subframeSubResourceCount))
+        return false;
+    
+    if (!decoder.decode(statistics.subframeUnderTopFrameOrigins))
+        return false;
+
+    if (!decoder.decode(statistics.subframeUniqueRedirectsTo))
+        return false;
+    
+    if (!decoder.decode(statistics.subframeHasBeenNavigatedTo))
+        return false;
+    
+    if (!decoder.decode(statistics.subframeHasBeenNavigatedFrom))
+        return false;
+    
+    // Subresource stats
+    if (!decoder.decode(statistics.subresourceHasBeenRedirectedFrom))
+        return false;
+    
+    if (!decoder.decode(statistics.subresourceHasBeenRedirectedTo))
+        return false;
+    
+    if (!decoder.decode(statistics.subresourceHasBeenSubresourceCount))
+        return false;
+    
+    if (!decoder.decode(statistics.subresourceHasBeenSubresourceCountDividedByTotalNumberOfOriginsVisited))
+        return false;
+    
+    if (!decoder.decode(statistics.subresourceUnderTopFrameOrigins))
+        return false;
+
+    if (!decoder.decode(statistics.subresourceUniqueRedirectsTo))
+        return false;
+    
+    // Prevalent Resource
+    if (!decoder.decode(statistics.redirectedToOtherPrevalentResourceOrigins))
+        return false;
+    
+    if (!decoder.decode(statistics.isPrevalentResource))
+        return false;
+    
+    return true;
+}
+
 
 } // namespace IPC

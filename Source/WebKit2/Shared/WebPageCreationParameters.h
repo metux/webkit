@@ -38,6 +38,7 @@
 #include <WebCore/Pagination.h>
 #include <WebCore/ScrollTypes.h>
 #include <WebCore/SessionID.h>
+#include <WebCore/UserInterfaceLayoutDirection.h>
 #include <WebCore/ViewState.h>
 #include <wtf/text/WTFString.h>
 
@@ -116,6 +117,8 @@ struct WebPageCreationParameters {
 
     Vector<String> mimeTypesWithCustomContentProviders;
 
+    bool controlledByAutomation;
+
 #if ENABLE(REMOTE_INSPECTOR)
     bool allowsRemoteInspection;
     String remoteInspectionNameOverride;
@@ -128,9 +131,12 @@ struct WebPageCreationParameters {
     WebCore::FloatSize screenSize;
     WebCore::FloatSize availableScreenSize;
     float textAutosizingWidth;
+    bool ignoresViewportScaleLimits;
 #endif
     bool appleMailPaginationQuirkEnabled;
     bool shouldScaleViewToFitDocument;
+
+    WebCore::UserInterfaceLayoutDirection userInterfaceLayoutDirection;
 };
 
 } // namespace WebKit

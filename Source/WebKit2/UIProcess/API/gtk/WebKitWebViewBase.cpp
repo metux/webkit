@@ -177,6 +177,7 @@ struct _WebKitWebViewBasePrivate {
     std::unique_ptr<PageClientImpl> pageClient;
     RefPtr<WebPageProxy> pageProxy;
     bool shouldForwardNextKeyEvent;
+    bool shouldForwardNextWheelEvent;
     ClickCounter clickCounter;
     CString tooltipText;
     IntRect tooltipArea;
@@ -190,6 +191,7 @@ struct _WebKitWebViewBasePrivate {
     InputMethodFilter inputMethodFilter;
     KeyBindingTranslator keyBindingTranslator;
     TouchEventsMap touchEvents;
+    IntSize contentsSize;
 
     GtkWindow* toplevelOnScreenWindow;
     unsigned long toplevelFocusInEventID;
@@ -352,6 +354,17 @@ static void webkitWebViewBaseSetToplevelOnScreenWindow(WebKitWebViewBase* webVie
         priv->toplevelWindowRealizedID = g_signal_connect_swapped(window, "realize", G_CALLBACK(toplevelWindowRealized), webViewBase);
 }
 
+#if USE(REDIRECTED_XCOMPOSITE_WINDOW)
+static void webkitWebViewBaseResizeRedirectedWindow(WebKitWebViewBase* webView)
+{
+    WebKitWebViewBasePrivate* priv = webView->priv;
+    DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(priv->pageProxy->drawingArea());
+    if (!drawingArea)
+        return;
+    priv->redirectedWindow->resize(drawingArea->size());
+}
+#endif
+
 static void webkitWebViewBaseRealize(GtkWidget* widget)
 {
     WebKitWebViewBase* webView = WEBKIT_WEB_VIEW_BASE(widget);
@@ -360,16 +373,19 @@ static void webkitWebViewBaseRealize(GtkWidget* widget)
 #if USE(REDIRECTED_XCOMPOSITE_WINDOW)
     if (PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::X11) {
         ASSERT(!priv->redirectedWindow);
+        DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(priv->pageProxy->drawingArea());
         priv->redirectedWindow = RedirectedXCompositeWindow::create(
-            gtk_widget_get_parent_window(widget),
+            *priv->pageProxy,
+            drawingArea && drawingArea->isInAcceleratedCompositingMode() ? drawingArea->size() : IntSize(),
             [webView] {
                 DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(webView->priv->pageProxy->drawingArea());
                 if (drawingArea && drawingArea->isInAcceleratedCompositingMode())
                     gtk_widget_queue_draw(GTK_WIDGET(webView));
             });
-        if (priv->redirectedWindow) {
-            if (DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(priv->pageProxy->drawingArea()))
-                drawingArea->setNativeSurfaceHandleForCompositing(priv->redirectedWindow->windowID());
+        if (priv->redirectedWindow && drawingArea) {
+            drawingArea->setNativeSurfaceHandleForCompositing(priv->redirectedWindow->windowID());
+            if (drawingArea->isInAcceleratedCompositingMode())
+                webkitWebViewBaseResizeRedirectedWindow(webView);
         }
     }
 #endif
@@ -573,15 +589,34 @@ static bool webkitWebViewRenderAcceleratedCompositingResults(WebKitWebViewBase* 
     if (!priv->redirectedWindow)
         return false;
 
-    priv->redirectedWindow->setDeviceScaleFactor(webViewBase->priv->pageProxy->deviceScaleFactor());
-    priv->redirectedWindow->resize(drawingArea->size());
-
+    webkitWebViewBaseResizeRedirectedWindow(webViewBase);
     if (cairo_surface_t* surface = priv->redirectedWindow->surface()) {
         cairo_save(cr);
+
+        if (!priv->pageProxy->drawsBackground()) {
+            const WebCore::Color& color = priv->pageProxy->backgroundColor();
+            if (color.hasAlpha()) {
+                cairo_rectangle(cr, clipRect->x, clipRect->y, clipRect->width, clipRect->height);
+                cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);
+                cairo_fill(cr);
+            }
+
+            if (color.alpha() > 0) {
+                setSourceRGBAFromColor(cr, color);
+                cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+                cairo_rectangle(cr, clipRect->x, clipRect->y, clipRect->width, clipRect->height);
+                cairo_fill(cr);
+            }
+        }
+
+        // The surface can be modified by the web process at any time, so we mark it
+        // as dirty to ensure we always render the updated contents as soon as possible.
+        cairo_surface_mark_dirty(surface);
         cairo_rectangle(cr, clipRect->x, clipRect->y, clipRect->width, clipRect->height);
         cairo_set_source_surface(cr, surface, 0, 0);
-        cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+        cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
         cairo_fill(cr);
+
         cairo_restore(cr);
     }
 
@@ -688,11 +723,30 @@ static void webkitWebViewBaseSizeAllocate(GtkWidget* widget, GtkAllocation* allo
 
 
 #if USE(REDIRECTED_XCOMPOSITE_WINDOW)
-    if (priv->redirectedWindow && drawingArea->isInAcceleratedCompositingMode())
+    if (priv->redirectedWindow && drawingArea->isInAcceleratedCompositingMode()) {
+        // We don't use webkitWebViewBaseResizeRedirectedWindow here, because we want to update the
+        // redirected window size before the drawing area, because on resize the drawing area sends
+        // the UpdateBackingStoreState message to the web process and waits for its reply. We want
+        // the web process to use the new xwindow size when UpdateBackingStoreState message arrives.
         priv->redirectedWindow->resize(viewRect.size());
+    }
 #endif
 
     drawingArea->setSize(viewRect.size(), IntSize(), IntSize());
+}
+
+static void webkitWebViewBaseGetPreferredWidth(GtkWidget* widget, gint* minimumSize, gint* naturalSize)
+{
+    WebKitWebViewBasePrivate* priv = WEBKIT_WEB_VIEW_BASE(widget)->priv;
+    *minimumSize = 0;
+    *naturalSize = priv->contentsSize.width();
+}
+
+static void webkitWebViewBaseGetPreferredHeight(GtkWidget* widget, gint* minimumSize, gint* naturalSize)
+{
+    WebKitWebViewBasePrivate* priv = WEBKIT_WEB_VIEW_BASE(widget)->priv;
+    *minimumSize = 0;
+    *naturalSize = priv->contentsSize.height();
 }
 
 static void webkitWebViewBaseMap(GtkWidget* widget)
@@ -853,8 +907,11 @@ static gboolean webkitWebViewBaseScrollEvent(GtkWidget* widget, GdkEventScroll* 
     WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(widget);
     WebKitWebViewBasePrivate* priv = webViewBase->priv;
 
+    if (std::exchange(priv->shouldForwardNextWheelEvent, false))
+        return FALSE;
+
     if (priv->authenticationDialog)
-        return TRUE;
+        return FALSE;
 
     priv->pageProxy->handleWheelEvent(NativeWebWheelEvent(reinterpret_cast<GdkEvent*>(event)));
 
@@ -1161,6 +1218,8 @@ static void webkit_web_view_base_class_init(WebKitWebViewBaseClass* webkitWebVie
     widgetClass->unrealize = webkitWebViewBaseUnrealize;
     widgetClass->draw = webkitWebViewBaseDraw;
     widgetClass->size_allocate = webkitWebViewBaseSizeAllocate;
+    widgetClass->get_preferred_width = webkitWebViewBaseGetPreferredWidth;
+    widgetClass->get_preferred_height = webkitWebViewBaseGetPreferredHeight;
     widgetClass->map = webkitWebViewBaseMap;
     widgetClass->unmap = webkitWebViewBaseUnmap;
     widgetClass->focus = webkitWebViewBaseFocus;
@@ -1227,7 +1286,7 @@ static void deviceScaleFactorChanged(WebKitWebViewBase* webkitWebViewBase)
 {
 #if USE(REDIRECTED_XCOMPOSITE_WINDOW)
     if (webkitWebViewBase->priv->redirectedWindow)
-        webkitWebViewBase->priv->redirectedWindow->setDeviceScaleFactor(webkitWebViewBase->priv->pageProxy->deviceScaleFactor());
+        webkitWebViewBaseResizeRedirectedWindow(webkitWebViewBase);
 #endif
     webkitWebViewBase->priv->pageProxy->setIntrinsicDeviceScaleFactor(gtk_widget_get_scale_factor(GTK_WIDGET(webkitWebViewBase)));
 }
@@ -1281,6 +1340,11 @@ DragAndDropHandler& webkitWebViewBaseDragAndDropHandler(WebKitWebViewBase* webVi
 void webkitWebViewBaseForwardNextKeyEvent(WebKitWebViewBase* webkitWebViewBase)
 {
     webkitWebViewBase->priv->shouldForwardNextKeyEvent = TRUE;
+}
+
+void webkitWebViewBaseForwardNextWheelEvent(WebKitWebViewBase* webkitWebViewBase)
+{
+    webkitWebViewBase->priv->shouldForwardNextWheelEvent = true;
 }
 
 #if ENABLE(FULLSCREEN_API)
@@ -1500,6 +1564,14 @@ void webkitWebViewBaseUpdateTextInputState(WebKitWebViewBase* webkitWebViewBase)
         webkitWebViewBase->priv->inputMethodFilter.setCursorRect(editorState.postLayoutData().caretRectAtStart);
 }
 
+void webkitWebViewBaseSetContentsSize(WebKitWebViewBase* webkitWebViewBase, const IntSize& contentsSize)
+{
+    WebKitWebViewBasePrivate* priv = webkitWebViewBase->priv;
+    if (priv->contentsSize == contentsSize)
+        return;
+    priv->contentsSize = contentsSize;
+}
+
 void webkitWebViewBaseResetClickCounter(WebKitWebViewBase* webkitWebViewBase)
 {
     webkitWebViewBase->priv->clickCounter.reset();
@@ -1523,8 +1595,7 @@ void webkitWebViewBaseWillEnterAcceleratedCompositingMode(WebKitWebViewBase* web
     if (!drawingArea)
         return;
 
-    priv->redirectedWindow->setDeviceScaleFactor(webkitWebViewBase->priv->pageProxy->deviceScaleFactor());
-    priv->redirectedWindow->resize(drawingArea->size());
+    webkitWebViewBaseResizeRedirectedWindow(webkitWebViewBase);
 
     // Clear the redirected window if we don't enter AC mode in the end.
     webkitWebViewBaseClearRedirectedWindowSoon(webkitWebViewBase);
@@ -1579,4 +1650,24 @@ void webkitWebViewBaseDidRelaunchWebProcess(WebKitWebViewBase* webkitWebViewBase
 #else
     UNUSED_PARAM(webkitWebViewBase);
 #endif
+}
+
+void webkitWebViewBasePageClosed(WebKitWebViewBase* webkitWebViewBase)
+{
+#if PLATFORM(X11) && USE(TEXTURE_MAPPER)
+    if (PlatformDisplay::sharedDisplay().type() != PlatformDisplay::Type::X11)
+        return;
+
+    if (!gtk_widget_get_realized(GTK_WIDGET(webkitWebViewBase)))
+        return;
+
+    WebKitWebViewBasePrivate* priv = webkitWebViewBase->priv;
+    DrawingAreaProxyImpl* drawingArea = static_cast<DrawingAreaProxyImpl*>(priv->pageProxy->drawingArea());
+    ASSERT(drawingArea);
+    drawingArea->destroyNativeSurfaceHandleForCompositing();
+
+#if USE(REDIRECTED_XCOMPOSITE_WINDOW)
+    priv->redirectedWindow = nullptr;
+#endif
+#endif // PLATFORM(X11) && USE(TEXTURE_MAPPER)
 }

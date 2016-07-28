@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003-2009, 2013-2015 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003-2009, 2013-2016 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -60,12 +60,12 @@ class FullGCActivityCallback;
 class GCActivityCallback;
 class GCAwareJITStubRoutine;
 class Heap;
+class HeapProfiler;
 class HeapRootVisitor;
 class HeapVerifier;
 class IncrementalSweeper;
 class JITStubRoutine;
 class JSCell;
-class JSStack;
 class JSValue;
 class LLIntOffsetsExtractor;
 class MarkedArgumentBuffer;
@@ -111,8 +111,6 @@ public:
     void writeBarrier(const JSCell*, JSValue);
     void writeBarrier(const JSCell*, JSCell*);
 
-    JS_EXPORT_PRIVATE static void* copyBarrier(const JSCell* owner, void*& copiedSpacePointer);
-
     WriteBarrierBuffer& writeBarrierBuffer() { return m_writeBarrierBuffer; }
     void flushWriteBarrierBuffer(JSCell*);
 
@@ -147,6 +145,7 @@ public:
     bool isBusy();
     MarkedSpace::Subspace& subspaceForObjectWithoutDestructor() { return m_objectSpace.subspaceForObjectsWithoutDestructor(); }
     MarkedSpace::Subspace& subspaceForObjectDestructor() { return m_objectSpace.subspaceForObjectsWithDestructor(); }
+    MarkedSpace::Subspace& subspaceForAuxiliaryData() { return m_objectSpace.subspaceForAuxiliaryData(); }
     template<typename ClassType> MarkedSpace::Subspace& subspaceForObjectOfType();
     MarkedAllocator& allocatorForObjectWithoutDestructor(size_t bytes) { return m_objectSpace.allocatorFor(bytes); }
     MarkedAllocator& allocatorForObjectWithDestructor(size_t bytes) { return m_objectSpace.destructorAllocatorFor(bytes); }
@@ -163,20 +162,29 @@ public:
     void notifyIsSafeToCollect() { m_isSafeToCollect = true; }
     bool isSafeToCollect() const { return m_isSafeToCollect; }
 
+    JS_EXPORT_PRIVATE bool isHeapSnapshotting() const;
+
     JS_EXPORT_PRIVATE void collectAllGarbageIfNotDoneRecently();
     void collectAllGarbage() { collectAndSweep(FullCollection); }
     JS_EXPORT_PRIVATE void collectAndSweep(HeapOperation collectionType = AnyCollection);
     bool shouldCollect();
     JS_EXPORT_PRIVATE void collect(HeapOperation collectionType = AnyCollection);
     bool collectIfNecessaryOrDefer(); // Returns true if it did collect.
+    void collectAccordingToDeferGCProbability();
 
-    void completeAllDFGPlans();
+    void completeAllJITPlans();
     
     // Use this API to report non-GC memory referenced by GC objects. Be sure to
     // call both of these functions: Calling only one may trigger catastropic
     // memory growth.
     void reportExtraMemoryAllocated(size_t);
     void reportExtraMemoryVisited(CellState cellStateBeforeVisiting, size_t);
+
+#if ENABLE(RESOURCE_USAGE)
+    // Use this API to report the subset of extra memory that lives outside this process.
+    void reportExternalMemoryVisited(CellState cellStateBeforeVisiting, size_t);
+    size_t externalMemorySize() { return m_externalMemorySize; }
+#endif
 
     // Use this API to report non-GC memory if you can't use the better API above.
     void deprecatedReportExtraMemory(size_t);
@@ -198,9 +206,8 @@ public:
 
     HashSet<MarkedArgumentBuffer*>& markListSet();
     
-    template<typename Functor> typename Functor::ReturnType forEachProtectedCell(Functor&);
-    template<typename Functor> typename Functor::ReturnType forEachProtectedCell();
-    template<typename Functor> void forEachCodeBlock(Functor&);
+    template<typename Functor> void forEachProtectedCell(const Functor&);
+    template<typename Functor> void forEachCodeBlock(const Functor&);
 
     HandleSet* handleSet() { return &m_handleSet; }
     HandleStack* handleStack() { return &m_handleStack; }
@@ -221,8 +228,6 @@ public:
     void deleteAllUnlinkedCodeBlocks();
 
     void didAllocate(size_t);
-    void didAbandon(size_t);
-
     bool isPagedOut(double deadline);
     
     const JITStubRoutineSet& jitStubRoutines() { return m_jitStubRoutines; }
@@ -235,8 +240,8 @@ public:
 
     CodeBlockSet& codeBlockSet() { return m_codeBlocks; }
 
-#if USE(CF)
-        template<typename T> void releaseSoon(RetainPtr<T>&&);
+#if USE(FOUNDATION)
+    template<typename T> void releaseSoon(RetainPtr<T>&&);
 #endif
 
     static bool isZombified(JSCell* cell) { return *(void**)cell == zombifiedBits; }
@@ -285,7 +290,7 @@ private:
     static const size_t minExtraMemory = 256;
     
     class FinalizerOwner : public WeakHandleOwner {
-        virtual void finalize(Handle<Unknown>, void* context) override;
+        void finalize(Handle<Unknown>, void* context) override;
     };
 
     JS_EXPORT_PRIVATE bool isValidAllocation(size_t);
@@ -316,6 +321,7 @@ private:
     void visitStrongHandles(HeapRootVisitor&);
     void visitHandleStack(HeapRootVisitor&);
     void visitSamplingProfiler();
+    void visitShadowChicken();
     void traceCodeBlocksAndJITStubRoutines();
     void converge();
     void visitWeakHandles(HeapRootVisitor&);
@@ -340,15 +346,14 @@ private:
     void didFinishCollection(double gcStartTime);
     void resumeCompilerThreads();
     void zombifyDeadObjects();
-    void markDeadObjects();
+    void gatherExtraHeapSnapshotData(HeapProfiler&);
+    void removeDeadHeapSnapshotNodes(HeapProfiler&);
 
     void sweepAllLogicallyEmptyWeakBlocks();
     bool sweepNextLogicallyEmptyWeakBlock();
 
     bool shouldDoFullCollection(HeapOperation requestedCollectionType) const;
 
-    JSStack& stack();
-    
     void incrementDeferralDepth();
     void decrementDeferralDepth();
     void decrementDeferralDepthAndGCIfNeeded();
@@ -431,7 +436,8 @@ private:
     Vector<DFG::Worklist*> m_suspendedCompilerWorklists;
 
     std::unique_ptr<HeapVerifier> m_verifier;
-#if USE(CF)
+
+#if USE(FOUNDATION)
     Vector<RetainPtr<CFTypeRef>> m_delayedReleaseObjects;
     unsigned m_delayedReleaseRecursionCount;
 #endif
@@ -458,6 +464,7 @@ private:
 
 #if ENABLE(RESOURCE_USAGE)
     size_t m_blockBytesAllocated { 0 };
+    size_t m_externalMemorySize { 0 };
 #endif
 };
 

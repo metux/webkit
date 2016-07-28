@@ -49,14 +49,21 @@
 namespace WebCore {
 
 #if !PLATFORM(MAC) && !PLATFORM(IOS)
-RefPtr<MockRealtimeVideoSource> MockRealtimeVideoSource::create()
+Ref<MockRealtimeVideoSource> MockRealtimeVideoSource::create()
 {
-    return adoptRef(new MockRealtimeVideoSource());
+    return adoptRef(*new MockRealtimeVideoSource(MockRealtimeMediaSource::mockVideoSourceName()));
+}
+
+Ref<MockRealtimeVideoSource> MockRealtimeVideoSource::createMuted(const String& name)
+{
+    auto source = adoptRef(*new MockRealtimeVideoSource(name));
+    source->m_muted = true;
+    return source;
 }
 #endif
 
-MockRealtimeVideoSource::MockRealtimeVideoSource()
-    : MockRealtimeMediaSource(createCanonicalUUIDString(), RealtimeMediaSource::Video, mockVideoSourceName())
+MockRealtimeVideoSource::MockRealtimeVideoSource(const String& name)
+    : MockRealtimeMediaSource(createCanonicalUUIDString(), RealtimeMediaSource::Video, name)
     , m_timer(RunLoop::current(), this, &MockRealtimeVideoSource::generateFrame)
 {
     m_dashWidths.reserveInitialCapacity(2);
@@ -127,7 +134,7 @@ void MockRealtimeVideoSource::setFrameRate(float rate)
     if (m_timer.isActive())
         m_timer.startRepeating(std::chrono::milliseconds(lround(1000 / m_frameRate)));
 
-    settingsDidChanged();
+    settingsDidChange();
 }
 
 void MockRealtimeVideoSource::setSize(const IntSize& size)
@@ -162,7 +169,7 @@ void MockRealtimeVideoSource::setSize(const IntSize& size)
     m_imageBuffer = nullptr;
     updatePlatformLayer();
 
-    settingsDidChanged();
+    settingsDidChange();
 }
 
 void MockRealtimeVideoSource::drawAnimation(GraphicsContext& context)
@@ -324,6 +331,7 @@ void MockRealtimeVideoSource::generateFrame()
     drawBoxes(context);
 
     updatePlatformLayer();
+    updateSampleBuffer();
 }
 
 ImageBuffer* MockRealtimeVideoSource::imageBuffer() const

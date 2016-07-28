@@ -33,7 +33,6 @@
 #include "PannerNode.h"
 #include <memory>
 #include <wtf/Lock.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -50,12 +49,12 @@ public:
     virtual ~AudioBufferSourceNode();
 
     // AudioNode
-    virtual void process(size_t framesToProcess) override;
-    virtual void reset() override;
+    void process(size_t framesToProcess) override;
+    void reset() override;
 
     // setBuffer() is called on the main thread.  This is the buffer we use for playback.
     // returns true on success.
-    bool setBuffer(AudioBuffer*);
+    void setBuffer(RefPtr<AudioBuffer>&&);
     AudioBuffer* buffer() { return m_buffer.get(); }
 
     // numberOfChannels() returns the number of output channels.  This value equals the number of channels from the buffer.
@@ -63,10 +62,7 @@ public:
     unsigned numberOfChannels();
 
     // Play-state
-    void start(ExceptionCode&);
-    void start(double when, ExceptionCode&);
-    void start(double when, double grainOffset, ExceptionCode&);
-    void start(double when, double grainOffset, double grainDuration, ExceptionCode&);
+    void start(double when, double grainOffset, Optional<double> grainDuration, ExceptionCode&);
 
 #if ENABLE(LEGACY_WEB_AUDIO)
     void noteGrainOn(double when, double grainOffset, double grainDuration, ExceptionCode&);
@@ -96,16 +92,16 @@ public:
     void clearPannerNode();
 
     // If we are no longer playing, propogate silence ahead to downstream nodes.
-    virtual bool propagatesSilence() const override;
+    bool propagatesSilence() const override;
 
     // AudioScheduledSourceNode
-    virtual void finish() override;
+    void finish() override;
 
 private:
     AudioBufferSourceNode(AudioContext&, float sampleRate);
 
-    virtual double tailTime() const override { return 0; }
-    virtual double latencyTime() const override { return 0; }
+    double tailTime() const override { return 0; }
+    double latencyTime() const override { return 0; }
 
     enum BufferPlaybackMode {
         Entire,

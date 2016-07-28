@@ -66,23 +66,13 @@ public:
 
     void setDefersLoading(bool);
 
-#if PLATFORM(COCOA)
-    static size_t fileBackedResourceMinimumSize();
-    virtual void willCacheResponseAsync(CFCachedURLResponseRef) override;
-#endif
-
     // Message handlers.
     void didReceiveNetworkResourceLoaderMessage(IPC::Connection&, IPC::MessageDecoder&);
-
-#if PLATFORM(COCOA)
-    static void tryGetShareableHandleFromCFURLCachedResponse(ShareableResource::Handle&, CFCachedURLResponseRef);
-    static void tryGetShareableHandleFromSharedBuffer(ShareableResource::Handle&, WebCore::SharedBuffer&);
-#endif
 
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
     void continueCanAuthenticateAgainstProtectionSpace(bool);
 #endif
-    void continueWillSendRequest(const WebCore::ResourceRequest& newRequest);
+    void continueWillSendRequest(WebCore::ResourceRequest&& newRequest);
 
     WebCore::SharedBuffer* bufferedData() { return m_bufferedData.get(); }
     const WebCore::ResourceResponse& response() const { return m_response; }
@@ -90,26 +80,35 @@ public:
     NetworkConnectionToWebProcess& connectionToWebProcess() { return m_connection; }
     WebCore::SessionID sessionID() const { return m_parameters.sessionID; }
     ResourceLoadIdentifier identifier() const { return m_parameters.identifier; }
+    uint64_t frameID() const { return m_parameters.webFrameID; }
+    uint64_t pageID() const { return m_parameters.webPageID; }
 
     struct SynchronousLoadData;
 
     // NetworkLoadClient.
-    virtual void didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent) override;
-    virtual void canAuthenticateAgainstProtectionSpaceAsync(const WebCore::ProtectionSpace&) override;
-    virtual bool isSynchronous() const override;
-    virtual void willSendRedirectedRequest(const WebCore::ResourceRequest&, const WebCore::ResourceRequest& redirectRequest, const WebCore::ResourceResponse& redirectResponse) override;
-    virtual ShouldContinueDidReceiveResponse didReceiveResponse(const WebCore::ResourceResponse&) override;
-    virtual void didReceiveBuffer(RefPtr<WebCore::SharedBuffer>&&, int reportedEncodedDataLength) override;
-    virtual void didFinishLoading(double finishTime) override;
-    virtual void didFailLoading(const WebCore::ResourceError&) override;
-    virtual void didConvertToDownload() override;
+    void didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent) override;
+    void canAuthenticateAgainstProtectionSpaceAsync(const WebCore::ProtectionSpace&) override;
+    bool isSynchronous() const override;
+    void willSendRedirectedRequest(WebCore::ResourceRequest&&, WebCore::ResourceRequest&& redirectRequest, WebCore::ResourceResponse&&) override;
+    ShouldContinueDidReceiveResponse didReceiveResponse(WebCore::ResourceResponse&&) override;
+    void didReceiveBuffer(Ref<WebCore::SharedBuffer>&&, int reportedEncodedDataLength) override;
+    void didFinishLoading(double finishTime) override;
+    void didFailLoading(const WebCore::ResourceError&) override;
+#if USE(NETWORK_SESSION)
+    void didBecomeDownload() override;
+#endif
+    
+    void didConvertToDownload();
+
+    bool isMainResource() const { return m_parameters.request.requester() == WebCore::ResourceRequest::Requester::Main; }
+    bool isAlwaysOnLoggingAllowed() const;
 
 private:
     NetworkResourceLoader(const NetworkResourceLoadParameters&, NetworkConnectionToWebProcess&, RefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply>&&);
 
     // IPC::MessageSender
-    virtual IPC::Connection* messageSenderConnection() override;
-    virtual uint64_t messageSenderDestinationID() override { return m_parameters.identifier; }
+    IPC::Connection* messageSenderConnection() override;
+    uint64_t messageSenderDestinationID() override { return m_parameters.identifier; }
 
 #if ENABLE(NETWORK_CACHE)
     bool canUseCache(const WebCore::ResourceRequest&) const;

@@ -393,7 +393,7 @@ sub GetClassName
     my $name = shift;
 
     # special cases
-    return "NSString" if $codeGenerator->IsStringType($name) or $name eq "SerializedScriptValue";
+    return "NSString" if $name eq "DOMString" or $name eq "SerializedScriptValue";
     return "CGColorRef" if $name eq "Color" and $shouldUseCGColor;
     return "NS$name" if IsNativeObjCType($name);
     return "BOOL" if $name eq "boolean";
@@ -542,15 +542,15 @@ sub SkipFunction
 
     return 1 if $function->signature->type eq "Promise";
     return 1 if $function->signature->type eq "Symbol";
-    return 1 if $function->signature->extendedAttributes->{"CustomBinding"};
 
     foreach my $param (@{$function->parameters}) {
         return 1 if $codeGenerator->GetSequenceType($param->type);
         return 1 if $codeGenerator->GetArrayType($param->type);
         return 1 if $param->extendedAttributes->{"Clamp"};
+        return 1 if $param->isVariadic;
     }
 
-    return 1 if $function->signature->extendedAttributes->{"Private"};
+    return 1 if $function->signature->extendedAttributes->{"PrivateIdentifier"} and not $function->signature->extendedAttributes->{"PublicIdentifier"};
 
     return 0;
 }
@@ -598,9 +598,9 @@ sub GetPropertyAttributes
     push(@attributes, "readonly") if $readOnly;
 
     # FIXME: <rdar://problem/5049934> Consider using 'nonatomic' on the DOM @property declarations.
-    if ($codeGenerator->IsStringType($type) || IsNativeObjCType($type)) {
+    if ($type eq "DOMString" || IsNativeObjCType($type)) {
         push(@attributes, "copy");
-    } elsif (!$codeGenerator->IsStringType($type) && !$codeGenerator->IsPrimitiveType($type) && $type ne "DOMTimeStamp") {
+    } elsif ($type ne "DOMString" && !$codeGenerator->IsPrimitiveType($type) && $type ne "DOMTimeStamp") {
         push(@attributes, "strong");
     }
 
@@ -612,7 +612,7 @@ sub ConversionNeeded
 {
     my $type = shift;
 
-    return !$codeGenerator->IsNonPointerType($type) && !$codeGenerator->IsStringType($type) && !IsNativeObjCType($type);
+    return !$codeGenerator->IsNonPointerType($type) && $type ne "DOMString" && !IsNativeObjCType($type);
 }
 
 sub GetObjCTypeGetter
@@ -620,7 +620,7 @@ sub GetObjCTypeGetter
     my $argName = shift;
     my $type = shift;
 
-    return $argName if $codeGenerator->IsPrimitiveType($type) or $codeGenerator->IsStringType($type) or IsNativeObjCType($type);
+    return $argName if $codeGenerator->IsPrimitiveType($type) or $type eq "DOMString" or IsNativeObjCType($type);
     return $argName . "Node" if $type eq "EventTarget";
     return "WTF::getPtr(nativeEventListener)" if $type eq "EventListener";
     return "WTF::getPtr(nativeNodeFilter)" if $type eq "NodeFilter";
@@ -676,7 +676,7 @@ sub AddIncludesForType
         return;
     }
 
-    if ($codeGenerator->IsStringType($type)) {
+    if ($type eq "DOMString") {
         $implIncludes{"URL.h"} = 1;
         return;
     }
@@ -1269,8 +1269,8 @@ sub GenerateImplementation
 
             my ($functionName, @arguments) = $codeGenerator->GetterExpression(\%implIncludes, $interfaceName, $attribute);
 
-            # To avoid bloating Obj-C bindings, we use getAttribute() instead of fastGetAttribute().
-            if ($functionName eq "fastGetAttribute") {
+            # To avoid bloating Obj-C bindings, we use getAttribute() instead of attributeWithoutSynchronization().
+            if ($functionName eq "attributeWithoutSynchronization") {
                 $functionName = "getAttribute";
             }
 
@@ -1410,12 +1410,18 @@ sub GenerateImplementation
                 push(@implContent, "{\n");
                 push(@implContent, "    $jsContextSetter\n");
 
-                unless ($codeGenerator->IsPrimitiveType($idlType) or $codeGenerator->IsStringType($idlType)) {
+                unless ($codeGenerator->IsPrimitiveType($idlType) or $idlType eq "DOMString") {
                     push(@implContent, "    ASSERT($argName);\n\n");
                 }
 
                 if ($idlType eq "Date") {
                     $arg = "core(" . $arg . ")";
+                }
+
+                if ($codeGenerator->ShouldPassWrapperByReference($attribute->signature, $interface)) {
+                    push(@implContent, "    if (!$arg)\n");
+                    push(@implContent, "        WebCore::raiseTypeErrorException();\n");
+                    $arg = "*$arg";
                 }
 
                 my ($functionName, @arguments) = $codeGenerator->SetterExpression(\%implIncludes, $interfaceName, $attribute);
@@ -1456,11 +1462,12 @@ sub GenerateImplementation
             my $raisesExceptions = $function->signature->extendedAttributes->{"RaisesException"};
 
             my @parameterNames = ();
-            my @needsAssert = ();
             my %needsCustom = ();
 
             my $parameterIndex = 0;
             my $functionSig = "- ($returnType)$functionName";
+            my @functionContent = ();
+
             foreach my $param (@{$function->parameters}) {
                 my $paramName = $param->name;
                 my $paramType = GetObjCType($param->type);
@@ -1478,16 +1485,18 @@ sub GenerateImplementation
                     $implGetter = GetObjCTypeGetter($paramName, $idlType);
                 }
 
+                if ($codeGenerator->ShouldPassWrapperByReference($param, $interface)) {
+                    $implGetter = "*$implGetter";
+                    push(@functionContent, "    if (!$paramName)\n");
+                    push(@functionContent, "        WebCore::raiseTypeErrorException();\n");
+                }
+
                 push(@parameterNames, $implGetter);
                 $needsCustom{"XPathNSResolver"} = $paramName if $idlType eq "XPathNSResolver";
                 $needsCustom{"NodeFilter"} = $paramName if $idlType eq "NodeFilter";
                 $needsCustom{"EventListener"} = $paramName if $idlType eq "EventListener";
                 $needsCustom{"EventTarget"} = $paramName if $idlType eq "EventTarget";
                 $needsCustom{"NodeToReturn"} = $paramName if $param->extendedAttributes->{"CustomReturn"};
-
-                unless ($codeGenerator->IsPrimitiveType($idlType) or $codeGenerator->IsStringType($idlType)) {
-                    push(@needsAssert, "    ASSERT($paramName);\n");
-                }
 
                 if ($parameterIndex >= 1) {
                     $functionSig .= " " . $param->name;
@@ -1498,7 +1507,6 @@ sub GenerateImplementation
                 $parameterIndex++;
             }
 
-            my @functionContent = ();
             my $caller = "IMPL";
 
             # special case the XPathNSResolver

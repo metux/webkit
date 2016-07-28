@@ -36,7 +36,7 @@ namespace WebCore {
 
     class NodeIterator : public ScriptWrappable, public RefCounted<NodeIterator>, public NodeIteratorBase {
     public:
-        static Ref<NodeIterator> create(Node* rootNode, unsigned long whatToShow, RefPtr<NodeFilter>&& filter)
+        static Ref<NodeIterator> create(Node& rootNode, unsigned long whatToShow, RefPtr<NodeFilter>&& filter)
         {
             return adoptRef(*new NodeIterator(rootNode, whatToShow, WTFMove(filter)));
         }
@@ -53,16 +53,18 @@ namespace WebCore {
         void nodeWillBeRemoved(Node&);
 
     private:
-        NodeIterator(Node*, unsigned long whatToShow, RefPtr<NodeFilter>&&);
+        NodeIterator(Node&, unsigned long whatToShow, RefPtr<NodeFilter>&&);
 
         struct NodePointer {
             RefPtr<Node> node;
-            bool isPointerBeforeNode;
-            NodePointer();
-            NodePointer(Node*, bool);
+            bool isPointerBeforeNode { true };
+
+            NodePointer() = default;
+            NodePointer(Node&, bool);
+
             void clear();
-            bool moveToNext(Node* root);
-            bool moveToPrevious(Node* root);
+            bool moveToNext(Node& root);
+            bool moveToPrevious(Node& root);
         };
 
         void updateForNodeRemoval(Node& nodeToBeRemoved, NodePointer&) const;

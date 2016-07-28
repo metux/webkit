@@ -19,12 +19,12 @@
 #
 
 ActiveDOMObject
+AppleCopyright
 AtomicString
-CPPPureInterface
 CachedAttribute
 CallbackNeedsOperatorEqual
 Callback=FunctionOnly
-CallWith=ScriptExecutionContext|ScriptState|ScriptArguments|CallStack|ActiveWindow|FirstWindow
+CallWith=Document|ScriptExecutionContext|ScriptState|ScriptArguments|CallStack|ActiveWindow|FirstWindow|CallerDocument|CallerWindow
 CheckSecurity
 CheckSecurityForNode
 Clamp
@@ -35,7 +35,6 @@ ConstructorConditional=*
 ConstructorRaisesException
 ConstructorTemplate=Event|TypedArray
 Custom
-CustomBinding
 CustomCall
 CustomConstructor
 CustomDeleteProperty
@@ -51,7 +50,6 @@ CustomPutFunction
 CustomReturn
 CustomSetter
 CustomToJSObject
-Default=NullString|Undefined
 Deletable
 DoNotCheckConstants
 DoNotCheckSecurity
@@ -61,15 +59,17 @@ DocumentEventHandler
 EnabledAtRuntime=*
 EnabledBySetting=*
 EnforceRange
+ExportMacro=WEBCORE_EXPORT|WEBCORE_TESTSUPPORT_EXPORT
+Exposed=*
 ForwardDeclareInHeader
 GenerateIsReachable=|Impl|ImplWebGLRenderingContext|ImplDocument|ImplElementRoot|ImplFrame|ImplOwnerNodeRoot
 GetterRaisesException
 GetterRaisesExceptionWithMessage
-GlobalContext=DOMWindow|WorkerGlobalScope|DedicatedWorkerGlobalScope
 Immutable
+ImplementedAs=*
 ImplementationLacksVTable
 ImplementationNamespace=*
-ImplementedAs=*
+ImplementationReturnType=*
 ImplicitThis
 InitializedByEventConstructor
 InterfaceName=*
@@ -91,6 +91,7 @@ JSLegacyParent=*
 LenientThis
 MasqueradesAsUndefined
 NamedConstructor=*
+InvokesCustomElementLifecycleCallbacks
 NewImpurePropertyFiresWatchpoints
 NewObject
 NoInterfaceObject
@@ -105,13 +106,15 @@ ObjCProtocol
 ObjCUseDefaultView
 OverrideBuiltins
 PassContext
-Private
+PrivateIdentifier
+PublicIdentifier
 PutForwards=*
 RaisesException
 RaisesExceptionWithMessage
 Reflect=*
 Replaceable
 ReportExtraMemoryCost
+ReportExternalMemoryCost
 RequiresExistingAtomicString
 SetterRaisesException
 SetterRaisesExceptionWithMessage
@@ -119,14 +122,9 @@ SetterCallWith=ScriptExecutionContext|ScriptState|ScriptArguments|CallStack|Acti
 SkipVTableValidation
 StrictTypeChecking
 SuppressToJSObject
-TreatNullAs=NullString
+TreatNullAs=EmptyString
 TreatReturnedNaNDateAs=Null|NaN
-TreatReturnedNullStringAs=Null|Undefined
-TreatUndefinedAs=NullString
 TypedArray=*
 URL
 Unforgeable
 WindowEventHandler
-
-# PLATFORM(IOS)
-AppleCopyright

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,7 +41,6 @@
 #include "DFGPropertyTypeKey.h"
 #include "DFGScannable.h"
 #include "FullBytecodeLiveness.h"
-#include "JSStack.h"
 #include "MethodOfGettingAValueProfile.h"
 #include <unordered_map>
 #include <wtf/BitVector.h>
@@ -56,7 +55,10 @@ class ExecState;
 
 namespace DFG {
 
+class BackwardsCFG;
+class BackwardsDominators;
 class CFG;
+class ControlEquivalenceAnalysis;
 class Dominators;
 class NaturalLoops;
 class PrePostNumbering;
@@ -263,7 +265,7 @@ public:
         return addSpeculationMode(add, pass) != DontSpeculateInt32;
     }
     
-    bool addShouldSpeculateMachineInt(Node* add)
+    bool addShouldSpeculateAnyInt(Node* add)
     {
         if (!enableInt52())
             return false;
@@ -271,7 +273,7 @@ public:
         Node* left = add->child1().node();
         Node* right = add->child2().node();
 
-        bool speculation = Node::shouldSpeculateMachineInt(left, right);
+        bool speculation = Node::shouldSpeculateAnyInt(left, right);
         return speculation && !hasExitSite(add, Int52Overflow);
     }
     
@@ -284,7 +286,7 @@ public:
             && node->canSpeculateInt32(node->sourceFor(pass));
     }
     
-    bool binaryArithShouldSpeculateMachineInt(Node* node, PredictionPass pass)
+    bool binaryArithShouldSpeculateAnyInt(Node* node, PredictionPass pass)
     {
         if (!enableInt52())
             return false;
@@ -292,7 +294,7 @@ public:
         Node* left = node->child1().node();
         Node* right = node->child2().node();
 
-        return Node::shouldSpeculateMachineInt(left, right)
+        return Node::shouldSpeculateAnyInt(left, right)
             && node->canSpeculateInt52(pass)
             && !hasExitSite(node, Int52Overflow);
     }
@@ -303,20 +305,22 @@ public:
             && node->canSpeculateInt32(pass);
     }
     
-    bool unaryArithShouldSpeculateMachineInt(Node* node, PredictionPass pass)
+    bool unaryArithShouldSpeculateAnyInt(Node* node, PredictionPass pass)
     {
         if (!enableInt52())
             return false;
-        return node->child1()->shouldSpeculateMachineInt()
+        return node->child1()->shouldSpeculateAnyInt()
             && node->canSpeculateInt52(pass)
             && !hasExitSite(node, Int52Overflow);
     }
 
     bool canOptimizeStringObjectAccess(const CodeOrigin&);
 
+    bool getRegExpPrototypeProperty(JSObject* regExpPrototype, Structure* regExpPrototypeStructure, UniquedStringImpl* uid, JSValue& returnJSValue);
+
     bool roundShouldSpeculateInt32(Node* arithRound, PredictionPass pass)
     {
-        ASSERT(arithRound->op() == ArithRound || arithRound->op() == ArithFloor || arithRound->op() == ArithCeil);
+        ASSERT(arithRound->op() == ArithRound || arithRound->op() == ArithFloor || arithRound->op() == ArithCeil || arithRound->op() == ArithTrunc);
         return arithRound->canSpeculateInt32(pass) && !hasExitSite(arithRound->origin.semantic, Overflow) && !hasExitSite(arithRound->origin.semantic, NegativeZero);
     }
     
@@ -398,7 +402,6 @@ public:
         return hasExitSite(node->origin.semantic, exitKind);
     }
     
-    ValueProfile* valueProfileFor(Node*);
     MethodOfGettingAValueProfile methodOfGettingAValueProfileFor(Node*);
     
     BlockIndex numBlocks() const { return m_blocks.size(); }
@@ -650,6 +653,7 @@ public:
     // this also makes it cheap to query if the condition holds. Also makes sure that the GC knows
     // what's going on.
     bool watchCondition(const ObjectPropertyCondition&);
+    bool watchConditions(const ObjectPropertyConditionSet&);
 
     // Checks if it's known that loading from the given object at the given offset is fine. This is
     // computed by tracking which conditions we track with watchCondition().
@@ -704,9 +708,9 @@ public:
             
             if (inlineCallFrame) {
                 if (inlineCallFrame->isClosureCall)
-                    functor(stackOffset + JSStack::Callee);
+                    functor(stackOffset + CallFrameSlot::callee);
                 if (inlineCallFrame->isVarargs())
-                    functor(stackOffset + JSStack::ArgumentCount);
+                    functor(stackOffset + CallFrameSlot::argumentCount);
             }
             
             CodeBlock* codeBlock = baselineCodeBlockFor(inlineCallFrame);
@@ -784,7 +788,7 @@ public:
     
     void registerFrozenValues();
     
-    virtual void visitChildren(SlotVisitor&) override;
+    void visitChildren(SlotVisitor&) override;
     
     NO_RETURN_DUE_TO_CRASH void handleAssertionFailure(
         std::nullptr_t, const char* file, int line, const char* function,
@@ -798,14 +802,20 @@ public:
 
     bool hasDebuggerEnabled() const { return m_hasDebuggerEnabled; }
 
-    void ensureDominators();
-    void ensurePrePostNumbering();
-    void ensureNaturalLoops();
+    Dominators& ensureDominators();
+    PrePostNumbering& ensurePrePostNumbering();
+    NaturalLoops& ensureNaturalLoops();
+    BackwardsCFG& ensureBackwardsCFG();
+    BackwardsDominators& ensureBackwardsDominators();
+    ControlEquivalenceAnalysis& ensureControlEquivalenceAnalysis();
 
     // This function only makes sense to call after bytecode parsing
     // because it queries the m_hasExceptionHandlers boolean whose value
     // is only fully determined after bytcode parsing.
     bool willCatchExceptionInMachineFrame(CodeOrigin, CodeOrigin& opCatchOriginOut, HandlerInfo*& catchHandlerOut);
+    
+    bool needsScopeRegister() const { return m_hasDebuggerEnabled || m_codeBlock->usesEval(); }
+    bool needsFlushedThis() const { return m_codeBlock->usesEval(); }
 
     VM& m_vm;
     Plan& m_plan;
@@ -867,6 +877,7 @@ public:
     Bag<CallVarargsData> m_callVarargsData;
     Bag<LoadVarargsData> m_loadVarargsData;
     Bag<StackAccessData> m_stackAccessData;
+    Bag<LazyJSValue> m_lazyJSValues;
     Vector<InlineVariableData, 4> m_inlineVariableData;
     HashMap<CodeBlock*, std::unique_ptr<FullBytecodeLiveness>> m_bytecodeLiveness;
     HashMap<CodeBlock*, std::unique_ptr<BytecodeKills>> m_bytecodeKills;
@@ -876,9 +887,15 @@ public:
     std::unique_ptr<PrePostNumbering> m_prePostNumbering;
     std::unique_ptr<NaturalLoops> m_naturalLoops;
     std::unique_ptr<CFG> m_cfg;
+    std::unique_ptr<BackwardsCFG> m_backwardsCFG;
+    std::unique_ptr<BackwardsDominators> m_backwardsDominators;
+    std::unique_ptr<ControlEquivalenceAnalysis> m_controlEquivalenceAnalysis;
     unsigned m_localVars;
     unsigned m_nextMachineLocal;
     unsigned m_parameterSlots;
+    
+    HashSet<String> m_localStrings;
+    HashMap<const StringImpl*, String> m_copiedStrings;
 
 #if USE(JSVALUE32_64)
     std::unordered_map<int64_t, double*> m_doubleConstantsMap;
@@ -895,7 +912,7 @@ public:
     bool m_hasExceptionHandlers { false };
 private:
 
-    bool isStringPrototypeMethodSane(JSObject* stringPrototype, Structure* stringPrototypeStructure, UniquedStringImpl*);
+    bool isStringPrototypeMethodSane(JSGlobalObject*, UniquedStringImpl*);
 
     void handleSuccessor(Vector<BasicBlock*, 16>& worklist, BasicBlock*, BasicBlock* successor);
     

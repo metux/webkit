@@ -51,10 +51,14 @@ public:
     void liftUpAtPoint(long x, long y, long touchCount, JSValueRef callback);
     void singleTapAtPoint(long x, long y, JSValueRef callback);
     void doubleTapAtPoint(long x, long y, JSValueRef callback);
+    void dragFromPointToPoint(long startX, long startY, long endX, long endY, double durationSeconds, JSValueRef callback);
     
     void typeCharacterUsingHardwareKeyboard(JSStringRef character, JSValueRef callback);
     void keyDownUsingHardwareKeyboard(JSStringRef character, JSValueRef callback);
     void keyUpUsingHardwareKeyboard(JSStringRef character, JSValueRef callback);
+
+    void keyboardAccessoryBarNext();
+    void keyboardAccessoryBarPrevious();
 
     void setWillBeginZoomingCallback(JSValueRef);
     JSValueRef willBeginZoomingCallback() const;
@@ -76,6 +80,9 @@ public:
     double maximumZoomScale() const;
 
     JSObjectRef contentVisibleRect() const;
+    
+    bool forceIPadStyleZoomOnInputFocus() const;
+    void setForceIPadStyleZoomOnInputFocus(bool);
 
     void uiScriptComplete(JSStringRef result);
 
@@ -89,7 +96,7 @@ private:
     void platformSetDidEndScrollingCallback();
     void platformClearAllCallbacks();
 
-    virtual JSClassRef wrapperClass() override;
+    JSClassRef wrapperClass() final;
 
     JSObjectRef objectFromRect(const WKRect&) const;
 

@@ -43,6 +43,7 @@
 #include "HTMLVideoElement.h"
 #include "KeyboardEvent.h"
 #include "NodeList.h"
+#include "Page.h"
 #include "RawDataDocumentParser.h"
 #include "ScriptController.h"
 #include "ShadowRoot.h"
@@ -68,7 +69,7 @@ private:
         m_outgoingReferrer = document.outgoingReferrer();
     }
 
-    virtual void appendBytes(DocumentWriter&, const char*, size_t) override;
+    void appendBytes(DocumentWriter&, const char*, size_t) override;
 
     void createDocumentStructure();
 
@@ -78,8 +79,8 @@ private:
     
 void MediaDocumentParser::createDocumentStructure()
 {
-    Ref<Element> rootElement = document()->createElement(htmlTag, false);
-    document()->appendChild(rootElement.copyRef(), IGNORE_EXCEPTION);
+    auto rootElement = document()->createElement(htmlTag, false);
+    document()->appendChild(rootElement, IGNORE_EXCEPTION);
     document()->setCSSTarget(rootElement.ptr());
     downcast<HTMLHtmlElement>(rootElement.get()).insertedByParser();
 
@@ -87,25 +88,25 @@ void MediaDocumentParser::createDocumentStructure()
         document()->frame()->injectUserScripts(InjectAtDocumentStart);
 
 #if PLATFORM(IOS)
-    Ref<Element> headElement = document()->createElement(headTag, false);
-    rootElement->appendChild(headElement.copyRef(), IGNORE_EXCEPTION);
+    auto headElement = document()->createElement(headTag, false);
+    rootElement->appendChild(headElement, IGNORE_EXCEPTION);
 
-    Ref<Element> metaElement = document()->createElement(metaTag, false);
-    metaElement->setAttribute(nameAttr, "viewport");
-    metaElement->setAttribute(contentAttr, "width=device-width,initial-scale=1,user-scalable=no");
-    headElement->appendChild(WTFMove(metaElement), IGNORE_EXCEPTION);
+    auto metaElement = document()->createElement(metaTag, false);
+    metaElement->setAttributeWithoutSynchronization(nameAttr, AtomicString("viewport", AtomicString::ConstructFromLiteral));
+    metaElement->setAttributeWithoutSynchronization(contentAttr, AtomicString("width=device-width,initial-scale=1,user-scalable=no", AtomicString::ConstructFromLiteral));
+    headElement->appendChild(metaElement, IGNORE_EXCEPTION);
 #endif
 
-    Ref<Element> body = document()->createElement(bodyTag, false);
-    rootElement->appendChild(body.copyRef(), IGNORE_EXCEPTION);
+    auto body = document()->createElement(bodyTag, false);
+    rootElement->appendChild(body, IGNORE_EXCEPTION);
 
-    Ref<Element> mediaElement = document()->createElement(videoTag, false);
+    auto mediaElement = document()->createElement(videoTag, false);
 
     m_mediaElement = downcast<HTMLVideoElement>(mediaElement.ptr());
-    m_mediaElement->setAttribute(controlsAttr, emptyAtom);
-    m_mediaElement->setAttribute(autoplayAttr, emptyAtom);
+    m_mediaElement->setAttributeWithoutSynchronization(controlsAttr, emptyAtom);
+    m_mediaElement->setAttributeWithoutSynchronization(autoplayAttr, emptyAtom);
 
-    m_mediaElement->setAttribute(nameAttr, "media");
+    m_mediaElement->setAttributeWithoutSynchronization(nameAttr, AtomicString("media", AtomicString::ConstructFromLiteral));
 
     StringBuilder elementStyle;
     elementStyle.appendLiteral("max-width: 100%; max-height: 100%;");
@@ -114,15 +115,15 @@ void MediaDocumentParser::createDocumentStructure()
 #endif
     m_mediaElement->setAttribute(styleAttr, elementStyle.toString());
 
-    Ref<Element> sourceElement = document()->createElement(sourceTag, false);
+    auto sourceElement = document()->createElement(sourceTag, false);
     HTMLSourceElement& source = downcast<HTMLSourceElement>(sourceElement.get());
     source.setSrc(document()->url());
 
     if (DocumentLoader* loader = document()->loader())
         source.setType(loader->responseMIMEType());
 
-    m_mediaElement->appendChild(WTFMove(sourceElement), IGNORE_EXCEPTION);
-    body->appendChild(WTFMove(mediaElement), IGNORE_EXCEPTION);
+    m_mediaElement->appendChild(sourceElement, IGNORE_EXCEPTION);
+    body->appendChild(mediaElement, IGNORE_EXCEPTION);
 
     Frame* frame = document()->frame();
     if (!frame)
@@ -236,22 +237,22 @@ void MediaDocument::replaceMediaElementTimerFired()
         return;
 
     // Set body margin width and height to 0 as that is what a PluginDocument uses.
-    htmlBody->setAttribute(marginwidthAttr, "0");
-    htmlBody->setAttribute(marginheightAttr, "0");
+    htmlBody->setAttributeWithoutSynchronization(marginwidthAttr, AtomicString("0", AtomicString::ConstructFromLiteral));
+    htmlBody->setAttributeWithoutSynchronization(marginheightAttr, AtomicString("0", AtomicString::ConstructFromLiteral));
 
     if (HTMLVideoElement* videoElement = descendantVideoElement(*htmlBody)) {
         RefPtr<Element> element = Document::createElement(embedTag, false);
         HTMLEmbedElement& embedElement = downcast<HTMLEmbedElement>(*element);
 
-        embedElement.setAttribute(widthAttr, "100%");
-        embedElement.setAttribute(heightAttr, "100%");
-        embedElement.setAttribute(nameAttr, "plugin");
-        embedElement.setAttribute(srcAttr, url().string());
+        embedElement.setAttributeWithoutSynchronization(widthAttr, AtomicString("100%", AtomicString::ConstructFromLiteral));
+        embedElement.setAttributeWithoutSynchronization(heightAttr, AtomicString("100%", AtomicString::ConstructFromLiteral));
+        embedElement.setAttributeWithoutSynchronization(nameAttr, AtomicString("plugin", AtomicString::ConstructFromLiteral));
+        embedElement.setAttributeWithoutSynchronization(srcAttr, url().string());
 
         DocumentLoader* documentLoader = loader();
         ASSERT(documentLoader);
         if (documentLoader)
-            embedElement.setAttribute(typeAttr, documentLoader->writer().mimeType());
+            embedElement.setAttributeWithoutSynchronization(typeAttr, documentLoader->writer().mimeType());
 
         videoElement->parentNode()->replaceChild(embedElement, *videoElement, IGNORE_EXCEPTION);
     }

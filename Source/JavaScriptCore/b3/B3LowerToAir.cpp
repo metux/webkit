@@ -155,7 +155,6 @@ public:
             }
 
             // Make sure that the successors are set up correctly.
-            ASSERT(block->successors().size() <= 2);
             for (B3::FrequentedBlock successor : block->successors()) {
                 m_blockToBlock[block]->successors().append(
                     Air::FrequentedBlock(m_blockToBlock[successor.block()], successor.frequency()));
@@ -715,8 +714,13 @@ private:
         // over three operand forms.
 
         if (left != right) {
+            ArgPromise leftAddr = loadPromise(left);
+            if (isValidForm(opcode, leftAddr.kind(), Arg::Tmp, Arg::Tmp)) {
+                append(opcode, leftAddr.consume(*this), tmp(right), result);
+                return;
+            }
+
             if (commutativity == Commutative) {
-                ArgPromise leftAddr = loadPromise(left);
                 if (isValidForm(opcode, leftAddr.kind(), Arg::Tmp)) {
                     append(relaxedMoveForType(m_value->type()), tmp(right), result);
                     append(opcode, leftAddr.consume(*this), result);
@@ -725,6 +729,18 @@ private:
             }
 
             ArgPromise rightAddr = loadPromise(right);
+            if (isValidForm(opcode, Arg::Tmp, rightAddr.kind(), Arg::Tmp)) {
+                append(opcode, tmp(left), rightAddr.consume(*this), result);
+                return;
+            }
+
+            if (commutativity == Commutative) {
+                if (isValidForm(opcode, rightAddr.kind(), Arg::Tmp, Arg::Tmp)) {
+                    append(opcode, rightAddr.consume(*this), tmp(left), result);
+                    return;
+                }
+            }
+
             if (isValidForm(opcode, rightAddr.kind(), Arg::Tmp)) {
                 append(relaxedMoveForType(m_value->type()), tmp(left), result);
                 append(opcode, rightAddr.consume(*this), result);
@@ -988,6 +1004,7 @@ private:
             case ValueRep::SomeRegister:
                 arg = tmp(value.value());
                 break;
+            case ValueRep::LateRegister:
             case ValueRep::Register:
                 stackmap->earlyClobbered().clear(value.rep().reg());
                 arg = Tmp(value.rep().reg());
@@ -2132,6 +2149,11 @@ private:
             return;
         }
 
+        case IToF: {
+            appendUnOp<ConvertInt32ToFloat, ConvertInt64ToFloat>(m_value->child(0));
+            return;
+        }
+
         case B3::CCall: {
             CCallValue* cCall = m_value->as<CCallValue>();
 
@@ -2171,6 +2193,7 @@ private:
                 case ValueRep::ColdAny:
                 case ValueRep::LateColdAny:
                 case ValueRep::SomeRegister:
+                case ValueRep::SomeEarlyRegister:
                     inst.args.append(tmp(patchpointValue));
                     break;
                 case ValueRep::Register: {
@@ -2421,6 +2444,11 @@ private:
 
         case B3::Oops: {
             append(Air::Oops);
+            return;
+        }
+            
+        case B3::EntrySwitch: {
+            append(Air::EntrySwitch);
             return;
         }
 

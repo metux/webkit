@@ -36,7 +36,7 @@ STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(JSImageConstructor);
 
 template<> void JSImageConstructor::initializeProperties(VM& vm, JSDOMGlobalObject& globalObject)
 {
-    putDirect(vm, vm.propertyNames->prototype, JSHTMLImageElement::getPrototype(vm, &globalObject), None);
+    putDirect(vm, vm.propertyNames->prototype, JSHTMLImageElement::prototype(vm, &globalObject), None);
 }
 
 template<> JSValue JSImageConstructor::prototypeForStructure(VM& vm, const JSDOMGlobalObject& globalObject)
@@ -54,7 +54,7 @@ template<> EncodedJSValue JSImageConstructor::construct(ExecState* state)
     // Calling toJS on the document causes the JS document wrapper to be
     // added to the window object. This is done to ensure that JSDocument::visit
     // will be called, which will cause the image element to be marked if necessary.
-    toJS(state, jsConstructor->globalObject(), document);
+    toJS(state, jsConstructor->globalObject(), *document);
     int width;
     int height;
     int* optionalWidth = 0;

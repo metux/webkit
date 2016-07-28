@@ -49,11 +49,11 @@ JSDOMWindowShell::JSDOMWindowShell(VM& vm, Structure* structure, DOMWrapperWorld
 {
 }
 
-void JSDOMWindowShell::finishCreation(VM& vm, PassRefPtr<DOMWindow> window)
+void JSDOMWindowShell::finishCreation(VM& vm, RefPtr<DOMWindow>&& window)
 {
     Base::finishCreation(vm);
     ASSERT(inherits(info()));
-    setWindow(window);
+    setWindow(WTFMove(window));
 }
 
 void JSDOMWindowShell::destroy(JSCell* cell)
@@ -69,7 +69,7 @@ void JSDOMWindowShell::setWindow(VM& vm, JSDOMWindow* window)
     GCController::singleton().garbageCollectSoon();
 }
 
-void JSDOMWindowShell::setWindow(PassRefPtr<DOMWindow> domWindow)
+void JSDOMWindowShell::setWindow(RefPtr<DOMWindow>&& domWindow)
 {
     // Replacing JSDOMWindow via telling JSDOMWindowShell to use the same DOMWindow it already uses makes no sense,
     // so we'd better never try to.
@@ -85,7 +85,7 @@ void JSDOMWindowShell::setWindow(PassRefPtr<DOMWindow> domWindow)
     Structure* structure = JSDOMWindow::createStructure(vm, 0, prototype.get());
     JSDOMWindow* jsDOMWindow = JSDOMWindow::create(vm, structure, *domWindow, this);
     prototype->structure()->setGlobalObject(vm, jsDOMWindow);
-    prototype->structure()->setPrototypeWithoutTransition(vm, JSEventTarget::getPrototype(vm, jsDOMWindow));
+    prototype->structure()->setPrototypeWithoutTransition(vm, JSEventTarget::prototype(vm, jsDOMWindow));
     setWindow(vm, jsDOMWindow);
     ASSERT(jsDOMWindow->globalObject() == jsDOMWindow);
     ASSERT(prototype->globalObject() == jsDOMWindow);

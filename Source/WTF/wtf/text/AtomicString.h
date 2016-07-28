@@ -56,6 +56,7 @@ public:
     }
 
     AtomicString(AtomicStringImpl*);
+    AtomicString(RefPtr<AtomicStringImpl>&&);
     ATOMICSTRING_CONVERSION AtomicString(StringImpl*);
     ATOMICSTRING_CONVERSION AtomicString(const String&);
     AtomicString(StringImpl* baseString, unsigned start, unsigned length);
@@ -104,6 +105,8 @@ public:
 
     WTF_EXPORT_STRING_API static AtomicString number(int);
     WTF_EXPORT_STRING_API static AtomicString number(unsigned);
+    WTF_EXPORT_STRING_API static AtomicString number(unsigned long);
+    WTF_EXPORT_STRING_API static AtomicString number(unsigned long long);
     WTF_EXPORT_STRING_API static AtomicString number(double);
     // If we need more overloads of the number function, we can add all the others that String has, but these seem to do for now.
 
@@ -256,6 +259,11 @@ inline AtomicString::AtomicString(const UChar* s)
 
 inline AtomicString::AtomicString(AtomicStringImpl* imp)
     : m_string(imp)
+{
+}
+
+inline AtomicString::AtomicString(RefPtr<AtomicStringImpl>&& imp)
+    : m_string(WTFMove(imp))
 {
 }
 

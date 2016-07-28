@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,43 +26,9 @@
 #include "config.h"
 #include "ValueProfile.h"
 
-namespace WTF {
-    
-using namespace JSC;
+#include "CCallHelpers.h"
+#include "JSCInlines.h"
 
-void printInternal(PrintStream& out, const ResultProfile& profile)
-{
-    const char* separator = "";
+namespace JSC {
 
-    if (!profile.didObserveNonInt32()) {
-        out.print("Int32");
-        separator = "|";
-    } else {
-        if (profile.didObserveNegZeroDouble()) {
-            out.print(separator, "NegZeroDouble");
-            separator = "|";
-        }
-        if (profile.didObserveNonNegZeroDouble()) {
-            out.print("NonNegZeroDouble");
-            separator = "|";
-        }
-        if (profile.didObserveNonNumber()) {
-            out.print("NonNumber");
-            separator = "|";
-        }
-        if (profile.didObserveInt32Overflow()) {
-            out.print("Int32Overflow");
-            separator = "|";
-        }
-        if (profile.didObserveInt52Overflow()) {
-            out.print("Int52Overflow");
-            separator = "|";
-        }
-    }
-    if (profile.specialFastPathCount()) {
-        out.print(" special fast path: ");
-        out.print(profile.specialFastPathCount());
-    }
-}
-
-} // namespace WTF
+} // namespace JSC

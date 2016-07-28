@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +27,7 @@
 #define WebCoreArgumentCoders_h
 
 #include "ArgumentCoders.h"
+#include <WebCore/PaymentHeaders.h>
 
 namespace WebCore {
 class AffineTransform;
@@ -60,6 +61,7 @@ class ResourceError;
 class ResourceRequest;
 class ResourceResponse;
 class SessionID;
+class SpringTimingFunction;
 class StepsTimingFunction;
 class StickyPositionViewportConstraints;
 class TextCheckingRequestData;
@@ -71,6 +73,7 @@ struct CompositionUnderline;
 struct Cookie;
 struct DictationAlternative;
 struct DictionaryPopupInfo;
+struct EventTrackingRegions;
 struct ExceptionDetails;
 struct FileChooserSettings;
 struct Length;
@@ -80,6 +83,7 @@ struct PasteboardImage;
 struct PasteboardWebContent;
 struct PluginInfo;
 struct RecentSearch;
+struct ResourceLoadStatistics;
 struct ScrollableAreaParameters;
 struct TextCheckingResult;
 struct TextIndicatorData;
@@ -130,6 +134,11 @@ template<> struct ArgumentCoder<WebCore::AffineTransform> {
     static bool decode(ArgumentDecoder&, WebCore::AffineTransform&);
 };
 
+template<> struct ArgumentCoder<WebCore::EventTrackingRegions> {
+    static void encode(ArgumentEncoder&, const WebCore::EventTrackingRegions&);
+    static bool decode(ArgumentDecoder&, WebCore::EventTrackingRegions&);
+};
+
 template<> struct ArgumentCoder<WebCore::TransformationMatrix> {
     static void encode(ArgumentEncoder&, const WebCore::TransformationMatrix&);
     static bool decode(ArgumentDecoder&, WebCore::TransformationMatrix&);
@@ -148,6 +157,11 @@ template<> struct ArgumentCoder<WebCore::CubicBezierTimingFunction> {
 template<> struct ArgumentCoder<WebCore::StepsTimingFunction> {
     static void encode(ArgumentEncoder&, const WebCore::StepsTimingFunction&);
     static bool decode(ArgumentDecoder&, WebCore::StepsTimingFunction&);
+};
+
+template<> struct ArgumentCoder<WebCore::SpringTimingFunction> {
+    static void encode(ArgumentEncoder&, const WebCore::SpringTimingFunction&);
+    static bool decode(ArgumentDecoder&, WebCore::SpringTimingFunction&);
 };
 
 template<> struct ArgumentCoder<WebCore::CertificateInfo> {
@@ -455,10 +469,70 @@ template<> struct ArgumentCoder<WebCore::ExceptionDetails> {
     static bool decode(ArgumentDecoder&, WebCore::ExceptionDetails&);
 };
 
-} // namespace IPC
+template<> struct ArgumentCoder<WebCore::ResourceLoadStatistics> {
+    static void encode(ArgumentEncoder&, const WebCore::ResourceLoadStatistics&);
+    static bool decode(ArgumentDecoder&, WebCore::ResourceLoadStatistics&);
+};
 
-#if USE(APPLE_INTERNAL_SDK)
-#include <WebKitAdditions/WebCoreArgumentCodersAdditions.h>
+#if ENABLE(APPLE_PAY)
+
+template<> struct ArgumentCoder<WebCore::Payment> {
+    static void encode(ArgumentEncoder&, const WebCore::Payment&);
+    static bool decode(ArgumentDecoder&, WebCore::Payment&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentContact> {
+    static void encode(ArgumentEncoder&, const WebCore::PaymentContact&);
+    static bool decode(ArgumentDecoder&, WebCore::PaymentContact&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentMerchantSession> {
+    static void encode(ArgumentEncoder&, const WebCore::PaymentMerchantSession&);
+    static bool decode(ArgumentDecoder&, WebCore::PaymentMerchantSession&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentMethod> {
+    static void encode(ArgumentEncoder&, const WebCore::PaymentMethod&);
+    static bool decode(ArgumentDecoder&, WebCore::PaymentMethod&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentRequest> {
+    static void encode(ArgumentEncoder&, const WebCore::PaymentRequest&);
+    static bool decode(ArgumentDecoder&, WebCore::PaymentRequest&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentRequest::ContactFields> {
+    static void encode(ArgumentEncoder&, const WebCore::PaymentRequest::ContactFields&);
+    static bool decode(ArgumentDecoder&, WebCore::PaymentRequest::ContactFields&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentRequest::LineItem> {
+    static void encode(ArgumentEncoder&, const WebCore::PaymentRequest::LineItem&);
+    static bool decode(ArgumentDecoder&, WebCore::PaymentRequest::LineItem&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentRequest::MerchantCapabilities> {
+    static void encode(ArgumentEncoder&, const WebCore::PaymentRequest::MerchantCapabilities&);
+    static bool decode(ArgumentDecoder&, WebCore::PaymentRequest::MerchantCapabilities&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentRequest::ShippingMethod> {
+    static void encode(ArgumentEncoder&, const WebCore::PaymentRequest::ShippingMethod&);
+    static bool decode(ArgumentDecoder&, WebCore::PaymentRequest::ShippingMethod&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentRequest::SupportedNetworks> {
+    static void encode(ArgumentEncoder&, const WebCore::PaymentRequest::SupportedNetworks&);
+    static bool decode(ArgumentDecoder&, WebCore::PaymentRequest::SupportedNetworks&);
+};
+
+template<> struct ArgumentCoder<WebCore::PaymentRequest::TotalAndLineItems> {
+    static void encode(ArgumentEncoder&, const WebCore::PaymentRequest::TotalAndLineItems&);
+    static bool decode(ArgumentDecoder&, WebCore::PaymentRequest::TotalAndLineItems&);
+};
+
 #endif
+
+} // namespace IPC
 
 #endif // WebCoreArgumentCoders_h

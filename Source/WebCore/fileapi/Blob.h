@@ -58,10 +58,10 @@ public:
         return adoptRef(*new Blob(WTFMove(blobParts), contentType));
     }
 
-    static Ref<Blob> deserialize(const URL& srcURL, const String& type, long long size)
+    static Ref<Blob> deserialize(const URL& srcURL, const String& type, long long size, const String& fileBackedPath)
     {
         ASSERT(Blob::isNormalizedContentType(type));
-        return adoptRef(*new Blob(deserializationContructor, srcURL, type, size));
+        return adoptRef(*new Blob(deserializationContructor, srcURL, type, size, fileBackedPath));
     }
 
     virtual ~Blob();
@@ -82,7 +82,7 @@ public:
 #endif
 
     // URLRegistrable
-    virtual URLRegistry& registry() const override;
+    URLRegistry& registry() const override;
 
     Ref<Blob> slice(long long start = 0, long long end = std::numeric_limits<long long>::max(), const String& contentType = String()) const
     {
@@ -98,7 +98,7 @@ protected:
     Blob(UninitializedContructor);
 
     enum DeserializationContructor { deserializationContructor };
-    Blob(DeserializationContructor, const URL& srcURL, const String& type, long long size);
+    Blob(DeserializationContructor, const URL& srcURL, const String& type, long long size, const String& fileBackedPath);
 
     // For slicing.
     Blob(const URL& srcURL, long long start, long long end, const String& contentType);

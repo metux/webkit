@@ -27,6 +27,7 @@
 #define CSSFontSelector_h
 
 #include "CSSFontFace.h"
+#include "CSSFontFaceSet.h"
 #include "CachedResourceHandle.h"
 #include "Font.h"
 #include "FontSelector.h"
@@ -48,7 +49,7 @@ class CachedFont;
 class Document;
 class StyleRuleFontFace;
 
-class CSSFontSelector final : public FontSelector {
+class CSSFontSelector final : public FontSelector, public CSSFontFaceSetClient {
 public:
     static Ref<CSSFontSelector> create(Document& document)
     {
@@ -56,53 +57,62 @@ public:
     }
     virtual ~CSSFontSelector();
     
-    virtual unsigned version() const override { return m_version; }
-    virtual unsigned uniqueId() const override { return m_uniqueId; }
+    unsigned version() const override { return m_version; }
+    unsigned uniqueId() const override { return m_uniqueId; }
 
-    virtual FontRanges fontRangesForFamily(const FontDescription&, const AtomicString&) override;
-    virtual size_t fallbackFontCount() override;
-    virtual RefPtr<Font> fallbackFontAt(const FontDescription&, size_t) override;
-    CSSSegmentedFontFace* getFontFace(const FontDescription&, const AtomicString& family);
+    FontRanges fontRangesForFamily(const FontDescription&, const AtomicString&) override;
+    size_t fallbackFontCount() override;
+    RefPtr<Font> fallbackFontAt(const FontDescription&, size_t) override;
 
     void clearDocument();
+    void buildStarted();
+    void buildCompleted();
 
-    static void appendSources(CSSFontFace&, CSSValueList&, Document*, bool isInitiatingElementInUserAgentShadowTree);
-    void addFontFaceRule(const StyleRuleFontFace&, bool isInitiatingElementInUserAgentShadowTree);
+    void addFontFaceRule(StyleRuleFontFace&, bool isInitiatingElementInUserAgentShadowTree);
 
     void fontLoaded();
-    virtual void fontCacheInvalidated() override;
+    void fontCacheInvalidated() override;
 
     bool isEmpty() const;
 
-    virtual void registerForInvalidationCallbacks(FontSelectorClient&) override;
-    virtual void unregisterForInvalidationCallbacks(FontSelectorClient&) override;
+    void registerForInvalidationCallbacks(FontSelectorClient&) override;
+    void unregisterForInvalidationCallbacks(FontSelectorClient&) override;
 
     Document* document() const { return m_document; }
 
-    void beginLoadingFontSoon(CachedFont*);
+    void beginLoadingFontSoon(CachedFont&);
 
-    static String familyNameFromPrimitive(const CSSPrimitiveValue&);
+    FontFaceSet& fontFaceSet();
 
 private:
     explicit CSSFontSelector(Document&);
 
     void dispatchInvalidationCallbacks();
 
+    void fontModified() override;
+
     void beginLoadTimerFired();
 
-    void registerLocalFontFacesForFamily(const String&);
+    struct PendingFontFaceRule {
+        StyleRuleFontFace& styleRuleFontFace;
+        bool isInitiatingElementInUserAgentShadowTree;
+    };
+    Vector<PendingFontFaceRule> m_stagingArea;
 
     Document* m_document;
-    HashMap<String, Vector<Ref<CSSFontFace>>, ASCIICaseInsensitiveHash> m_fontFaces;
-    HashMap<String, Vector<Ref<CSSFontFace>>, ASCIICaseInsensitiveHash> m_locallyInstalledFontFaces;
-    HashMap<String, HashMap<unsigned, std::unique_ptr<CSSSegmentedFontFace>>, ASCIICaseInsensitiveHash> m_fonts;
+    RefPtr<FontFaceSet> m_fontFaceSet;
+    Ref<CSSFontFaceSet> m_cssFontFaceSet;
     HashSet<FontSelectorClient*> m_clients;
 
     Vector<CachedResourceHandle<CachedFont>> m_fontsToBeginLoading;
+    HashSet<RefPtr<CSSFontFace>> m_cssConnectionsPossiblyToRemove;
+    HashSet<RefPtr<StyleRuleFontFace>> m_cssConnectionsEncounteredDuringBuild;
     Timer m_beginLoadingTimer;
 
     unsigned m_uniqueId;
     unsigned m_version;
+    bool m_creatingFont { false };
+    bool m_buildIsUnderway { false };
 };
 
 } // namespace WebCore

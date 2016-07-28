@@ -38,7 +38,7 @@ static JSValue namedItems(ExecState& state, JSHTMLFormControlsCollection* collec
     if (namedItems.isEmpty())
         return jsUndefined();
     if (namedItems.size() == 1)
-        return toJS(&state, collection->globalObject(), namedItems[0].ptr());
+        return toJS(&state, collection->globalObject(), namedItems[0]);
 
     ASSERT(collection->wrapped().type() == FormControls);
     return toJS(&state, collection->globalObject(), collection->wrapped().ownerNode().radioNodeList(name).get());
@@ -56,7 +56,10 @@ bool JSHTMLFormControlsCollection::nameGetter(ExecState* state, PropertyName pro
 
 JSValue JSHTMLFormControlsCollection::namedItem(ExecState& state)
 {
-    JSValue value = namedItems(state, this, Identifier::fromString(&state, state.argument(0).toString(&state)->value(&state)));
+    if (UNLIKELY(state.argumentCount() < 1))
+        return state.vm().throwException(&state, createNotEnoughArgumentsError(&state));
+
+    JSValue value = namedItems(state, this, Identifier::fromString(&state, state.uncheckedArgument(0).toString(&state)->value(&state)));
     return value.isUndefined() ? jsNull() : value;
 }
 

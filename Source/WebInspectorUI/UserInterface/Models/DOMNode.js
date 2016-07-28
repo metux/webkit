@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2009, 2010 Google Inc. All rights reserved.
  * Copyright (C) 2009 Joseph Pecoraro
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -47,7 +47,9 @@ WebInspector.DOMNode = class DOMNode extends WebInspector.Object
         this._localName = payload.localName;
         this._nodeValue = payload.nodeValue;
         this._pseudoType = payload.pseudoType;
+        this._shadowRootType = payload.shadowRootType;
         this._computedRole = payload.role;
+        this._contentSecurityPolicyHash = payload.contentSecurityPolicyHash;
 
         if (this._nodeType === Node.DOCUMENT_NODE)
             this.ownerDocument = this;
@@ -70,22 +72,26 @@ WebInspector.DOMNode = class DOMNode extends WebInspector.Object
 
         this._enabledPseudoClasses = [];
 
+        // FIXME: The logic around this._shadowRoots and this._children is very confusing.
         this._shadowRoots = [];
         if (payload.shadowRoots) {
             for (var i = 0; i < payload.shadowRoots.length; ++i) {
                 var root = payload.shadowRoots[i];
                 var node = new WebInspector.DOMNode(this._domTreeManager, this.ownerDocument, true, root);
+                node.parentNode = this;
                 this._shadowRoots.push(node);
             }
         }
 
         if (payload.templateContent) {
-            this._templateContent = new WebInspector.DOMNode(this._domTreeManager, this.ownerDocument, true, payload.templateContent);
+            this._templateContent = new WebInspector.DOMNode(this._domTreeManager, this.ownerDocument, false, payload.templateContent);
             this._templateContent.parentNode = this;
         }
 
         if (payload.children)
             this._setChildrenPayload(payload.children);
+        else if (!this._children && this._shadowRoots.length)
+            this._children = this._shadowRoots.slice();
 
         this._pseudoElements = new Map;
         if (payload.pseudoElements) {
@@ -228,6 +234,11 @@ WebInspector.DOMNode = class DOMNode extends WebInspector.Object
         return this._computedRole;
     }
 
+    contentSecurityPolicyHash()
+    {
+        return this._contentSecurityPolicyHash;
+    }
+
     hasAttributes()
     {
         return this._attributes.length > 0;
@@ -306,6 +317,16 @@ WebInspector.DOMNode = class DOMNode extends WebInspector.Object
     afterPseudoElement()
     {
         return this._pseudoElements.get(WebInspector.DOMNode.PseudoElementType.After) || null;
+    }
+
+    shadowRoots()
+    {
+        return this._shadowRoots;
+    }
+
+    shadowRootType()
+    {
+        return this._shadowRootType;
     }
 
     nodeValue()
@@ -667,4 +688,10 @@ WebInspector.DOMNode.Event = {
 WebInspector.DOMNode.PseudoElementType = {
     Before: "before",
     After: "after",
+};
+
+WebInspector.DOMNode.ShadowRootType = {
+    UserAgent: "user-agent",
+    Closed: "closed",
+    Open: "open",
 };

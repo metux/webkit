@@ -54,7 +54,7 @@ WorkerScriptLoader::~WorkerScriptLoader()
 {
 }
 
-void WorkerScriptLoader::loadSynchronously(ScriptExecutionContext* scriptExecutionContext, const URL& url, CrossOriginRequestPolicy crossOriginRequestPolicy, ContentSecurityPolicyEnforcement contentSecurityPolicyEnforcement)
+void WorkerScriptLoader::loadSynchronously(ScriptExecutionContext* scriptExecutionContext, const URL& url, FetchOptions::Mode mode, ContentSecurityPolicyEnforcement contentSecurityPolicyEnforcement)
 {
     m_url = url;
 
@@ -66,15 +66,14 @@ void WorkerScriptLoader::loadSynchronously(ScriptExecutionContext* scriptExecuti
 
     ThreadableLoaderOptions options;
     options.setAllowCredentials(AllowStoredCredentials);
-    options.crossOriginRequestPolicy = crossOriginRequestPolicy;
+    options.mode = mode;
     options.setSendLoadCallbacks(SendCallbacks);
-    options.securityOrigin = scriptExecutionContext->securityOrigin();
     options.contentSecurityPolicyEnforcement = contentSecurityPolicyEnforcement;
 
     WorkerThreadableLoader::loadResourceSynchronously(downcast<WorkerGlobalScope>(scriptExecutionContext), *request, *this, options);
 }
-    
-void WorkerScriptLoader::loadAsynchronously(ScriptExecutionContext* scriptExecutionContext, const URL& url, CrossOriginRequestPolicy crossOriginRequestPolicy, ContentSecurityPolicyEnforcement contentSecurityPolicyEnforcement, WorkerScriptLoaderClient* client)
+
+void WorkerScriptLoader::loadAsynchronously(ScriptExecutionContext* scriptExecutionContext, const URL& url, FetchOptions::Mode mode, ContentSecurityPolicyEnforcement contentSecurityPolicyEnforcement, WorkerScriptLoaderClient* client)
 {
     ASSERT(client);
     m_client = client;
@@ -86,13 +85,12 @@ void WorkerScriptLoader::loadAsynchronously(ScriptExecutionContext* scriptExecut
 
     ThreadableLoaderOptions options;
     options.setAllowCredentials(AllowStoredCredentials);
-    options.crossOriginRequestPolicy = crossOriginRequestPolicy;
+    options.mode = mode;
     options.setSendLoadCallbacks(SendCallbacks);
-    options.securityOrigin = scriptExecutionContext->securityOrigin();
     options.contentSecurityPolicyEnforcement = contentSecurityPolicyEnforcement;
 
     // During create, callbacks may happen which remove the last reference to this object.
-    Ref<WorkerScriptLoader> protect(*this);
+    Ref<WorkerScriptLoader> protectedThis(*this);
     m_threadableLoader = ThreadableLoader::create(scriptExecutionContext, this, *request, options);
 }
 
@@ -157,11 +155,6 @@ void WorkerScriptLoader::didFinishLoading(unsigned long identifier, double)
 }
 
 void WorkerScriptLoader::didFail(const ResourceError&)
-{
-    notifyError();
-}
-
-void WorkerScriptLoader::didFailRedirectCheck()
 {
     notifyError();
 }

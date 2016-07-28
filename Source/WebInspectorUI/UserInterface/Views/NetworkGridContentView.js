@@ -80,10 +80,11 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
         for (var column in columns)
             columns[column].sortable = true;
 
-        this._dataGrid = new WebInspector.TimelineDataGrid(this._contentTreeOutline, columns);
+        this._dataGrid = new WebInspector.TimelineDataGrid(columns, this._contentTreeOutline);
         this._dataGrid.addEventListener(WebInspector.DataGrid.Event.SelectedNodeChanged, this._dataGridNodeSelected, this);
-        this._dataGrid.sortColumnIdentifierSetting = new WebInspector.Setting("network-grid-content-view-sort", "requestSent");
-        this._dataGrid.sortOrderSetting = new WebInspector.Setting("network-grid-content-view-sort-order", WebInspector.DataGrid.SortOrder.Ascending);
+        this._dataGrid.sortColumnIdentifier = "requestSent";
+        this._dataGrid.sortOrder = WebInspector.DataGrid.SortOrder.Ascending;
+        this._dataGrid.createSettings("network-grid-content-view");
 
         this.element.classList.add("network-grid");
         this.addSubview(this._dataGrid);
@@ -99,11 +100,6 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
     }
 
     // Public
-
-    get navigationSidebarTreeOutline()
-    {
-        return this._contentTreeOutline;
-    }
 
     get selectionPathComponents()
     {

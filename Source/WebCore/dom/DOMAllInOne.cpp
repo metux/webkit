@@ -34,7 +34,6 @@
 #include "BeforeUnloadEvent.cpp"
 #include "CDATASection.cpp"
 #include "CharacterData.cpp"
-#include "CheckedRadioButtons.cpp"
 #include "ChildListMutationScope.cpp"
 #include "ChildNodeList.cpp"
 #include "ClassCollection.cpp"
@@ -83,6 +82,7 @@
 #include "EventDispatcher.cpp"
 #include "EventListenerMap.cpp"
 #include "EventNames.cpp"
+#include "EventPath.cpp"
 #include "EventTarget.cpp"
 #include "ExceptionBase.cpp"
 #include "ExceptionCodePlaceholder.cpp"
@@ -93,6 +93,7 @@
 #include "IdTargetObserverRegistry.cpp"
 #include "InlineStyleSheetOwner.cpp"
 #include "KeyboardEvent.cpp"
+#include "LifecycleCallbackQueue.cpp"
 #include "LiveNodeList.cpp"
 #include "MessageChannel.cpp"
 #include "MessageEvent.cpp"
@@ -127,6 +128,7 @@
 // Build error if adding QualifiedName.cpp to DOMAllInOne.cpp
 // https://bugs.webkit.org/show_bug.cgi?id=146586
 // #include "QualifiedName.cpp"
+#include "RadioButtonGroups.cpp"
 #include "Range.cpp"
 #include "RegisteredEventListener.cpp"
 #include "ScopedEventQueue.cpp"

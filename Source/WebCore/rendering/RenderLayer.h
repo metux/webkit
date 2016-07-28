@@ -203,7 +203,9 @@ public:
     ScrollOffset scrollOffset() const { return scrollOffsetFromPosition(m_scrollPosition); }
     IntSize scrollableContentsSize() const;
 
-    void scrollRectToVisible(const LayoutRect&, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
+    void availableContentSizeChanged(AvailableSizeChangeReason) override;
+
+    void scrollRectToVisible(SelectionRevealMode, const LayoutRect&, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
 
     LayoutRect getRectToExpose(const LayoutRect& visibleRect, const LayoutRect& visibleRectRelativeToDocument, const LayoutRect& exposeRect, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
 
@@ -219,28 +221,28 @@ public:
     bool hasVerticalScrollbar() const { return verticalScrollbar(); }
 
     // ScrollableArea overrides
-    virtual ScrollPosition scrollPosition() const override { return m_scrollPosition; }
+    ScrollPosition scrollPosition() const override { return m_scrollPosition; }
 
-    virtual Scrollbar* horizontalScrollbar() const override { return m_hBar.get(); }
-    virtual Scrollbar* verticalScrollbar() const override { return m_vBar.get(); }
-    virtual ScrollableArea* enclosingScrollableArea() const override;
-    virtual bool isScrollableOrRubberbandable() override;
-    virtual bool hasScrollableOrRubberbandableAncestor() override;
+    Scrollbar* horizontalScrollbar() const override { return m_hBar.get(); }
+    Scrollbar* verticalScrollbar() const override { return m_vBar.get(); }
+    ScrollableArea* enclosingScrollableArea() const override;
+    bool isScrollableOrRubberbandable() override;
+    bool hasScrollableOrRubberbandableAncestor() override;
 #if ENABLE(CSS_SCROLL_SNAP)
-    virtual void updateSnapOffsets() override;
+    void updateSnapOffsets() override;
 #endif
 
 #if PLATFORM(IOS)
 #if ENABLE(TOUCH_EVENTS)
-    virtual bool handleTouchEvent(const PlatformTouchEvent&) override;
-    virtual bool isTouchScrollable() const override { return true; }
+    bool handleTouchEvent(const PlatformTouchEvent&) override;
+    bool isTouchScrollable() const override { return true; }
 #endif
-    virtual bool isOverflowScroll() const override { return true; }
+    bool isOverflowScroll() const override { return true; }
     
-    virtual void didStartScroll() override;
-    virtual void didEndScroll() override;
-    virtual void didUpdateScroll() override;
-    virtual void setIsUserScroll(bool isUserScroll) override { m_inUserScroll = isUserScroll; }
+    void didStartScroll() override;
+    void didEndScroll() override;
+    void didUpdateScroll() override;
+    void setIsUserScroll(bool isUserScroll) override { m_inUserScroll = isUserScroll; }
 
     bool isInUserScroll() const { return m_inUserScroll; }
 
@@ -384,7 +386,7 @@ public:
     void setHasVisibleContent();
     void dirtyVisibleContentStatus();
 
-    bool hasBoxDecorationsOrBackground() const;
+    bool hasVisibleBoxDecorationsOrBackground() const;
     bool hasVisibleBoxDecorations() const;
     // Returns true if this layer has visible content (ignoring any child layers).
     bool isVisuallyNonEmpty() const;
@@ -536,7 +538,8 @@ public:
     LayoutRect calculateLayerBounds(const RenderLayer* ancestorLayer, const LayoutSize& offsetFromRoot, CalculateLayerBoundsFlags = DefaultCalculateLayerBoundsFlags) const;
     
     // Return a cached repaint rect, computed relative to the layer renderer's containerForRepaint.
-    LayoutRect repaintRect() const { return m_repaintRect; }
+    bool hasComputedRepaintRect() const { return m_hasComputedRepaintRect; }
+    LayoutRect repaintRect() const { ASSERT(hasComputedRepaintRect()); return m_repaintRect; }
     LayoutRect repaintRectIncludingNonCompositingDescendants() const;
 
     void setRepaintStatus(RepaintStatus status) { m_repaintStatus = status; }
@@ -610,12 +613,12 @@ public:
     RenderLayerBacking* backing() const { return m_backing.get(); }
     RenderLayerBacking* ensureBacking();
     void clearBacking(bool layerBeingDestroyed = false);
-    virtual GraphicsLayer* layerForScrolling() const override;
-    virtual GraphicsLayer* layerForHorizontalScrollbar() const override;
-    virtual GraphicsLayer* layerForVerticalScrollbar() const override;
-    virtual GraphicsLayer* layerForScrollCorner() const override;
-    virtual bool usesCompositedScrolling() const override;
-    virtual bool usesAsyncScrolling() const override;
+    GraphicsLayer* layerForScrolling() const override;
+    GraphicsLayer* layerForHorizontalScrollbar() const override;
+    GraphicsLayer* layerForVerticalScrollbar() const override;
+    GraphicsLayer* layerForScrollCorner() const override;
+    bool usesCompositedScrolling() const override;
+    bool usesAsyncScrolling() const override;
     WEBCORE_EXPORT bool needsCompositedScrolling() const;
 
     bool paintsWithTransparency(PaintBehavior paintBehavior) const
@@ -668,6 +671,8 @@ public:
     bool isFlowThreadCollectingGraphicsLayersUnderRegions() const;
 
     RenderLayer* enclosingFlowThreadAncestor() const;
+
+    bool shouldPlaceBlockDirectionScrollbarOnLeft() const final { return renderer().shouldPlaceBlockDirectionScrollbarOnLeft(); }
 
 private:
     enum CollectLayersBehavior { StopAtStackingContexts, StopAtStackingContainers };
@@ -722,8 +727,8 @@ private:
     void computeRepaintRectsIncludingDescendants();
     void clearRepaintRects();
 
-    void clipToRect(const LayerPaintingInfo&, GraphicsContext&, const ClipRect&, BorderRadiusClippingRule = IncludeSelfForBorderRadius);
-    void restoreClip(GraphicsContext&, const LayoutRect& paintDirtyRect, const ClipRect&);
+    void clipToRect(GraphicsContext&, const LayerPaintingInfo&, const ClipRect&, BorderRadiusClippingRule = IncludeSelfForBorderRadius);
+    void restoreClip(GraphicsContext&, const LayerPaintingInfo&, const ClipRect&);
 
     bool shouldRepaintAfterLayout() const;
 
@@ -754,10 +759,6 @@ private:
     typedef unsigned UpdateLayerPositionsAfterScrollFlags;
     void updateLayerPositionsAfterScroll(RenderGeometryMap*, UpdateLayerPositionsAfterScrollFlags = NoFlag);
 
-    friend IntSize RenderBox::scrolledContentOffset() const;
-    // FIXME: rename this toscrolledContentPosition(), or remove it.
-    IntSize scrolledContentOffset() const { return toIntSize(m_scrollPosition); }
-
     ScrollOffset clampScrollOffset(const ScrollOffset&) const;
 
     RenderLayer* enclosingPaginationLayerInSubtree(const RenderLayer* rootLayer, PaginationInclusionMode) const;
@@ -782,7 +783,7 @@ private:
 
     bool hasFilterThatIsPainting(GraphicsContext&, PaintLayerFlags) const;
     std::unique_ptr<FilterEffectRendererHelper> setupFilters(GraphicsContext&, LayerPaintingInfo&, PaintLayerFlags, const LayoutSize& offsetFromRoot, LayoutRect& rootRelativeBounds, bool& rootRelativeBoundsComputed);
-    GraphicsContext& applyFilters(FilterEffectRendererHelper*, GraphicsContext& originalContext, LayerPaintingInfo&, LayerFragments&);
+    void applyFilters(FilterEffectRendererHelper*, GraphicsContext& originalContext, const LayerPaintingInfo&, const LayerFragments&);
 
     void paintLayer(GraphicsContext&, const LayerPaintingInfo&, PaintLayerFlags);
     void paintFixedLayersInNamedFlows(GraphicsContext&, const LayerPaintingInfo&, PaintLayerFlags);
@@ -855,32 +856,31 @@ private:
 
     bool shouldBeSelfPaintingLayer() const;
 
-    virtual int scrollOffset(ScrollbarOrientation) const override;
+    int scrollOffset(ScrollbarOrientation) const override;
     
     // ScrollableArea interface
-    virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) override;
-    virtual void invalidateScrollCornerRect(const IntRect&) override;
-    virtual bool isActive() const override;
-    virtual bool isScrollCornerVisible() const override;
-    virtual IntRect scrollCornerRect() const override;
-    virtual IntRect convertFromScrollbarToContainingView(const Scrollbar*, const IntRect&) const override;
-    virtual IntRect convertFromContainingViewToScrollbar(const Scrollbar*, const IntRect&) const override;
-    virtual IntPoint convertFromScrollbarToContainingView(const Scrollbar*, const IntPoint&) const override;
-    virtual IntPoint convertFromContainingViewToScrollbar(const Scrollbar*, const IntPoint&) const override;
-    virtual int scrollSize(ScrollbarOrientation) const override;
-    virtual void setScrollOffset(const ScrollOffset&) override;
+    void invalidateScrollbarRect(Scrollbar&, const IntRect&) override;
+    void invalidateScrollCornerRect(const IntRect&) override;
+    bool isActive() const override;
+    bool isScrollCornerVisible() const override;
+    IntRect scrollCornerRect() const override;
+    IntRect convertFromScrollbarToContainingView(const Scrollbar&, const IntRect&) const override;
+    IntRect convertFromContainingViewToScrollbar(const Scrollbar&, const IntRect&) const override;
+    IntPoint convertFromScrollbarToContainingView(const Scrollbar&, const IntPoint&) const override;
+    IntPoint convertFromContainingViewToScrollbar(const Scrollbar&, const IntPoint&) const override;
+    int scrollSize(ScrollbarOrientation) const override;
+    void setScrollOffset(const ScrollOffset&) override;
 
-    virtual IntRect visibleContentRectInternal(VisibleContentRectIncludesScrollbars, VisibleContentRectBehavior) const override;
-    virtual IntSize visibleSize() const override;
-    virtual IntSize contentsSize() const override;
-    virtual IntSize overhangAmount() const override;
-    virtual IntPoint lastKnownMousePosition() const override;
-    virtual bool isHandlingWheelEvent() const override;
-    virtual bool shouldSuspendScrollAnimations() const override;
-    virtual IntRect scrollableAreaBoundingBox(bool* isInsideFixed = nullptr) const override;
-    virtual bool isRubberBandInProgress() const override;
-    virtual bool updatesScrollLayerPositionOnMainThread() const override { return true; }
-    virtual bool forceUpdateScrollbarsOnMainThreadForPerformanceTesting() const override;
+    IntRect visibleContentRectInternal(VisibleContentRectIncludesScrollbars, VisibleContentRectBehavior) const override;
+    IntSize visibleSize() const override;
+    IntSize contentsSize() const override;
+    IntSize overhangAmount() const override;
+    IntPoint lastKnownMousePosition() const override;
+    bool isHandlingWheelEvent() const override;
+    bool shouldSuspendScrollAnimations() const override;
+    IntRect scrollableAreaBoundingBox(bool* isInsideFixed = nullptr) const override;
+    bool isRubberBandInProgress() const override;
+    bool forceUpdateScrollbarsOnMainThreadForPerformanceTesting() const override;
 #if ENABLE(CSS_SCROLL_SNAP)
     bool isScrollSnapInProgress() const override;
 #endif
@@ -899,7 +899,7 @@ private:
     void scrollTo(const ScrollPosition&);
     void updateCompositingLayersAfterScroll();
 
-    IntSize scrollbarOffset(const Scrollbar*) const;
+    IntSize scrollbarOffset(const Scrollbar&) const;
     
     void updateScrollableAreaSet(bool hasOverflow);
     
@@ -922,7 +922,7 @@ private:
     void createReflection();
     void removeReflection();
 
-    Ref<RenderStyle> createReflectionStyle();
+    RenderStyle createReflectionStyle();
     bool paintingInsideReflection() const { return m_paintingInsideReflection; }
     void setPaintingInsideReflection(bool b) { m_paintingInsideReflection = b; }
 
@@ -995,7 +995,6 @@ private:
 
     RenderNamedFlowFragment* currentRenderNamedFlowFragment() const;
 
-private:
     // The bitfields are up here so they will fall into the padding from ScrollableArea on 64-bit.
 
     const bool m_isRootLayer : 1;
@@ -1070,6 +1069,8 @@ private:
 #endif
 
     bool m_hasFilterInfo : 1;
+    
+    bool m_hasComputedRepaintRect : 1;
 
 #if ENABLE(CSS_COMPOSITING)
     unsigned m_blendMode : 5;
@@ -1101,7 +1102,7 @@ private:
     ScrollPosition m_scrollPosition;
 
     // The width/height of our scrolled area.
-    LayoutSize m_scrollSize;
+    IntSize m_scrollSize;
 
     // For layers with overflow, we have a pair of scrollbars.
     RefPtr<Scrollbar> m_hBar;
@@ -1122,7 +1123,7 @@ private:
     
     IntPoint m_cachedOverlayScrollbarOffset;
 
-    std::unique_ptr<RenderMarquee> m_marquee; // Used by layers with overflow:marquee
+    std::unique_ptr<RenderMarquee> m_marquee; // Used for <marquee>.
     
     // Cached normal flow values for absolute positioned elements with static left/top values.
     LayoutUnit m_staticInlinePosition;
@@ -1150,6 +1151,7 @@ private:
 inline void RenderLayer::clearZOrderLists()
 {
     ASSERT(!isStackingContainer());
+    ASSERT(m_layerListMutationAllowed);
 
     m_posZOrderList = nullptr;
     m_negZOrderList = nullptr;
