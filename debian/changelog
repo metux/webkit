@@ -1,4 +1,4 @@
-webkit2gtk (2.13.4-1) UNRELEASED; urgency=medium
+webkit2gtk (2.13.4-1) experimental; urgency=medium
 
   * New upstream release.
   * debian/patches/hide-gtk2-plugins.patch:
@@ -11,7 +11,7 @@ webkit2gtk (2.13.4-1) UNRELEASED; urgency=medium
   * debian/libwebkit2gtk-4.0-37.symbols:
     + New symbols added, and some optional dom symbols dropped.
 
- -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 28 Jul 2016 13:36:24 +0200
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Sun, 31 Jul 2016 20:46:25 +0200
 
 webkit2gtk (2.12.3-1) unstable; urgency=high
 
