@@ -1,5 +1,4 @@
 install-minibrowser.patch
 fix-ftbfs-m68k.patch
-hide-gtk2-plugins.patch
 fix-ftbfs-sparc64.patch
 fix-ftbfs-alpha.patch
