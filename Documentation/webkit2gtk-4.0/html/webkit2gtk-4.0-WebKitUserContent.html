@@ -194,16 +194,16 @@ called from any thread.</p>
 <div class="refsect2">
 <a name="webkit-user-style-sheet-new"></a><h3>webkit_user_style_sheet_new ()</h3>
 <pre class="programlisting"><a class="link" href="webkit2gtk-4.0-WebKitUserContent.html#WebKitUserStyleSheet"><span class="returnvalue">WebKitUserStyleSheet</span></a> *
-webkit_user_style_sheet_new (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *source</code></em>,
+webkit_user_style_sheet_new (<em class="parameter"><code>const <span class="type">gchar</span> *source</code></em>,
                              <em class="parameter"><code><a class="link" href="webkit2gtk-4.0-WebKitUserContent.html#WebKitUserContentInjectedFrames" title="enum WebKitUserContentInjectedFrames"><span class="type">WebKitUserContentInjectedFrames</span></a> injected_frames</code></em>,
                              <em class="parameter"><code><a class="link" href="webkit2gtk-4.0-WebKitUserContent.html#WebKitUserStyleLevel" title="enum WebKitUserStyleLevel"><span class="type">WebKitUserStyleLevel</span></a> level</code></em>,
-                             <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> * const *whitelist</code></em>,
-                             <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> * const *blacklist</code></em>);</pre>
+                             <em class="parameter"><code>const <span class="type">gchar</span> * const *whitelist</code></em>,
+                             <em class="parameter"><code>const <span class="type">gchar</span> * const *blacklist</code></em>);</pre>
 <p>Creates a new user style sheet. Style sheets can be applied to some URIs
 only by passing non-null values for <em class="parameter"><code>whitelist</code></em>
  or <em class="parameter"><code>blacklist</code></em>
 . Passing a
-<a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> whitelist implies that all URIs are on the whitelist. The style
+<code class="literal">NULL</code> whitelist implies that all URIs are on the whitelist. The style
 sheet is applied if an URI matches the whitelist and not the blacklist.
 URI patterns must be of the form <code class="literal">[protocol]://[host]/[path]</code>, where the
 *host* and *path* components can contain the wildcard character (<code class="literal">*</code>) to
@@ -234,12 +234,12 @@ represent zero or more other characters.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>whitelist</p></td>
-<td class="parameter_description"><p> A whitelist of URI patterns or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. </p></td>
+<td class="parameter_description"><p> A whitelist of URI patterns or <code class="literal">NULL</code>. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="Parameter points to an array of items."><span class="acronym">array</span></acronym> zero-terminated=1][<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 <tr>
 <td class="parameter_name"><p>blacklist</p></td>
-<td class="parameter_description"><p> A blacklist of URI patterns or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. </p></td>
+<td class="parameter_description"><p> A blacklist of URI patterns or <code class="literal">NULL</code>. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="Parameter points to an array of items."><span class="acronym">array</span></acronym> zero-terminated=1][<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 </tbody>
@@ -311,16 +311,16 @@ from any thread.</p>
 <div class="refsect2">
 <a name="webkit-user-script-new"></a><h3>webkit_user_script_new ()</h3>
 <pre class="programlisting"><a class="link" href="webkit2gtk-4.0-WebKitUserContent.html#WebKitUserScript"><span class="returnvalue">WebKitUserScript</span></a> *
-webkit_user_script_new (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *source</code></em>,
+webkit_user_script_new (<em class="parameter"><code>const <span class="type">gchar</span> *source</code></em>,
                         <em class="parameter"><code><a class="link" href="webkit2gtk-4.0-WebKitUserContent.html#WebKitUserContentInjectedFrames" title="enum WebKitUserContentInjectedFrames"><span class="type">WebKitUserContentInjectedFrames</span></a> injected_frames</code></em>,
                         <em class="parameter"><code><a class="link" href="webkit2gtk-4.0-WebKitUserContent.html#WebKitUserScriptInjectionTime" title="enum WebKitUserScriptInjectionTime"><span class="type">WebKitUserScriptInjectionTime</span></a> injection_time</code></em>,
-                        <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> * const *whitelist</code></em>,
-                        <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> * const *blacklist</code></em>);</pre>
+                        <em class="parameter"><code>const <span class="type">gchar</span> * const *whitelist</code></em>,
+                        <em class="parameter"><code>const <span class="type">gchar</span> * const *blacklist</code></em>);</pre>
 <p>Creates a new user script. Scripts can be applied to some URIs
 only by passing non-null values for <em class="parameter"><code>whitelist</code></em>
  or <em class="parameter"><code>blacklist</code></em>
 . Passing a
-<a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> whitelist implies that all URIs are on the whitelist. The script
+<code class="literal">NULL</code> whitelist implies that all URIs are on the whitelist. The script
 is applied if an URI matches the whitelist and not the blacklist.
 URI patterns must be of the form <code class="literal">[protocol]://[host]/[path]</code>, where the
 *host* and *path* components can contain the wildcard character (<code class="literal">*</code>) to
@@ -351,12 +351,12 @@ represent zero or more other characters.</p>
 </tr>
 <tr>
 <td class="parameter_name"><p>whitelist</p></td>
-<td class="parameter_description"><p> A whitelist of URI patterns or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. </p></td>
+<td class="parameter_description"><p> A whitelist of URI patterns or <code class="literal">NULL</code>. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="Parameter points to an array of items."><span class="acronym">array</span></acronym> zero-terminated=1][<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 <tr>
 <td class="parameter_name"><p>blacklist</p></td>
-<td class="parameter_description"><p> A blacklist of URI patterns or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. </p></td>
+<td class="parameter_description"><p> A blacklist of URI patterns or <code class="literal">NULL</code>. </p></td>
 <td class="parameter_annotations"><span class="annotation">[<acronym title="Parameter points to an array of items."><span class="acronym">array</span></acronym> zero-terminated=1][<acronym title="NULL is OK, both for passing and for returning."><span class="acronym">allow-none</span></acronym>]</span></td>
 </tr>
 </tbody>
