@@ -1,3 +1,11 @@
+webkit2gtk (2.12.4-2) UNRELEASED; urgency=high
+
+  * debian/rules:
+    + Don't use the gold linker in mips/mipsel, see #834147.
+  * Set urgency=high to get the CVE fixes into testing quickly.
+
+ -- Alberto Garcia <berto@igalia.com>  Tue, 30 Aug 2016 10:53:50 +0300
+
 webkit2gtk (2.12.4-1) unstable; urgency=medium
 
   * New upstream release.
