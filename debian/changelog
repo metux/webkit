@@ -12,6 +12,8 @@ webkit2gtk (2.13.91-1) UNRELEASED; urgency=medium
     + Update source-is-missing overrides.
   * debian/libwebkit2gtk-4.0-37.symbols:
     + Update.
+  * debian/rules:
+    + Don't use the gold linker in mips/mipsel, see #834147.
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 13 Sep 2016 11:40:22 +0300
 
