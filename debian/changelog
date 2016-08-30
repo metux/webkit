@@ -1,4 +1,4 @@
-webkit2gtk (2.12.4-2) UNRELEASED; urgency=high
+webkit2gtk (2.12.4-2) unstable; urgency=high
 
   * debian/rules:
     + Don't use the gold linker in mips/mipsel, see #834147.
