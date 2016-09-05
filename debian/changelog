@@ -1,6 +1,8 @@
 webkit2gtk (2.12.5-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * debian/patches/fix-ftbfs-m68k.patch:
+    + Drop this patch, the m68k build has been broken for ages.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 05 Sep 2016 13:49:55 +0300
 
