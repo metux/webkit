@@ -1,2 +1,2 @@
 version=3
-http://webkitgtk.org/releases/ webkitgtk-([\d]+\.[\d]*[02468]\.[\d]+).tar.xz
+https://webkitgtk.org/releases/ webkitgtk-([\d]+\.[\d]*[02468]\.[\d]+).tar.xz
