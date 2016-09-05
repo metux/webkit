@@ -79,7 +79,7 @@
 <tbody><tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="WebKitWebExtension.html#WebKitWebExtension-page-created" title="The “page-created” signal">page-created</a></td>
-<td class="signal_flags">Run Last</td>
+<td class="signal_flags"><a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></td>
 </tr></tbody>
 </table></div>
 </div>
@@ -98,7 +98,7 @@
 </div>
 <div class="refsect1">
 <a name="WebKitWebExtension.object-hierarchy"></a><h2>Object Hierarchy</h2>
-<pre class="screen">    GObject
+<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject-struct">GObject</a>
     <span class="lineart">╰──</span> WebKitWebExtension
 </pre>
 </div>
@@ -110,7 +110,7 @@ JavaScript code, for example.</p>
 <p>To create a WebKitWebExtension you should write a module with an initialization function that could
 be either <code class="function">webkit_web_extension_initialize()</code> with prototype <a class="link" href="WebKitWebExtension.html#WebKitWebExtensionInitializeFunction" title="WebKitWebExtensionInitializeFunction ()"><span class="type">WebKitWebExtensionInitializeFunction</span></a> or
 <code class="function">webkit_web_extension_initialize_with_user_data()</code> with prototype <a class="link" href="WebKitWebExtension.html#WebKitWebExtensionInitializeWithUserDataFunction" title="WebKitWebExtensionInitializeWithUserDataFunction ()"><span class="type">WebKitWebExtensionInitializeWithUserDataFunction</span></a>.
-This function has to be public and it has to use the <span class="type">G_MODULE_EXPORT</span> macro. It is called when the
+This function has to be public and it has to use the <a href="../glib/glib-Dynamic-Loading-of-Modules.html#G-MODULE-EXPORT:CAPS"><span class="type">G_MODULE_EXPORT</span></a> macro. It is called when the
 web process is initialized.</p>
 <div class="informalexample">
   <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
@@ -256,7 +256,7 @@ the web extension when the web process starts.</p>
 <pre class="programlisting"><span class="returnvalue">void</span>
 <span class="c_punctuation">(</span>*WebKitWebExtensionInitializeWithUserDataFunction<span class="c_punctuation">)</span>
                                (<em class="parameter"><code><a class="link" href="WebKitWebExtension.html" title="WebKitWebExtension"><span class="type">WebKitWebExtension</span></a> *extension</code></em>,
-                                <em class="parameter"><code>const <span class="type">GVariant</span> *user_data</code></em>);</pre>
+                                <em class="parameter"><code>const <a href="../glib/glib-GVariant.html#GVariant"><span class="type">GVariant</span></a> *user_data</code></em>);</pre>
 <p>Type definition for a function that will be called to initialize
 the web extensions when the web process starts, and which receives
 as additional argument the user data set with
@@ -277,7 +277,7 @@ as additional argument the user data set with
 </tr>
 <tr>
 <td class="parameter_name"><p>user_data</p></td>
-<td class="parameter_description"><p>a <span class="type">GVariant</span></p></td>
+<td class="parameter_description"><p>a <a href="../glib/glib-GVariant.html#GVariant"><span class="type">GVariant</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 </tbody>
@@ -290,7 +290,7 @@ as additional argument the user data set with
 <a name="webkit-web-extension-get-page"></a><h3>webkit_web_extension_get_page ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="returnvalue">WebKitWebPage</span></a> *
 webkit_web_extension_get_page (<em class="parameter"><code><a class="link" href="WebKitWebExtension.html" title="WebKitWebExtension"><span class="type">WebKitWebExtension</span></a> *extension</code></em>,
-                               <em class="parameter"><code><span class="type">guint64</span> page_id</code></em>);</pre>
+                               <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint64"><span class="type">guint64</span></a> page_id</code></em>);</pre>
 <p>Get the web page of the given <em class="parameter"><code>page_id</code></em>
 .</p>
 <div class="refsect3">
@@ -318,7 +318,7 @@ webkit_web_extension_get_page (<em class="parameter"><code><a class="link" href=
 <div class="refsect3">
 <a name="webkit-web-extension-get-page.returns"></a><h4>Returns</h4>
 <p> the <a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a> for the given <em class="parameter"><code>page_id</code></em>
-, or <code class="literal">NULL</code> if the
+, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if the
 identifier doesn't correspond to an exsiting web page. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -338,7 +338,7 @@ identifier doesn't correspond to an exsiting web page. </p>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="WebKitWebExtension.html" title="WebKitWebExtension"><span class="type">WebKitWebExtension</span></a> *extension,
                <a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a>      *web_page,
-               <span class="type">gpointer</span>            user_data)</pre>
+               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>            user_data)</pre>
 <p>This signal is emitted when a new <a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a> is created in
 the Web Process.</p>
 <div class="refsect3">
@@ -368,7 +368,7 @@ the Web Process.</p>
 </tbody>
 </table></div>
 </div>
-<p>Flags: Run Last</p>
+<p>Flags: <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></p>
 </div>
 </div>
 </div>

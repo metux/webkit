@@ -143,12 +143,12 @@
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation-failed" title="The “failed” signal">failed</a></td>
-<td class="signal_flags">Run Last</td>
+<td class="signal_flags"><a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></td>
 </tr>
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation-finished" title="The “finished” signal">finished</a></td>
-<td class="signal_flags">Run Last</td>
+<td class="signal_flags"><a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></td>
 </tr>
 </tbody>
 </table></div>
@@ -174,7 +174,7 @@
 </div>
 <div class="refsect1">
 <a name="WebKitPrintOperation.object-hierarchy"></a><h2>Object Hierarchy</h2>
-<pre class="screen">    GObject
+<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject-struct">GObject</a>
     <span class="lineart">╰──</span> WebKitPrintOperation
 </pre>
 </div>
@@ -221,7 +221,7 @@ webkit_print_operation_new (<em class="parameter"><code><a class="link" href="We
 webkit_print_operation_get_print_settings
                                (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>);</pre>
 <p>Return the current print settings of <em class="parameter"><code>print_operation</code></em>
-. It returns <code class="literal">NULL</code> until
+. It returns <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> until
 either <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-set-print-settings" title="webkit_print_operation_set_print_settings ()"><code class="function">webkit_print_operation_set_print_settings()</code></a> or <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()"><code class="function">webkit_print_operation_run_dialog()</code></a>
 have been called.</p>
 <div class="refsect3">
@@ -285,7 +285,7 @@ the initial values of the print dialog when <a class="link" href="WebKitPrintOpe
 <pre class="programlisting"><a href="../gtk2/GtkPageSetup.html#GtkPageSetup-struct"><span class="returnvalue">GtkPageSetup</span></a> *
 webkit_print_operation_get_page_setup (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>);</pre>
 <p>Return the current page setup of <em class="parameter"><code>print_operation</code></em>
-. It returns <code class="literal">NULL</code> until
+. It returns <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> until
 either <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-set-page-setup" title="webkit_print_operation_set_page_setup ()"><code class="function">webkit_print_operation_set_page_setup()</code></a> or <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()"><code class="function">webkit_print_operation_run_dialog()</code></a>
 have been called.</p>
 <div class="refsect3">
@@ -486,8 +486,8 @@ operation finishes. If an error occurs while printing the signal
 <a name="WebKitPrintOperation-failed"></a><h3>The <code class="literal">“failed”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation,
-               <span class="type">GError</span>               *error,
-               <span class="type">gpointer</span>              user_data)</pre>
+               <a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a>               *error,
+               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>              user_data)</pre>
 <p>Emitted when an error occurs while printing. The given <em class="parameter"><code>error</code></em>
 , of the domain
 <a class="link" href="webkit2gtk-4.0-WebKitError.html#WEBKIT-PRINT-ERROR:CAPS" title="WEBKIT_PRINT_ERROR"><code class="literal">WEBKIT_PRINT_ERROR</code></a>, contains further details of the failure.
@@ -508,7 +508,7 @@ The <a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation-finishe
 </tr>
 <tr>
 <td class="parameter_name"><p>error</p></td>
-<td class="parameter_description"><p>the <span class="type">GError</span> that was triggered</p></td>
+<td class="parameter_description"><p>the <a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> that was triggered</p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -519,14 +519,14 @@ The <a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation-finishe
 </tbody>
 </table></div>
 </div>
-<p>Flags: Run Last</p>
+<p>Flags: <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitPrintOperation-finished"></a><h3>The <code class="literal">“finished”</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 user_function (<a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation,
-               <span class="type">gpointer</span>              user_data)</pre>
+               <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>              user_data)</pre>
 <p>Emitted when the print operation has finished doing everything
 required for printing.</p>
 <div class="refsect3">
@@ -551,7 +551,7 @@ required for printing.</p>
 </tbody>
 </table></div>
 </div>
-<p>Flags: Run Last</p>
+<p>Flags: <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></p>
 </div>
 </div>
 </div>
