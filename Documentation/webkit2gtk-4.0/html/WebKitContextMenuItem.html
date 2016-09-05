@@ -98,7 +98,7 @@
 </tr>
 <tr>
 <td class="function_type">
-<span class="returnvalue">gboolean</span>
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 </td>
 <td class="function_name">
 <a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-is-separator" title="webkit_context_menu_item_is_separator ()">webkit_context_menu_item_is_separator</a> <span class="c_punctuation">()</span>
@@ -144,8 +144,8 @@
 </div>
 <div class="refsect1">
 <a name="WebKitContextMenuItem.object-hierarchy"></a><h2>Object Hierarchy</h2>
-<pre class="screen">    GObject
-    <span class="lineart">╰──</span> GInitiallyUnowned
+<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject-struct">GObject</a>
+    <span class="lineart">╰──</span> <a href="../gobject/gobject-The-Base-Object-Type.html#GInitiallyUnowned">GInitiallyUnowned</a>
         <span class="lineart">╰──</span> WebKitContextMenuItem
 </pre>
 </div>
@@ -225,7 +225,7 @@ action from being performed.</p>
 <pre class="programlisting"><a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="returnvalue">WebKitContextMenuItem</span></a> *
 webkit_context_menu_item_new_from_stock_action_with_label
                                (<em class="parameter"><code><a class="link" href="WebKitContextMenuItem.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="type">WebKitContextMenuAction</span></a> action</code></em>,
-                                <em class="parameter"><code>const <span class="type">gchar</span> *label</code></em>);</pre>
+                                <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *label</code></em>);</pre>
 <p>Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> for the given stock action using the given <em class="parameter"><code>label</code></em>
 .
 Stock actions have a predefined label, this method can be used to create a
@@ -262,7 +262,7 @@ Stock actions have a predefined label, this method can be used to create a
 <a name="webkit-context-menu-item-new-with-submenu"></a><h3>webkit_context_menu_item_new_with_submenu ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="returnvalue">WebKitContextMenuItem</span></a> *
 webkit_context_menu_item_new_with_submenu
-                               (<em class="parameter"><code>const <span class="type">gchar</span> *label</code></em>,
+                               (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *label</code></em>,
                                 <em class="parameter"><code><a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a> *submenu</code></em>);</pre>
 <p>Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> using the given <em class="parameter"><code>label</code></em>
  with a submenu.</p>
@@ -330,7 +330,7 @@ webkit_context_menu_item_get_action (<em class="parameter"><code><a class="link"
 <div class="refsect3">
 <a name="webkit-context-menu-item-get-action.returns"></a><h4>Returns</h4>
 <p> the <a href="../gtk2/GtkAction.html#GtkAction-struct"><span class="type">GtkAction</span></a> associated to the <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a>,
-or <code class="literal">NULL</code> if <em class="parameter"><code>item</code></em>
+or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if <em class="parameter"><code>item</code></em>
 is a separator. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -370,7 +370,7 @@ will be returned.</p>
 <hr>
 <div class="refsect2">
 <a name="webkit-context-menu-item-is-separator"></a><h3>webkit_context_menu_item_is_separator ()</h3>
-<pre class="programlisting"><span class="returnvalue">gboolean</span>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 webkit_context_menu_item_is_separator (<em class="parameter"><code><a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> *item</code></em>);</pre>
 <p>Checks whether <em class="parameter"><code>item</code></em>
  is a separator.</p>
@@ -391,8 +391,8 @@ webkit_context_menu_item_is_separator (<em class="parameter"><code><a class="lin
 </div>
 <div class="refsect3">
 <a name="webkit-context-menu-item-is-separator.returns"></a><h4>Returns</h4>
-<p> <code class="literal">TRUE</code> is <em class="parameter"><code>item</code></em>
-is a separator or <code class="literal">FALSE</code> otherwise</p>
+<p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> is <em class="parameter"><code>item</code></em>
+is a separator or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise</p>
 </div>
 </div>
 <hr>
@@ -403,7 +403,7 @@ webkit_context_menu_item_set_submenu (<em class="parameter"><code><a class="link
                                       <em class="parameter"><code><a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a> *submenu</code></em>);</pre>
 <p>Sets or replaces the <em class="parameter"><code>item</code></em>
  submenu. If <em class="parameter"><code>submenu</code></em>
- is <code class="literal">NULL</code> the current
+ is <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> the current
 submenu of <em class="parameter"><code>item</code></em>
  is removed.</p>
 <div class="refsect3">
@@ -455,7 +455,7 @@ webkit_context_menu_item_get_submenu (<em class="parameter"><code><a class="link
 <a name="webkit-context-menu-item-get-submenu.returns"></a><h4>Returns</h4>
 <p> the <a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a> representing the submenu of
 <em class="parameter"><code>item</code></em>
-or <code class="literal">NULL</code> if <em class="parameter"><code>item</code></em>
+or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if <em class="parameter"><code>item</code></em>
 doesn't have a submenu. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
