@@ -8,6 +8,8 @@ webkit2gtk (2.13.91-1) UNRELEASED; urgency=medium
   * debian/patches/fix-ftbfs-alpha.patch,
     debian/patches/fix-ftbfs-sparc64.patch:
     + Refresh.
+  * debian/source/lintian-overrides:
+    + Update source-is-missing overrides.
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 13 Sep 2016 11:40:22 +0300
 
