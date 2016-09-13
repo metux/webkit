@@ -40,16 +40,16 @@
 
 #include "CodeBlock.h"
 #include "CompactJITCodeMap.h"
-#include "Interpreter.h"
 #include "JITDisassembler.h"
 #include "JITInlineCacheGenerator.h"
 #include "JITMathIC.h"
 #include "JSInterfaceJIT.h"
-#include "Opcode.h"
 #include "PCToCodeOriginMap.h"
 #include "UnusedPointer.h"
 
 namespace JSC {
+
+    enum OpcodeID : unsigned;
 
     class ArrayAllocationProfile;
     class CallLinkInfo;
@@ -248,14 +248,7 @@ namespace JSC {
             jit.privateCompileHasIndexedProperty(byValInfo, returnAddress, arrayMode);
         }
 
-        static CodeRef compileCTINativeCall(VM* vm, NativeFunction func)
-        {
-            if (!vm->canUseJIT()) {
-                return CodeRef::createLLIntCodeRef(llint_native_call_trampoline);
-            }
-            JIT jit(vm, 0);
-            return jit.privateCompileCTINativeCall(vm, func);
-        }
+        static CodeRef compileCTINativeCall(VM*, NativeFunction);
 
         static unsigned frameRegisterCountFor(CodeBlock*);
         static int stackPointerOffsetFor(CodeBlock*);
@@ -395,10 +388,10 @@ namespace JSC {
         JumpList emitFloatTypedArrayPutByVal(Instruction*, PatchableJump& badType, TypedArrayType);
 
         // Identifier check helper for GetByVal and PutByVal.
-        void emitIdentifierCheck(RegisterID cell, RegisterID scratch, const Identifier&, JumpList& slowCases);
+        void emitByValIdentifierCheck(ByValInfo*, RegisterID cell, RegisterID scratch, const Identifier&, JumpList& slowCases);
 
-        JITGetByIdGenerator emitGetByValWithCachedId(Instruction*, const Identifier&, Jump& fastDoneCase, Jump& slowDoneCase, JumpList& slowCases);
-        JITPutByIdGenerator emitPutByValWithCachedId(Instruction*, PutKind, const Identifier&, JumpList& doneCases, JumpList& slowCases);
+        JITGetByIdGenerator emitGetByValWithCachedId(ByValInfo*, Instruction*, const Identifier&, Jump& fastDoneCase, Jump& slowDoneCase, JumpList& slowCases);
+        JITPutByIdGenerator emitPutByValWithCachedId(ByValInfo*, Instruction*, PutKind, const Identifier&, JumpList& doneCases, JumpList& slowCases);
 
         enum FinalObjectMode { MayBeFinal, KnownNotFinal };
 
@@ -493,12 +486,10 @@ namespace JSC {
         void emit_op_create_scoped_arguments(Instruction*);
         void emit_op_create_cloned_arguments(Instruction*);
         void emit_op_argument_count(Instruction*);
-        void emit_op_copy_rest(Instruction*);
+        void emit_op_create_rest(Instruction*);
         void emit_op_get_rest_length(Instruction*);
         void emit_op_check_tdz(Instruction*);
         void emit_op_assert(Instruction*);
-        void emit_op_save(Instruction*);
-        void emit_op_resume(Instruction*);
         void emit_op_debug(Instruction*);
         void emit_op_del_by_id(Instruction*);
         void emit_op_del_by_val(Instruction*);
@@ -943,6 +934,7 @@ namespace JSC {
 
         JumpList m_exceptionChecks;
         JumpList m_exceptionChecksWithCallFrameRollback;
+        Label m_exceptionHandler;
 
         unsigned m_getByIdIndex;
         unsigned m_putByIdIndex;

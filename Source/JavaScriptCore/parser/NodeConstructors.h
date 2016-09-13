@@ -23,6 +23,7 @@
 
 #include "Nodes.h"
 #include "Lexer.h"
+#include "Opcode.h"
 #include "Parser.h"
 
 namespace JSC {
@@ -1048,13 +1049,12 @@ namespace JSC {
     {
     }
 
-    inline RestParameterNode::RestParameterNode(const Identifier& name, unsigned numParametersToSkip, const JSTextPosition& start, const JSTextPosition& end)
+    inline RestParameterNode::RestParameterNode(DestructuringPatternNode* pattern, unsigned numParametersToSkip)
         : DestructuringPatternNode()
-        , m_name(name)
+        , m_pattern(pattern)
         , m_numParametersToSkip(numParametersToSkip)
-        , m_divotStart(start)
-        , m_divotEnd(end)
     {
+        ASSERT(!pattern->isRestParameter());
     }
 
     inline DestructuringAssignmentNode::DestructuringAssignmentNode(const JSTokenLocation& location, DestructuringPatternNode* bindings, ExpressionNode* initializer)

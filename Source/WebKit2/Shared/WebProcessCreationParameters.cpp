@@ -56,7 +56,7 @@ WebProcessCreationParameters::~WebProcessCreationParameters()
 {
 }
 
-void WebProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
+void WebProcessCreationParameters::encode(IPC::Encoder& encoder) const
 {
     encoder << injectedBundlePath;
     encoder << injectedBundlePathExtensionHandle;
@@ -145,9 +145,13 @@ void WebProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
 #if OS(LINUX)
     encoder << memoryPressureMonitorHandle;
 #endif
+
+#if PLATFORM(WAYLAND)
+    encoder << waylandCompositorDisplayName;
+#endif
 }
 
-bool WebProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebProcessCreationParameters& parameters)
+bool WebProcessCreationParameters::decode(IPC::Decoder& decoder, WebProcessCreationParameters& parameters)
 {
     if (!decoder.decode(parameters.injectedBundlePath))
         return false;
@@ -302,6 +306,11 @@ bool WebProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebProc
 
 #if OS(LINUX)
     if (!decoder.decode(parameters.memoryPressureMonitorHandle))
+        return false;
+#endif
+
+#if PLATFORM(WAYLAND)
+    if (!decoder.decode(parameters.waylandCompositorDisplayName))
         return false;
 #endif
 

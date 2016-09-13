@@ -46,7 +46,6 @@
 #include "FTLThunks.h"
 #include "FunctionConstructor.h"
 #include "GCActivityCallback.h"
-#include "GeneratorFrame.h"
 #include "GetterSetter.h"
 #include "Heap.h"
 #include "HeapIterationScope.h"
@@ -66,10 +65,12 @@
 #include "JSInternalPromiseDeferred.h"
 #include "JSLexicalEnvironment.h"
 #include "JSLock.h"
+#include "JSMap.h"
 #include "JSPromiseDeferred.h"
 #include "JSPropertyNameEnumerator.h"
 #include "JSTemplateRegistryKey.h"
 #include "JSWithScope.h"
+#include "LLIntData.h"
 #include "Lexer.h"
 #include "Lookup.h"
 #include "MapData.h"
@@ -99,7 +100,7 @@
 #include "WeakMapData.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/ProcessID.h>
-#include <wtf/RetainPtr.h>
+#include <wtf/SimpleStats.h>
 #include <wtf/StringPrintStream.h>
 #include <wtf/Threading.h>
 #include <wtf/WTFThreadData.h>
@@ -108,6 +109,7 @@
 
 #if !ENABLE(JIT)
 #include "CLoopStack.h"
+#include "CLoopStackInlines.h"
 #endif
 
 #if ENABLE(DFG_JIT)
@@ -164,8 +166,10 @@ VM::VM(VMType vmType, HeapType heapType)
     , m_atomicStringTable(vmType == Default ? wtfThreadData().atomicStringTable() : new AtomicStringTable)
     , propertyNames(nullptr)
     , emptyList(new MarkedArgumentBuffer)
+    , machineCodeBytesPerBytecodeWordForBaselineJIT(std::make_unique<SimpleStats>())
     , customGetterSetterFunctionMap(*this)
     , stringCache(*this)
+    , symbolImplToSymbolMap(*this)
     , prototypeMap(*this)
     , interpreter(0)
     , jsArrayClassInfo(JSArray::info())
@@ -240,7 +244,6 @@ VM::VM(VMType vmType, HeapType heapType)
     inferredTypeStructure.set(*this, InferredType::createStructure(*this, 0, jsNull()));
     inferredTypeTableStructure.set(*this, InferredTypeTable::createStructure(*this, 0, jsNull()));
     functionRareDataStructure.set(*this, FunctionRareData::createStructure(*this, 0, jsNull()));
-    generatorFrameStructure.set(*this, GeneratorFrame::createStructure(*this, 0, jsNull()));
     exceptionStructure.set(*this, Exception::createStructure(*this, 0, jsNull()));
     promiseDeferredStructure.set(*this, JSPromiseDeferred::createStructure(*this, 0, jsNull()));
     internalPromiseDeferredStructure.set(*this, JSInternalPromiseDeferred::createStructure(*this, 0, jsNull()));
@@ -251,6 +254,10 @@ VM::VM(VMType vmType, HeapType heapType)
 #if ENABLE(WEBASSEMBLY)
     webAssemblyCodeBlockStructure.set(*this, WebAssemblyCodeBlock::createStructure(*this, 0, jsNull()));
 #endif
+    hashMapBucketSetStructure.set(*this, HashMapBucket<HashMapBucketDataKey>::createStructure(*this, 0, jsNull()));
+    hashMapBucketMapStructure.set(*this, HashMapBucket<HashMapBucketDataKeyValue>::createStructure(*this, 0, jsNull()));
+    hashMapImplSetStructure.set(*this, HashMapImpl<HashMapBucket<HashMapBucketDataKey>>::createStructure(*this, 0, jsNull()));
+    hashMapImplMapStructure.set(*this, HashMapImpl<HashMapBucket<HashMapBucketDataKeyValue>>::createStructure(*this, 0, jsNull()));
 
     iterationTerminator.set(*this, JSFinalObject::create(*this, JSFinalObject::createStructure(*this, 0, jsNull(), 1)));
     nativeStdFunctionCellStructure.set(*this, NativeStdFunctionCell::createStructure(*this, 0, jsNull()));
@@ -874,5 +881,17 @@ size_t VM::committedStackByteCount()
     return CLoopStack::committedByteCount();
 #endif
 }
+
+#if !ENABLE(JIT)
+bool VM::ensureStackCapacityForCLoop(Register* newTopOfStack)
+{
+    return interpreter->cloopStack().ensureCapacityFor(newTopOfStack);
+}
+
+bool VM::isSafeToRecurseSoftCLoop() const
+{
+    return interpreter->cloopStack().isSafeToRecurse();
+}
+#endif // !ENABLE(JIT)
 
 } // namespace JSC

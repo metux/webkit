@@ -29,7 +29,6 @@
 #include "BuiltinNames.h"
 #include "Error.h"
 #include "JITCode.h"
-#include "Opcode.h"
 #include "ParserArena.h"
 #include "ParserTokens.h"
 #include "ResultType.h"
@@ -40,6 +39,8 @@
 #include <wtf/SmallPtrSet.h>
 
 namespace JSC {
+
+    enum OpcodeID : unsigned;
 
     class ArgumentListNode;
     class BytecodeGenerator;
@@ -52,6 +53,7 @@ namespace JSC {
     class JSScope;
     class ScopeNode;
     class ModuleAnalyzer;
+    class ModuleScopeData;
 
     typedef SmallPtrSet<UniquedStringImpl*> UniquedStringImplPtrSet;
 
@@ -166,6 +168,7 @@ namespace JSC {
         virtual bool isLocation() const { return false; }
         virtual bool isAssignmentLocation() const { return isLocation(); }
         virtual bool isResolveNode() const { return false; }
+        virtual bool isAssignResolveNode() const { return false; }
         virtual bool isBracketAccessorNode() const { return false; }
         virtual bool isDotAccessorNode() const { return false; }
         virtual bool isDestructuringNode() const { return false; }
@@ -1215,6 +1218,8 @@ namespace JSC {
     class AssignResolveNode : public ExpressionNode, public ThrowableExpressionData {
     public:
         AssignResolveNode(const JSTokenLocation&, const Identifier&, ExpressionNode* right, AssignmentContext);
+        bool isAssignResolveNode() const override { return true; }
+        const Identifier& identifier() const { return m_ident; }
 
     private:
         RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;
@@ -1644,7 +1649,7 @@ namespace JSC {
 
     class ProgramNode : public ScopeNode {
     public:
-        ProgramNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, UniquedStringImplPtrSet&&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
+        ProgramNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, UniquedStringImplPtrSet&&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants, RefPtr<ModuleScopeData>&&);
 
         unsigned startColumn() const { return m_startColumn; }
         unsigned endColumn() const { return m_endColumn; }
@@ -1659,7 +1664,7 @@ namespace JSC {
 
     class EvalNode : public ScopeNode {
     public:
-        EvalNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, UniquedStringImplPtrSet&&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
+        EvalNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, UniquedStringImplPtrSet&&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants, RefPtr<ModuleScopeData>&&);
 
         ALWAYS_INLINE unsigned startColumn() const { return 0; }
         unsigned endColumn() const { return m_endColumn; }
@@ -1674,17 +1679,23 @@ namespace JSC {
 
     class ModuleProgramNode : public ScopeNode {
     public:
-        ModuleProgramNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, UniquedStringImplPtrSet&&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
+        ModuleProgramNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, UniquedStringImplPtrSet&&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants, RefPtr<ModuleScopeData>&&);
 
         unsigned startColumn() const { return m_startColumn; }
         unsigned endColumn() const { return m_endColumn; }
 
         static const bool scopeIsFunction = false;
 
+        ModuleScopeData& moduleScopeData()
+        {
+            return m_moduleScopeData;
+        }
+
     private:
         void emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;
         unsigned m_startColumn;
         unsigned m_endColumn;
+        Ref<ModuleScopeData> m_moduleScopeData;
     };
 
     class ModuleNameNode : public Node {
@@ -1915,7 +1926,7 @@ namespace JSC {
 
     class FunctionNode final : public ScopeNode {
     public:
-        FunctionNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, UniquedStringImplPtrSet&&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
+        FunctionNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, UniquedStringImplPtrSet&&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants, RefPtr<ModuleScopeData>&&);
 
         FunctionParameters* parameters() const { return m_parameters; }
 
@@ -2121,23 +2132,19 @@ namespace JSC {
 
     class RestParameterNode : public DestructuringPatternNode {
     public:
-        RestParameterNode(const Identifier& boundProperty, unsigned numParametersToSkip, const JSTextPosition& start, const JSTextPosition& end);
+        RestParameterNode(DestructuringPatternNode*, unsigned numParametersToSkip);
 
         bool isRestParameter() const override { return true; }
 
         void emit(BytecodeGenerator&);
-
-        const Identifier& name() const { return m_name; }
 
     private:
         void collectBoundIdentifiers(Vector<Identifier>&) const override;
         void bindValue(BytecodeGenerator&, RegisterID*) const override;
         void toString(StringBuilder&) const override;
 
-        const Identifier& m_name;
+        DestructuringPatternNode* m_pattern;
         unsigned m_numParametersToSkip;
-        JSTextPosition m_divotStart; // "f" in "...foo"
-        JSTextPosition m_divotEnd;
     };
 
     class AssignmentElementNode : public DestructuringPatternNode {

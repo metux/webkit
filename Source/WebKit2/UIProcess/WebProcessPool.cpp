@@ -35,6 +35,7 @@
 #include "CustomProtocolManagerMessages.h"
 #include "DownloadProxy.h"
 #include "DownloadProxyMessages.h"
+#include "GamepadData.h"
 #include "LogInitialization.h"
 #include "NetworkProcessCreationParameters.h"
 #include "NetworkProcessMessages.h"
@@ -42,6 +43,8 @@
 #include "SandboxExtension.h"
 #include "StatisticsData.h"
 #include "TextChecker.h"
+#include "UIGamepad.h"
+#include "UIGamepadProvider.h"
 #include "WKContextPrivate.h"
 #include "WebAutomationSession.h"
 #include "WebCertificateInfo.h"
@@ -71,6 +74,7 @@
 #include <wtf/MainThread.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/RunLoop.h>
+#include <wtf/text/StringBuilder.h>
 
 #if ENABLE(BATTERY_STATUS)
 #include "WebBatteryManagerProxy.h"
@@ -95,6 +99,11 @@
 
 #if OS(LINUX)
 #include "MemoryPressureMonitor.h"
+#endif
+
+#if PLATFORM(WAYLAND)
+#include "WaylandCompositor.h"
+#include <WebCore/PlatformDisplay.h>
 #endif
 
 #ifndef NDEBUG
@@ -209,10 +218,6 @@ WebProcessPool::WebProcessPool(API::ProcessPoolConfiguration& configuration)
     WebKit::initializeLogChannelsIfNecessary();
 #endif // !LOG_DISABLED
 
-#if ENABLE(NETSCAPE_PLUGIN_API)
-    m_pluginInfoStore.setClient(this);
-#endif
-
 #ifndef NDEBUG
     processPoolCounter.increment();
 #endif
@@ -249,16 +254,17 @@ WebProcessPool::~WebProcessPool()
 
     platformInvalidateContext();
 
-#if ENABLE(NETSCAPE_PLUGIN_API)
-    m_pluginInfoStore.setClient(0);
-#endif
-
 #ifndef NDEBUG
     processPoolCounter.decrement();
 #endif
 
     if (m_networkProcess)
         m_networkProcess->shutDownProcess();
+
+#if ENABLE(GAMEPAD)
+    if (!m_processesUsingGamepads.isEmpty())
+        UIGamepadProvider::singleton().processPoolStoppedUsingGamepads(*this);
+#endif
 }
 
 void WebProcessPool::initializeClient(const WKContextClientBase* client)
@@ -639,6 +645,11 @@ WebProcessProxy& WebProcessPool::createNewWebProcess()
         parameters.memoryPressureMonitorHandle = MemoryPressureMonitor::singleton().createHandle();
 #endif
 
+#if PLATFORM(WAYLAND)
+    if (PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::Wayland)
+        parameters.waylandCompositorDisplayName = WaylandCompositor::singleton().displayName();
+#endif
+
     parameters.resourceLoadStatisticsEnabled = resourceLoadStatisticsEnabled();
 
     // Add any platform specific parameters
@@ -730,6 +741,9 @@ void WebProcessPool::processDidFinishLaunching(WebProcessProxy* process)
     if (m_configuration->fullySynchronousModeIsAllowedForTesting())
         process->connection()->allowFullySynchronousModeForTesting();
 
+    if (m_configuration->ignoreSynchronousMessagingTimeoutsForTesting())
+        process->connection()->ignoreTimeoutsForTesting();
+
     m_connectionClient.didCreateConnection(this, process->webConnection());
 }
 
@@ -749,6 +763,11 @@ void WebProcessPool::disconnectProcess(WebProcessProxy* process)
     static_cast<WebContextSupplement*>(supplement<WebGeolocationManagerProxy>())->processDidClose(process);
 
     m_processes.removeFirst(process);
+
+#if ENABLE(GAMEPAD)
+    if (m_processesUsingGamepads.contains(process))
+        processStoppedUsingGamepads(*process);
+#endif
 }
 
 WebProcessProxy& WebProcessPool::createNewWebProcessRespectingProcessCountLimit()
@@ -1022,12 +1041,12 @@ void WebProcessPool::removeMessageReceiver(IPC::StringReference messageReceiverN
     m_messageReceiverMap.removeMessageReceiver(messageReceiverName, destinationID);
 }
 
-bool WebProcessPool::dispatchMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder)
+bool WebProcessPool::dispatchMessage(IPC::Connection& connection, IPC::Decoder& decoder)
 {
     return m_messageReceiverMap.dispatchMessage(connection, decoder);
 }
 
-bool WebProcessPool::dispatchSyncMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder, std::unique_ptr<IPC::MessageEncoder>& replyEncoder)
+bool WebProcessPool::dispatchSyncMessage(IPC::Connection& connection, IPC::Decoder& decoder, std::unique_ptr<IPC::Encoder>& replyEncoder)
 {
     return m_messageReceiverMap.dispatchSyncMessage(connection, decoder, replyEncoder);
 }
@@ -1198,9 +1217,20 @@ void WebProcessPool::requestNetworkingStatistics(StatisticsRequest* request)
     m_networkProcess->send(Messages::NetworkProcess::GetNetworkProcessStatistics(requestID), 0);
 }
 
+static WebProcessProxy* webProcessProxyFromConnection(IPC::Connection& connection, const Vector<RefPtr<WebProcessProxy>>& processes)
+{
+    for (auto& process : processes) {
+        if (process->connection() == &connection)
+            return process.get();
+    }
+
+    // FIXME: Can this ever return null?
+    return nullptr;
+}
+
 void WebProcessPool::handleMessage(IPC::Connection& connection, const String& messageName, const WebKit::UserData& messageBody)
 {
-    auto* webProcessProxy = WebProcessProxy::fromConnection(&connection);
+    auto* webProcessProxy = webProcessProxyFromConnection(connection, m_processes);
     if (!webProcessProxy)
         return;
     m_injectedBundleClient.didReceiveMessageFromInjectedBundle(this, messageName, webProcessProxy->transformHandlesToObjects(messageBody.object()).get());
@@ -1208,7 +1238,7 @@ void WebProcessPool::handleMessage(IPC::Connection& connection, const String& me
 
 void WebProcessPool::handleSynchronousMessage(IPC::Connection& connection, const String& messageName, const UserData& messageBody, UserData& returnUserData)
 {
-    auto* webProcessProxy = WebProcessProxy::fromConnection(&connection);
+    auto* webProcessProxy = webProcessProxyFromConnection(connection, m_processes);
     if (!webProcessProxy)
         return;
 
@@ -1227,6 +1257,72 @@ void WebProcessPool::didGetStatistics(const StatisticsData& statisticsData, uint
 
     request->completedRequest(requestID, statisticsData);
 }
+
+#if ENABLE(GAMEPAD)
+
+void WebProcessPool::startedUsingGamepads(IPC::Connection& connection)
+{
+    auto* proxy = webProcessProxyFromConnection(connection, m_processes);
+    if (!proxy)
+        return;
+
+    bool wereAnyProcessesUsingGamepads = !m_processesUsingGamepads.isEmpty();
+
+    ASSERT(!m_processesUsingGamepads.contains(proxy));
+    m_processesUsingGamepads.add(proxy);
+
+    if (!wereAnyProcessesUsingGamepads)
+        UIGamepadProvider::singleton().processPoolStartedUsingGamepads(*this);
+}
+
+void WebProcessPool::stoppedUsingGamepads(IPC::Connection& connection)
+{
+    auto* proxy = webProcessProxyFromConnection(connection, m_processes);
+    if (!proxy)
+        return;
+
+    ASSERT(m_processesUsingGamepads.contains(proxy));
+    processStoppedUsingGamepads(*proxy);
+}
+
+void WebProcessPool::processStoppedUsingGamepads(WebProcessProxy& process)
+{
+    bool wereAnyProcessesUsingGamepads = !m_processesUsingGamepads.isEmpty();
+
+    ASSERT(m_processesUsingGamepads.contains(&process));
+    m_processesUsingGamepads.remove(&process);
+
+    if (wereAnyProcessesUsingGamepads && m_processesUsingGamepads.isEmpty())
+        UIGamepadProvider::singleton().processPoolStoppedUsingGamepads(*this);
+}
+
+void WebProcessPool::gamepadConnected(const UIGamepad& gamepad)
+{
+    for (auto& process : m_processesUsingGamepads)
+        process->send(Messages::WebProcess::GamepadConnected(gamepad.fullGamepadData()), 0);
+}
+
+void WebProcessPool::gamepadDisconnected(const UIGamepad& gamepad)
+{
+    for (auto& process : m_processesUsingGamepads)
+        process->send(Messages::WebProcess::GamepadDisconnected(gamepad.index()), 0);
+}
+
+void WebProcessPool::setInitialConnectedGamepads(const Vector<std::unique_ptr<UIGamepad>>& gamepads)
+{
+    Vector<GamepadData> gamepadDatas;
+    gamepadDatas.resize(gamepads.size());
+    for (size_t i = 0; i < gamepads.size(); ++i) {
+        if (!gamepads[i])
+            continue;
+        gamepadDatas[i] = gamepads[i]->fullGamepadData();
+    }
+
+    for (auto& process : m_processesUsingGamepads)
+        process->send(Messages::WebProcess::SetInitialGamepads(gamepadDatas), 0);
+}
+
+#endif // ENABLE(GAMEPAD)
 
 void WebProcessPool::garbageCollectJavaScriptObjects()
 {
@@ -1279,45 +1375,8 @@ void WebProcessPool::unregisterSchemeForCustomProtocol(const String& scheme)
 }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
-void WebProcessPool::pluginInfoStoreDidLoadPlugins(PluginInfoStore* store)
-{
-#ifdef NDEBUG
-    UNUSED_PARAM(store);
-#endif
-    ASSERT(store == &m_pluginInfoStore);
-
-    Vector<PluginModuleInfo> pluginModules = m_pluginInfoStore.plugins();
-
-    Vector<RefPtr<API::Object>> plugins;
-    plugins.reserveInitialCapacity(pluginModules.size());
-
-    for (const auto& pluginModule : pluginModules) {
-        API::Dictionary::MapType map;
-        map.set(ASCIILiteral("path"), API::String::create(pluginModule.path));
-        map.set(ASCIILiteral("name"), API::String::create(pluginModule.info.name));
-        map.set(ASCIILiteral("file"), API::String::create(pluginModule.info.file));
-        map.set(ASCIILiteral("desc"), API::String::create(pluginModule.info.desc));
-
-        Vector<RefPtr<API::Object>> mimeTypes;
-        mimeTypes.reserveInitialCapacity(pluginModule.info.mimes.size());
-        for (const auto& mimeClassInfo : pluginModule.info.mimes)
-            mimeTypes.uncheckedAppend(API::String::create(mimeClassInfo.type));
-        map.set(ASCIILiteral("mimes"), API::Array::create(WTFMove(mimeTypes)));
-
-#if PLATFORM(COCOA)
-        map.set(ASCIILiteral("bundleId"), API::String::create(pluginModule.bundleIdentifier));
-        map.set(ASCIILiteral("version"), API::String::create(pluginModule.versionString));
-#endif
-
-        plugins.uncheckedAppend(API::Dictionary::create(WTFMove(map)));
-    }
-
-    m_client.plugInInformationBecameAvailable(this, API::Array::create(WTFMove(plugins)).ptr());
-}
-
 void WebProcessPool::setPluginLoadClientPolicy(WebCore::PluginLoadClientPolicy policy, const String& host, const String& bundleIdentifier, const String& versionString)
 {
-#if ENABLE(NETSCAPE_PLUGIN_API)
     HashMap<String, HashMap<String, uint8_t>> policiesByIdentifier;
     if (m_pluginLoadClientPolicies.contains(host))
         policiesByIdentifier = m_pluginLoadClientPolicies.get(host);
@@ -1329,20 +1388,17 @@ void WebProcessPool::setPluginLoadClientPolicy(WebCore::PluginLoadClientPolicy p
     versionsToPolicies.set(versionString, policy);
     policiesByIdentifier.set(bundleIdentifier, versionsToPolicies);
     m_pluginLoadClientPolicies.set(host, policiesByIdentifier);
-#endif
 
     sendToAllProcesses(Messages::WebProcess::SetPluginLoadClientPolicy(policy, host, bundleIdentifier, versionString));
 }
 
 void WebProcessPool::clearPluginClientPolicies()
 {
-#if ENABLE(NETSCAPE_PLUGIN_API)
     m_pluginLoadClientPolicies.clear();
-#endif
     sendToAllProcesses(Messages::WebProcess::ClearPluginClientPolicies());
 }
 #endif
-    
+
 void WebProcessPool::setMemoryCacheDisabled(bool disabled)
 {
     m_memoryCacheDisabled = disabled;

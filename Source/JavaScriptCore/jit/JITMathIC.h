@@ -27,10 +27,12 @@
 
 #if ENABLE(JIT)
 
+#include "ArithProfile.h"
 #include "CCallHelpers.h"
 #include "JITAddGenerator.h"
 #include "JITMathICInlineResult.h"
 #include "JITMulGenerator.h"
+#include "JITSubGenerator.h"
 #include "LinkBuffer.h"
 #include "Repatch.h"
 #include "SnippetOperand.h"
@@ -56,21 +58,43 @@ public:
     CodeLocationLabel doneLocation() { return m_inlineStart.labelAtOffset(m_inlineSize); }
     CodeLocationLabel slowPathStartLocation() { return m_inlineStart.labelAtOffset(m_deltaFromStartToSlowPathStart); }
     CodeLocationCall slowPathCallLocation() { return m_inlineStart.callAtOffset(m_deltaFromStartToSlowPathCallLocation); }
-
-    bool isLeftOperandValidConstant() const { return m_generator.isLeftOperandValidConstant(); }
-    bool isRightOperandValidConstant() const { return m_generator.isRightOperandValidConstant(); }
-
+    
     bool generateInline(CCallHelpers& jit, MathICGenerationState& state, bool shouldEmitProfiling = true)
     {
+#if CPU(ARM_TRADITIONAL)
+        // FIXME: Remove this workaround once the proper fixes are landed.
+        // [ARM] Disable Inline Caching on ARMv7 traditional until proper fix
+        // https://bugs.webkit.org/show_bug.cgi?id=159759
+        return false;
+#endif
+
         state.fastPathStart = jit.label();
         size_t startSize = jit.m_assembler.buffer().codeSize();
+
+        if (ArithProfile* arithProfile = m_generator.arithProfile()) {
+            if (arithProfile->lhsObservedType().isEmpty() || arithProfile->rhsObservedType().isEmpty()) {
+                // It looks like the MathIC has yet to execute. We don't want to emit code in this
+                // case for a couple reasons. First, the operation may never execute, so if we don't emit
+                // code, it's a win. Second, if the operation does execute, we can emit better code
+                // once we have an idea about the types of lhs and rhs.
+                state.slowPathJumps.append(jit.patchableJump());
+                size_t inlineSize = jit.m_assembler.buffer().codeSize() - startSize;
+                ASSERT_UNUSED(inlineSize, static_cast<ptrdiff_t>(inlineSize) <= MacroAssembler::patchableJumpSize());
+                state.shouldSlowPathRepatch = true;
+                state.fastPathEnd = jit.label();
+                ASSERT(!m_generateFastPathOnRepatch); // We should have gathered some observed type info for lhs and rhs before trying to regenerate again.
+                m_generateFastPathOnRepatch = true;
+                return true;
+            }
+        }
+
         JITMathICInlineResult result = m_generator.generateInline(jit, state);
 
         switch (result) {
         case JITMathICInlineResult::GeneratedFastPath: {
             size_t inlineSize = jit.m_assembler.buffer().codeSize() - startSize;
-            if (static_cast<ptrdiff_t>(inlineSize) < MacroAssembler::maxJumpReplacementSize()) {
-                size_t nopsToEmitInBytes = MacroAssembler::maxJumpReplacementSize() - inlineSize;
+            if (static_cast<ptrdiff_t>(inlineSize) < MacroAssembler::patchableJumpSize()) {
+                size_t nopsToEmitInBytes = MacroAssembler::patchableJumpSize() - inlineSize;
                 jit.emitNops(nopsToEmitInBytes);
             }
             state.shouldSlowPathRepatch = true;
@@ -100,10 +124,64 @@ public:
 
     void generateOutOfLine(VM& vm, CodeBlock* codeBlock, FunctionPtr callReplacement)
     {
+        auto linkJumpToOutOfLineSnippet = [&] () {
+            CCallHelpers jit(&vm, codeBlock);
+            auto jump = jit.jump();
+            // We don't need a nop sled here because nobody should be jumping into the middle of an IC.
+            bool needsBranchCompaction = false;
+            RELEASE_ASSERT(jit.m_assembler.buffer().codeSize() <= static_cast<size_t>(m_inlineSize));
+            LinkBuffer linkBuffer(jit, m_inlineStart.dataLocation(), jit.m_assembler.buffer().codeSize(), JITCompilationMustSucceed, needsBranchCompaction);
+            RELEASE_ASSERT(linkBuffer.isValid());
+            linkBuffer.link(jump, CodeLocationLabel(m_code.code()));
+            FINALIZE_CODE(linkBuffer, ("JITMathIC: linking constant jump to out of line stub"));
+        };
+
+        auto replaceCall = [&] () {
+            ftlThunkAwareRepatchCall(codeBlock, slowPathCallLocation(), callReplacement);
+        };
+
+        bool shouldEmitProfiling = !JITCode::isOptimizingJIT(codeBlock->jitType());
+
+        if (m_generateFastPathOnRepatch) {
+
+            CCallHelpers jit(&vm, codeBlock);
+            MathICGenerationState generationState;
+            bool generatedInline = generateInline(jit, generationState, shouldEmitProfiling);
+
+            // We no longer want to try to regenerate the fast path.
+            m_generateFastPathOnRepatch = false;
+
+            if (generatedInline) {
+                auto jumpToDone = jit.jump();
+
+                LinkBuffer linkBuffer(vm, jit, codeBlock, JITCompilationCanFail);
+                if (!linkBuffer.didFailToAllocate()) {
+                    linkBuffer.link(generationState.slowPathJumps, slowPathStartLocation());
+                    linkBuffer.link(jumpToDone, doneLocation());
+
+                    m_code = FINALIZE_CODE_FOR(
+                        codeBlock, linkBuffer, ("JITMathIC: generating out of line fast IC snippet"));
+
+                    if (!generationState.shouldSlowPathRepatch) {
+                        // We won't need to regenerate, so we can wire the slow path call
+                        // to a non repatching variant.
+                        replaceCall();
+                    }
+
+                    linkJumpToOutOfLineSnippet();
+
+                    return;
+                }
+            }
+            
+            // We weren't able to generate an out of line fast path.
+            // We just generate the snippet in its full generality.
+        }
+
         // We rewire to the alternate regardless of whether or not we can allocate the out of line path
         // because if we fail allocating the out of line path, we don't want to waste time trying to
         // allocate it in the future.
-        ftlThunkAwareRepatchCall(codeBlock, slowPathCallLocation(), callReplacement);
+        replaceCall();
 
         {
             CCallHelpers jit(&vm, codeBlock);
@@ -111,7 +189,6 @@ public:
             MacroAssembler::JumpList endJumpList; 
             MacroAssembler::JumpList slowPathJumpList; 
 
-            bool shouldEmitProfiling = !JITCode::isOptimizingJIT(codeBlock->jitType());
             bool emittedFastPath = m_generator.generateFastPath(jit, endJumpList, slowPathJumpList, shouldEmitProfiling);
             if (!emittedFastPath)
                 return;
@@ -128,17 +205,7 @@ public:
                 codeBlock, linkBuffer, ("JITMathIC: generating out of line IC snippet"));
         }
 
-        {
-            CCallHelpers jit(&vm, codeBlock);
-            auto jump = jit.jump();
-            // We don't need a nop sled here because nobody should be jumping into the middle of an IC.
-            bool needsBranchCompaction = false;
-            RELEASE_ASSERT(jit.m_assembler.buffer().codeSize() <= static_cast<size_t>(m_inlineSize));
-            LinkBuffer linkBuffer(jit, m_inlineStart.dataLocation(), jit.m_assembler.buffer().codeSize(), JITCompilationMustSucceed, needsBranchCompaction);
-            RELEASE_ASSERT(linkBuffer.isValid());
-            linkBuffer.link(jump, CodeLocationLabel(m_code.code()));
-            FINALIZE_CODE(linkBuffer, ("JITMathIC: linking constant jump to out of line stub"));
-        }
+        linkJumpToOutOfLineSnippet();
     }
 
     void finalizeInlineCode(const MathICGenerationState& state, LinkBuffer& linkBuffer)
@@ -172,11 +239,13 @@ public:
     int32_t m_inlineSize;
     int32_t m_deltaFromStartToSlowPathCallLocation;
     int32_t m_deltaFromStartToSlowPathStart;
+    bool m_generateFastPathOnRepatch { false };
     GeneratorType m_generator;
 };
 
 typedef JITMathIC<JITAddGenerator> JITAddIC;
 typedef JITMathIC<JITMulGenerator> JITMulIC;
+typedef JITMathIC<JITSubGenerator> JITSubIC;
 
 } // namespace JSC
 

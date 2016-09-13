@@ -66,8 +66,6 @@
 #define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK false
 #define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_AFTER_FULLSCREEN true
 #define DEFAULT_INLINE_MEDIA_PLAYBACK_REQUIRES_PLAYS_INLINE_ATTRIBUTE true
-#define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_WITH_PLAYS_INLINE_ATTRIBUTE true
-#define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_WITH_WEBKIT_PLAYS_INLINE_ATTRIBUTE true
 #define DEFAULT_INVISIBLE_AUTOPLAY_NOT_PERMITTED true
 #define DEFAULT_MEDIA_DATA_LOADS_AUTOMATICALLY false
 #define DEFAULT_MEDIA_CONTROLS_SCALE_WITH_PAGE_ZOOM false
@@ -85,8 +83,6 @@
 #define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK true
 #define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_AFTER_FULLSCREEN false
 #define DEFAULT_INLINE_MEDIA_PLAYBACK_REQUIRES_PLAYS_INLINE_ATTRIBUTE false
-#define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_WITH_PLAYS_INLINE_ATTRIBUTE false
-#define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_WITH_WEBKIT_PLAYS_INLINE_ATTRIBUTE false
 #define DEFAULT_INVISIBLE_AUTOPLAY_NOT_PERMITTED false
 #define DEFAULT_MEDIA_DATA_LOADS_AUTOMATICALLY true
 #define DEFAULT_MEDIA_CONTROLS_SCALE_WITH_PAGE_ZOOM true
@@ -157,8 +153,6 @@
     macro(AllowsInlineMediaPlayback, allowsInlineMediaPlayback, Bool, bool, DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK, "", "") \
     macro(AllowsInlineMediaPlaybackAfterFullscreen, allowsInlineMediaPlaybackAfterFullscreen, Bool, bool, DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_AFTER_FULLSCREEN, "", "") \
     macro(InlineMediaPlaybackRequiresPlaysInlineAttribute, inlineMediaPlaybackRequiresPlaysInlineAttribute, Bool, bool, DEFAULT_INLINE_MEDIA_PLAYBACK_REQUIRES_PLAYS_INLINE_ATTRIBUTE, "", "") \
-    macro(AllowsInlineMediaPlaybackWithPlaysInlineAttribute, allowsInlineMediaPlaybackWithPlaysInlineAttribute, Bool, bool, DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_WITH_PLAYS_INLINE_ATTRIBUTE, "", "") \
-    macro(AllowsInlineMediaPlaybackWithWebKitPlaysInlineAttribute, allowsInlineMediaPlaybackWithWebKitPlaysInlineAttribute, Bool, bool, DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_WITH_WEBKIT_PLAYS_INLINE_ATTRIBUTE, "", "") \
     macro(InvisibleAutoplayNotPermitted, invisibleAutoplayNotPermitted, Bool, bool, DEFAULT_INVISIBLE_AUTOPLAY_NOT_PERMITTED, "", "") \
     macro(MediaDataLoadsAutomatically, mediaDataLoadsAutomatically, Bool, bool, DEFAULT_MEDIA_DATA_LOADS_AUTOMATICALLY, "", "") \
     macro(AllowsPictureInPictureMediaPlayback, allowsPictureInPictureMediaPlayback, Bool, bool, DEFAULT_ALLOWS_PICTURE_IN_PICTURE_MEDIA_PLAYBACK, "", "") \
@@ -226,13 +220,13 @@
     macro(ImageControlsEnabled, imageControlsEnabled, Bool, bool, false, "", "") \
     macro(EnableInheritURIQueryComponent, enableInheritURIQueryComponent, Bool, bool, false, "", "") \
     macro(ServiceControlsEnabled, serviceControlsEnabled, Bool, bool, false, "", "") \
-    macro(GamepadsEnabled, gamepadsEnabled, Bool, bool, false, "", "") \
     macro(NewBlockInsideInlineModelEnabled, newBlockInsideInlineModelEnabled, Bool, bool, false, "", "") \
+    macro(NewCSSParserEnabled, newCSSParserEnabled, Bool, bool, false, "", "") \
     macro(HTTPEquivEnabled, httpEquivEnabled, Bool, bool, true, "", "") \
     macro(MockCaptureDevicesEnabled, mockCaptureDevicesEnabled, Bool, bool, false, "", "") \
     macro(ShadowDOMEnabled, shadowDOMEnabled, Bool, bool, true, "Shadow DOM", "HTML Shadow DOM prototype") \
     macro(DOMIteratorEnabled, domIteratorEnabled, Bool, bool, true, "", "") \
-    macro(FetchAPIEnabled, fetchAPIEnabled, Bool, bool, false, "", "") \
+    macro(FetchAPIEnabled, fetchAPIEnabled, Bool, bool, true, "", "") \
     macro(DownloadAttributeEnabled, downloadAttributeEnabled, Bool, bool, false, "", "") \
     macro(SelectionPaintingWithoutSelectionGapsEnabled, selectionPaintingWithoutSelectionGapsEnabled, Bool, bool, DEFAULT_SELECTION_PAINTING_WITHOUT_SELECTION_GAPS_ENABLED, "", "") \
     macro(ApplePayEnabled, applePayEnabled, Bool, bool, false, "", "") \
@@ -294,8 +288,10 @@
 #define FOR_EACH_WEBKIT_EXPERIMENTAL_FEATURE_PREFERENCE(macro) \
     macro(CSSGridLayoutEnabled, cssGridLayoutEnabled, Bool, bool, true, "CSS Grid", "CSS Grid Layout Module support") \
     macro(CustomElementsEnabled, customElementsEnabled, Bool, bool, false, "Custom Elements", "HTML Custom Elements prototype") \
-    macro(WebGL2Enabled, webGL2Enabled, Bool, bool, true, "WebGL 2.0", "WebGL 2 prototype") \
+    macro(GamepadsEnabled, gamepadsEnabled, Bool, bool, false, "Gamepads", "Web Gamepad API support") \
     macro(SpringTimingFunctionEnabled, springTimingFunctionEnabled, Bool, bool, true, "CSS Spring Animations", "CSS Spring Animation prototype") \
+    macro(WebGL2Enabled, webGL2Enabled, Bool, bool, true, "WebGL 2.0", "WebGL 2 prototype") \
+    macro(VisualViewportEnabled, visualViewportEnabled, Bool, bool, false, "Visual Viewport", "Use Visual Viewport for fixed elements when zooming") \
     \
 
 #if PLATFORM(COCOA)

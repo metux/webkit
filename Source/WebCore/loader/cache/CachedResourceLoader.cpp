@@ -68,6 +68,7 @@
 #include "SessionID.h"
 #include "Settings.h"
 #include "StyleSheetContents.h"
+#include "SubresourceLoader.h"
 #include "UserContentController.h"
 #include "UserStyleSheet.h"
 #include <wtf/text/CString.h>
@@ -390,7 +391,7 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const URL& url,
         return false;
     }
 
-    bool skipContentSecurityPolicyCheck = options.contentSecurityPolicyImposition() == ContentSecurityPolicyImposition::SkipPolicyCheck;
+    bool skipContentSecurityPolicyCheck = options.contentSecurityPolicyImposition == ContentSecurityPolicyImposition::SkipPolicyCheck;
     ContentSecurityPolicy::RedirectResponseReceived redirectResponseReceived = didReceiveRedirectResponse ? ContentSecurityPolicy::RedirectResponseReceived::Yes : ContentSecurityPolicy::RedirectResponseReceived::No;
 
     // Some types of resources can be loaded only from the same origin.  Other
@@ -571,7 +572,10 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
 
 #if ENABLE(CONTENT_EXTENSIONS)
     if (frame() && frame()->mainFrame().page() && m_documentLoader) {
-        if (frame()->mainFrame().page()->userContentProvider().processContentExtensionRulesForLoad(request.mutableResourceRequest(), toResourceType(type), *m_documentLoader) == ContentExtensions::BlockedStatus::Blocked) {
+        auto& resourceRequest = request.mutableResourceRequest();
+        auto blockedStatus = frame()->mainFrame().page()->userContentProvider().processContentExtensionRulesForLoad(resourceRequest.url(), toResourceType(type), *m_documentLoader);
+        applyBlockedStatusToRequest(blockedStatus, resourceRequest);
+        if (blockedStatus.blockedLoad) {
             if (type == CachedResource::Type::MainResource) {
                 auto resource = createResource(type, request.mutableResourceRequest(), request.charset(), sessionID());
                 ASSERT(resource);
@@ -581,9 +585,20 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
             }
             return nullptr;
         }
+        if (blockedStatus.madeHTTPS
+            && type == CachedResource::Type::MainResource
+            && m_documentLoader->isLoadingMainResource()) {
+            // This is to make sure the correct 'new' URL shows in the location bar.
+            m_documentLoader->frameLoader()->client().dispatchDidChangeProvisionalURL();
+        }
         url = request.resourceRequest().url(); // The content extension could have changed it from http to https.
         url = MemoryCache::removeFragmentIdentifierIfNeeded(url); // Might need to remove fragment identifier again.
     }
+#endif
+
+#if ENABLE(WEB_TIMING)
+    LoadTiming loadTiming;
+    loadTiming.markStartTimeAndFetchStart();
 #endif
 
     auto& memoryCache = MemoryCache::singleton();
@@ -629,8 +644,11 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
         memoryCache.resourceAccessed(*resource);
 #if ENABLE(WEB_TIMING)
         if (document() && RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled()) {
+            // FIXME (161170): The networkLoadTiming shouldn't be stored on the ResourceResponse.
+            resource->response().networkLoadTiming().reset();
+            loadTiming.setResponseEnd(monotonicallyIncreasingTime());
             m_resourceTimingInfo.storeResourceTimingInitiatorInformation(resource, request, frame());
-            m_resourceTimingInfo.addResourceTiming(resource.get(), *document());
+            m_resourceTimingInfo.addResourceTiming(resource.get(), *document(), loadTiming);
         }
 #endif
         break;
@@ -686,7 +704,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::revalidateResource(co
     memoryCache.add(*newResource);
 #if ENABLE(WEB_TIMING)
     if (RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled())
-        m_resourceTimingInfo.storeResourceTimingInitiatorInformation(resource, request, frame());
+        m_resourceTimingInfo.storeResourceTimingInitiatorInformation(newResource, request, frame());
 #else
     UNUSED_PARAM(request);
 #endif
@@ -979,8 +997,8 @@ void CachedResourceLoader::loadDone(CachedResource* resource, bool shouldPerform
     RefPtr<Document> protectDocument(m_document);
 
 #if ENABLE(WEB_TIMING)
-    if (document() && RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled())
-        m_resourceTimingInfo.addResourceTiming(resource, *document());
+    if (resource && document() && RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled())
+        m_resourceTimingInfo.addResourceTiming(resource, *document(), resource->loader()->loadTiming());
 #else
     UNUSED_PARAM(resource);
 #endif

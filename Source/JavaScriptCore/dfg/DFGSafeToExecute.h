@@ -58,6 +58,8 @@ public:
         case FunctionUse:
         case FinalObjectUse:
         case RegExpObjectUse:
+        case MapObjectUse:
+        case SetObjectUse:
         case ObjectOrOtherUse:
         case StringIdentUse:
         case StringUse:
@@ -225,7 +227,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CheckCell:
     case CheckBadCell:
     case CheckNotEmpty:
-    case CheckIdent:
+    case CheckStringIdent:
     case RegExpExec:
     case RegExpTest:
     case CompareLess:
@@ -346,7 +348,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case GetMyArgumentByVal:
     case GetMyArgumentByValOutOfBounds:
     case ForwardVarargs:
-    case CopyRest:
+    case CreateRest:
     case StringReplace:
     case StringReplaceRegExp:
     case GetRegExpObjectLastIndex:
@@ -355,6 +357,10 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case GetDynamicVar:
     case PutDynamicVar:
     case ResolveScope:
+    case MapHash:
+    case GetMapBucket:
+    case LoadFromJSMapBucket:
+    case IsNonEmptyMapBucket:
         return true;
 
     case BottomValue:

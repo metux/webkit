@@ -83,7 +83,6 @@ bool Settings::gAVFoundationNSURLSessionEnabled = true;
 
 #if PLATFORM(COCOA)
 bool Settings::gQTKitEnabled = false;
-bool Settings::gCookieStoragePartitioningEnabled = false;
 #endif
 
 bool Settings::gMockScrollbarsEnabled = false;
@@ -139,8 +138,6 @@ static const bool defaultFixedBackgroundsPaintRelativeToDocument = true;
 static const bool defaultAcceleratedCompositingForFixedPositionEnabled = true;
 static const bool defaultAllowsInlineMediaPlayback = false;
 static const bool defaultInlineMediaPlaybackRequiresPlaysInlineAttribute = true;
-static const bool defaultAllowsInlineMediaPlaybackWithPlaysInlineAttribute = true;
-static const bool defaultAllowsInlineMediaPlaybackWithWebKitPlaysInlineAttribute = true;
 static const bool defaultVideoPlaybackRequiresUserGesture = true;
 static const bool defaultAudioPlaybackRequiresUserGesture = true;
 static const bool defaultMediaDataLoadsAutomatically = false;
@@ -154,8 +151,6 @@ static const bool defaultFixedBackgroundsPaintRelativeToDocument = false;
 static const bool defaultAcceleratedCompositingForFixedPositionEnabled = false;
 static const bool defaultAllowsInlineMediaPlayback = true;
 static const bool defaultInlineMediaPlaybackRequiresPlaysInlineAttribute = false;
-static const bool defaultAllowsInlineMediaPlaybackWithPlaysInlineAttribute = false;
-static const bool defaultAllowsInlineMediaPlaybackWithWebKitPlaysInlineAttribute = false;
 static const bool defaultVideoPlaybackRequiresUserGesture = false;
 static const bool defaultAudioPlaybackRequiresUserGesture = false;
 static const bool defaultMediaDataLoadsAutomatically = true;
@@ -197,7 +192,6 @@ Settings::Settings(Page* page)
     , m_loadsImagesAutomatically(false)
     , m_areImagesEnabled(true)
     , m_preferMIMETypeForImages(false)
-    , m_isCachedPDFImageEnabled(true)
     , m_arePluginsEnabled(false)
     , m_isScriptEnabled(false)
     , m_needsAdobeFrameReloadingQuirk(false)
@@ -430,11 +424,6 @@ void Settings::setPreferMIMETypeForImages(bool preferMIMETypeForImages)
     m_preferMIMETypeForImages = preferMIMETypeForImages;
 }
 
-void Settings::setCachedPDFImageEnabled(bool isCachedPDFImageEnabled)
-{
-    m_isCachedPDFImageEnabled = isCachedPDFImageEnabled;
-}
-
 void Settings::setForcePendingWebGLPolicy(bool forced)
 {
     m_forcePendingWebGLPolicy = forced;
@@ -601,11 +590,6 @@ void Settings::setQTKitEnabled(bool enabled)
 
     gQTKitEnabled = enabled;
     HTMLMediaElement::resetMediaEngines();
-}
-    
-void Settings::setCookieStoragePartitioningEnabled(bool enabled)
-{
-    gCookieStoragePartitioningEnabled = enabled;
 }
 #endif
 

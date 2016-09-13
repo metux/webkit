@@ -73,11 +73,6 @@ public:
     static Ref<WebProcessProxy> create(WebProcessPool&);
     ~WebProcessProxy();
 
-    static WebProcessProxy* fromConnection(IPC::Connection* connection)
-    {
-        return static_cast<WebProcessProxy*>(ChildProcessProxy::fromConnection(connection));
-    }
-
     WebConnection* webConnection() const { return m_webConnection.get(); }
 
     WebProcessPool& processPool() { return m_processPool; }
@@ -198,12 +193,10 @@ private:
 
     // IPC::Connection::Client
     friend class WebConnectionToWebProcess;
-    void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
-    void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
+    void didReceiveMessage(IPC::Connection&, IPC::Decoder&) override;
+    void didReceiveSyncMessage(IPC::Connection&, IPC::Decoder&, std::unique_ptr<IPC::Encoder>&) override;
     void didClose(IPC::Connection&) override;
     void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
-    IPC::ProcessType localProcessType() override { return IPC::ProcessType::UI; }
-    IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Web; }
 
     // ResponsivenessTimer::Client
     void didBecomeUnresponsive() override;
@@ -222,8 +215,8 @@ private:
     void didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier) override;
 
     // Implemented in generated WebProcessProxyMessageReceiver.cpp
-    void didReceiveWebProcessProxyMessage(IPC::Connection&, IPC::MessageDecoder&);
-    void didReceiveSyncWebProcessProxyMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
+    void didReceiveWebProcessProxyMessage(IPC::Connection&, IPC::Decoder&);
+    void didReceiveSyncWebProcessProxyMessage(IPC::Connection&, IPC::Decoder&, std::unique_ptr<IPC::Encoder>&);
 
     bool canTerminateChildProcess();
 

@@ -128,7 +128,7 @@ inline CapabilityLevel canCompile(Node* node)
     case CheckCell:
     case CheckBadCell:
     case CheckNotEmpty:
-    case CheckIdent:
+    case CheckStringIdent:
     case CheckWatchdogTimer:
     case StringCharCodeAt:
     case StringFromCharCode:
@@ -179,7 +179,12 @@ inline CapabilityLevel canCompile(Node* node)
     case Throw:
     case ThrowReferenceError:
     case Unreachable:
+    case In:
     case IsJSArray:
+    case MapHash:
+    case GetMapBucket:
+    case LoadFromJSMapBucket:
+    case IsNonEmptyMapBucket:
     case IsEmpty:
     case IsUndefined:
     case IsBoolean:
@@ -204,6 +209,7 @@ inline CapabilityLevel canCompile(Node* node)
     case HasStructureProperty:
     case GetDirectPname:
     case GetEnumerableLength:
+    case GetIndexedPropertyStorage:
     case GetPropertyEnumerator:
     case GetEnumeratorStructurePname:
     case GetEnumeratorGenericPname:
@@ -224,12 +230,16 @@ inline CapabilityLevel canCompile(Node* node)
     case ForwardVarargs:
     case Switch:
     case TypeOf:
+    case PutById:
+    case PutByIdDirect:
+    case PutByIdFlush:
+    case PutByIdWithThis:
     case PutGetterById:
     case PutSetterById:
     case PutGetterSetterById:
     case PutGetterByVal:
     case PutSetterByVal:
-    case CopyRest:
+    case CreateRest:
     case GetRestLength:
     case RegExpExec:
     case RegExpTest:
@@ -245,7 +255,13 @@ inline CapabilityLevel canCompile(Node* node)
     case ResolveScope:
     case GetDynamicVar:
     case PutDynamicVar:
+    case CompareEq:
     case CompareEqPtr:
+    case CompareLess:
+    case CompareLessEq:
+    case CompareGreater:
+    case CompareGreaterEq:
+    case CompareStrictEq:
         // These are OK.
         break;
 
@@ -255,24 +271,6 @@ inline CapabilityLevel canCompile(Node* node)
         // case because it would prevent us from catching bugs where the FTL backend
         // pipeline failed to optimize out an Identity.
         break;
-    case In:
-        if (node->child2().useKind() == CellUse)
-            break;
-        return CannotCompile;
-    case PutByIdDirect:
-    case PutById:
-    case PutByIdFlush:
-        if (node->child1().useKind() == CellUse)
-            break;
-        return CannotCompile;
-    case PutByIdWithThis:
-        break;
-    case GetIndexedPropertyStorage:
-        if (node->arrayMode().type() == Array::String)
-            break;
-        if (isTypedView(node->arrayMode().typedArrayType()))
-            break;
-        return CannotCompile;
     case CheckArray:
         switch (node->arrayMode().type()) {
         case Array::Int32:
@@ -362,85 +360,6 @@ inline CapabilityLevel canCompile(Node* node)
             return CannotCompile;
         }
         break;
-    case CompareEq:
-        if (node->isBinaryUseKind(Int32Use))
-            break;
-        if (node->isBinaryUseKind(Int52RepUse))
-            break;
-        if (node->isBinaryUseKind(DoubleRepUse))
-            break;
-        if (node->isBinaryUseKind(StringIdentUse))
-            break;
-        if (node->isBinaryUseKind(StringUse))
-            break;
-        if (node->isBinaryUseKind(SymbolUse))
-            break;
-        if (node->isBinaryUseKind(ObjectUse))
-            break;
-        if (node->isBinaryUseKind(UntypedUse))
-            break;
-        if (node->isBinaryUseKind(BooleanUse))
-            break;
-        if (node->isBinaryUseKind(ObjectUse, ObjectOrOtherUse))
-            break;
-        if (node->isBinaryUseKind(ObjectOrOtherUse, ObjectUse))
-            break;
-        if (node->child1().useKind() == OtherUse || node->child2().useKind() == OtherUse)
-            break;
-        return CannotCompile;
-    case CompareStrictEq:
-        if (node->isBinaryUseKind(Int32Use))
-            break;
-        if (node->isBinaryUseKind(Int52RepUse))
-            break;
-        if (node->isBinaryUseKind(DoubleRepUse))
-            break;
-        if (node->isBinaryUseKind(StringIdentUse))
-            break;
-        if (node->isBinaryUseKind(StringUse))
-            break;
-        if (node->isBinaryUseKind(ObjectUse, UntypedUse))
-            break;
-        if (node->isBinaryUseKind(UntypedUse, ObjectUse))
-            break;
-        if (node->isBinaryUseKind(ObjectUse))
-            break;
-        if (node->isBinaryUseKind(BooleanUse))
-            break;
-        if (node->isBinaryUseKind(UntypedUse))
-            break;
-        if (node->isBinaryUseKind(SymbolUse))
-            break;
-        if (node->isBinaryUseKind(SymbolUse, UntypedUse))
-            break;
-        if (node->isBinaryUseKind(UntypedUse, SymbolUse))
-            break;
-        if (node->isBinaryUseKind(MiscUse, UntypedUse))
-            break;
-        if (node->isBinaryUseKind(UntypedUse, MiscUse))
-            break;
-        if (node->isBinaryUseKind(StringIdentUse, NotStringVarUse))
-            break;
-        if (node->isBinaryUseKind(NotStringVarUse, StringIdentUse))
-            break;
-        return CannotCompile;
-    case CompareLess:
-    case CompareLessEq:
-    case CompareGreater:
-    case CompareGreaterEq:
-        if (node->isBinaryUseKind(Int32Use))
-            break;
-        if (node->isBinaryUseKind(Int52RepUse))
-            break;
-        if (node->isBinaryUseKind(DoubleRepUse))
-            break;
-        if (node->isBinaryUseKind(StringIdentUse))
-            break;
-        if (node->isBinaryUseKind(StringUse))
-            break;
-        if (node->isBinaryUseKind(UntypedUse))
-            break;
-        return CannotCompile;
     default:
         // Don't know how to handle anything else.
         return CannotCompile;
@@ -510,6 +429,8 @@ CapabilityLevel canCompile(Graph& graph)
                 case StringObjectUse:
                 case StringOrStringObjectUse:
                 case SymbolUse:
+                case MapObjectUse:
+                case SetObjectUse:
                 case FinalObjectUse:
                 case RegExpObjectUse:
                 case NotCellUse:

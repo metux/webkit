@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2007-2009, 2011, 2016 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,17 +20,17 @@
 #include "config.h"
 #include "JSDocument.h"
 
-#include "CustomElementDefinitions.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "HTMLDocument.h"
 #include "JSCanvasRenderingContext2D.h"
+#include "JSDOMConvert.h"
 #include "JSDOMWindowCustom.h"
 #include "JSHTMLDocument.h"
 #include "JSLocation.h"
 #include "JSNodeOrString.h"
-#include "JSSVGDocument.h"
+#include "JSXMLDocument.h"
 #include "Location.h"
 #include "NodeTraversal.h"
 #include "SVGDocument.h"
@@ -58,8 +58,6 @@ static inline JSValue createNewDocumentWrapper(ExecState& state, JSDOMGlobalObje
     JSObject* wrapper;
     if (document.isHTMLDocument())
         wrapper = CREATE_DOM_WRAPPER(&globalObject, HTMLDocument, WTFMove(passedDocument));
-    else if (document.isSVGDocument())
-        wrapper = CREATE_DOM_WRAPPER(&globalObject, SVGDocument, WTFMove(passedDocument));
     else if (document.isXMLDocument())
         wrapper = CREATE_DOM_WRAPPER(&globalObject, XMLDocument, WTFMove(passedDocument));
     else
@@ -131,12 +129,15 @@ JSValue JSDocument::append(ExecState& state)
 #if ENABLE(TOUCH_EVENTS)
 JSValue JSDocument::createTouchList(ExecState& state)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     auto touchList = TouchList::create();
 
     for (size_t i = 0; i < state.argumentCount(); ++i) {
         auto* item = JSTouch::toWrapped(state.uncheckedArgument(i));
         if (!item)
-            return JSValue::decode(throwArgumentTypeError(state, i, "touches", "Document", "createTouchList", "Touch"));
+            return JSValue::decode(throwArgumentTypeError(state, scope, i, "touches", "Document", "createTouchList", "Touch"));
 
         touchList->append(*item);
     }
@@ -144,63 +145,41 @@ JSValue JSDocument::createTouchList(ExecState& state)
 }
 #endif
 
-#if ENABLE(CUSTOM_ELEMENTS)
-JSValue JSDocument::defineElement(ExecState& state)
+JSValue JSDocument::getCSSCanvasContext(JSC::ExecState& state)
 {
-    AtomicString tagName(state.argument(0).toString(&state)->toAtomicString(&state));
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
+    if (UNLIKELY(state.argumentCount() < 4))
+        return throwException(&state, scope, createNotEnoughArgumentsError(&state));
+    auto contextId = state.uncheckedArgument(0).toWTFString(&state);
+    if (UNLIKELY(state.hadException()))
+        return jsUndefined();
+    auto name = state.uncheckedArgument(1).toWTFString(&state);
+    if (UNLIKELY(state.hadException()))
+        return jsUndefined();
+    auto width = convert<int32_t>(state, state.uncheckedArgument(2), NormalConversion);
+    if (UNLIKELY(state.hadException()))
+        return jsUndefined();
+    auto height = convert<int32_t>(state, state.uncheckedArgument(3), NormalConversion);
     if (UNLIKELY(state.hadException()))
         return jsUndefined();
 
-    JSObject* object = state.argument(1).getObject();
-    ConstructData callData;
-    if (!object || object->methodTable()->getConstructData(object, callData) == ConstructType::None)
-        return throwTypeError(&state, ASCIILiteral("The second argument must be a constructor"));
+    auto* context = wrapped().getCSSCanvasContext(WTFMove(contextId), WTFMove(name), WTFMove(width), WTFMove(height));
+    if (!context)
+        return jsNull();
 
-    Document& document = wrapped();
-    if (!document.domWindow()) {
-        throwNotSupportedError(state, "Cannot define a custom element in a docuemnt without a browsing context");
-        return jsUndefined();
-    }
-
-    switch (Document::validateCustomElementName(tagName)) {
-    case CustomElementNameValidationStatus::Valid:
-        break;
-    case CustomElementNameValidationStatus::ConflictsWithBuiltinNames:
-        return throwSyntaxError(&state, "Custom element name cannot be same as one of the builtin elements");
-    case CustomElementNameValidationStatus::NoHyphen:
-        return throwSyntaxError(&state, "Custom element name must contain a hyphen");
-    case CustomElementNameValidationStatus::ContainsUpperCase:
-        return throwSyntaxError(&state, "Custom element name cannot contain an upper case letter");
-    }
-
-    auto& definitions = document.ensureCustomElementDefinitions();
-    if (definitions.findInterface(tagName)) {
-        throwNotSupportedError(state, "Cannot define multiple custom elements with the same tag name");
-        return jsUndefined();
-    }
-
-    if (definitions.containsConstructor(object)) {
-        throwNotSupportedError(state, "Cannot define multiple custom elements with the same class");
-        return jsUndefined();
-    }
-
-    // FIXME: 10. Let prototype be Get(constructor, "prototype"). Rethrow any exceptions.
-    // FIXME: 11. If Type(prototype) is not Object, throw a TypeError exception.
-    // FIXME: 12. Let attachedCallback be Get(prototype, "attachedCallback"). Rethrow any exceptions.
-    // FIXME: 13. Let detachedCallback be Get(prototype, "detachedCallback"). Rethrow any exceptions.
-    // FIXME: 14. Let attributeChangedCallback be Get(prototype, "attributeChangedCallback"). Rethrow any exceptions.
-
-    PrivateName uniquePrivateName;
-    globalObject()->putDirect(globalObject()->vm(), uniquePrivateName, object);
-
-    QualifiedName name(nullAtom, tagName, HTMLNames::xhtmlNamespaceURI);
-    definitions.addElementDefinition(JSCustomElementInterface::create(name, object, globalObject()));
-
-    // FIXME: 17. Let map be registry's upgrade candidates map.
-    // FIXME: 18. Upgrade a newly-defined element given map and definition.
-
-    return jsUndefined();
-}
+#if ENABLE(WEBGL)
+    if (is<WebGLRenderingContextBase>(*context))
+        return toJS(&state, globalObject(), downcast<WebGLRenderingContextBase>(*context));
 #endif
+
+    return toJS(&state, globalObject(), downcast<CanvasRenderingContext2D>(*context));
+}
+
+void JSDocument::visitAdditionalChildren(SlotVisitor& visitor)
+{
+    visitor.addOpaqueRoot(wrapped().scriptExecutionContext());
+}
 
 } // namespace WebCore

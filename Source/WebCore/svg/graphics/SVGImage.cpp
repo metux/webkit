@@ -78,7 +78,7 @@ inline SVGSVGElement* SVGImage::rootElement() const
 {
     if (!m_page)
         return nullptr;
-    return downcast<SVGDocument>(*m_page->mainFrame().document()).rootElement();
+    return SVGDocument::rootElement(*m_page->mainFrame().document());
 }
 
 bool SVGImage::hasSingleSecurityOrigin() const
@@ -422,7 +422,7 @@ bool SVGImage::dataChanged(bool allDataReceived)
 
 String SVGImage::filenameExtension() const
 {
-    return "svg";
+    return ASCIILiteral("svg");
 }
 
 bool isInSVGImage(const Element* element)

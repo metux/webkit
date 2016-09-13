@@ -155,7 +155,7 @@ bool FileInputType::appendFormData(FormDataList& encoding, bool multipart) const
     }
 
     for (unsigned i = 0; i < numFiles; ++i)
-        encoding.appendBlob(element().name(), fileList->item(i));
+        encoding.appendBlob(element().name(), *fileList->item(i));
     return true;
 }
 
@@ -169,7 +169,7 @@ String FileInputType::valueMissingText() const
     return element().multiple() ? validationMessageValueMissingForMultipleFileText() : validationMessageValueMissingForFileText();
 }
 
-void FileInputType::handleDOMActivateEvent(Event* event)
+void FileInputType::handleDOMActivateEvent(Event& event)
 {
     if (element().isDisabledFormControl())
         return;
@@ -185,14 +185,14 @@ void FileInputType::handleDOMActivateEvent(Event* event)
         settings.acceptFileExtensions = input.acceptFileExtensions();
         settings.selectedFiles = m_fileList->paths();
 #if ENABLE(MEDIA_CAPTURE)
-        settings.capture = input.shouldUseMediaCapture();
+        settings.mediaCaptureType = input.mediaCaptureType();
 #endif
 
         applyFileChooserSettings(settings);
         chrome->runOpenPanel(input.document().frame(), m_fileChooser);
     }
 
-    event->setDefaultHandled();
+    event.setDefaultHandled();
 }
 
 RenderPtr<RenderElement> FileInputType::createInputRenderer(RenderStyle&& style)

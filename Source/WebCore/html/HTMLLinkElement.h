@@ -21,8 +21,7 @@
  *
  */
 
-#ifndef HTMLLinkElement_h
-#define HTMLLinkElement_h
+#pragma once
 
 #include "CSSStyleSheet.h"
 #include "CachedStyleSheetClient.h"
@@ -56,9 +55,6 @@ public:
 
     Optional<LinkIconType> iconType() const;
 
-    // the icon size string as parsed from the HTML attribute
-    String iconSizes();
-
     CSSStyleSheet* sheet() const { return m_sheet.get(); }
 
     bool styleSheetIsLoading() const;
@@ -67,13 +63,13 @@ public:
     bool isEnabledViaScript() const { return m_disabledState == EnabledViaScript; }
     DOMTokenList& sizes();
 
-    void setCrossOrigin(const AtomicString&);
-    String crossOrigin() const;
+    WEBCORE_EXPORT void setCrossOrigin(const AtomicString&);
+    WEBCORE_EXPORT String crossOrigin() const;
 
     void dispatchPendingEvent(LinkEventSender*);
     static void dispatchPendingLoadEvents();
 
-    DOMTokenList& relList();
+    WEBCORE_EXPORT DOMTokenList& relList();
 
 private:
     void parseAttribute(const QualifiedName&, const AtomicString&) final;
@@ -101,7 +97,7 @@ private:
 
     bool isURLAttribute(const Attribute&) const final;
 
-    void defaultEventHandler(Event*) final;
+    void defaultEventHandler(Event&) final;
     void handleClick(Event&);
 
     HTMLLinkElement(const QualifiedName&, Document&, bool createdByParser);
@@ -146,5 +142,3 @@ private:
 };
 
 } //namespace
-
-#endif

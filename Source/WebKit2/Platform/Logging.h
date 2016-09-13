@@ -43,6 +43,7 @@ extern "C" {
 
 #define WEBKIT2_LOG_CHANNELS(M) \
     M(ContextMenu) \
+    M(Gamepad) \
     M(IDB) \
     M(IconDatabase) \
     M(IndexedDB) \
@@ -58,6 +59,7 @@ extern "C" {
     M(Printing) \
     M(RemoteLayerTree) \
     M(Resize) \
+    M(Selection) \
     M(SessionState) \
     M(StorageAPI) \
     M(TextInput) \

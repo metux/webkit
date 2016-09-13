@@ -256,19 +256,21 @@ FetchHeaders* FetchRequest::initializeWith(FetchRequest& input, const Dictionary
 
 void FetchRequest::setBody(JSC::ExecState& execState, JSC::JSValue body, FetchRequest* request, ExceptionCode& ec)
 {
-    if (!body.isNull())
-        m_body = FetchBody::extract(execState, body);
+    if (!body.isNull()) {
+        ASSERT(scriptExecutionContext());
+        m_body = FetchBody::extract(*scriptExecutionContext(), execState, body);
+        if (m_body.type() == FetchBody::Type::None) {
+            ec = TypeError;
+            return;
+        }
+    }
     else if (request && !request->m_body.isEmpty()) {
         m_body = FetchBody::extractFromBody(&request->m_body);
         request->setDisturbed();
     }
 
-    String type = m_headers->fastGet(HTTPHeaderName::ContentType);
-    if (!body.isUndefined() && type.isEmpty() && !m_body.mimeType().isEmpty()) {
-        type = m_body.mimeType();
-        m_headers->fastSet(HTTPHeaderName::ContentType, type);
-    }
-    m_body.setMimeType(type);
+    m_body.updateContentType(m_headers);
+
     if (!validateBodyAndMethod(m_body, m_internalRequest))
         ec = TypeError;
 }
@@ -291,9 +293,16 @@ const String& FetchRequest::url() const
 
 ResourceRequest FetchRequest::internalRequest() const
 {
+    ASSERT(scriptExecutionContext());
+
     ResourceRequest request = m_internalRequest.request;
     request.setHTTPHeaderFields(m_headers->internalHeaders());
-    request.setHTTPBody(body().bodyForInternalRequest());
+    request.setHTTPBody(body().bodyForInternalRequest(*scriptExecutionContext()));
+
+    // FIXME: Support no-referrer and client. Ensure this case-sensitive comparison is ok.
+    if (m_internalRequest.referrer != "no-referrer" && m_internalRequest.referrer != "client")
+        request.setHTTPReferrer(URL(URL(), m_internalRequest.referrer).strippedForUseAsReferrer());
+
     return request;
 }
 

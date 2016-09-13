@@ -26,11 +26,12 @@
 #pragma once
 
 #if ENABLE(MATHML)
-#include "MathMLInlineContainerElement.h"
+
+#include "MathMLPresentationElement.h"
 
 namespace WebCore {
 
-class MathMLScriptsElement : public MathMLInlineContainerElement {
+class MathMLScriptsElement : public MathMLPresentationElement {
 public:
     static Ref<MathMLScriptsElement> create(const QualifiedName& tagName, Document&);
     const Length& subscriptShift();
@@ -43,8 +44,8 @@ private:
     RenderPtr<RenderElement> createElementRenderer(RenderStyle&&, const RenderTreePosition&) override;
     void parseAttribute(const QualifiedName&, const AtomicString&) override;
 
-    Length m_subscriptShift;
-    Length m_superscriptShift;
+    Optional<Length> m_subscriptShift;
+    Optional<Length> m_superscriptShift;
 };
 
 }

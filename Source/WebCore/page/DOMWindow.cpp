@@ -38,6 +38,7 @@
 #include "ContentExtensionActions.h"
 #include "ContentExtensionRule.h"
 #include "Crypto.h"
+#include "CustomElementRegistry.h"
 #include "DOMApplicationCache.h"
 #include "DOMSelection.h"
 #include "DOMStringList.h"
@@ -80,6 +81,7 @@
 #include "PageTransitionEvent.h"
 #include "Performance.h"
 #include "ResourceLoadInfo.h"
+#include "RuntimeApplicationChecks.h"
 #include "RuntimeEnabledFeatures.h"
 #include "ScheduledAction.h"
 #include "Screen.h"
@@ -480,6 +482,8 @@ Page* DOMWindow::page()
 
 void DOMWindow::frameDestroyed()
 {
+    Ref<DOMWindow> protectedThis(*this);
+
     willDestroyDocumentInFrame();
     FrameDestructionObserver::frameDestroyed();
     resetDOMWindowProperties();
@@ -616,6 +620,15 @@ bool DOMWindow::isCurrentlyDisplayedInFrame() const
 {
     return m_frame && m_frame->document()->domWindow() == this;
 }
+
+#if ENABLE(CUSTOM_ELEMENTS)
+CustomElementRegistry& DOMWindow::ensureCustomElementRegistry()
+{
+    if (!m_customElementRegistry)
+        m_customElementRegistry = CustomElementRegistry::create();
+    return *m_customElementRegistry;
+}
+#endif
 
 #if ENABLE(ORIENTATION_EVENTS)
 int DOMWindow::orientation() const
@@ -878,14 +891,6 @@ Storage* DOMWindow::localStorage(ExceptionCode& ec) const
 
     m_localStorage = Storage::create(m_frame, WTFMove(storageArea));
     return m_localStorage.get();
-}
-
-void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort* port, const String& targetOrigin, DOMWindow& source, ExceptionCode& ec)
-{
-    MessagePortArray ports;
-    if (port)
-        ports.append(port);
-    postMessage(message, &ports, targetOrigin, source, ec);
 }
 
 void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray* ports, const String& targetOrigin, DOMWindow& source, ExceptionCode& ec)
@@ -1401,6 +1406,19 @@ RefPtr<CSSStyleDeclaration> DOMWindow::getComputedStyle(Element& element, const 
     return CSSComputedStyleDeclaration::create(element, false, pseudoElt);
 }
 
+// FIXME: Drop this overload once <rdar://problem/28016778> has been fixed.
+RefPtr<CSSStyleDeclaration> DOMWindow::getComputedStyle(Document&, const String&, ExceptionCode& ec)
+{
+#if PLATFORM(MAC)
+    if (MacApplication::isAppStore()) {
+        printErrorMessage(ASCIILiteral("Passing a non-Element as first parameter to window.getComputedStyle() is invalid and always returns null"));
+        return nullptr;
+    }
+#endif
+    ec = TypeError;
+    return nullptr;
+}
+
 RefPtr<CSSRuleList> DOMWindow::getMatchedCSSRules(Element* element, const String& pseudoElement, bool authorOnly) const
 {
     if (!isCurrentlyDisplayedInFrame())
@@ -1866,10 +1884,10 @@ void DOMWindow::dispatchLoadEvent()
 {
     Ref<Event> loadEvent = Event::create(eventNames().loadEvent, false, false);
     if (m_frame && m_frame->loader().documentLoader() && !m_frame->loader().documentLoader()->timing().loadEventStart()) {
-        // The DocumentLoader (and thus its DocumentLoadTiming) might get destroyed while dispatching
+        // The DocumentLoader (and thus its LoadTiming) might get destroyed while dispatching
         // the event, so protect it to prevent writing the end time into freed memory.
         RefPtr<DocumentLoader> documentLoader = m_frame->loader().documentLoader();
-        DocumentLoadTiming& timing = documentLoader->timing();
+        LoadTiming& timing = documentLoader->timing();
         timing.markLoadEventStart();
         dispatchEvent(loadEvent, document());
         timing.markLoadEventEnd();

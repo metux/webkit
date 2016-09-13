@@ -68,7 +68,7 @@ static String restrictionName(MediaElementSession::BehaviorRestrictions restrict
 #define CASE(restrictionType) \
     if (restriction & MediaElementSession::restrictionType) { \
         if (!restrictionBuilder.isEmpty()) \
-            restrictionBuilder.append(", "); \
+            restrictionBuilder.appendLiteral(", "); \
         restrictionBuilder.append(#restrictionType); \
     } \
 
@@ -221,11 +221,6 @@ bool MediaElementSession::canControlControlsManager() const
 
     if (!m_element.hasAudio()) {
         LOG(Media, "MediaElementSession::canControlControlsManager - returning FALSE: No audio");
-        return false;
-    }
-
-    if (m_element.ended()) {
-        LOG(Media, "MediaElementSession::canControlControlsManager - returning FALSE: Ended");
         return false;
     }
 
@@ -470,6 +465,8 @@ bool MediaElementSession::requiresFullscreenForVideoPlayback(const HTMLMediaElem
         return false;
 
 #if PLATFORM(IOS)
+    if (IOSApplication::isIBooks())
+        return !element.hasAttributeWithoutSynchronization(HTMLNames::webkit_playsinlineAttr) && !element.hasAttributeWithoutSynchronization(HTMLNames::playsinlineAttr);
     if (dyld_get_program_sdk_version() < DYLD_IOS_VERSION_10_0)
         return !element.hasAttributeWithoutSynchronization(HTMLNames::webkit_playsinlineAttr);
 #endif
@@ -599,11 +596,32 @@ static bool isMainContent(const HTMLMediaElement& element)
     return true;
 }
 
+static bool isElementLargeRelativeToMainFrame(const HTMLMediaElement& element)
+{
+    static const double minimumPercentageOfMainFrameAreaForMainContent = 0.9;
+    auto* renderer = element.renderer();
+    if (!renderer)
+        return false;
+
+    auto* documentFrame = element.document().frame();
+    if (!documentFrame)
+        return false;
+
+    if (!documentFrame->mainFrame().view())
+        return false;
+
+    auto& mainFrameView = *documentFrame->mainFrame().view();
+    auto maxVisibleClientWidth = std::min(renderer->clientWidth().toInt(), mainFrameView.visibleWidth());
+    auto maxVisibleClientHeight = std::min(renderer->clientHeight().toInt(), mainFrameView.visibleHeight());
+
+    return maxVisibleClientWidth * maxVisibleClientHeight > minimumPercentageOfMainFrameAreaForMainContent * mainFrameView.visibleWidth() * mainFrameView.visibleHeight();
+}
+
 static bool isElementLargeEnoughForMainContent(const HTMLMediaElement& element)
 {
     static const double elementMainContentAreaMinimum = 400 * 300;
     static const double maximumAspectRatio = 1.8; // Slightly larger than 16:9.
-    static const double minimumAspectRatio = .5; // Slightly smaller than 16:9.
+    static const double minimumAspectRatio = .5; // Slightly smaller than 9:16.
 
     // Elements which have not yet been laid out, or which are not yet in the DOM, cannot be main content.
     auto* renderer = element.renderer();
@@ -614,7 +632,14 @@ static bool isElementLargeEnoughForMainContent(const HTMLMediaElement& element)
     double height = renderer->clientHeight();
     double area = width * height;
     double aspectRatio = width / height;
-    return area >= elementMainContentAreaMinimum && aspectRatio >= minimumAspectRatio && aspectRatio <= maximumAspectRatio;
+
+    if (area < elementMainContentAreaMinimum)
+        return false;
+
+    if (aspectRatio >= minimumAspectRatio && aspectRatio <= maximumAspectRatio)
+        return true;
+
+    return isElementLargeRelativeToMainFrame(element);
 }
 
 void MediaElementSession::mainContentCheckTimerFired()

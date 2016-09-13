@@ -453,9 +453,9 @@ String WebSocket::binaryType() const
 {
     switch (m_binaryType) {
     case BinaryTypeBlob:
-        return "blob";
+        return ASCIILiteral("blob");
     case BinaryTypeArrayBuffer:
-        return "arraybuffer";
+        return ASCIILiteral("arraybuffer");
     }
     ASSERT_NOT_REACHED();
     return String();
@@ -633,6 +633,12 @@ void WebSocket::didClose(unsigned unhandledBufferedAmount, ClosingHandshakeCompl
     }
     if (hasPendingActivity())
         ActiveDOMObject::unsetPendingActivity(this);
+}
+
+void WebSocket::didUpgradeURL()
+{
+    ASSERT(m_url.protocolIs("ws"));
+    m_url.setProtocol("wss");
 }
 
 size_t WebSocket::getFramingOverhead(size_t payloadSize)

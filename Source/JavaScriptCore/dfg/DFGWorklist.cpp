@@ -29,9 +29,9 @@
 #if ENABLE(DFG_JIT)
 
 #include "CodeBlock.h"
-#include "DeferGC.h"
 #include "DFGLongLivedState.h"
 #include "DFGSafepoint.h"
+#include "DeferGC.h"
 #include "JSCInlines.h"
 #include <mutex>
 

@@ -135,6 +135,22 @@ T compileAndRun(Procedure& procedure, Arguments... arguments)
     return invoke<T>(*compile(procedure), arguments...);
 }
 
+void lowerToAirForTesting(Procedure& proc)
+{
+    proc.resetReachability();
+    
+    if (shouldBeVerbose())
+        dataLog("B3 before lowering:\n", proc);
+    
+    validate(proc);
+    lowerToAir(proc);
+    
+    if (shouldBeVerbose())
+        dataLog("Air after lowering:\n", proc.code());
+    
+    Air::validate(proc.code());
+}
+
 template<typename Type>
 struct Operand {
     const char* name;
@@ -333,6 +349,14 @@ void testReturnConst64(int64_t value)
         root->appendNew<Const64Value>(proc, Origin(), value));
 
     CHECK(compileAndRun<int64_t>(proc) == value);
+}
+
+void testReturnVoid()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    root->appendNewControlValue(proc, Return, Origin());
+    compileAndRun<void>(proc);
 }
 
 void testAddArg(int a)
@@ -2144,6 +2168,48 @@ void testSubArgsFloatWithEffectfulDoubleConversion(float a, float b)
     double effect = 0;
     CHECK(isIdentical(compileAndRun<int32_t>(proc, bitwise_cast<int32_t>(a), bitwise_cast<int32_t>(b), &effect), bitwise_cast<int32_t>(a - b)));
     CHECK(isIdentical(effect, static_cast<double>(a) - static_cast<double>(b)));
+}
+
+void testNegDouble(double a)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    root->appendNewControlValue(
+        proc, Return, Origin(),
+        root->appendNew<Value>(
+            proc, Neg, Origin(),
+            root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0)));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, a), -a));
+}
+
+void testNegFloat(float a)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument32 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* floatValue = root->appendNew<Value>(proc, BitwiseCast, Origin(), argument32);
+    root->appendNewControlValue(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Neg, Origin(), floatValue));
+
+    CHECK(isIdentical(compileAndRun<float>(proc, bitwise_cast<int32_t>(a)), -a));
+}
+
+void testNegFloatWithUselessDoubleConversion(float a)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argumentInt32 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* floatValue = root->appendNew<Value>(proc, BitwiseCast, Origin(), argumentInt32);
+    Value* asDouble = root->appendNew<Value>(proc, FloatToDouble, Origin(), floatValue);
+    Value* result = root->appendNew<Value>(proc, Neg, Origin(), asDouble);
+    Value* floatResult = root->appendNew<Value>(proc, DoubleToFloat, Origin(), result);
+    root->appendNewControlValue(proc, Return, Origin(), floatResult);
+
+    CHECK(isIdentical(compileAndRun<float>(proc, bitwise_cast<int32_t>(a)), -a));
 }
 
 void testBitAndArgs(int64_t a, int64_t b)
@@ -12179,6 +12245,7 @@ void testInterpreter()
     
     polyJump->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            AllowMacroScratchRegisterUsage allowScratch(jit);
             Vector<Box<CCallHelpers::Label>> labels = params.successorLabels();
 
             MacroAssemblerCodePtr* jumpTable = bitwise_cast<MacroAssemblerCodePtr*>(
@@ -12811,6 +12878,122 @@ void testSomeEarlyRegister()
     run(false);
 }
 
+void testBranchBitAndImmFusion(
+    B3::Opcode valueModifier, Type valueType, int64_t constant,
+    Air::Opcode expectedOpcode, Air::Arg::Kind firstKind)
+{
+    // Currently this test should pass on all CPUs. But some CPUs may not support this fused
+    // instruction. It's OK to skip this test on those CPUs.
+    
+    Procedure proc;
+    
+    BasicBlock* root = proc.addBlock();
+    BasicBlock* one = proc.addBlock();
+    BasicBlock* two = proc.addBlock();
+    
+    Value* left = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    
+    if (valueModifier != Identity) {
+        if (MemoryValue::accepts(valueModifier))
+            left = root->appendNew<MemoryValue>(proc, valueModifier, valueType, Origin(), left);
+        else
+            left = root->appendNew<Value>(proc, valueModifier, valueType, Origin(), left);
+    }
+    
+    root->appendNew<Value>(
+        proc, Branch, Origin(),
+        root->appendNew<Value>(
+            proc, BitAnd, Origin(), left,
+            root->appendIntConstant(proc, Origin(), valueType, constant)));
+    root->setSuccessors(FrequentedBlock(one), FrequentedBlock(two));
+    
+    one->appendNew<Value>(proc, Oops, Origin());
+    two->appendNew<Value>(proc, Oops, Origin());
+
+    lowerToAirForTesting(proc);
+
+    // The first basic block must end in a BranchTest64(resCond, tmp, bitImm).
+    Air::Inst terminal = proc.code()[0]->last();
+    CHECK_EQ(terminal.opcode, expectedOpcode);
+    CHECK_EQ(terminal.args[0].kind(), Air::Arg::ResCond);
+    CHECK_EQ(terminal.args[1].kind(), firstKind);
+    CHECK(terminal.args[2].kind() == Air::Arg::BitImm || terminal.args[2].kind() == Air::Arg::BitImm64);
+}
+
+void testPatchpointTerminalReturnValue(bool successIsRare)
+{
+    // This is a unit test for how FTL's heap allocation fast paths behave.
+    Procedure proc;
+    
+    BasicBlock* root = proc.addBlock();
+    BasicBlock* success = proc.addBlock();
+    BasicBlock* slowPath = proc.addBlock();
+    BasicBlock* continuation = proc.addBlock();
+    
+    Value* arg = root->appendNew<Value>(
+        proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    
+    PatchpointValue* patchpoint = root->appendNew<PatchpointValue>(proc, Int32, Origin());
+    patchpoint->effects.terminal = true;
+    patchpoint->clobber(RegisterSet::macroScratchRegisters());
+    
+    if (successIsRare) {
+        root->appendSuccessor(FrequentedBlock(success, FrequencyClass::Rare));
+        root->appendSuccessor(slowPath);
+    } else {
+        root->appendSuccessor(success);
+        root->appendSuccessor(FrequentedBlock(slowPath, FrequencyClass::Rare));
+    }
+    
+    patchpoint->appendSomeRegister(arg);
+    
+    patchpoint->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            AllowMacroScratchRegisterUsage allowScratch(jit);
+            
+            CCallHelpers::Jump jumpToSlow =
+                jit.branch32(CCallHelpers::Above, params[1].gpr(), CCallHelpers::TrustedImm32(42));
+            
+            jit.add32(CCallHelpers::TrustedImm32(31), params[1].gpr(), params[0].gpr());
+            
+            CCallHelpers::Jump jumpToSuccess;
+            if (!params.fallsThroughToSuccessor(0))
+                jumpToSuccess = jit.jump();
+            
+            Vector<Box<CCallHelpers::Label>> labels = params.successorLabels();
+            
+            params.addLatePath(
+                [=] (CCallHelpers& jit) {
+                    jumpToSlow.linkTo(*labels[1], &jit);
+                    if (jumpToSuccess.isSet())
+                        jumpToSuccess.linkTo(*labels[0], &jit);
+                });
+        });
+    
+    UpsilonValue* successUpsilon = success->appendNew<UpsilonValue>(proc, Origin(), patchpoint);
+    success->appendNew<Value>(proc, Jump, Origin());
+    success->setSuccessors(continuation);
+    
+    UpsilonValue* slowPathUpsilon = slowPath->appendNew<UpsilonValue>(
+        proc, Origin(), slowPath->appendNew<Const32Value>(proc, Origin(), 666));
+    slowPath->appendNew<Value>(proc, Jump, Origin());
+    slowPath->setSuccessors(continuation);
+    
+    Value* phi = continuation->appendNew<Value>(proc, Phi, Int32, Origin());
+    successUpsilon->setPhi(phi);
+    slowPathUpsilon->setPhi(phi);
+    continuation->appendNew<Value>(proc, Return, Origin(), phi);
+    
+    auto code = compile(proc);
+    CHECK_EQ(invoke<int>(*code, 0), 31);
+    CHECK_EQ(invoke<int>(*code, 1), 32);
+    CHECK_EQ(invoke<int>(*code, 41), 72);
+    CHECK_EQ(invoke<int>(*code, 42), 73);
+    CHECK_EQ(invoke<int>(*code, 43), 666);
+    CHECK_EQ(invoke<int>(*code, -1), 666);
+}
+
 // Make sure the compiler does not try to optimize anything out.
 NEVER_INLINE double zero()
 {
@@ -12885,6 +13068,7 @@ void run(const char* filter)
     RUN(testArg(43));
     RUN(testReturnConst64(5));
     RUN(testReturnConst64(-42));
+    RUN(testReturnVoid());
 
     RUN(testAddArg(111));
     RUN(testAddArgs(1, 1));
@@ -13097,6 +13281,10 @@ void run(const char* filter)
     RUN_UNARY(testSubArgFloatWithUselessDoubleConversion, floatingPointOperands<float>());
     RUN_BINARY(testSubArgsFloatWithUselessDoubleConversion, floatingPointOperands<float>(), floatingPointOperands<float>());
     RUN_BINARY(testSubArgsFloatWithEffectfulDoubleConversion, floatingPointOperands<float>(), floatingPointOperands<float>());
+
+    RUN_UNARY(testNegDouble, floatingPointOperands<double>());
+    RUN_UNARY(testNegFloat, floatingPointOperands<float>());
+    RUN_UNARY(testNegFloatWithUselessDoubleConversion, floatingPointOperands<float>());
 
     RUN(testBitAndArgs(43, 43));
     RUN(testBitAndArgs(43, 0));
@@ -14223,7 +14411,20 @@ void run(const char* filter)
     RUN(testEntrySwitchLoop());
 
     RUN(testSomeEarlyRegister());
+    RUN(testPatchpointTerminalReturnValue(true));
+    RUN(testPatchpointTerminalReturnValue(false));
     
+    if (isX86()) {
+        RUN(testBranchBitAndImmFusion(Identity, Int64, 1, Air::BranchTest32, Air::Arg::Tmp));
+        RUN(testBranchBitAndImmFusion(Identity, Int64, 0xff, Air::BranchTest32, Air::Arg::Tmp));
+        RUN(testBranchBitAndImmFusion(Trunc, Int32, 1, Air::BranchTest32, Air::Arg::Tmp));
+        RUN(testBranchBitAndImmFusion(Trunc, Int32, 0xff, Air::BranchTest32, Air::Arg::Tmp));
+        RUN(testBranchBitAndImmFusion(Load8S, Int32, 1, Air::BranchTest8, Air::Arg::Addr));
+        RUN(testBranchBitAndImmFusion(Load8Z, Int32, 1, Air::BranchTest8, Air::Arg::Addr));
+        RUN(testBranchBitAndImmFusion(Load, Int32, 1, Air::BranchTest32, Air::Arg::Addr));
+        RUN(testBranchBitAndImmFusion(Load, Int64, 1, Air::BranchTest32, Air::Arg::Addr));
+    }
+
     if (tasks.isEmpty())
         usage();
 

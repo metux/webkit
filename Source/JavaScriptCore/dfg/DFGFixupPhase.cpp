@@ -126,8 +126,11 @@ private:
         }
 
         case ArithClz32: {
-            fixIntConvertingEdge(node->child1());
-            node->setArithMode(Arith::Unchecked);
+            if (node->child1()->shouldSpeculateNotCell()) {
+                fixIntConvertingEdge(node->child1());
+                node->clearFlags(NodeMustGenerate);
+            } else
+                fixEdge<UntypedUse>(node->child1());
             break;
         }
             
@@ -331,15 +334,23 @@ private:
         }
             
         case ArithAbs: {
-            if (m_graph.unaryArithShouldSpeculateInt32(node, FixupPass)) {
+            if (node->child1()->shouldSpeculateInt32OrBoolean()
+                && node->canSpeculateInt32(FixupPass)) {
                 fixIntOrBooleanEdge(node->child1());
                 if (bytecodeCanTruncateInteger(node->arithNodeFlags()))
                     node->setArithMode(Arith::Unchecked);
                 else
                     node->setArithMode(Arith::CheckOverflow);
+                node->clearFlags(NodeMustGenerate);
+                node->setResult(NodeResultInt32);
                 break;
             }
-            fixDoubleOrBooleanEdge(node->child1());
+
+            if (node->child1()->shouldSpeculateNotCell()) {
+                fixDoubleOrBooleanEdge(node->child1());
+                node->clearFlags(NodeMustGenerate);
+            } else
+                fixEdge<UntypedUse>(node->child1());
             node->setResult(NodeResultDouble);
             break;
         }
@@ -385,14 +396,18 @@ private:
             }
             break;
         }
-            
-        case ArithSqrt:
-        case ArithFRound:
-        case ArithSin:
+
         case ArithCos:
-        case ArithLog: {
-            fixDoubleOrBooleanEdge(node->child1());
-            node->setResult(NodeResultDouble);
+        case ArithFRound:
+        case ArithLog:
+        case ArithSin:
+        case ArithSqrt: {
+            Edge& child1 = node->child1();
+            if (child1->shouldSpeculateNotCell()) {
+                fixDoubleOrBooleanEdge(child1);
+                node->clearFlags(NodeMustGenerate);
+            } else
+                fixEdge<UntypedUse>(child1);
             break;
         }
             
@@ -1214,12 +1229,8 @@ private:
             break;
         }
 
-        case CheckIdent: {
-            UniquedStringImpl* uid = node->uidOperand();
-            if (uid->isSymbol())
-                fixEdge<SymbolUse>(node->child1());
-            else
-                fixEdge<StringIdentUse>(node->child1());
+        case CheckStringIdent: {
+            fixEdge<StringIdentUse>(node->child1());
             break;
         }
             
@@ -1456,12 +1467,22 @@ private:
             RefPtr<TypeSet> typeSet = node->typeLocation()->m_instructionTypeSet;
             RuntimeTypeMask seenTypes = typeSet->seenTypes();
             if (typeSet->doesTypeConformTo(TypeAnyInt)) {
-                if (node->child1()->shouldSpeculateInt32())
+                if (node->child1()->shouldSpeculateInt32()) {
                     fixEdge<Int32Use>(node->child1());
-                else
+                    node->remove();
+                    break;
+                }
+
+                if (enableInt52()) {
                     fixEdge<AnyIntUse>(node->child1());
-                node->remove();
-            } else if (typeSet->doesTypeConformTo(TypeNumber | TypeAnyInt)) {
+                    node->remove();
+                    break;
+                }
+
+                // Must not perform fixEdge<NumberUse> here since the type set only includes TypeAnyInt. Double values should be logged.
+            }
+
+            if (typeSet->doesTypeConformTo(TypeNumber | TypeAnyInt)) {
                 fixEdge<NumberUse>(node->child1());
                 node->remove();
             } else if (typeSet->doesTypeConformTo(TypeString)) {
@@ -1504,9 +1525,9 @@ private:
             break;
         }
 
-        case CopyRest: {
-            fixEdge<KnownCellUse>(node->child1());
-            fixEdge<KnownInt32Use>(node->child2());
+        case CreateRest: {
+            watchHavingABadTime(node);
+            fixEdge<KnownInt32Use>(node->child1());
             break;
         }
 
@@ -1526,6 +1547,29 @@ private:
             fixEdge<KnownCellUse>(node->child2());
             break;
         }
+
+        case GetMapBucket:
+            if (node->child1().useKind() == MapObjectUse)
+                fixEdge<MapObjectUse>(node->child1());
+            else if (node->child1().useKind() == SetObjectUse)
+                fixEdge<SetObjectUse>(node->child1());
+            else
+                RELEASE_ASSERT_NOT_REACHED();
+            fixEdge<UntypedUse>(node->child2());
+            fixEdge<Int32Use>(node->child3());
+            break;
+
+        case LoadFromJSMapBucket:
+            fixEdge<KnownCellUse>(node->child1());
+            break;
+
+        case IsNonEmptyMapBucket:
+            fixEdge<KnownCellUse>(node->child1());
+            break;
+
+        case MapHash:
+            fixEdge<UntypedUse>(node->child1());
+            break;
 
 #if !ASSERT_DISABLED
         // Have these no-op cases here to ensure that nobody forgets to add handlers for new opcodes.

@@ -408,7 +408,7 @@ inline NinePieceImage StyleBuilderConverter::convertBorderMask(StyleResolver& st
 template <CSSPropertyID property>
 inline PassRefPtr<StyleImage> StyleBuilderConverter::convertStyleImage(StyleResolver& styleResolver, CSSValue& value)
 {
-    return styleResolver.styleImage(property, value);
+    return styleResolver.styleImage(value);
 }
 
 inline TransformOperations StyleBuilderConverter::convertTransform(StyleResolver& styleResolver, CSSValue& value)
@@ -730,11 +730,7 @@ inline TextDecorationSkip StyleBuilderConverter::convertTextDecorationSkip(Style
 #if ENABLE(CSS_SHAPES)
 static inline bool isImageShape(const CSSValue& value)
 {
-    return is<CSSImageValue>(value)
-#if ENABLE(CSS_IMAGE_SET)
-        || is<CSSImageSetValue>(value)
-#endif 
-        || is<CSSImageGeneratorValue>(value);
+    return is<CSSImageValue>(value) || is<CSSImageSetValue>(value) || is<CSSImageGeneratorValue>(value);
 }
 
 inline PassRefPtr<ShapeValue> StyleBuilderConverter::convertShapeValue(StyleResolver& styleResolver, CSSValue& value)
@@ -745,7 +741,7 @@ inline PassRefPtr<ShapeValue> StyleBuilderConverter::convertShapeValue(StyleReso
     }
 
     if (isImageShape(value))
-        return ShapeValue::createImageValue(styleResolver.styleImage(CSSPropertyWebkitShapeOutside, value));
+        return ShapeValue::createImageValue(styleResolver.styleImage(value));
 
     RefPtr<BasicShape> shape;
     CSSBoxType referenceBox = BoxMissing;

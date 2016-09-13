@@ -49,6 +49,11 @@ template<typename T> EnableIfFloatingPointType<T, Optional<T>> convertOptional(J
 template<typename T, typename U> EnableIfIntegralType<T> convertOptional(JSC::ExecState&, JSC::JSValue, IntegerConversionConfiguration, U&& defaultValue);
 template<typename T, typename U> EnableIfFloatingPointType<T> convertOptional(JSC::ExecState&, JSC::JSValue, ShouldAllowNonFinite, U&& defaultValue);
 
+template<typename T> Optional<T> convertDictionary(JSC::ExecState&, JSC::JSValue);
+
+enum class IsNullable { No, Yes };
+template<typename T, typename JST> T* convertWrapperType(JSC::ExecState&, JSC::JSValue, IsNullable);
+
 // This is where the implementation of the things declared above begins:
 
 template<typename T> T convert(JSC::ExecState& state, JSC::JSValue value)
@@ -64,6 +69,16 @@ template<typename T> inline EnableIfIntegralType<T> convert(JSC::ExecState& stat
 template<typename T> inline EnableIfFloatingPointType<T> convert(JSC::ExecState& state, JSC::JSValue value, ShouldAllowNonFinite allow)
 {
     return Converter<T>::convert(state, value, allow);
+}
+
+template<typename T, typename JST> inline T* convertWrapperType(JSC::ExecState& state, JSC::JSValue value, IsNullable isNullable)
+{
+    JSC::VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+    T* object = JST::toWrapped(value);
+    if (!object && (isNullable == IsNullable::No || !value.isUndefinedOrNull()))
+        throwTypeError(&state, scope);
+    return object;
 }
 
 template<typename T> inline typename Converter<T>::OptionalValue convertOptional(JSC::ExecState& state, JSC::JSValue value)
@@ -118,10 +133,17 @@ template<> struct Converter<String> : DefaultConverter<String> {
     }
 };
 
+template<> struct Converter<JSC::JSValue> : DefaultConverter<JSC::JSValue> {
+    using OptionalValue = JSC::JSValue; // Use jsUndefined() to mean an optional value was not present.
+    static JSC::JSValue convert(JSC::ExecState&, JSC::JSValue value)
+    {
+        return value;
+    }
+};
+
 template<typename T> struct Converter<Vector<T>> : DefaultConverter<Vector<T>> {
     static Vector<T> convert(JSC::ExecState& state, JSC::JSValue value)
     {
-        // FIXME: The toNativeArray function doesn't throw a type error if the value is not an object. Is that OK?
         return toNativeArray<T>(state, value);
     }
 };
@@ -255,9 +277,11 @@ template<> struct Converter<uint64_t> : DefaultConverter<uint64_t> {
 template<typename T> struct Converter<T, typename std::enable_if<std::is_floating_point<T>::value>::type> : DefaultConverter<T> {
     static T convert(JSC::ExecState& state, JSC::JSValue value, ShouldAllowNonFinite allow)
     {
+        JSC::VM& vm = state.vm();
+        auto scope = DECLARE_THROW_SCOPE(vm);
         double number = value.toNumber(&state);
         if (allow == ShouldAllowNonFinite::No && UNLIKELY(!std::isfinite(number)))
-            throwNonFiniteTypeError(state);
+            throwNonFiniteTypeError(state, scope);
         return static_cast<T>(number);
     }
 };

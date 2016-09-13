@@ -34,6 +34,7 @@
 #include "ExceptionCode.h"
 #include "FetchRequest.h"
 #include "HTTPParsers.h"
+#include "JSBlob.h"
 #include "JSFetchResponse.h"
 #include "ScriptExecutionContext.h"
 
@@ -81,9 +82,9 @@ void FetchResponse::setStatus(int status, const String& statusText, ExceptionCod
 
 void FetchResponse::initializeWith(JSC::ExecState& execState, JSC::JSValue body)
 {
-    m_body = FetchBody::extract(execState, body);
-    if (m_headers->fastGet(HTTPHeaderName::ContentType).isEmpty() && !m_body.mimeType().isEmpty())
-        m_headers->fastSet(HTTPHeaderName::ContentType, m_body.mimeType());
+    ASSERT(scriptExecutionContext());
+    m_body = FetchBody::extract(*scriptExecutionContext(), execState, body);
+    m_body.updateContentType(m_headers);
 }
 
 FetchResponse::FetchResponse(ScriptExecutionContext& context, FetchBody&& body, Ref<FetchHeaders>&& headers, ResourceResponse&& response)
@@ -93,13 +94,11 @@ FetchResponse::FetchResponse(ScriptExecutionContext& context, FetchBody&& body, 
 {
 }
 
-RefPtr<FetchResponse> FetchResponse::clone(ScriptExecutionContext& context, ExceptionCode& ec)
+Ref<FetchResponse> FetchResponse::cloneForJS()
 {
-    if (isDisturbed()) {
-        ec = TypeError;
-        return nullptr;
-    }
-    return adoptRef(*new FetchResponse(context, FetchBody(m_body), FetchHeaders::create(headers()), ResourceResponse(m_response)));
+    ASSERT(scriptExecutionContext());
+    ASSERT(!isDisturbed());
+    return adoptRef(*new FetchResponse(*scriptExecutionContext(), FetchBody(m_body), FetchHeaders::create(headers()), ResourceResponse(m_response)));
 }
 
 void FetchResponse::fetch(ScriptExecutionContext& context, FetchRequest& request, FetchPromise&& promise)
@@ -124,12 +123,17 @@ const String& FetchResponse::url() const
 void FetchResponse::BodyLoader::didSucceed()
 {
     ASSERT(m_response.hasPendingActivity());
+    m_response.m_body.loadingSucceeded();
+
 #if ENABLE(STREAMS_API)
-    if (m_response.m_readableStreamSource) {
+    if (m_response.m_readableStreamSource && m_response.m_body.type() != FetchBody::Type::Loaded) {
+        // We only close the stream if FetchBody already enqueued data.
+        // Otherwise, FetchBody will close the stream when enqueuing data.
         m_response.m_readableStreamSource->close();
         m_response.m_readableStreamSource = nullptr;
     }
 #endif
+
     if (m_loader->isStarted())
         m_response.m_bodyLoader = Nullopt;
     m_response.unsetPendingActivity(&m_response);
@@ -170,6 +174,7 @@ void FetchResponse::BodyLoader::didReceiveResponse(const ResourceResponse& resou
 
     m_response.m_response = resourceResponse;
     m_response.m_headers->filterAndFill(resourceResponse.httpHeaderFields(), FetchHeaders::Guard::Response);
+    m_response.m_body.setContentType(m_response.m_headers->fastGet(HTTPHeaderName::ContentType));
 
     std::exchange(m_promise, Nullopt)->resolve(m_response);
 }
@@ -187,25 +192,60 @@ void FetchResponse::BodyLoader::didReceiveData(const char* data, size_t size)
 #endif
 }
 
-void FetchResponse::BodyLoader::didFinishLoadingAsArrayBuffer(RefPtr<ArrayBuffer>&& buffer)
-{
-    m_response.body().loadedAsArrayBuffer(WTFMove(buffer));
-}
-
 bool FetchResponse::BodyLoader::start(ScriptExecutionContext& context, const FetchRequest& request)
 {
-    m_loader = std::make_unique<FetchLoader>(FetchLoader::Type::ArrayBuffer, *this);
+    m_loader = std::make_unique<FetchLoader>(*this, &m_response.m_body.consumer());
     m_loader->start(context, request);
     return m_loader->isStarted();
 }
 
 void FetchResponse::BodyLoader::stop()
 {
+    m_promise = Nullopt;
     if (m_loader)
         m_loader->stop();
 }
 
+void FetchResponse::consume(unsigned type, DeferredWrapper&& wrapper)
+{
+    ASSERT(type <= static_cast<unsigned>(FetchBodyConsumer::Type::Text));
+
+    switch (static_cast<FetchBodyConsumer::Type>(type)) {
+    case FetchBodyConsumer::Type::ArrayBuffer:
+        arrayBuffer(WTFMove(wrapper));
+        return;
+    case FetchBodyConsumer::Type::Blob:
+        blob(WTFMove(wrapper));
+        return;
+    case FetchBodyConsumer::Type::JSON:
+        json(WTFMove(wrapper));
+        return;
+    case FetchBodyConsumer::Type::Text:
+        text(WTFMove(wrapper));
+        return;
+    case FetchBodyConsumer::Type::None:
+        ASSERT_NOT_REACHED();
+        return;
+    }
+}
+
 #if ENABLE(STREAMS_API)
+void FetchResponse::startConsumingStream(unsigned type)
+{
+    m_isDisturbed = true;
+    m_consumer.setType(static_cast<FetchBodyConsumer::Type>(type));
+}
+
+void FetchResponse::consumeChunk(Ref<JSC::Uint8Array>&& chunk)
+{
+    m_consumer.append(chunk->data(), chunk->byteLength());
+}
+
+void FetchResponse::finishConsumingStream(DeferredWrapper&& promise)
+{
+    m_consumer.resolve(promise);
+}
+
 void FetchResponse::consumeBodyAsStream()
 {
     ASSERT(m_readableStreamSource);

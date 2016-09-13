@@ -29,7 +29,6 @@
 #if ENABLE(DFG_JIT)
 
 #include "DFGGraph.h"
-#include "DFGNodeAllocator.h"
 #include "DFGPromotedHeapLocation.h"
 #include "JSCInlines.h"
 
@@ -62,11 +61,6 @@ void BranchTarget::dump(PrintStream& out) const
     
     if (count == count) // If the count is not NaN, then print it.
         out.print("/w:", count);
-}
-
-unsigned Node::index() const
-{
-    return NodeAllocator::allocatorOf(this)->indexOf(this);
 }
 
 bool Node::hasVariableAccessData(Graph& graph)
@@ -164,15 +158,15 @@ void Node::convertToLazyJSConstant(Graph& graph, LazyJSValue value)
 {
     m_op = LazyJSConstant;
     m_flags &= ~NodeMustGenerate;
-    m_opInfo = bitwise_cast<uintptr_t>(graph.m_lazyJSValues.add(value));
+    m_opInfo = graph.m_lazyJSValues.add(value);
     children.reset();
 }
 
 void Node::convertToPutHint(const PromotedLocationDescriptor& descriptor, Node* base, Node* value)
 {
     m_op = PutHint;
-    m_opInfo = descriptor.imm1().m_value;
-    m_opInfo2 = descriptor.imm2().m_value;
+    m_opInfo = descriptor.imm1();
+    m_opInfo2 = descriptor.imm2();
     child1() = base->defaultEdge();
     child2() = value->defaultEdge();
     child3() = Edge();
@@ -212,7 +206,7 @@ String Node::tryGetString(Graph& graph)
 
 PromotedLocationDescriptor Node::promotedLocationDescriptor()
 {
-    return PromotedLocationDescriptor(static_cast<PromotedLocationKind>(m_opInfo), m_opInfo2);
+    return PromotedLocationDescriptor(static_cast<PromotedLocationKind>(m_opInfo.as<uint32_t>()), m_opInfo2.as<uint32_t>());
 }
 
 } } // namespace JSC::DFG

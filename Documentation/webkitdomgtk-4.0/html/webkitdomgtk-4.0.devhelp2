@@ -230,10 +230,16 @@
     <keyword type="function" name="webkit_dom_attr_get_value ()" link="WebKitDOMAttr.html#webkit-dom-attr-get-value"/>
     <keyword type="function" name="webkit_dom_attr_set_value ()" link="WebKitDOMAttr.html#webkit-dom-attr-set-value"/>
     <keyword type="function" name="webkit_dom_attr_get_owner_element ()" link="WebKitDOMAttr.html#webkit-dom-attr-get-owner-element"/>
+    <keyword type="function" name="webkit_dom_attr_get_namespace_uri ()" link="WebKitDOMAttr.html#webkit-dom-attr-get-namespace-uri" since="2.14"/>
+    <keyword type="function" name="webkit_dom_attr_get_prefix ()" link="WebKitDOMAttr.html#webkit-dom-attr-get-prefix" since="2.14"/>
+    <keyword type="function" name="webkit_dom_attr_get_local_name ()" link="WebKitDOMAttr.html#webkit-dom-attr-get-local-name" since="2.14"/>
     <keyword type="struct" name="WebKitDOMAttr" link="WebKitDOMAttr.html#WebKitDOMAttr-struct"/>
     <keyword type="property" name="The “is-id” property" link="WebKitDOMAttr.html#WebKitDOMAttr--is-id"/>
+    <keyword type="property" name="The “local-name” property" link="WebKitDOMAttr.html#WebKitDOMAttr--local-name"/>
     <keyword type="property" name="The “name” property" link="WebKitDOMAttr.html#WebKitDOMAttr--name"/>
+    <keyword type="property" name="The “namespace-uri” property" link="WebKitDOMAttr.html#WebKitDOMAttr--namespace-uri"/>
     <keyword type="property" name="The “owner-element” property" link="WebKitDOMAttr.html#WebKitDOMAttr--owner-element"/>
+    <keyword type="property" name="The “prefix” property" link="WebKitDOMAttr.html#WebKitDOMAttr--prefix"/>
     <keyword type="property" name="The “specified” property" link="WebKitDOMAttr.html#WebKitDOMAttr--specified"/>
     <keyword type="property" name="The “value” property" link="WebKitDOMAttr.html#WebKitDOMAttr--value"/>
     <keyword type="struct" name="WebKitDOMCDATASection" link="WebKitDOMCDATASection.html#WebKitDOMCDATASection-struct"/>
@@ -306,7 +312,9 @@
     <keyword type="function" name="webkit_dom_document_get_default_view ()" link="WebKitDOMDocument.html#webkit-dom-document-get-default-view"/>
     <keyword type="function" name="webkit_dom_document_get_style_sheets ()" link="WebKitDOMDocument.html#webkit-dom-document-get-style-sheets"/>
     <keyword type="function" name="webkit_dom_document_get_title ()" link="WebKitDOMDocument.html#webkit-dom-document-get-title"/>
-    <keyword type="function" name="webkit_dom_document_set_title_with_error ()" link="WebKitDOMDocument.html#webkit-dom-document-set-title-with-error" since="2.14"/>
+    <keyword type="function" name="webkit_dom_document_set_title ()" link="WebKitDOMDocument.html#webkit-dom-document-set-title"/>
+    <keyword type="function" name="webkit_dom_document_get_design_mode ()" link="WebKitDOMDocument.html#webkit-dom-document-get-design-mode" since="2.14"/>
+    <keyword type="function" name="webkit_dom_document_set_design_mode ()" link="WebKitDOMDocument.html#webkit-dom-document-set-design-mode" since="2.14"/>
     <keyword type="function" name="webkit_dom_document_get_referrer ()" link="WebKitDOMDocument.html#webkit-dom-document-get-referrer"/>
     <keyword type="function" name="webkit_dom_document_get_domain ()" link="WebKitDOMDocument.html#webkit-dom-document-get-domain"/>
     <keyword type="function" name="webkit_dom_document_get_url ()" link="WebKitDOMDocument.html#webkit-dom-document-get-url"/>
@@ -320,21 +328,24 @@
     <keyword type="function" name="webkit_dom_document_get_links ()" link="WebKitDOMDocument.html#webkit-dom-document-get-links"/>
     <keyword type="function" name="webkit_dom_document_get_forms ()" link="WebKitDOMDocument.html#webkit-dom-document-get-forms"/>
     <keyword type="function" name="webkit_dom_document_get_anchors ()" link="WebKitDOMDocument.html#webkit-dom-document-get-anchors"/>
+    <keyword type="function" name="webkit_dom_document_get_embeds ()" link="WebKitDOMDocument.html#webkit-dom-document-get-embeds" since="2.14"/>
+    <keyword type="function" name="webkit_dom_document_get_plugins ()" link="WebKitDOMDocument.html#webkit-dom-document-get-plugins" since="2.14"/>
+    <keyword type="function" name="webkit_dom_document_get_scripts ()" link="WebKitDOMDocument.html#webkit-dom-document-get-scripts" since="2.14"/>
     <keyword type="function" name="webkit_dom_document_get_last_modified ()" link="WebKitDOMDocument.html#webkit-dom-document-get-last-modified"/>
     <keyword type="function" name="webkit_dom_document_get_charset ()" link="WebKitDOMDocument.html#webkit-dom-document-get-charset"/>
     <keyword type="function" name="webkit_dom_document_set_charset ()" link="WebKitDOMDocument.html#webkit-dom-document-set-charset"/>
-    <keyword type="function" name="webkit_dom_document_get_default_charset ()" link="WebKitDOMDocument.html#webkit-dom-document-get-default-charset"/>
     <keyword type="function" name="webkit_dom_document_get_ready_state ()" link="WebKitDOMDocument.html#webkit-dom-document-get-ready-state"/>
     <keyword type="function" name="webkit_dom_document_get_character_set ()" link="WebKitDOMDocument.html#webkit-dom-document-get-character-set"/>
     <keyword type="function" name="webkit_dom_document_get_preferred_stylesheet_set ()" link="WebKitDOMDocument.html#webkit-dom-document-get-preferred-stylesheet-set"/>
     <keyword type="function" name="webkit_dom_document_get_selected_stylesheet_set ()" link="WebKitDOMDocument.html#webkit-dom-document-get-selected-stylesheet-set"/>
     <keyword type="function" name="webkit_dom_document_set_selected_stylesheet_set ()" link="WebKitDOMDocument.html#webkit-dom-document-set-selected-stylesheet-set"/>
     <keyword type="function" name="webkit_dom_document_get_active_element ()" link="WebKitDOMDocument.html#webkit-dom-document-get-active-element"/>
+    <keyword type="function" name="webkit_dom_document_get_compat_mode ()" link="WebKitDOMDocument.html#webkit-dom-document-get-compat-mode" since="2.14"/>
     <keyword type="function" name="webkit_dom_document_get_elements_by_class_name ()" link="WebKitDOMDocument.html#webkit-dom-document-get-elements-by-class-name" deprecated=""/>
     <keyword type="function" name="webkit_dom_document_get_elements_by_tag_name ()" link="WebKitDOMDocument.html#webkit-dom-document-get-elements-by-tag-name" deprecated=""/>
     <keyword type="function" name="webkit_dom_document_get_elements_by_tag_name_ns ()" link="WebKitDOMDocument.html#webkit-dom-document-get-elements-by-tag-name-ns" deprecated=""/>
     <keyword type="function" name="webkit_dom_document_create_entity_reference ()" link="WebKitDOMDocument.html#webkit-dom-document-create-entity-reference" deprecated=""/>
-    <keyword type="function" name="webkit_dom_document_set_title ()" link="WebKitDOMDocument.html#webkit-dom-document-set-title" deprecated=""/>
+    <keyword type="function" name="webkit_dom_document_get_default_charset ()" link="WebKitDOMDocument.html#webkit-dom-document-get-default-charset" deprecated=""/>
     <keyword type="struct" name="WebKitDOMDocument" link="WebKitDOMDocument.html#WebKitDOMDocument-struct"/>
     <keyword type="property" name="The “active-element” property" link="WebKitDOMDocument.html#WebKitDOMDocument--active-element"/>
     <keyword type="property" name="The “anchors” property" link="WebKitDOMDocument.html#WebKitDOMDocument--anchors"/>
@@ -348,13 +359,14 @@
     <keyword type="property" name="The “content-type” property" link="WebKitDOMDocument.html#WebKitDOMDocument--content-type"/>
     <keyword type="property" name="The “cookie” property" link="WebKitDOMDocument.html#WebKitDOMDocument--cookie"/>
     <keyword type="property" name="The “current-script” property" link="WebKitDOMDocument.html#WebKitDOMDocument--current-script"/>
-    <keyword type="property" name="The “default-charset” property" link="WebKitDOMDocument.html#WebKitDOMDocument--default-charset"/>
     <keyword type="property" name="The “default-view” property" link="WebKitDOMDocument.html#WebKitDOMDocument--default-view"/>
+    <keyword type="property" name="The “design-mode” property" link="WebKitDOMDocument.html#WebKitDOMDocument--design-mode"/>
     <keyword type="property" name="The “dir” property" link="WebKitDOMDocument.html#WebKitDOMDocument--dir"/>
     <keyword type="property" name="The “doctype” property" link="WebKitDOMDocument.html#WebKitDOMDocument--doctype"/>
     <keyword type="property" name="The “document-element” property" link="WebKitDOMDocument.html#WebKitDOMDocument--document-element"/>
     <keyword type="property" name="The “document-uri” property" link="WebKitDOMDocument.html#WebKitDOMDocument--document-uri"/>
     <keyword type="property" name="The “domain” property" link="WebKitDOMDocument.html#WebKitDOMDocument--domain"/>
+    <keyword type="property" name="The “embeds” property" link="WebKitDOMDocument.html#WebKitDOMDocument--embeds"/>
     <keyword type="property" name="The “first-element-child” property" link="WebKitDOMDocument.html#WebKitDOMDocument--first-element-child"/>
     <keyword type="property" name="The “forms” property" link="WebKitDOMDocument.html#WebKitDOMDocument--forms"/>
     <keyword type="property" name="The “head” property" link="WebKitDOMDocument.html#WebKitDOMDocument--head"/>
@@ -366,14 +378,15 @@
     <keyword type="property" name="The “last-modified” property" link="WebKitDOMDocument.html#WebKitDOMDocument--last-modified"/>
     <keyword type="property" name="The “links” property" link="WebKitDOMDocument.html#WebKitDOMDocument--links"/>
     <keyword type="property" name="The “origin” property" link="WebKitDOMDocument.html#WebKitDOMDocument--origin"/>
+    <keyword type="property" name="The “plugins” property" link="WebKitDOMDocument.html#WebKitDOMDocument--plugins"/>
     <keyword type="property" name="The “pointer-lock-element” property" link="WebKitDOMDocument.html#WebKitDOMDocument--pointer-lock-element"/>
     <keyword type="property" name="The “preferred-stylesheet-set” property" link="WebKitDOMDocument.html#WebKitDOMDocument--preferred-stylesheet-set"/>
     <keyword type="property" name="The “ready-state” property" link="WebKitDOMDocument.html#WebKitDOMDocument--ready-state"/>
     <keyword type="property" name="The “referrer” property" link="WebKitDOMDocument.html#WebKitDOMDocument--referrer"/>
+    <keyword type="property" name="The “scripts” property" link="WebKitDOMDocument.html#WebKitDOMDocument--scripts"/>
     <keyword type="property" name="The “scrolling-element” property" link="WebKitDOMDocument.html#WebKitDOMDocument--scrolling-element"/>
     <keyword type="property" name="The “selected-stylesheet-set” property" link="WebKitDOMDocument.html#WebKitDOMDocument--selected-stylesheet-set"/>
     <keyword type="property" name="The “style-sheets” property" link="WebKitDOMDocument.html#WebKitDOMDocument--style-sheets"/>
-    <keyword type="property" name="The “timeline” property" link="WebKitDOMDocument.html#WebKitDOMDocument--timeline"/>
     <keyword type="property" name="The “title” property" link="WebKitDOMDocument.html#WebKitDOMDocument--title"/>
     <keyword type="property" name="The “url” property" link="WebKitDOMDocument.html#WebKitDOMDocument--url"/>
     <keyword type="property" name="The “visibility-state” property" link="WebKitDOMDocument.html#WebKitDOMDocument--visibility-state"/>
@@ -393,9 +406,9 @@
     <keyword type="function" name="webkit_dom_document_type_get_name ()" link="WebKitDOMDocumentType.html#webkit-dom-document-type-get-name"/>
     <keyword type="function" name="webkit_dom_document_type_get_entities ()" link="WebKitDOMDocumentType.html#webkit-dom-document-type-get-entities"/>
     <keyword type="function" name="webkit_dom_document_type_get_notations ()" link="WebKitDOMDocumentType.html#webkit-dom-document-type-get-notations"/>
+    <keyword type="function" name="webkit_dom_document_type_get_internal_subset ()" link="WebKitDOMDocumentType.html#webkit-dom-document-type-get-internal-subset"/>
     <keyword type="function" name="webkit_dom_document_type_get_public_id ()" link="WebKitDOMDocumentType.html#webkit-dom-document-type-get-public-id"/>
     <keyword type="function" name="webkit_dom_document_type_get_system_id ()" link="WebKitDOMDocumentType.html#webkit-dom-document-type-get-system-id"/>
-    <keyword type="function" name="webkit_dom_document_type_get_internal_subset ()" link="WebKitDOMDocumentType.html#webkit-dom-document-type-get-internal-subset"/>
     <keyword type="struct" name="WebKitDOMDocumentType" link="WebKitDOMDocumentType.html#WebKitDOMDocumentType-struct"/>
     <keyword type="property" name="The “entities” property" link="WebKitDOMDocumentType.html#WebKitDOMDocumentType--entities"/>
     <keyword type="property" name="The “internal-subset” property" link="WebKitDOMDocumentType.html#WebKitDOMDocumentType--internal-subset"/>
@@ -433,6 +446,9 @@
     <keyword type="function" name="webkit_dom_element_get_style ()" link="WebKitDOMElement.html#webkit-dom-element-get-style"/>
     <keyword type="function" name="webkit_dom_element_get_id ()" link="WebKitDOMElement.html#webkit-dom-element-get-id"/>
     <keyword type="function" name="webkit_dom_element_set_id ()" link="WebKitDOMElement.html#webkit-dom-element-set-id"/>
+    <keyword type="function" name="webkit_dom_element_get_namespace_uri ()" link="WebKitDOMElement.html#webkit-dom-element-get-namespace-uri" since="2.14"/>
+    <keyword type="function" name="webkit_dom_element_get_prefix ()" link="WebKitDOMElement.html#webkit-dom-element-get-prefix" since="2.14"/>
+    <keyword type="function" name="webkit_dom_element_get_local_name ()" link="WebKitDOMElement.html#webkit-dom-element-get-local-name" since="2.14"/>
     <keyword type="function" name="webkit_dom_element_get_offset_left ()" link="WebKitDOMElement.html#webkit-dom-element-get-offset-left"/>
     <keyword type="function" name="webkit_dom_element_get_offset_top ()" link="WebKitDOMElement.html#webkit-dom-element-get-offset-top"/>
     <keyword type="function" name="webkit_dom_element_get_offset_width ()" link="WebKitDOMElement.html#webkit-dom-element-get-offset-width"/>
@@ -477,6 +493,8 @@
     <keyword type="property" name="The “id” property" link="WebKitDOMElement.html#WebKitDOMElement--id"/>
     <keyword type="property" name="The “inner-html” property" link="WebKitDOMElement.html#WebKitDOMElement--inner-html"/>
     <keyword type="property" name="The “last-element-child” property" link="WebKitDOMElement.html#WebKitDOMElement--last-element-child"/>
+    <keyword type="property" name="The “local-name” property" link="WebKitDOMElement.html#WebKitDOMElement--local-name"/>
+    <keyword type="property" name="The “namespace-uri” property" link="WebKitDOMElement.html#WebKitDOMElement--namespace-uri"/>
     <keyword type="property" name="The “next-element-sibling” property" link="WebKitDOMElement.html#WebKitDOMElement--next-element-sibling"/>
     <keyword type="property" name="The “offset-height” property" link="WebKitDOMElement.html#WebKitDOMElement--offset-height"/>
     <keyword type="property" name="The “offset-left” property" link="WebKitDOMElement.html#WebKitDOMElement--offset-left"/>
@@ -484,6 +502,7 @@
     <keyword type="property" name="The “offset-top” property" link="WebKitDOMElement.html#WebKitDOMElement--offset-top"/>
     <keyword type="property" name="The “offset-width” property" link="WebKitDOMElement.html#WebKitDOMElement--offset-width"/>
     <keyword type="property" name="The “outer-html” property" link="WebKitDOMElement.html#WebKitDOMElement--outer-html"/>
+    <keyword type="property" name="The “prefix” property" link="WebKitDOMElement.html#WebKitDOMElement--prefix"/>
     <keyword type="property" name="The “previous-element-sibling” property" link="WebKitDOMElement.html#WebKitDOMElement--previous-element-sibling"/>
     <keyword type="property" name="The “scroll-height” property" link="WebKitDOMElement.html#WebKitDOMElement--scroll-height"/>
     <keyword type="property" name="The “scroll-left” property" link="WebKitDOMElement.html#WebKitDOMElement--scroll-left"/>
@@ -634,15 +653,15 @@
     <keyword type="function" name="webkit_dom_node_get_previous_sibling ()" link="WebKitDOMNode.html#webkit-dom-node-get-previous-sibling"/>
     <keyword type="function" name="webkit_dom_node_get_next_sibling ()" link="WebKitDOMNode.html#webkit-dom-node-get-next-sibling"/>
     <keyword type="function" name="webkit_dom_node_get_owner_document ()" link="WebKitDOMNode.html#webkit-dom-node-get-owner-document"/>
-    <keyword type="function" name="webkit_dom_node_get_namespace_uri ()" link="WebKitDOMNode.html#webkit-dom-node-get-namespace-uri"/>
-    <keyword type="function" name="webkit_dom_node_get_prefix ()" link="WebKitDOMNode.html#webkit-dom-node-get-prefix"/>
-    <keyword type="function" name="webkit_dom_node_set_prefix ()" link="WebKitDOMNode.html#webkit-dom-node-set-prefix"/>
-    <keyword type="function" name="webkit_dom_node_get_local_name ()" link="WebKitDOMNode.html#webkit-dom-node-get-local-name"/>
     <keyword type="function" name="webkit_dom_node_get_base_uri ()" link="WebKitDOMNode.html#webkit-dom-node-get-base-uri"/>
     <keyword type="function" name="webkit_dom_node_get_text_content ()" link="WebKitDOMNode.html#webkit-dom-node-get-text-content"/>
     <keyword type="function" name="webkit_dom_node_set_text_content ()" link="WebKitDOMNode.html#webkit-dom-node-set-text-content"/>
     <keyword type="function" name="webkit_dom_node_get_parent_element ()" link="WebKitDOMNode.html#webkit-dom-node-get-parent-element"/>
     <keyword type="function" name="webkit_dom_node_clone_node ()" link="WebKitDOMNode.html#webkit-dom-node-clone-node" deprecated=""/>
+    <keyword type="function" name="webkit_dom_node_get_namespace_uri ()" link="WebKitDOMNode.html#webkit-dom-node-get-namespace-uri" deprecated=""/>
+    <keyword type="function" name="webkit_dom_node_get_prefix ()" link="WebKitDOMNode.html#webkit-dom-node-get-prefix" deprecated=""/>
+    <keyword type="function" name="webkit_dom_node_set_prefix ()" link="WebKitDOMNode.html#webkit-dom-node-set-prefix" deprecated=""/>
+    <keyword type="function" name="webkit_dom_node_get_local_name ()" link="WebKitDOMNode.html#webkit-dom-node-get-local-name" deprecated=""/>
     <keyword type="struct" name="WebKitDOMNode" link="WebKitDOMNode.html#WebKitDOMNode-struct"/>
     <keyword type="macro" name="WEBKIT_DOM_NODE_ELEMENT_NODE" link="WebKitDOMNode.html#WEBKIT-DOM-NODE-ELEMENT-NODE:CAPS"/>
     <keyword type="macro" name="WEBKIT_DOM_NODE_ATTRIBUTE_NODE" link="WebKitDOMNode.html#WEBKIT-DOM-NODE-ATTRIBUTE-NODE:CAPS"/>
@@ -666,8 +685,6 @@
     <keyword type="property" name="The “first-child” property" link="WebKitDOMNode.html#WebKitDOMNode--first-child"/>
     <keyword type="property" name="The “is-connected” property" link="WebKitDOMNode.html#WebKitDOMNode--is-connected"/>
     <keyword type="property" name="The “last-child” property" link="WebKitDOMNode.html#WebKitDOMNode--last-child"/>
-    <keyword type="property" name="The “local-name” property" link="WebKitDOMNode.html#WebKitDOMNode--local-name"/>
-    <keyword type="property" name="The “namespace-uri” property" link="WebKitDOMNode.html#WebKitDOMNode--namespace-uri"/>
     <keyword type="property" name="The “next-sibling” property" link="WebKitDOMNode.html#WebKitDOMNode--next-sibling"/>
     <keyword type="property" name="The “node-name” property" link="WebKitDOMNode.html#WebKitDOMNode--node-name"/>
     <keyword type="property" name="The “node-type” property" link="WebKitDOMNode.html#WebKitDOMNode--node-type"/>
@@ -675,7 +692,6 @@
     <keyword type="property" name="The “owner-document” property" link="WebKitDOMNode.html#WebKitDOMNode--owner-document"/>
     <keyword type="property" name="The “parent-element” property" link="WebKitDOMNode.html#WebKitDOMNode--parent-element"/>
     <keyword type="property" name="The “parent-node” property" link="WebKitDOMNode.html#WebKitDOMNode--parent-node"/>
-    <keyword type="property" name="The “prefix” property" link="WebKitDOMNode.html#WebKitDOMNode--prefix"/>
     <keyword type="property" name="The “previous-sibling” property" link="WebKitDOMNode.html#WebKitDOMNode--previous-sibling"/>
     <keyword type="property" name="The “text-content” property" link="WebKitDOMNode.html#WebKitDOMNode--text-content"/>
     <keyword type="function" name="webkit_dom_node_iterator_next_node ()" link="WebKitDOMNodeIterator.html#webkit-dom-node-iterator-next-node"/>
@@ -749,8 +765,8 @@
     <keyword type="property" name="The “start-offset” property" link="WebKitDOMRange.html#WebKitDOMRange--start-offset"/>
     <keyword type="property" name="The “text” property" link="WebKitDOMRange.html#WebKitDOMRange--text"/>
     <keyword type="function" name="webkit_dom_text_split_text ()" link="WebKitDOMText.html#webkit-dom-text-split-text"/>
-    <keyword type="function" name="webkit_dom_text_replace_whole_text ()" link="WebKitDOMText.html#webkit-dom-text-replace-whole-text"/>
     <keyword type="function" name="webkit_dom_text_get_whole_text ()" link="WebKitDOMText.html#webkit-dom-text-get-whole-text"/>
+    <keyword type="function" name="webkit_dom_text_replace_whole_text ()" link="WebKitDOMText.html#webkit-dom-text-replace-whole-text" deprecated=""/>
     <keyword type="struct" name="WebKitDOMText" link="WebKitDOMText.html#WebKitDOMText-struct"/>
     <keyword type="property" name="The “whole-text” property" link="WebKitDOMText.html#WebKitDOMText--whole-text"/>
     <keyword type="function" name="webkit_dom_tree_walker_parent_node ()" link="WebKitDOMTreeWalker.html#webkit-dom-tree-walker-parent-node"/>
@@ -1034,16 +1050,10 @@
     <keyword type="function" name="webkit_dom_html_document_clear ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-clear"/>
     <keyword type="function" name="webkit_dom_html_document_capture_events ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-capture-events"/>
     <keyword type="function" name="webkit_dom_html_document_release_events ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-release-events"/>
-    <keyword type="function" name="webkit_dom_html_document_get_embeds ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-embeds"/>
-    <keyword type="function" name="webkit_dom_html_document_get_plugins ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-plugins"/>
-    <keyword type="function" name="webkit_dom_html_document_get_scripts ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-scripts"/>
     <keyword type="function" name="webkit_dom_html_document_get_width ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-width"/>
     <keyword type="function" name="webkit_dom_html_document_get_height ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-height"/>
     <keyword type="function" name="webkit_dom_html_document_get_dir ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-dir"/>
     <keyword type="function" name="webkit_dom_html_document_set_dir ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-set-dir"/>
-    <keyword type="function" name="webkit_dom_html_document_get_design_mode ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-design-mode"/>
-    <keyword type="function" name="webkit_dom_html_document_set_design_mode ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-set-design-mode"/>
-    <keyword type="function" name="webkit_dom_html_document_get_compat_mode ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-compat-mode"/>
     <keyword type="function" name="webkit_dom_html_document_get_bg_color ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-bg-color"/>
     <keyword type="function" name="webkit_dom_html_document_set_bg_color ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-set-bg-color"/>
     <keyword type="function" name="webkit_dom_html_document_get_fg_color ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-fg-color"/>
@@ -1054,18 +1064,19 @@
     <keyword type="function" name="webkit_dom_html_document_set_link_color ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-set-link-color"/>
     <keyword type="function" name="webkit_dom_html_document_get_vlink_color ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-vlink-color"/>
     <keyword type="function" name="webkit_dom_html_document_set_vlink_color ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-set-vlink-color"/>
+    <keyword type="function" name="webkit_dom_html_document_set_design_mode ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-set-design-mode" deprecated=""/>
+    <keyword type="function" name="webkit_dom_html_document_get_design_mode ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-design-mode" deprecated=""/>
+    <keyword type="function" name="webkit_dom_html_document_get_compat_mode ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-compat-mode" deprecated=""/>
+    <keyword type="function" name="webkit_dom_html_document_get_scripts ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-scripts" deprecated=""/>
+    <keyword type="function" name="webkit_dom_html_document_get_embeds ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-embeds" deprecated=""/>
+    <keyword type="function" name="webkit_dom_html_document_get_plugins ()" link="WebKitDOMHTMLDocument.html#webkit-dom-html-document-get-plugins" deprecated=""/>
     <keyword type="struct" name="WebKitDOMHTMLDocument" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument-struct"/>
     <keyword type="property" name="The “alink-color” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--alink-color"/>
     <keyword type="property" name="The “bg-color” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--bg-color"/>
-    <keyword type="property" name="The “compat-mode” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--compat-mode"/>
-    <keyword type="property" name="The “design-mode” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--design-mode"/>
     <keyword type="property" name="The “dir” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--dir"/>
-    <keyword type="property" name="The “embeds” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--embeds"/>
     <keyword type="property" name="The “fg-color” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--fg-color"/>
     <keyword type="property" name="The “height” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--height"/>
     <keyword type="property" name="The “link-color” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--link-color"/>
-    <keyword type="property" name="The “plugins” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--plugins"/>
-    <keyword type="property" name="The “scripts” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--scripts"/>
     <keyword type="property" name="The “vlink-color” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--vlink-color"/>
     <keyword type="property" name="The “width” property" link="WebKitDOMHTMLDocument.html#WebKitDOMHTMLDocument--width"/>
     <keyword type="function" name="webkit_dom_html_element_click ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-click"/>
@@ -1377,7 +1388,8 @@
     <keyword type="function" name="webkit_dom_html_input_element_set_align ()" link="WebKitDOMHTMLInputElement.html#webkit-dom-html-input-element-set-align"/>
     <keyword type="function" name="webkit_dom_html_input_element_get_use_map ()" link="WebKitDOMHTMLInputElement.html#webkit-dom-html-input-element-get-use-map"/>
     <keyword type="function" name="webkit_dom_html_input_element_set_use_map ()" link="WebKitDOMHTMLInputElement.html#webkit-dom-html-input-element-set-use-map"/>
-    <keyword type="function" name="webkit_dom_html_input_element_get_capture ()" link="WebKitDOMHTMLInputElement.html#webkit-dom-html-input-element-get-capture"/>
+    <keyword type="function" name="webkit_dom_html_input_element_get_capture_type ()" link="WebKitDOMHTMLInputElement.html#webkit-dom-html-input-element-get-capture-type" since="2.14"/>
+    <keyword type="function" name="webkit_dom_html_input_element_get_capture ()" link="WebKitDOMHTMLInputElement.html#webkit-dom-html-input-element-get-capture" deprecated=""/>
     <keyword type="struct" name="WebKitDOMHTMLInputElement" link="WebKitDOMHTMLInputElement.html#WebKitDOMHTMLInputElement-struct"/>
     <keyword type="property" name="The “accept” property" link="WebKitDOMHTMLInputElement.html#WebKitDOMHTMLInputElement--accept"/>
     <keyword type="property" name="The “align” property" link="WebKitDOMHTMLInputElement.html#WebKitDOMHTMLInputElement--align"/>
@@ -1942,8 +1954,7 @@
     <keyword type="property" name="The “will-validate” property" link="WebKitDOMHTMLTextAreaElement.html#WebKitDOMHTMLTextAreaElement--will-validate"/>
     <keyword type="property" name="The “wrap” property" link="WebKitDOMHTMLTextAreaElement.html#WebKitDOMHTMLTextAreaElement--wrap"/>
     <keyword type="function" name="webkit_dom_html_title_element_get_text ()" link="WebKitDOMHTMLTitleElement.html#webkit-dom-html-title-element-get-text"/>
-    <keyword type="function" name="webkit_dom_html_title_element_set_text_with_error ()" link="WebKitDOMHTMLTitleElement.html#webkit-dom-html-title-element-set-text-with-error" since="2.14"/>
-    <keyword type="function" name="webkit_dom_html_title_element_set_text ()" link="WebKitDOMHTMLTitleElement.html#webkit-dom-html-title-element-set-text" deprecated=""/>
+    <keyword type="function" name="webkit_dom_html_title_element_set_text ()" link="WebKitDOMHTMLTitleElement.html#webkit-dom-html-title-element-set-text"/>
     <keyword type="struct" name="WebKitDOMHTMLTitleElement" link="WebKitDOMHTMLTitleElement.html#WebKitDOMHTMLTitleElement-struct"/>
     <keyword type="property" name="The “text” property" link="WebKitDOMHTMLTitleElement.html#WebKitDOMHTMLTitleElement--text"/>
     <keyword type="function" name="webkit_dom_html_u_list_element_get_compact ()" link="WebKitDOMHTMLUListElement.html#webkit-dom-html-u-list-element-get-compact"/>

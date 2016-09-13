@@ -142,7 +142,7 @@ namespace JSC { namespace DFG {
     /* this is only true if we do the overflow check - hence the need to keep it alive. More */\
     /* generally, we need to keep alive any operation whose checks cause filtration in AI. */\
     macro(ArithAdd, NodeResultNumber | NodeMustGenerate) \
-    macro(ArithClz32, NodeResultInt32) \
+    macro(ArithClz32, NodeResultInt32 | NodeMustGenerate) \
     macro(ArithSub, NodeResultNumber | NodeMustGenerate) \
     macro(ArithNegate, NodeResultNumber | NodeMustGenerate) \
     macro(ArithMul, NodeResultNumber | NodeMustGenerate) \
@@ -152,17 +152,17 @@ namespace JSC { namespace DFG {
     macro(ArithAbs, NodeResultNumber | NodeMustGenerate) \
     macro(ArithMin, NodeResultNumber) \
     macro(ArithMax, NodeResultNumber) \
-    macro(ArithFRound, NodeResultNumber) \
+    macro(ArithFRound, NodeResultDouble | NodeMustGenerate) \
     macro(ArithPow, NodeResultDouble) \
     macro(ArithRandom, NodeResultDouble | NodeMustGenerate) \
     macro(ArithRound, NodeResultNumber) \
     macro(ArithFloor, NodeResultNumber) \
     macro(ArithCeil, NodeResultNumber) \
     macro(ArithTrunc, NodeResultNumber) \
-    macro(ArithSqrt, NodeResultNumber) \
-    macro(ArithSin, NodeResultNumber) \
-    macro(ArithCos, NodeResultNumber) \
-    macro(ArithLog, NodeResultNumber) \
+    macro(ArithSqrt, NodeResultDouble | NodeMustGenerate) \
+    macro(ArithSin, NodeResultDouble | NodeMustGenerate) \
+    macro(ArithCos, NodeResultDouble | NodeMustGenerate) \
+    macro(ArithLog, NodeResultDouble | NodeMustGenerate) \
     \
     /* Add of values may either be arithmetic, or result in string concatenation. */\
     macro(ValueAdd, NodeResultJS | NodeMustGenerate) \
@@ -239,7 +239,7 @@ namespace JSC { namespace DFG {
     macro(CheckNotEmpty, NodeMustGenerate) \
     macro(CheckBadCell, NodeMustGenerate) \
     macro(CheckInBounds, NodeMustGenerate) \
-    macro(CheckIdent, NodeMustGenerate) \
+    macro(CheckStringIdent, NodeMustGenerate) \
     macro(CheckTypeInfoFlags, NodeMustGenerate) /* Takes an OpInfo with the flags you want to test are set */\
     \
     /* Optimizations for array mutation. */\
@@ -291,7 +291,7 @@ namespace JSC { namespace DFG {
     macro(NewRegexp, NodeResultJS) \
     /* Rest Parameter */\
     macro(GetRestLength, NodeResultInt32) \
-    macro(CopyRest, NodeMustGenerate) \
+    macro(CreateRest, NodeResultJS | NodeMustGenerate) \
     \
     /* Support for allocation sinking. */\
     macro(PhantomNewObject, NodeResultJS | NodeMustGenerate) \
@@ -388,7 +388,12 @@ namespace JSC { namespace DFG {
     macro(GetPropertyEnumerator, NodeMustGenerate | NodeResultJS) \
     macro(GetEnumeratorStructurePname, NodeMustGenerate | NodeResultJS) \
     macro(GetEnumeratorGenericPname, NodeMustGenerate | NodeResultJS) \
-    macro(ToIndexString, NodeResultJS)
+    macro(ToIndexString, NodeResultJS) \
+    /* Nodes for JSMap and JSSet */ \
+    macro(MapHash, NodeResultInt32) \
+    macro(GetMapBucket, NodeResultJS) \
+    macro(LoadFromJSMapBucket, NodeResultJS) \
+    macro(IsNonEmptyMapBucket, NodeResultBoolean) \
 
 // This enum generates a monotonically increasing id for all Node types,
 // and is used by the subsequent enum to fill out the id (as accessed via the NodeIdMask).

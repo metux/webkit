@@ -26,7 +26,7 @@
 #pragma once
 
 #include "AffineTransform.h"
-#include "CanvasPathMethods.h"
+#include "CanvasPath.h"
 #include "CanvasRenderingContext.h"
 #include "CanvasStyle.h"
 #include "Color.h"
@@ -57,7 +57,7 @@ class TextMetrics;
 
 typedef int ExceptionCode;
 
-class CanvasRenderingContext2D final : public CanvasRenderingContext, public CanvasPathMethods {
+class CanvasRenderingContext2D final : public CanvasRenderingContext, public CanvasPath {
 public:
     CanvasRenderingContext2D(HTMLCanvasElement*, bool usesCSSCompatibilityParseMode, bool usesDashboardCompatibilityMode);
     virtual ~CanvasRenderingContext2D();
@@ -82,12 +82,11 @@ public:
 
     const Vector<float>& getLineDash() const;
     void setLineDash(const Vector<float>&);
+    const Vector<float>& webkitLineDash() const { return getLineDash(); }
     void setWebkitLineDash(const Vector<float>&);
 
     float lineDashOffset() const;
     void setLineDashOffset(float);
-    float webkitLineDashOffset() const;
-    void setWebkitLineDashOffset(float);
 
     float shadowOffsetX() const;
     void setShadowOffsetX(float);
@@ -110,11 +109,15 @@ public:
     void save() { ++m_unrealizedSaveCount; }
     void restore();
 
+    // This is a no-op in a direct-2d canvas.
+    void commit() { }
+
     void scale(float sx, float sy);
     void rotate(float angleInRadians);
     void translate(float tx, float ty);
     void transform(float m11, float m12, float m21, float m22, float dx, float dy);
     void setTransform(float m11, float m12, float m21, float m22, float dx, float dy);
+    void resetTransform();
 
     void setStrokeColor(const String& color, Optional<float> alpha = Nullopt);
     void setStrokeColor(float grayLevel, float alpha = 1.0);
