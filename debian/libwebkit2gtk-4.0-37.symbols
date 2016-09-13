@@ -96,8 +96,11 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_credential_new@Base 2.5.3
  webkit_credential_persistence_get_type@Base 2.5.3
  (optional)webkit_dom_attr_get_is_id@Base 2.5.3
+ (optional)webkit_dom_attr_get_local_name@Base 2.13.91
  webkit_dom_attr_get_name@Base 2.5.3
+ (optional)webkit_dom_attr_get_namespace_uri@Base 2.13.91
  webkit_dom_attr_get_owner_element@Base 2.5.3
+ (optional)webkit_dom_attr_get_prefix@Base 2.13.91
  webkit_dom_attr_get_specified@Base 2.5.3
  webkit_dom_attr_get_type@Base 2.5.3
  webkit_dom_attr_get_value@Base 2.5.3
@@ -192,7 +195,6 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_document_create_processing_instruction@Base 2.5.3
  webkit_dom_document_create_range@Base 2.5.3
  webkit_dom_document_create_text_node@Base 2.5.3
- (optional)webkit_dom_document_create_touch@Base 2.5.3
  webkit_dom_document_create_tree_walker@Base 2.5.3
  webkit_dom_document_element_from_point@Base 2.5.3
  webkit_dom_document_evaluate@Base 2.5.3
@@ -220,6 +222,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  (optional)webkit_dom_document_get_current_script@Base 2.5.3
  webkit_dom_document_get_default_charset@Base 2.5.3
  webkit_dom_document_get_default_view@Base 2.5.3
+ (optional)webkit_dom_document_get_design_mode@Base 2.13.91
  webkit_dom_document_get_dir@Base 2.13.4
  webkit_dom_document_get_doctype@Base 2.5.3
  webkit_dom_document_get_document_element@Base 2.5.3
@@ -233,6 +236,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_document_get_elements_by_tag_name_as_html_collection@Base 2.12.0
  webkit_dom_document_get_elements_by_tag_name_ns@Base 2.5.3
  webkit_dom_document_get_elements_by_tag_name_ns_as_html_collection@Base 2.12.0
+ (optional)webkit_dom_document_get_embeds@Base 2.13.91
  webkit_dom_document_get_first_element_child@Base 2.10.0
  webkit_dom_document_get_forms@Base 2.5.3
  webkit_dom_document_get_head@Base 2.5.3
@@ -245,10 +249,12 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_document_get_links@Base 2.5.3
  (optional)webkit_dom_document_get_origin@Base 2.5.3
  webkit_dom_document_get_override_style@Base 2.5.3
+ (optional)webkit_dom_document_get_plugins@Base 2.13.91
  (optional)webkit_dom_document_get_pointer_lock_element@Base 2.5.3
  webkit_dom_document_get_preferred_stylesheet_set@Base 2.5.3
  webkit_dom_document_get_ready_state@Base 2.5.3
  webkit_dom_document_get_referrer@Base 2.5.3
+ (optional)webkit_dom_document_get_scripts@Base 2.13.91
  webkit_dom_document_get_scrolling_element@Base 2.10.0
  webkit_dom_document_get_selected_stylesheet_set@Base 2.5.3
  webkit_dom_document_get_style_sheets@Base 2.5.3
@@ -276,11 +282,11 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_document_set_body@Base 2.5.3
  webkit_dom_document_set_charset@Base 2.5.3
  webkit_dom_document_set_cookie@Base 2.5.3
+ (optional)webkit_dom_document_set_design_mode@Base 2.13.91
  webkit_dom_document_set_dir@Base 2.13.4
  webkit_dom_document_set_document_uri@Base 2.5.3
  webkit_dom_document_set_selected_stylesheet_set@Base 2.5.3
  webkit_dom_document_set_title@Base 2.5.3
- webkit_dom_document_set_title_with_error@Base 2.13.4
  webkit_dom_document_set_xml_standalone@Base 2.5.3
  webkit_dom_document_set_xml_version@Base 2.5.3
  webkit_dom_document_type_get_entities@Base 2.5.3
@@ -293,7 +299,6 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  (optional)webkit_dom_document_type_remove@Base 2.5.3
  (optional)webkit_dom_document_webkit_cancel_full_screen@Base 2.5.3
  (optional)webkit_dom_document_webkit_exit_fullscreen@Base 2.5.3
- (optional)webkit_dom_document_webkit_get_named_flows@Base 2.5.3
  (optional)webkit_dom_dom_application_cache_abort@Base 2.5.3
  (optional)webkit_dom_dom_application_cache_get_status@Base 2.5.3
  (optional)webkit_dom_dom_application_cache_get_type@Base 2.5.3
@@ -369,6 +374,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  (optional)webkit_dom_dom_token_list_get_value@Base 2.12.0
  (optional)webkit_dom_dom_token_list_item@Base 2.5.3
  (optional)webkit_dom_dom_token_list_remove@Base 2.5.3
+ (optional)webkit_dom_dom_token_list_replace@Base 2.13.91
  (optional)webkit_dom_dom_token_list_set_value@Base 2.12.0
  webkit_dom_dom_token_list_toggle@Base 2.13.4
  (optional)webkit_dom_dom_window_alert@Base 2.5.3
@@ -477,6 +483,8 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_element_get_id@Base 2.5.3
  webkit_dom_element_get_inner_html@Base 2.8.1
  webkit_dom_element_get_last_element_child@Base 2.5.3
+ (optional)webkit_dom_element_get_local_name@Base 2.13.91
+ (optional)webkit_dom_element_get_namespace_uri@Base 2.13.91
  webkit_dom_element_get_next_element_sibling@Base 2.5.3
  webkit_dom_element_get_offset_height@Base 2.5.3
  webkit_dom_element_get_offset_left@Base 2.5.3
@@ -484,6 +492,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_element_get_offset_top@Base 2.5.3
  webkit_dom_element_get_offset_width@Base 2.5.3
  webkit_dom_element_get_outer_html@Base 2.8.1
+ (optional)webkit_dom_element_get_prefix@Base 2.13.91
  webkit_dom_element_get_previous_element_sibling@Base 2.5.3
  webkit_dom_element_get_scroll_height@Base 2.5.3
  webkit_dom_element_get_scroll_left@Base 2.5.3
@@ -496,6 +505,9 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_element_has_attribute@Base 2.5.3
  webkit_dom_element_has_attribute_ns@Base 2.5.3
  webkit_dom_element_has_attributes@Base 2.5.3
+ (optional)webkit_dom_element_insert_adjacent_element@Base 2.13.91
+ (optional)webkit_dom_element_insert_adjacent_html@Base 2.13.91
+ (optional)webkit_dom_element_insert_adjacent_text@Base 2.13.91
  (optional)webkit_dom_element_matches@Base 2.5.3
  webkit_dom_element_query_selector@Base 2.5.3
  webkit_dom_element_query_selector_all@Base 2.5.3
@@ -698,6 +710,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_html_br_element_get_type@Base 2.5.3
  webkit_dom_html_br_element_set_clear@Base 2.5.3
  (optional)webkit_dom_html_button_element_check_validity@Base 2.5.3
+ (optional)webkit_dom_html_button_element_click@Base 2.13.91
  webkit_dom_html_button_element_get_autofocus@Base 2.5.3
  webkit_dom_html_button_element_get_button_type@Base 2.5.3
  webkit_dom_html_button_element_get_disabled@Base 2.5.3
@@ -790,9 +803,6 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  (optional)webkit_dom_html_element_get_translate@Base 2.5.3
  webkit_dom_html_element_get_type@Base 2.5.3
  (optional)webkit_dom_html_element_get_webkitdropzone@Base 2.5.3
- (optional)webkit_dom_html_element_insert_adjacent_element@Base 2.5.3
- (optional)webkit_dom_html_element_insert_adjacent_html@Base 2.5.3
- (optional)webkit_dom_html_element_insert_adjacent_text@Base 2.5.3
  webkit_dom_html_element_set_access_key@Base 2.5.3
  webkit_dom_html_element_set_content_editable@Base 2.5.3
  webkit_dom_html_element_set_dir@Base 2.5.3
@@ -991,6 +1001,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  (optional)webkit_dom_html_input_element_get_autocorrect@Base 2.5.3
  webkit_dom_html_input_element_get_autofocus@Base 2.5.3
  webkit_dom_html_input_element_get_capture@Base 2.5.3
+ (optional)webkit_dom_html_input_element_get_capture_type@Base 2.13.91
  webkit_dom_html_input_element_get_checked@Base 2.5.3
  webkit_dom_html_input_element_get_default_checked@Base 2.5.3
  webkit_dom_html_input_element_get_default_value@Base 2.5.3
@@ -1308,6 +1319,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_html_options_collection_get_selected_index@Base 2.5.3
  webkit_dom_html_options_collection_get_type@Base 2.5.3
  webkit_dom_html_options_collection_named_item@Base 2.5.3
+ (optional)webkit_dom_html_options_collection_remove@Base 2.13.91
  webkit_dom_html_options_collection_set_selected_index@Base 2.5.3
  webkit_dom_html_paragraph_element_get_align@Base 2.5.3
  webkit_dom_html_paragraph_element_get_type@Base 2.5.3
@@ -1560,7 +1572,6 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_html_title_element_get_text@Base 2.5.3
  webkit_dom_html_title_element_get_type@Base 2.5.3
  webkit_dom_html_title_element_set_text@Base 2.5.3
- webkit_dom_html_title_element_set_text_with_error@Base 2.13.4
  webkit_dom_html_u_list_element_get_compact@Base 2.5.3
  webkit_dom_html_u_list_element_get_type@Base 2.5.3
  webkit_dom_html_u_list_element_get_type_attr@Base 2.5.3
@@ -1597,7 +1608,6 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_dom_keyboard_event_get_shift_key@Base 2.5.3
  webkit_dom_keyboard_event_get_type@Base 2.5.3
  webkit_dom_keyboard_event_init_keyboard_event@Base 2.5.3
- (optional)webkit_dom_location_get_ancestor_origins@Base 2.5.3
  (optional)webkit_dom_location_get_hash@Base 2.5.3
  (optional)webkit_dom_location_get_host@Base 2.5.3
  (optional)webkit_dom_location_get_hostname@Base 2.5.3
@@ -1756,12 +1766,6 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  (optional)webkit_dom_performance_entry_get_name@Base 2.5.3
  (optional)webkit_dom_performance_entry_get_start_time@Base 2.5.3
  (optional)webkit_dom_performance_entry_get_type@Base 2.5.3
- (optional)webkit_dom_performance_entry_list_get_length@Base 2.5.3
- (optional)webkit_dom_performance_entry_list_get_type@Base 2.5.3
- (optional)webkit_dom_performance_entry_list_item@Base 2.5.3
- webkit_dom_performance_get_entries@Base 2.13.4
- webkit_dom_performance_get_entries_by_name@Base 2.13.4
- webkit_dom_performance_get_entries_by_type@Base 2.13.4
  (optional)webkit_dom_performance_get_navigation@Base 2.5.3
  (optional)webkit_dom_performance_get_timing@Base 2.5.3
  (optional)webkit_dom_performance_get_type@Base 2.5.3
