@@ -3,6 +3,11 @@ webkit2gtk (2.13.91-1) UNRELEASED; urgency=medium
   * New upstream development release.
   * debian/{control,copyright,watch}:
     + Use https instead of http for webkitgtk.org.
+  * debian/patches/fix-ftbfs-m68k.patch:
+    + Drop this patch, the m68k build has been broken for ages.
+  * debian/patches/fix-ftbfs-alpha.patch,
+    debian/patches/fix-ftbfs-sparc64.patch:
+    + Refresh.
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 13 Sep 2016 11:40:22 +0300
 
