@@ -41,12 +41,19 @@
 #include "FrameView.h"
 #include "HTMLBDIElement.h"
 #include "HTMLBRElement.h"
+#include "HTMLButtonElement.h"
 #include "HTMLCollection.h"
 #include "HTMLDocument.h"
 #include "HTMLElementFactory.h"
+#include "HTMLFieldSetElement.h"
 #include "HTMLFormElement.h"
+#include "HTMLInputElement.h"
 #include "HTMLNames.h"
+#include "HTMLOptGroupElement.h"
+#include "HTMLOptionElement.h"
 #include "HTMLParserIdioms.h"
+#include "HTMLSelectElement.h"
+#include "HTMLTextAreaElement.h"
 #include "HTMLTextFormControlElement.h"
 #include "NodeTraversal.h"
 #include "RenderElement.h"
@@ -81,45 +88,6 @@ String HTMLElement::nodeName() const
         return Element::nodeName().convertToASCIIUppercase();
     }
     return Element::nodeName();
-}
-
-bool HTMLElement::ieForbidsInsertHTML() const
-{
-    // FIXME: Supposedly IE disallows settting innerHTML, outerHTML
-    // and createContextualFragment on these tags.  We have no tests to
-    // verify this however, so this list could be totally wrong.
-    // This list was moved from the previous endTagRequirement() implementation.
-    // This is also called from editing and assumed to be the list of tags
-    // for which no end tag should be serialized. It's unclear if the list for
-    // IE compat and the list for serialization sanity are the same.
-    if (hasTagName(areaTag)
-        || hasTagName(baseTag)
-        || hasTagName(basefontTag)
-        || hasTagName(brTag)
-        || hasTagName(colTag)
-        || hasTagName(embedTag)
-        || hasTagName(frameTag)
-        || hasTagName(hrTag)
-        || hasTagName(imageTag)
-        || hasTagName(imgTag)
-        || hasTagName(inputTag)
-        || hasTagName(isindexTag)
-        || hasTagName(linkTag)
-        || hasTagName(metaTag)
-        || hasTagName(paramTag)
-        || hasTagName(sourceTag)
-        || hasTagName(wbrTag))
-        return true;
-    // FIXME: I'm not sure why dashboard mode would want to change the
-    // serialization of <canvas>, that seems like a bad idea.
-#if ENABLE(DASHBOARD_SUPPORT)
-    if (hasTagName(canvasTag)) {
-        Settings* settings = document().settings();
-        if (settings && settings->usesDashboardBackwardCompatibilityMode())
-            return true;
-    }
-#endif
-    return false;
 }
 
 static inline CSSValueID unicodeBidiAttributeForDirAuto(HTMLElement& element)
@@ -473,7 +441,7 @@ Ref<DocumentFragment> HTMLElement::textToFragment(const String& text, ExceptionC
     for (unsigned start = 0, length = text.length(); start < length; ) {
 
         // Find next line break.
-        UChar c;
+        UChar c = 0;
         unsigned i;
         for (i = start; i < length; i++) {
             c = text[i];
@@ -628,77 +596,6 @@ void HTMLElement::setOuterText(const String& text, ExceptionCode& ec)
         mergeWithNextTextNode(downcast<Text>(*node), ec);
     if (!ec && is<Text>(prev.get()))
         mergeWithNextTextNode(downcast<Text>(*prev), ec);
-}
-
-Node* HTMLElement::insertAdjacent(const String& where, Ref<Node>&& newChild, ExceptionCode& ec)
-{
-    // In Internet Explorer if the element has no parent and where is "beforeBegin" or "afterEnd",
-    // a document fragment is created and the elements appended in the correct order. This document
-    // fragment isn't returned anywhere.
-    //
-    // This is impossible for us to implement as the DOM tree does not allow for such structures,
-    // Opera also appears to disallow such usage.
-
-    if (equalLettersIgnoringASCIICase(where, "beforebegin")) {
-        ContainerNode* parent = this->parentNode();
-        return (parent && parent->insertBefore(newChild, this, ec)) ? newChild.ptr() : nullptr;
-    }
-
-    if (equalLettersIgnoringASCIICase(where, "afterbegin"))
-        return insertBefore(newChild, firstChild(), ec) ? newChild.ptr() : nullptr;
-
-    if (equalLettersIgnoringASCIICase(where, "beforeend"))
-        return appendChild(newChild, ec) ? newChild.ptr() : nullptr;
-
-    if (equalLettersIgnoringASCIICase(where, "afterend")) {
-        ContainerNode* parent = this->parentNode();
-        return (parent && parent->insertBefore(newChild, nextSibling(), ec)) ? newChild.ptr() : nullptr;
-    }
-    
-    // IE throws COM Exception E_INVALIDARG; this is the best DOM exception alternative.
-    ec = NOT_SUPPORTED_ERR;
-    return nullptr;
-}
-
-Element* HTMLElement::insertAdjacentElement(const String& where, Element& newChild, ExceptionCode& ec)
-{
-    Node* returnValue = insertAdjacent(where, newChild, ec);
-    ASSERT_WITH_SECURITY_IMPLICATION(!returnValue || is<Element>(*returnValue));
-    return downcast<Element>(returnValue); 
-}
-
-// Step 3 of http://www.whatwg.org/specs/web-apps/current-work/multipage/apis-in-html-documents.html#insertadjacenthtml()
-static Element* contextElementForInsertion(const String& where, Element* element, ExceptionCode& ec)
-{
-    if (equalLettersIgnoringASCIICase(where, "beforebegin") || equalLettersIgnoringASCIICase(where, "afterend")) {
-        ContainerNode* parent = element->parentNode();
-        if (parent && !is<Element>(*parent)) {
-            ec = NO_MODIFICATION_ALLOWED_ERR;
-            return nullptr;
-        }
-        ASSERT_WITH_SECURITY_IMPLICATION(!parent || is<Element>(*parent));
-        return downcast<Element>(parent);
-    }
-    if (equalLettersIgnoringASCIICase(where, "afterbegin") || equalLettersIgnoringASCIICase(where, "beforeend"))
-        return element;
-    ec =  SYNTAX_ERR;
-    return nullptr;
-}
-
-void HTMLElement::insertAdjacentHTML(const String& where, const String& markup, ExceptionCode& ec)
-{
-    Element* contextElement = contextElementForInsertion(where, this, ec);
-    if (!contextElement)
-        return;
-    RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(*contextElement, markup, AllowScriptingContent, ec);
-    if (!fragment)
-        return;
-    insertAdjacent(where, fragment.releaseNonNull(), ec);
-}
-
-void HTMLElement::insertAdjacentText(const String& where, const String& text, ExceptionCode& ec)
-{
-    insertAdjacent(where, document().createTextNode(text), ec);
 }
 
 void HTMLElement::applyAlignmentAttributeToStyle(const AtomicString& alignment, MutableStyleProperties& style)
@@ -1167,6 +1064,22 @@ bool HTMLElement::willRespondToMouseWheelEvents()
 bool HTMLElement::willRespondToMouseClickEvents()
 {
     return !isDisabledFormControl() && Element::willRespondToMouseClickEvents();
+}
+
+bool HTMLElement::canBeActuallyDisabled() const
+{
+    return is<HTMLButtonElement>(*this)
+        || is<HTMLInputElement>(*this)
+        || is<HTMLSelectElement>(*this)
+        || is<HTMLTextAreaElement>(*this)
+        || is<HTMLOptGroupElement>(*this)
+        || is<HTMLOptionElement>(*this)
+        || is<HTMLFieldSetElement>(*this);
+}
+
+bool HTMLElement::isActuallyDisabled() const
+{
+    return canBeActuallyDisabled() && isDisabledFormControl();
 }
 
 } // namespace WebCore

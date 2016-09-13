@@ -29,6 +29,7 @@
 #ifndef ResourceLoader_h
 #define ResourceLoader_h
 
+#include "LoadTiming.h"
 #include "ResourceHandleClient.h"
 #include "ResourceLoaderOptions.h"
 #include "ResourceLoaderTypes.h"
@@ -125,11 +126,11 @@ public:
 
     const URL& url() const { return m_request.url(); }
     ResourceHandle* handle() const { return m_handle.get(); }
-    bool shouldSendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks() == SendCallbacks; }
-    void setSendCallbackPolicy(SendCallbackPolicy sendLoadCallbacks) { m_options.setSendLoadCallbacks(sendLoadCallbacks); }
-    bool shouldSniffContent() const { return m_options.sniffContent() == SniffContent; }
+    bool shouldSendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks == SendCallbacks; }
+    void setSendCallbackPolicy(SendCallbackPolicy sendLoadCallbacks) { m_options.sendLoadCallbacks = sendLoadCallbacks; }
+    bool shouldSniffContent() const { return m_options.sniffContent == SniffContent; }
     WEBCORE_EXPORT bool isAllowedToAskUserForCredentials() const;
-    bool shouldIncludeCertificateInfo() const { return m_options.certificateInfoPolicy() == IncludeCertificateInfo; }
+    bool shouldIncludeCertificateInfo() const { return m_options.certificateInfoPolicy == IncludeCertificateInfo; }
 
     bool reachedTerminalState() const { return m_reachedTerminalState; }
 
@@ -139,6 +140,8 @@ public:
     void setDataBufferingPolicy(DataBufferingPolicy);
 
     void willSwitchToSubstituteResource();
+
+    const LoadTiming& loadTiming() { return m_loadTiming; }
 
 #if PLATFORM(COCOA) && !USE(CFNETWORK)
     void schedule(WTF::SchedulePair&);
@@ -172,7 +175,8 @@ protected:
     RefPtr<Frame> m_frame;
     RefPtr<DocumentLoader> m_documentLoader;
     ResourceResponse m_response;
-    
+    LoadTiming m_loadTiming;
+
 private:
     virtual void willCancel(const ResourceError&) = 0;
     virtual void didCancel(const ResourceError&) = 0;

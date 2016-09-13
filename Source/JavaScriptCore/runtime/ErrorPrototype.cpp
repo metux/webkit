@@ -67,12 +67,15 @@ void ErrorPrototype::finishCreation(VM& vm)
 // ECMA-262 5.1, 15.11.4.4
 EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState* exec)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     // 1. Let O be the this value.
     JSValue thisValue = exec->thisValue();
 
     // 2. If Type(O) is not Object, throw a TypeError exception.
     if (!thisValue.isObject())
-        return throwVMTypeError(exec);
+        return throwVMTypeError(exec, scope);
     JSObject* thisObj = asObject(thisValue);
 
     // Guard against recursion!
@@ -118,7 +121,7 @@ EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState* exec)
 
     // 9. If msg is the empty String, return name.
     if (!messageString.length())
-        return JSValue::encode(name.isString() ? name : jsNontrivialString(exec, nameString));
+        return JSValue::encode(name.isString() ? name : jsString(exec, nameString));
 
     // 10. Return the result of concatenating name, ":", a single space character, and msg.
     return JSValue::encode(jsMakeNontrivialString(exec, nameString, ": ", messageString));

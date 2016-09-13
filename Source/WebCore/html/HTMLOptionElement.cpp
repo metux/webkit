@@ -110,7 +110,7 @@ String HTMLOptionElement::text() const
     return document().displayStringModifiedByEncoding(text).stripWhiteSpace(isHTMLSpace).simplifyWhiteSpace(isHTMLSpace);
 }
 
-void HTMLOptionElement::setText(const String &text, ExceptionCode& ec)
+void HTMLOptionElement::setText(const String &text)
 {
     Ref<HTMLOptionElement> protectedThis(*this);
 
@@ -127,7 +127,7 @@ void HTMLOptionElement::setText(const String &text, ExceptionCode& ec)
         downcast<Text>(*child).setData(text);
     else {
         removeChildren();
-        appendChild(Text::create(document(), text), ec);
+        appendChild(Text::create(document(), text), ASSERT_NO_EXCEPTION);
     }
     
     if (selectIsMenuList && select->selectedIndex() != oldSelectedIndex)
@@ -316,6 +316,7 @@ Node::InsertionNotificationRequest HTMLOptionElement::insertedInto(ContainerNode
 {
     if (HTMLSelectElement* select = ownerSelectElement()) {
         select->setRecalcListItems();
+        select->updateValidity();
         // Do not call selected() since calling updateListItemSelectedStates()
         // at this time won't do the right thing. (Why, exactly?)
         // FIXME: Might be better to call this unconditionally, always passing m_isSelected,

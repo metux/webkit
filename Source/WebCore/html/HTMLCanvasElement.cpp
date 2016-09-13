@@ -51,6 +51,7 @@
 #include <runtime/JSCInlines.h>
 #include <runtime/JSLock.h>
 #include <wtf/RAMSize.h>
+#include <wtf/text/StringBuilder.h>
 
 #if ENABLE(WEBGL)    
 #include "WebGLContextAttributes.h"
@@ -575,14 +576,14 @@ size_t HTMLCanvasElement::memoryCost() const
 {
     if (!m_imageBuffer)
         return 0;
-    return 4 * m_imageBuffer->internalSize().width() * m_imageBuffer->internalSize().height();
+    return m_imageBuffer->memoryCost();
 }
 
 size_t HTMLCanvasElement::externalMemoryCost() const
 {
     if (!m_imageBuffer)
         return 0;
-    return 4 * m_imageBuffer->internalSize().width() * m_imageBuffer->internalSize().height();
+    return m_imageBuffer->externalMemoryCost();
 }
 
 void HTMLCanvasElement::setUsesDisplayListDrawing(bool usesDisplayListDrawing)

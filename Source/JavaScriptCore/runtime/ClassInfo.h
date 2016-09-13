@@ -92,6 +92,9 @@ struct MethodTable {
     typedef String (*ClassNameFunctionPtr)(const JSObject*);
     ClassNameFunctionPtr className;
 
+    typedef String (*ToStringNameFunctionPtr)(const JSObject*, ExecState*);
+    ToStringNameFunctionPtr toStringName;
+
     typedef bool (*CustomHasInstanceFunctionPtr)(JSObject*, ExecState*, JSValue);
     CustomHasInstanceFunctionPtr customHasInstance;
 
@@ -166,6 +169,7 @@ struct MethodTable {
         &ClassName::getStructurePropertyNames, \
         &ClassName::getGenericPropertyNames, \
         &ClassName::className, \
+        &ClassName::toStringName, \
         &ClassName::customHasInstance, \
         &ClassName::defineOwnProperty, \
         &ClassName::slowDownAndWasteMemory, \

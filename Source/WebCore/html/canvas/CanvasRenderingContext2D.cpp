@@ -645,16 +645,6 @@ void CanvasRenderingContext2D::setLineDashOffset(float offset)
     applyLineDash();
 }
 
-float CanvasRenderingContext2D::webkitLineDashOffset() const
-{
-    return lineDashOffset();
-}
-
-void CanvasRenderingContext2D::setWebkitLineDashOffset(float offset)
-{
-    setLineDashOffset(offset);
-}
-
 void CanvasRenderingContext2D::applyLineDash() const
 {
     GraphicsContext* c = drawingContext();
@@ -817,18 +807,28 @@ void CanvasRenderingContext2D::setTransform(float m11, float m12, float m21, flo
     if (!std::isfinite(m11) | !std::isfinite(m21) | !std::isfinite(dx) | !std::isfinite(m12) | !std::isfinite(m22) | !std::isfinite(dy))
         return;
 
-    AffineTransform ctm = state().transform;
-    if (!ctm.isInvertible())
+    resetTransform();
+    transform(m11, m12, m21, m22, dx, dy);
+}
+
+void CanvasRenderingContext2D::resetTransform()
+{
+    GraphicsContext* c = drawingContext();
+    if (!c)
         return;
 
+    AffineTransform ctm = state().transform;
+    bool hasInvertibleTransform = state().hasInvertibleTransform;
+
     realizeSaves();
-    
+
     c->setCTM(canvas()->baseTransform());
     modifiableState().transform = AffineTransform();
-    m_path.transform(ctm);
+
+    if (hasInvertibleTransform)
+        m_path.transform(ctm);
 
     modifiableState().hasInvertibleTransform = true;
-    transform(m11, m12, m21, m22, dx, dy);
 }
 
 void CanvasRenderingContext2D::setStrokeColor(const String& color, Optional<float> alpha)
@@ -1390,8 +1390,20 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement& imageElement, const F
         ec = INDEX_SIZE_ERR;
         return;
     }
-    if (!imageRect.contains(normalizedSrcRect))
+
+    // When the source rectangle is outside the source image, the source rectangle must be clipped
+    // to the source image and the destination rectangle must be clipped in the same proportion.
+    FloatRect originalNormalizedSrcRect = normalizedSrcRect;
+    normalizedSrcRect.intersect(imageRect);
+    if (normalizedSrcRect.isEmpty())
         return;
+
+    if (normalizedSrcRect != originalNormalizedSrcRect) {
+        normalizedDstRect.setWidth(normalizedDstRect.width() * normalizedSrcRect.width() / originalNormalizedSrcRect.width());
+        normalizedDstRect.setHeight(normalizedDstRect.height() * normalizedSrcRect.height() / originalNormalizedSrcRect.height());
+        if (normalizedDstRect.isEmpty())
+            return;
+    }
 
     GraphicsContext* c = drawingContext();
     if (!c)

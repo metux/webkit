@@ -45,7 +45,6 @@
 #include "StringRecursionChecker.h"
 #include <algorithm>
 #include <wtf/Assertions.h>
-#include <wtf/HashSet.h>
 
 namespace JSC {
 
@@ -154,12 +153,12 @@ static ALWAYS_INLINE JSValue getProperty(ExecState* exec, JSObject* object, unsi
         return result;
     // We want to perform get and has in the same operation.
     // We can only do so when this behavior is not observable. The
-    // only time it is observable is when we encounter a ProxyObject
+    // only time it is observable is when we encounter an opaque objects (ProxyObject and JSModuleNamespaceObject)
     // somewhere in the prototype chain.
     PropertySlot slot(object, PropertySlot::InternalMethodType::HasProperty);
     if (!object->getPropertySlot(exec, index, slot))
         return JSValue();
-    if (UNLIKELY(slot.isTaintedByProxy()))
+    if (UNLIKELY(slot.isTaintedByOpaqueObject()))
         return object->get(exec, index);
     return slot.getValue(exec, index);
 }
@@ -266,6 +265,9 @@ static inline unsigned argumentClampedIndexFromStartOrEnd(ExecState* exec, int a
 template<JSArray::ShiftCountMode shiftCountMode>
 void shift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned currentCount, unsigned resultCount, unsigned length)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     RELEASE_ASSERT(currentCount > resultCount);
     unsigned count = currentCount - resultCount;
 
@@ -287,14 +289,14 @@ void shift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned current
             thisObj->putByIndexInline(exec, to, value, true);
             if (exec->hadException())
                 return;
-        } else if (!thisObj->methodTable(exec->vm())->deletePropertyByIndex(thisObj, exec, to)) {
-            throwTypeError(exec, ASCIILiteral("Unable to delete property."));
+        } else if (!thisObj->methodTable(vm)->deletePropertyByIndex(thisObj, exec, to)) {
+            throwTypeError(exec, scope, ASCIILiteral("Unable to delete property."));
             return;
         }
     }
     for (unsigned k = length; k > length - count; --k) {
-        if (!thisObj->methodTable(exec->vm())->deletePropertyByIndex(thisObj, exec, k - 1)) {
-            throwTypeError(exec, ASCIILiteral("Unable to delete property."));
+        if (!thisObj->methodTable(vm)->deletePropertyByIndex(thisObj, exec, k - 1)) {
+            throwTypeError(exec, scope, ASCIILiteral("Unable to delete property."));
             return;
         }
     }
@@ -303,6 +305,9 @@ void shift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned current
 template<JSArray::ShiftCountMode shiftCountMode>
 void unshift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned currentCount, unsigned resultCount, unsigned length)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     RELEASE_ASSERT(resultCount > currentCount);
     unsigned count = resultCount - currentCount;
 
@@ -311,7 +316,7 @@ void unshift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned curre
 
     // Guard against overflow.
     if (count > (UINT_MAX - length)) {
-        throwOutOfMemoryError(exec);
+        throwOutOfMemoryError(exec, scope);
         return;
     }
 
@@ -328,8 +333,8 @@ void unshift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned curre
             if (exec->hadException())
                 return;
             thisObj->putByIndexInline(exec, to, value, true);
-        } else if (!thisObj->methodTable(exec->vm())->deletePropertyByIndex(thisObj, exec, to)) {
-            throwTypeError(exec, ASCIILiteral("Unable to delete property."));
+        } else if (!thisObj->methodTable(vm)->deletePropertyByIndex(thisObj, exec, to)) {
+            throwTypeError(exec, scope, ASCIILiteral("Unable to delete property."));
             return;
         }
         if (exec->hadException())
@@ -362,7 +367,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncToString(ExecState* exec)
         customJoinCase = true;
 
     if (UNLIKELY(customJoinCase))
-        return JSValue::encode(jsMakeNontrivialString(exec, "[object ", thisObject->methodTable(exec->vm())->className(thisObject), "]"));
+        return JSValue::encode(jsMakeNontrivialString(exec, "[object ", thisObject->methodTable(vm)->className(thisObject), "]"));
 
     // 4. Return the result of calling the [[Call]] internal method of func providing array as the this value and an empty arguments list.
     if (!isJSArray(thisObject) || callType != CallType::Host || callData.native.function != arrayProtoFuncJoin)
@@ -675,6 +680,9 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncJoin(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL arrayProtoFuncPop(ExecState* exec)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     JSValue thisValue = exec->thisValue().toThis(exec, StrictMode);
 
     if (isJSArray(thisValue))
@@ -695,8 +703,8 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncPop(ExecState* exec)
         result = thisObj->get(exec, length - 1);
         if (exec->hadException())
             return JSValue::encode(jsUndefined());
-        if (!thisObj->methodTable(exec->vm())->deletePropertyByIndex(thisObj, exec, length - 1)) {
-            throwTypeError(exec, ASCIILiteral("Unable to delete property."));
+        if (!thisObj->methodTable(vm)->deletePropertyByIndex(thisObj, exec, length - 1)) {
+            throwTypeError(exec, scope, ASCIILiteral("Unable to delete property."));
             return JSValue::encode(jsUndefined());
         }
         putLength(exec, thisObj, jsNumber(length - 1));
@@ -741,11 +749,13 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncPush(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL arrayProtoFuncReverse(ExecState* exec)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     JSObject* thisObject = exec->thisValue().toThis(exec, StrictMode).toObject(exec);
     if (!thisObject)
         return JSValue::encode(JSValue());
 
-    VM& vm = exec->vm();
     unsigned length = getLength(exec, thisObject);
     if (vm.exception())
         return JSValue::encode(jsUndefined());
@@ -813,7 +823,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncReverse(ExecState* exec)
                 return JSValue::encode(JSValue());
         } else if (!thisObject->methodTable(vm)->deletePropertyByIndex(thisObject, exec, lower)) {
             if (!vm.exception())
-                throwTypeError(exec, ASCIILiteral("Unable to delete property."));
+                throwTypeError(exec, scope, ASCIILiteral("Unable to delete property."));
             return JSValue::encode(JSValue());
         }
 
@@ -823,7 +833,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncReverse(ExecState* exec)
                 return JSValue::encode(JSValue());
         } else if (!thisObject->methodTable(vm)->deletePropertyByIndex(thisObject, exec, upper)) {
             if (!vm.exception())
-                throwTypeError(exec, ASCIILiteral("Unable to delete property."));
+                throwTypeError(exec, scope, ASCIILiteral("Unable to delete property."));
             return JSValue::encode(JSValue());
         }
     }
@@ -903,6 +913,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncSplice(ExecState* exec)
     // 15.4.4.12
 
     VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
 
     JSObject* thisObj = exec->thisValue().toThis(exec, StrictMode).toObject(exec);
     if (!thisObj)
@@ -967,7 +978,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncSplice(ExecState* exec)
         } else {
             result = JSArray::tryCreateUninitialized(vm, exec->lexicalGlobalObject()->arrayStructureForIndexingTypeDuringAllocation(ArrayWithUndecided), deleteCount);
             if (!result)
-                return JSValue::encode(throwOutOfMemoryError(exec));
+                return JSValue::encode(throwOutOfMemoryError(exec, scope));
             
             for (unsigned k = 0; k < deleteCount; ++k) {
                 JSValue v = getProperty(exec, thisObj, k + begin);
@@ -995,7 +1006,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncSplice(ExecState* exec)
         if (UNLIKELY(vm.exception()))
             return JSValue::encode(jsUndefined());
     }
-
+    
     setLength(exec, thisObj, length - deleteCount + additionalArgs);
     return JSValue::encode(result);
 }
@@ -1033,20 +1044,23 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncIndexOf(ExecState* exec)
     JSObject* thisObj = exec->thisValue().toThis(exec, StrictMode).toObject(exec);
     if (!thisObj)
         return JSValue::encode(JSValue());
+    VM& vm = exec->vm();
     unsigned length = getLength(exec, thisObj);
-    if (exec->hadException())
+    if (UNLIKELY(vm.exception()))
         return JSValue::encode(jsUndefined());
 
     unsigned index = argumentClampedIndexFromStartOrEnd(exec, 1, length);
     JSValue searchElement = exec->argument(0);
     for (; index < length; ++index) {
         JSValue e = getProperty(exec, thisObj, index);
-        if (exec->hadException())
+        if (UNLIKELY(vm.exception()))
             return JSValue::encode(jsUndefined());
         if (!e)
             continue;
         if (JSValue::strictEqual(exec, searchElement, e))
             return JSValue::encode(jsNumber(index));
+        if (UNLIKELY(vm.exception()))
+            return JSValue::encode(jsUndefined());
     }
 
     return JSValue::encode(jsNumber(-1));
@@ -1075,16 +1089,19 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncLastIndexOf(ExecState* exec)
             index = static_cast<unsigned>(fromDouble);
     }
 
+    VM& vm = exec->vm();
     JSValue searchElement = exec->argument(0);
     do {
         RELEASE_ASSERT(index < length);
         JSValue e = getProperty(exec, thisObj, index);
-        if (exec->hadException())
+        if (UNLIKELY(vm.exception()))
             return JSValue::encode(jsUndefined());
         if (!e)
             continue;
         if (JSValue::strictEqual(exec, searchElement, e))
             return JSValue::encode(jsNumber(index));
+        if (UNLIKELY(vm.exception()))
+            return JSValue::encode(jsUndefined());
     } while (index--);
 
     return JSValue::encode(jsNumber(-1));
@@ -1118,19 +1135,22 @@ static bool moveElements(ExecState* exec, VM& vm, JSArray* target, unsigned targ
 
 static EncodedJSValue concatAppendOne(ExecState* exec, VM& vm, JSArray* first, JSValue second)
 {
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     ASSERT(!isJSArray(second));
     ASSERT(!shouldUseSlowPut(first->indexingType()));
     Butterfly* firstButterfly = first->butterfly();
     unsigned firstArraySize = firstButterfly->publicLength();
 
     IndexingType type = first->mergeIndexingTypeForCopying(indexingTypeForValue(second) | IsArray);
+    
     if (type == NonArray)
-        type = ArrayWithUndecided;
+        type = first->indexingType();
 
     Structure* resultStructure = exec->lexicalGlobalObject()->arrayStructureForIndexingTypeDuringAllocation(type);
     JSArray* result = JSArray::create(vm, resultStructure, firstArraySize + 1);
     if (!result)
-        return JSValue::encode(throwOutOfMemoryError(exec));
+        return JSValue::encode(throwOutOfMemoryError(exec, scope));
 
     if (!result->appendMemcpy(exec, vm, 0, first)) {
         if (!moveElements(exec, vm, result, 0, first, firstArraySize)) {
@@ -1149,9 +1169,10 @@ EncodedJSValue JSC_HOST_CALL arrayProtoPrivateFuncConcatMemcpy(ExecState* exec)
 {
     ASSERT(exec->argumentCount() == 2);
     VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
 
     JSArray* firstArray = jsCast<JSArray*>(exec->uncheckedArgument(0));
-
+    
     // This code assumes that neither array has set Symbol.isConcatSpreadable. If the first array
     // has indexed accessors then one of those accessors might change the value of Symbol.isConcatSpreadable
     // on the second argument.
@@ -1167,14 +1188,15 @@ EncodedJSValue JSC_HOST_CALL arrayProtoPrivateFuncConcatMemcpy(ExecState* exec)
         return concatAppendOne(exec, vm, firstArray, second);
 
     JSArray* secondArray = jsCast<JSArray*>(second);
-
+    
     Butterfly* firstButterfly = firstArray->butterfly();
     Butterfly* secondButterfly = secondArray->butterfly();
 
     unsigned firstArraySize = firstButterfly->publicLength();
     unsigned secondArraySize = secondButterfly->publicLength();
 
-    IndexingType type = firstArray->mergeIndexingTypeForCopying(secondArray->indexingType());
+    IndexingType secondType = secondArray->indexingType();
+    IndexingType type = firstArray->mergeIndexingTypeForCopying(secondType);
     if (type == NonArray || !firstArray->canFastCopy(vm, secondArray) || firstArraySize + secondArraySize >= MIN_SPARSE_ARRAY_INDEX) {
         JSArray* result = constructEmptyArray(exec, nullptr, firstArraySize + secondArraySize);
         if (vm.exception())
@@ -1192,8 +1214,8 @@ EncodedJSValue JSC_HOST_CALL arrayProtoPrivateFuncConcatMemcpy(ExecState* exec)
     Structure* resultStructure = exec->lexicalGlobalObject()->arrayStructureForIndexingTypeDuringAllocation(type);
     JSArray* result = JSArray::tryCreateUninitialized(vm, resultStructure, firstArraySize + secondArraySize);
     if (!result)
-        return JSValue::encode(throwOutOfMemoryError(exec));
-
+        return JSValue::encode(throwOutOfMemoryError(exec, scope));
+    
     if (type == ArrayWithDouble) {
         double* buffer = result->butterfly()->contiguousDouble().data();
         memcpy(buffer, firstButterfly->contiguousDouble().data(), sizeof(JSValue) * firstArraySize);
@@ -1201,7 +1223,12 @@ EncodedJSValue JSC_HOST_CALL arrayProtoPrivateFuncConcatMemcpy(ExecState* exec)
     } else if (type != ArrayWithUndecided) {
         WriteBarrier<Unknown>* buffer = result->butterfly()->contiguous().data();
         memcpy(buffer, firstButterfly->contiguous().data(), sizeof(JSValue) * firstArraySize);
-        memcpy(buffer + firstArraySize, secondButterfly->contiguous().data(), sizeof(JSValue) * secondArraySize);
+        if (secondType != ArrayWithUndecided)
+            memcpy(buffer + firstArraySize, secondButterfly->contiguous().data(), sizeof(JSValue) * secondArraySize);
+        else {
+            for (unsigned i = secondArraySize; i--;)
+                buffer[i + firstArraySize].clear();
+        }
     }
 
     result->butterfly()->setPublicLength(firstArraySize + secondArraySize);

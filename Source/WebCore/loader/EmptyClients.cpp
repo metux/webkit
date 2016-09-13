@@ -42,11 +42,13 @@
 #include "Page.h"
 #include "PageConfiguration.h"
 #include "PaymentCoordinatorClient.h"
+#include "PluginInfoProvider.h"
 #include "StorageArea.h"
 #include "StorageNamespace.h"
 #include "StorageNamespaceProvider.h"
 #include "ThreadableWebSocketChannel.h"
 #include "UserContentProvider.h"
+#include <heap/HeapInlines.h>
 #include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
@@ -76,6 +78,12 @@ class EmptyDatabaseProvider final : public DatabaseProvider {
         return sharedConnection.get()->connectionToServer();
     }
 #endif
+};
+
+class EmptyPluginInfoProvider final : public PluginInfoProvider {
+    void refreshPlugins() override { };
+    void getPluginInfo(Page&, Vector<PluginInfo>&) override { }
+    void getWebVisiblePluginInfo(Page&, Vector<PluginInfo>&) override { }
 };
 
 class EmptyStorageNamespaceProvider final : public StorageNamespaceProvider {
@@ -163,6 +171,7 @@ void fillWithEmptyClients(PageConfiguration& pageConfiguration)
 
     pageConfiguration.applicationCacheStorage = ApplicationCacheStorage::create(String(), String());
     pageConfiguration.databaseProvider = adoptRef(new EmptyDatabaseProvider);
+    pageConfiguration.pluginInfoProvider = adoptRef(new EmptyPluginInfoProvider);
     pageConfiguration.storageNamespaceProvider = adoptRef(new EmptyStorageNamespaceProvider);
     pageConfiguration.userContentProvider = adoptRef(new EmptyUserContentProvider);
     pageConfiguration.visitedLinkStore = adoptRef(new EmptyVisitedLinkStore);

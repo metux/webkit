@@ -38,6 +38,7 @@
 #include "InspectorFrontendRouter.h"
 #include "InspectorHeapAgent.h"
 #include "InspectorScriptProfilerAgent.h"
+#include "JSCInlines.h"
 #include "JSGlobalObject.h"
 #include "JSGlobalObjectConsoleAgent.h"
 #include "JSGlobalObjectConsoleClient.h"
@@ -48,8 +49,8 @@
 #include "ScriptCallStackFactory.h"
 #include <wtf/Stopwatch.h>
 
-#include <cxxabi.h>
 #if OS(DARWIN) || (OS(LINUX) && !PLATFORM(GTK))
+#include <cxxabi.h>
 #include <dlfcn.h>
 #include <execinfo.h>
 #endif
@@ -115,7 +116,7 @@ JSGlobalObjectInspectorController::~JSGlobalObjectInspectorController()
 
 void JSGlobalObjectInspectorController::globalObjectDestroyed()
 {
-    disconnectAllFrontends();
+    ASSERT(!m_frontendRouter->hasFrontends());
 
     m_injectedScriptManager->disconnect();
 }
@@ -131,6 +132,10 @@ void JSGlobalObjectInspectorController::connectFrontend(FrontendChannel* fronten
 
     if (!connectedFirstFrontend)
         return;
+
+    // Keep the JSGlobalObject and VM alive while we are debugging it.
+    m_strongVM = &m_globalObject.vm();
+    m_strongGlobalObject.set(m_globalObject.vm(), &m_globalObject);
 
     // FIXME: change this to notify agents which frontend has connected (by id).
     m_agents.didCreateFrontendAndBackend(nullptr, nullptr);
@@ -162,21 +167,10 @@ void JSGlobalObjectInspectorController::disconnectFrontend(FrontendChannel* fron
     if (m_augmentingClient)
         m_augmentingClient->inspectorDisconnected();
 #endif
-}
 
-void JSGlobalObjectInspectorController::disconnectAllFrontends()
-{
-    // FIXME: change this to notify agents which frontend has disconnected (by id).
-    m_agents.willDestroyFrontendAndBackend(DisconnectReason::InspectedTargetDestroyed);
-
-    m_frontendRouter->disconnectAllFrontends();
-
-    m_isAutomaticInspection = false;
-
-#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
-    if (m_augmentingClient)
-        m_augmentingClient->inspectorDisconnected();
-#endif
+    // Remove our JSGlobalObject and VM references, we are done debugging it.
+    m_strongGlobalObject.clear();
+    m_strongVM = nullptr;
 }
 
 void JSGlobalObjectInspectorController::dispatchMessageFromFrontend(const String& message)
@@ -315,4 +309,3 @@ void JSGlobalObjectInspectorController::appendExtraAgent(std::unique_ptr<Inspect
 #endif
 
 } // namespace Inspector
-

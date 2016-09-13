@@ -82,7 +82,7 @@ public:
     // This is guaranteed to be equivalent to doing:
     //
     // state.startExecuting()
-    // state.executeEdges(index);
+    // state.executeEdges(node);
     // result = state.executeEffects(index);
     bool execute(unsigned indexInBlock);
     bool execute(Node*);
@@ -95,8 +95,7 @@ public:
     // on all edges of the node. You can skip this step, if you have already used
     // filterEdgeByUse() (or some equivalent) on each edge.
     void executeEdges(Node*);
-    void executeEdges(unsigned indexInBlock);
-    
+
     void executeKnownEdgeTypes(Node*);
     
     ALWAYS_INLINE void filterEdgeByUse(Edge& edge)
@@ -187,6 +186,7 @@ private:
     
     void verifyEdge(Node*, Edge);
     void verifyEdges(Node*);
+    void executeDoubleUnaryOpEffects(Node*, double(*equivalentFunction)(double));
     
     CodeBlock* m_codeBlock;
     Graph& m_graph;

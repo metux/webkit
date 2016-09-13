@@ -28,19 +28,15 @@
 
 #include "BatchedTransitionOptimizer.h"
 #include "CodeBlock.h"
-#include "DFGDriver.h"
+#include "Debugger.h"
 #include "JIT.h"
 #include "JSCInlines.h"
 #include "JSWASMModule.h"
 #include "LLIntEntrypoint.h"
 #include "Parser.h"
-#include "ProfilerDatabase.h"
 #include "TypeProfiler.h"
 #include "VMInlines.h"
-#include "WASMFunctionParser.h"
 #include <wtf/CommaPrinter.h>
-#include <wtf/Vector.h>
-#include <wtf/text/StringBuilder.h>
 
 namespace JSC {
 
@@ -150,6 +146,7 @@ ScriptExecutable::ScriptExecutable(Structure* structure, VM& vm, const SourceCod
     , m_neverOptimize(false)
     , m_neverFTLOptimize(false)
     , m_isArrowFunctionContext(isInArrowFunctionContext)
+    , m_canUseOSRExitFuzzing(true)
     , m_derivedContextType(static_cast<unsigned>(derivedContextType))
     , m_evalContextType(static_cast<unsigned>(evalContextType))
     , m_overrideLineNumber(-1)
@@ -177,7 +174,8 @@ void ScriptExecutable::installCode(VM& vm, CodeBlock* genericCodeBlock, CodeType
 {
     ASSERT(vm.heap.isDeferred());
     
-    CODEBLOCK_LOG_EVENT(genericCodeBlock, "installCode", ());
+    if (genericCodeBlock)
+        CODEBLOCK_LOG_EVENT(genericCodeBlock, "installCode", ());
     
     CodeBlock* oldCodeBlock = nullptr;
     
@@ -270,6 +268,7 @@ CodeBlock* ScriptExecutable::newCodeBlockFor(
     CodeSpecializationKind kind, JSFunction* function, JSScope* scope, JSObject*& exception)
 {
     VM* vm = scope->vm();
+    auto throwScope = DECLARE_THROW_SCOPE(*vm);
 
     ASSERT(vm->heap.isDeferred());
     ASSERT(startColumn() != UINT_MAX);
@@ -321,8 +320,8 @@ CodeBlock* ScriptExecutable::newCodeBlockFor(
         executable->m_unlinkedExecutable->hasCapturedVariables(), firstLine(), 
         lastLine(), startColumn(), endColumn()); 
     if (!unlinkedCodeBlock) {
-        exception = vm->throwException(
-            globalObject->globalExec(),
+        exception = throwException(
+            globalObject->globalExec(), throwScope,
             error.toErrorObject(globalObject, executable->m_source));
         return nullptr;
     }
@@ -399,16 +398,17 @@ static void setupJIT(VM& vm, CodeBlock* codeBlock)
 }
 
 JSObject* ScriptExecutable::prepareForExecutionImpl(
-    ExecState* exec, JSFunction* function, JSScope* scope, CodeSpecializationKind kind)
+    ExecState* exec, JSFunction* function, JSScope* scope, CodeSpecializationKind kind, CodeBlock*& resultCodeBlock)
 {
     VM& vm = exec->vm();
-    DeferGC deferGC(vm.heap);
+    DeferGCForAWhile deferGC(vm.heap);
 
     if (vm.getAndClearFailNextNewCodeBlock())
         return createError(exec->callerFrame(), ASCIILiteral("Forced Failure"));
 
     JSObject* exception = 0;
     CodeBlock* codeBlock = newCodeBlockFor(kind, function, scope, exception);
+    resultCodeBlock = codeBlock;
     if (!codeBlock) {
         RELEASE_ASSERT(exception);
         return exception;
@@ -423,27 +423,30 @@ JSObject* ScriptExecutable::prepareForExecutionImpl(
         setupJIT(vm, codeBlock);
     
     installCode(*codeBlock->vm(), codeBlock, codeBlock->codeType(), codeBlock->specializationKind());
-    return 0;
+    return nullptr;
 }
 
 const ClassInfo EvalExecutable::s_info = { "EvalExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(EvalExecutable) };
 
 EvalExecutable* EvalExecutable::create(ExecState* exec, const SourceCode& source, bool isInStrictContext, DerivedContextType derivedContextType, bool isArrowFunctionContext, EvalContextType evalContextType, const VariableEnvironment* variablesUnderTDZ)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     JSGlobalObject* globalObject = exec->lexicalGlobalObject();
     if (!globalObject->evalEnabled()) {
-        exec->vm().throwException(exec, createEvalError(exec, globalObject->evalDisabledErrorMessage()));
+        throwException(exec, scope, createEvalError(exec, globalObject->evalDisabledErrorMessage()));
         return 0;
     }
 
     EvalExecutable* executable = new (NotNull, allocateCell<EvalExecutable>(*exec->heap())) EvalExecutable(exec, source, isInStrictContext, derivedContextType, isArrowFunctionContext, evalContextType);
-    executable->finishCreation(exec->vm());
+    executable->finishCreation(vm);
 
     UnlinkedEvalCodeBlock* unlinkedEvalCode = globalObject->createEvalCodeBlock(exec, executable, variablesUnderTDZ);
     if (!unlinkedEvalCode)
         return 0;
 
-    executable->m_unlinkedEvalCodeBlock.set(exec->vm(), executable, unlinkedEvalCode);
+    executable->m_unlinkedEvalCodeBlock.set(vm, executable, unlinkedEvalCode);
 
     return executable;
 }
@@ -569,8 +572,8 @@ JSObject* ProgramExecutable::checkSyntax(ExecState* exec)
     VM* vm = &exec->vm();
     JSGlobalObject* lexicalGlobalObject = exec->lexicalGlobalObject();
     std::unique_ptr<ProgramNode> programNode = parse<ProgramNode>(
-        vm, m_source, Identifier(), JSParserBuiltinMode::NotBuiltin, 
-        JSParserStrictMode::NotStrict, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, error);
+        vm, m_source, Identifier(), JSParserBuiltinMode::NotBuiltin,
+        JSParserStrictMode::NotStrict, JSParserCommentMode::Classic, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, error);
     if (programNode)
         return 0;
     ASSERT(error.isValid());
@@ -763,28 +766,6 @@ void WebAssemblyExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
     if (thisObject->m_codeBlockForCall)
         thisObject->m_codeBlockForCall->visitWeakly(visitor);
     visitor.append(&thisObject->m_module);
-}
-
-void WebAssemblyExecutable::prepareForExecution(ExecState* exec)
-{
-    if (hasJITCodeForCall())
-        return;
-
-    VM& vm = exec->vm();
-    DeferGC deferGC(vm.heap);
-
-    WebAssemblyCodeBlock* codeBlock = WebAssemblyCodeBlock::create(&vm,
-        this, exec->lexicalGlobalObject());
-
-    WASMFunctionParser::compile(vm, codeBlock, m_module.get(), m_source, m_functionIndex);
-
-    m_jitCodeForCall = codeBlock->jitCode();
-    m_jitCodeForCallWithArityCheck = MacroAssemblerCodePtr();
-    m_numParametersForCall = codeBlock->numParameters();
-
-    m_codeBlockForCall.set(vm, this, codeBlock);
-
-    Heap::heap(this)->writeBarrier(this);
 }
 #endif
 

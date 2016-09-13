@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -104,9 +104,16 @@ bool JSHTMLAllCollection::nameGetter(ExecState* state, PropertyName propertyName
 
 JSValue JSHTMLAllCollection::item(ExecState& state)
 {
-    if (Optional<uint32_t> index = parseIndex(*state.argument(0).toString(&state)->value(&state).impl()))
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
+    if (UNLIKELY(state.argumentCount() < 1))
+        return throwException(&state, scope, createNotEnoughArgumentsError(&state));
+
+    String argument = state.uncheckedArgument(0).toWTFString(&state);
+    if (Optional<uint32_t> index = parseIndex(*argument.impl()))
         return toJS(&state, globalObject(), wrapped().item(index.value()));
-    return namedItems(state, this, Identifier::fromString(&state, state.argument(0).toString(&state)->value(&state)));
+    return namedItems(state, this, Identifier::fromString(&state, argument));
 }
 
 JSValue JSHTMLAllCollection::namedItem(ExecState& state)

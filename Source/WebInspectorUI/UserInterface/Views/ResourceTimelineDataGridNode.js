@@ -148,8 +148,7 @@ WebInspector.ResourceTimelineDataGridNode = class ResourceTimelineDataGridNode e
 
     appendContextMenuItems(contextMenu)
     {
-        if (this._resource.urlComponents.scheme !== "data")
-            contextMenu.appendItem(WebInspector.UIString("Copy as cURL"), () => { this._resource.generateCURLCommand(); });
+        WebInspector.appendContextMenuItemsForResource(contextMenu, this._resource);
     }
 
     // Protected

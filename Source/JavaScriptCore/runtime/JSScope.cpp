@@ -217,6 +217,7 @@ static inline bool isUnscopable(ExecState* exec, JSScope* scope, JSObject* objec
 
 JSObject* JSScope::resolve(ExecState* exec, JSScope* scope, const Identifier& ident)
 {
+    VM& vm = exec->vm();
     ScopeChainIterator end = scope->end();
     ScopeChainIterator it = scope->begin();
     while (1) {
@@ -225,7 +226,7 @@ JSObject* JSScope::resolve(ExecState* exec, JSScope* scope, const Identifier& id
 
         // Global scope.
         if (++it == end) {
-            JSScope* globalScopeExtension = scope->globalObject()->globalScopeExtension();
+            JSScope* globalScopeExtension = scope->globalObject(vm)->globalScopeExtension();
             if (UNLIKELY(globalScopeExtension)) {
                 if (object->hasProperty(exec, ident))
                     return object;
@@ -264,7 +265,7 @@ ResolveOp JSScope::abstractResolve(ExecState* exec, size_t depthOffset, JSScope*
 void JSScope::collectVariablesUnderTDZ(JSScope* scope, VariableEnvironment& result)
 {
     for (; scope; scope = scope->next()) {
-        if (!scope->isLexicalScope() && !scope->isGlobalLexicalEnvironment())
+        if (!scope->isLexicalScope() && !scope->isGlobalLexicalEnvironment() && !scope->isCatchScope())
             continue;
 
         if (scope->isModuleScope()) {
@@ -274,7 +275,7 @@ void JSScope::collectVariablesUnderTDZ(JSScope* scope, VariableEnvironment& resu
         }
 
         SymbolTable* symbolTable = jsCast<JSSymbolTableObject*>(scope)->symbolTable();
-        ASSERT(symbolTable->scopeType() == SymbolTable::ScopeType::LexicalScope || symbolTable->scopeType() == SymbolTable::ScopeType::GlobalLexicalScope);
+        ASSERT(symbolTable->scopeType() == SymbolTable::ScopeType::LexicalScope || symbolTable->scopeType() == SymbolTable::ScopeType::GlobalLexicalScope || symbolTable->scopeType() == SymbolTable::ScopeType::CatchScope);
         ConcurrentJITLocker locker(symbolTable->m_lock);
         for (auto end = symbolTable->end(locker), iter = symbolTable->begin(locker); iter != end; ++iter)
             result.add(iter->key);

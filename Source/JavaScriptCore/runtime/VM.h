@@ -39,7 +39,6 @@
 #include "JITThunks.h"
 #include "JSCJSValue.h"
 #include "JSLock.h"
-#include "LLIntData.h"
 #include "MacroAssemblerCodeRef.h"
 #include "Microtask.h"
 #include "NumericStrings.h"
@@ -48,6 +47,7 @@
 #include "SmallStrings.h"
 #include "SourceCode.h"
 #include "Strong.h"
+#include "ThrowScopeLocation.h"
 #include "ThunkGenerators.h"
 #include "TypedArrayController.h"
 #include "VMEntryRecord.h"
@@ -59,18 +59,21 @@
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
-#include <wtf/SimpleStats.h>
 #include <wtf/StackBounds.h>
 #include <wtf/Stopwatch.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/ThreadSpecific.h>
 #include <wtf/WTFThreadData.h>
-#include <wtf/WeakRandom.h>
 #include <wtf/text/SymbolRegistry.h>
 #include <wtf/text/WTFString.h>
 #if ENABLE(REGEXP_TRACING)
 #include <wtf/ListHashSet.h>
 #endif
+
+namespace WTF {
+class SimpleStats;
+} // namespace WTF
+using WTF::SimpleStats;
 
 namespace JSC {
 
@@ -108,6 +111,8 @@ class Structure;
 #if ENABLE(REGEXP_TRACING)
 class RegExp;
 #endif
+class Symbol;
+class ThrowScope;
 class UnlinkedCodeBlock;
 class UnlinkedEvalCodeBlock;
 class UnlinkedFunctionExecutable;
@@ -278,7 +283,11 @@ public:
     VMType vmType;
     ClientData* clientData;
     VMEntryFrame* topVMEntryFrame;
-    ExecState* topCallFrame;
+    // NOTE: When throwing an exception while rolling back the call frame, this may be equal to
+    // topVMEntryFrame.
+    // FIXME: This should be a void*, because it might not point to a CallFrame.
+    // https://bugs.webkit.org/show_bug.cgi?id=160441
+    ExecState* topCallFrame; 
     Strong<Structure> structureStructure;
     Strong<Structure> structureRareDataStructure;
     Strong<Structure> terminatedExecutionErrorStructure;
@@ -316,7 +325,6 @@ public:
     Strong<Structure> inferredTypeStructure;
     Strong<Structure> inferredTypeTableStructure;
     Strong<Structure> functionRareDataStructure;
-    Strong<Structure> generatorFrameStructure;
     Strong<Structure> exceptionStructure;
     Strong<Structure> promiseDeferredStructure;
     Strong<Structure> internalPromiseDeferredStructure;
@@ -326,6 +334,10 @@ public:
     Strong<Structure> evalCodeBlockStructure;
     Strong<Structure> functionCodeBlockStructure;
     Strong<Structure> webAssemblyCodeBlockStructure;
+    Strong<Structure> hashMapBucketSetStructure;
+    Strong<Structure> hashMapBucketMapStructure;
+    Strong<Structure> hashMapImplSetStructure;
+    Strong<Structure> hashMapImplMapStructure;
 
     Strong<JSCell> iterationTerminator;
     Strong<JSCell> emptyPropertyNameEnumerator;
@@ -337,13 +349,15 @@ public:
     SmallStrings smallStrings;
     NumericStrings numericStrings;
     DateInstanceCache dateInstanceCache;
-    WTF::SimpleStats machineCodeBytesPerBytecodeWordForBaselineJIT;
+    std::unique_ptr<SimpleStats> machineCodeBytesPerBytecodeWordForBaselineJIT;
     WeakGCMap<std::pair<CustomGetterSetter*, int>, JSCustomGetterSetterFunction> customGetterSetterFunctionMap;
     WeakGCMap<StringImpl*, JSString, PtrHash<StringImpl*>> stringCache;
     Strong<JSString> lastCachedString;
 
     AtomicStringTable* atomicStringTable() const { return m_atomicStringTable; }
     WTF::SymbolRegistry& symbolRegistry() { return m_symbolRegistry; }
+
+    WeakGCMap<SymbolImpl*, Symbol, PtrHash<SymbolImpl*>> symbolImplToSymbolMap;
 
     enum class DeletePropertyMode {
         // Default behaviour of deleteProperty, matching the spec.
@@ -443,10 +457,6 @@ public:
 
     Exception* lastException() const { return m_lastException; }
     JSCell** addressOfLastException() { return reinterpret_cast<JSCell**>(&m_lastException); }
-
-    JS_EXPORT_PRIVATE void throwException(ExecState*, Exception*);
-    JS_EXPORT_PRIVATE JSValue throwException(ExecState*, JSValue);
-    JS_EXPORT_PRIVATE JSObject* throwException(ExecState*, JSObject*);
 
     void setFailNextNewCodeBlock() { m_failNextNewCodeBlock = true; }
     bool getAndClearFailNextNewCodeBlock()
@@ -619,7 +629,6 @@ public:
 
 private:
     friend class LLIntOffsetsExtractor;
-    friend class ClearExceptionScope;
 
     VM(VMType, HeapType);
     static VM*& sharedInstanceInternal();
@@ -639,6 +648,15 @@ private:
         m_exception = exception;
         m_lastException = exception;
     }
+
+#if !ENABLE(JIT)    
+    bool ensureStackCapacityForCLoop(Register* newTopOfStack);
+    bool isSafeToRecurseSoftCLoop() const;
+#endif // !ENABLE(JIT)
+
+    JS_EXPORT_PRIVATE void throwException(ExecState*, Exception*);
+    JS_EXPORT_PRIVATE JSValue throwException(ExecState*, JSValue);
+    JS_EXPORT_PRIVATE JSObject* throwException(ExecState*, JSObject*);
 
 #if ENABLE(ASSEMBLER)
     bool m_canUseAssembler;
@@ -664,6 +682,13 @@ private:
 
     Exception* m_exception { nullptr };
     Exception* m_lastException { nullptr };
+#if ENABLE(THROW_SCOPE_VERIFICATION)
+    ThrowScope* m_topThrowScope { nullptr };
+    ThrowScopeLocation m_simulatedThrowPointLocation;
+    unsigned m_simulatedThrowPointDepth { 0 };
+    mutable bool m_needExceptionCheck { false };
+#endif
+
     bool m_failNextNewCodeBlock { false };
     DeletePropertyMode m_deletePropertyMode { DeletePropertyMode::Default };
     bool m_globalConstRedeclarationShouldThrow { true };
@@ -686,6 +711,8 @@ private:
 #endif
     std::unique_ptr<ShadowChicken> m_shadowChicken;
     std::unique_ptr<BytecodeIntrinsicRegistry> m_bytecodeIntrinsicRegistry;
+
+    friend class ThrowScope;
 };
 
 #if ENABLE(GC_VALIDATION)

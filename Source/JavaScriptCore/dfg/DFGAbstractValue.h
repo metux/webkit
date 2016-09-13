@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -55,6 +55,15 @@ struct AbstractValue {
         : m_type(SpecNone)
         , m_arrayModes(0)
     {
+#if USE(JSVALUE64) && !defined(NDEBUG)
+        // The WTF Traits for AbstractValue allow the initialization of values with bzero().
+        // We verify the correctness of this assumption here.
+        static bool needsDefaultConstructorCheck = true;
+        if (needsDefaultConstructorCheck) {
+            needsDefaultConstructorCheck = false;
+            ensureCanInitializeWithZeros();
+        }
+#endif
     }
     
     void clear()
@@ -448,6 +457,10 @@ private:
     
     void filterValueByType();
     void filterArrayModesByType();
+
+#if USE(JSVALUE64) && !defined(NDEBUG)
+    void ensureCanInitializeWithZeros();
+#endif
     
     bool shouldBeClear() const;
     FiltrationResult normalizeClarity();
@@ -455,6 +468,20 @@ private:
 };
 
 } } // namespace JSC::DFG
+
+#if USE(JSVALUE64)
+namespace WTF {
+template <>
+struct VectorTraits<JSC::DFG::AbstractValue> : VectorTraitsBase<false, JSC::DFG::AbstractValue> {
+    static const bool canInitializeWithMemset = true;
+};
+
+template <>
+struct HashTraits<JSC::DFG::AbstractValue> : GenericHashTraits<JSC::DFG::AbstractValue> {
+    static const bool emptyValueIsZero = true;
+};
+};
+#endif // USE(JSVALUE64)
 
 #endif // ENABLE(DFG_JIT)
 

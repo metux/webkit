@@ -822,12 +822,12 @@ String Internals::shadowRootType(const Node& root, ExceptionCode& ec) const
         return String();
     }
 
-    switch (downcast<ShadowRoot>(root).type()) {
-    case ShadowRoot::Type::UserAgent:
+    switch (downcast<ShadowRoot>(root).mode()) {
+    case ShadowRoot::Mode::UserAgent:
         return String("UserAgentShadowRoot");
-    case ShadowRoot::Type::Closed:
+    case ShadowRoot::Mode::Closed:
         return String("ClosedShadowRoot");
-    case ShadowRoot::Type::Open:
+    case ShadowRoot::Mode::Open:
         return String("OpenShadowRoot");
     default:
         ASSERT_NOT_REACHED();
@@ -2880,10 +2880,11 @@ void Internals::setMediaElementRestrictions(HTMLMediaElement& element, const Str
     element.mediaSession().addBehaviorRestriction(restrictions);
 }
 
-void Internals::postRemoteControlCommand(const String& commandString, ExceptionCode& ec)
+void Internals::postRemoteControlCommand(const String& commandString, float argument, ExceptionCode& ec)
 {
     PlatformMediaSession::RemoteControlCommandType command;
-    
+    PlatformMediaSession::RemoteCommandArgument parameter { argument };
+
     if (equalLettersIgnoringASCIICase(commandString, "play"))
         command = PlatformMediaSession::PlayCommand;
     else if (equalLettersIgnoringASCIICase(commandString, "pause"))
@@ -2900,12 +2901,14 @@ void Internals::postRemoteControlCommand(const String& commandString, ExceptionC
         command = PlatformMediaSession::BeginSeekingForwardCommand;
     else if (equalLettersIgnoringASCIICase(commandString, "endseekingforward"))
         command = PlatformMediaSession::EndSeekingForwardCommand;
+    else if (equalLettersIgnoringASCIICase(commandString, "seektoplaybackposition"))
+        command = PlatformMediaSession::SeekToPlaybackPositionCommand;
     else {
         ec = INVALID_ACCESS_ERR;
         return;
     }
     
-    PlatformMediaSessionManager::sharedManager().didReceiveRemoteControlCommand(command);
+    PlatformMediaSessionManager::sharedManager().didReceiveRemoteControlCommand(command, &parameter);
 }
 
 bool Internals::elementIsBlockingDisplaySleep(HTMLMediaElement& element) const
@@ -3127,16 +3130,16 @@ static void appendOffsets(StringBuilder& builder, const Vector<LayoutUnit>& snap
 {
     bool justStarting = true;
 
-    builder.append("{ ");
+    builder.appendLiteral("{ ");
     for (auto& coordinate : snapOffsets) {
         if (!justStarting)
-            builder.append(", ");
+            builder.appendLiteral(", ");
         else
             justStarting = false;
         
         builder.append(String::number(coordinate.toUnsigned()));
     }
-    builder.append(" }");
+    builder.appendLiteral(" }");
 }
     
 String Internals::scrollSnapOffsets(Element& element, ExceptionCode& ec)

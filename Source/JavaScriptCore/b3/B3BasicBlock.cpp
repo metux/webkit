@@ -85,6 +85,11 @@ Value* BasicBlock::appendIntConstant(Procedure& proc, Value* likeValue, int64_t 
     return appendIntConstant(proc, likeValue->origin(), likeValue->type(), value);
 }
 
+Value* BasicBlock::appendBoolConstant(Procedure& proc, Origin origin, bool value)
+{
+    return appendIntConstant(proc, origin, Int32, value ? 1 : 0);
+}
+
 void BasicBlock::clearSuccessors()
 {
     m_successors.clear();
@@ -166,7 +171,7 @@ void BasicBlock::deepDump(const Procedure& proc, PrintStream& out) const
 
 Value* BasicBlock::appendNewControlValue(Procedure& proc, Opcode opcode, Origin origin)
 {
-    RELEASE_ASSERT(opcode == Oops);
+    RELEASE_ASSERT(opcode == Oops || opcode == Return);
     clearSuccessors();
     return appendNew<Value>(proc, opcode, origin);
 }

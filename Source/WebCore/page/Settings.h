@@ -24,8 +24,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef Settings_h
-#define Settings_h
+#pragma once
 
 #include "ClipboardAccessPolicy.h"
 #include "EditingBehaviorTypes.h"
@@ -75,6 +74,18 @@ enum DebugOverlayRegionFlags {
 enum class UserInterfaceDirectionPolicy {
     Content,
     System
+};
+
+enum PDFImageCachingPolicy {
+    PDFImageCachingEnabled,
+    PDFImageCachingBelowMemoryLimit,
+    PDFImageCachingDisabled,
+    PDFImageCachingClipBoundsOnly,
+#if PLATFORM(IOS)
+    PDFImageCachingDefault = PDFImageCachingBelowMemoryLimit
+#else
+    PDFImageCachingDefault = PDFImageCachingEnabled
+#endif
 };
 
 typedef unsigned DebugOverlayRegions;
@@ -146,9 +157,6 @@ public:
     WEBCORE_EXPORT void setPreferMIMETypeForImages(bool);
     bool preferMIMETypeForImages() const { return m_preferMIMETypeForImages; }
 
-    WEBCORE_EXPORT void setCachedPDFImageEnabled(bool);
-    bool isCachedPDFImageEnabled() const { return m_isCachedPDFImageEnabled; }
-
     WEBCORE_EXPORT void setPluginsEnabled(bool);
     bool arePluginsEnabled() const { return m_arePluginsEnabled; }
 
@@ -206,9 +214,6 @@ public:
 #if PLATFORM(COCOA)
     WEBCORE_EXPORT static void setQTKitEnabled(bool flag);
     static bool isQTKitEnabled() { return gQTKitEnabled; }
-
-    WEBCORE_EXPORT static void setCookieStoragePartitioningEnabled(bool flag);
-    static bool cookieStoragePartitioningEnabled() { return gCookieStoragePartitioningEnabled; }
 #else
     static bool isQTKitEnabled() { return false; }
 #endif
@@ -331,7 +336,6 @@ private:
     bool m_loadsImagesAutomatically : 1;
     bool m_areImagesEnabled : 1;
     bool m_preferMIMETypeForImages : 1;
-    bool m_isCachedPDFImageEnabled : 1;
     bool m_arePluginsEnabled : 1;
     bool m_isScriptEnabled : 1;
     bool m_needsAdobeFrameReloadingQuirk : 1;
@@ -371,7 +375,6 @@ private:
 
 #if PLATFORM(COCOA)
     WEBCORE_EXPORT static bool gQTKitEnabled;
-    static bool gCookieStoragePartitioningEnabled;
 #endif
 
     static bool gMockScrollbarsEnabled;
@@ -409,5 +412,3 @@ private:
 };
 
 } // namespace WebCore
-
-#endif

@@ -33,6 +33,9 @@ namespace WebCore {
 
 bool JSLocation::getOwnPropertySlotDelegate(ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     Frame* frame = wrapped().frame();
     if (!frame) {
         slot.setUndefined();
@@ -55,13 +58,16 @@ bool JSLocation::getOwnPropertySlotDelegate(ExecState* exec, PropertyName proper
         return true;
     }
 
-    printErrorMessageForFrame(frame, message);
+    throwSecurityError(*exec, scope, message);
     slot.setUndefined();
     return true;
 }
 
 bool JSLocation::putDelegate(ExecState* exec, PropertyName propertyName, JSValue, PutPropertySlot&, bool& putResult)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     putResult = false;
     Frame* frame = wrapped().frame();
     if (!frame)
@@ -70,20 +76,25 @@ bool JSLocation::putDelegate(ExecState* exec, PropertyName propertyName, JSValue
     if (propertyName == exec->propertyNames().toString || propertyName == exec->propertyNames().valueOf)
         return true;
 
-    if (shouldAllowAccessToFrame(exec, frame))
+    String errorMessage;
+    if (shouldAllowAccessToFrame(exec, frame, errorMessage))
         return false;
 
     // Cross-domain access to the location is allowed when assigning the whole location,
-    //but not when assigning the individual pieces, since that might inadvertently
+    // but not when assigning the individual pieces, since that might inadvertently
     // disclose other parts of the original location.
-    return propertyName != exec->propertyNames().href;
+    if (propertyName != exec->propertyNames().href) {
+        throwSecurityError(*exec, scope, errorMessage);
+        return true;
+    }
+    return false;
 }
 
 bool JSLocation::deleteProperty(JSCell* cell, ExecState* exec, PropertyName propertyName)
 {
     JSLocation* thisObject = jsCast<JSLocation*>(cell);
     // Only allow deleting by frames in the same origin.
-    if (!shouldAllowAccessToFrame(exec, thisObject->wrapped().frame()))
+    if (!BindingSecurity::shouldAllowAccessToFrame(exec, thisObject->wrapped().frame(), ThrowSecurityError))
         return false;
     return Base::deleteProperty(thisObject, exec, propertyName);
 }
@@ -92,7 +103,7 @@ bool JSLocation::deletePropertyByIndex(JSCell* cell, ExecState* exec, unsigned p
 {
     JSLocation* thisObject = jsCast<JSLocation*>(cell);
     // Only allow deleting by frames in the same origin.
-    if (!shouldAllowAccessToFrame(exec, thisObject->wrapped().frame()))
+    if (!BindingSecurity::shouldAllowAccessToFrame(exec, thisObject->wrapped().frame(), ThrowSecurityError))
         return false;
     return Base::deletePropertyByIndex(thisObject, exec, propertyName);
 }
@@ -111,15 +122,6 @@ bool JSLocation::defineOwnProperty(JSObject* object, ExecState* exec, PropertyNa
     if (descriptor.isAccessorDescriptor() && (propertyName == exec->propertyNames().toString || propertyName == exec->propertyNames().valueOf))
         return false;
     return Base::defineOwnProperty(object, exec, propertyName, descriptor, throwException);
-}
-
-JSValue JSLocation::toStringFunction(ExecState& state)
-{
-    Frame* frame = wrapped().frame();
-    if (!frame || !shouldAllowAccessToFrame(&state, frame))
-        return jsUndefined();
-
-    return jsStringWithCache(&state, wrapped().toString());
 }
 
 bool JSLocationPrototype::putDelegate(ExecState* exec, PropertyName propertyName, JSValue, PutPropertySlot&, bool& putResult)

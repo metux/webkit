@@ -330,12 +330,12 @@ private:
         }
 
         case ArithAbs: {
-            SpeculatedType child = node->child1()->prediction();
-            if (isInt32OrBooleanSpeculationForArithmetic(child)
+            SpeculatedType childPrediction = node->child1()->prediction();
+            if (isInt32OrBooleanSpeculation(childPrediction)
                 && node->canSpeculateInt32(m_pass))
                 changed |= mergePrediction(SpecInt32Only);
             else
-                changed |= mergePrediction(speculatedDoubleTypeForPrediction(child));
+                changed |= mergePrediction(SpecBytecodeDouble);
             break;
         }
 
@@ -680,15 +680,6 @@ private:
             break;
         }
 
-        case GetByValWithThis:
-        case GetByIdWithThis: {
-            setPrediction(SpecBytecodeTop);
-            break;
-        }
-        case TryGetById: {
-            setPrediction(SpecBytecodeTop);
-            break;
-        }
         case ArrayPop:
         case ArrayPush:
         case RegExpExec:
@@ -697,6 +688,9 @@ private:
         case StringReplaceRegExp:
         case GetById:
         case GetByIdFlush:
+        case GetByIdWithThis:
+        case TryGetById:
+        case GetByValWithThis:
         case GetByOffset:
         case MultiGetByOffset:
         case GetDirectPname:
@@ -714,6 +708,7 @@ private:
         case GetGlobalLexicalVariable:
         case GetClosureVar:
         case GetFromArguments:
+        case LoadFromJSMapBucket:
         case ToNumber: {
             setPrediction(m_currentNode->getHeapPrediction());
             break;
@@ -743,6 +738,16 @@ private:
             setPrediction(SpecInt32Only);
             break;
         }
+
+        case MapHash:
+            setPrediction(SpecInt32Only);
+            break;
+        case GetMapBucket:
+            setPrediction(SpecCellOther);
+            break;
+        case IsNonEmptyMapBucket:
+            setPrediction(SpecBoolean);
+            break;
 
         case GetRestLength: {
             setPrediction(SpecInt32Only);
@@ -836,6 +841,7 @@ private:
             
         case NewArray:
         case NewArrayWithSize:
+        case CreateRest:
         case NewArrayBuffer: {
             setPrediction(SpecArray);
             break;
@@ -1045,7 +1051,7 @@ private:
         case CheckStructure:
         case CheckCell:
         case CheckNotEmpty:
-        case CheckIdent:
+        case CheckStringIdent:
         case CheckBadCell:
         case PutStructure:
         case Phantom:
@@ -1063,7 +1069,6 @@ private:
         case ExitOK:
         case LoadVarargs:
         case ForwardVarargs:
-        case CopyRest:
         case PutDynamicVar:
             break;
             

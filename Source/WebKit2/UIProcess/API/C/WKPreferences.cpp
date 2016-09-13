@@ -30,7 +30,6 @@
 #include "WKAPICast.h"
 #include "WebPreferences.h"
 #include <WebCore/Settings.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
 using namespace WebKit;
@@ -803,26 +802,6 @@ bool WKPreferencesGetInlineMediaPlaybackRequiresPlaysInlineAttribute(WKPreferenc
     return toImpl(preferencesRef)->inlineMediaPlaybackRequiresPlaysInlineAttribute();
 }
 
-void WKPreferencesSetAllowsInlineMediaPlaybackWithPlaysInlineAttribute(WKPreferencesRef preferencesRef, bool flag)
-{
-    toImpl(preferencesRef)->setAllowsInlineMediaPlaybackWithPlaysInlineAttribute(flag);
-}
-
-bool WKPreferencesGetAllowsInlineMediaPlaybackWithPlaysInlineAttribute(WKPreferencesRef preferencesRef)
-{
-    return toImpl(preferencesRef)->allowsInlineMediaPlaybackWithPlaysInlineAttribute();
-}
-
-void WKPreferencesSetAllowsInlineMediaPlaybackWithWebKitPlaysInlineAttribute(WKPreferencesRef preferencesRef, bool flag)
-{
-    toImpl(preferencesRef)->setAllowsInlineMediaPlaybackWithWebKitPlaysInlineAttribute(flag);
-}
-
-bool WKPreferencesGetAllowsInlineMediaPlaybackWithWebKitPlaysInlineAttribute(WKPreferencesRef preferencesRef)
-{
-    return toImpl(preferencesRef)->allowsInlineMediaPlaybackWithWebKitPlaysInlineAttribute();
-}
-
 void WKPreferencesSetMediaControlsScaleWithPageZoom(WKPreferencesRef preferencesRef, bool flag)
 {
     toImpl(preferencesRef)->setMediaControlsScaleWithPageZoom(flag);
@@ -1280,6 +1259,16 @@ void WKPreferencesSetNewBlockInsideInlineModelEnabled(WKPreferencesRef preferenc
 bool WKPreferencesGetNewBlockInsideInlineModelEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->newBlockInsideInlineModelEnabled();
+}
+
+void WKPreferencesSetNewCSSParserEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setNewCSSParserEnabled(flag);
+}
+
+bool WKPreferencesGetNewCSSParserEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->newCSSParserEnabled();
 }
 
 void WKPreferencesSetSubpixelCSSOMElementMetricsEnabled(WKPreferencesRef preferencesRef, bool flag)

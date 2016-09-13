@@ -70,8 +70,12 @@ my %webCoreTypeHash = (
     "SerializedScriptValue" => 1,
 );
 
-my %enumTypeHash = ();
 my %dictionaryTypes = ();
+my %dictionaryTypeImplementationNameOverrides = ();
+
+my %enumTypeHash = ();
+my %enumTypeImplementationNameOverrides = ();
+
 
 my %typedArrayTypes = (
     "ArrayBuffer" => 1,
@@ -163,8 +167,19 @@ sub ProcessDocument
     my $ifaceName = "CodeGenerator" . $useGenerator;
     require $ifaceName . ".pm";
 
-    %enumTypeHash = map { $_->name => $_->values } @{$useDocument->enumerations};
-    %dictionaryTypes = map { $_->name => 1 } @{$useDocument->dictionaries};
+    foreach my $dictionary (@{$useDocument->dictionaries}) {
+        $dictionaryTypes{$dictionary->name} = 1;
+        if ($dictionary->extendedAttributes->{"ImplementedAs"}) {
+            $dictionaryTypeImplementationNameOverrides{$dictionary->name} = $dictionary->extendedAttributes->{"ImplementedAs"};
+        }
+    }
+
+    foreach my $enumeration (@{$useDocument->enumerations}) {
+        $enumTypeHash{$enumeration->name} = $enumeration->values;
+        if ($enumeration->extendedAttributes->{"ImplementedAs"}) {
+            $enumTypeImplementationNameOverrides{$enumeration->name} = $enumeration->extendedAttributes->{"ImplementedAs"};
+        }
+    }
 
     # Dynamically load external code generation perl module
     $codeGenerator = $ifaceName->new($object, $writeDependencies, $verbose, $targetIdlFilePath);
@@ -332,7 +347,7 @@ sub SkipIncludeHeader
     return 1 if $object->IsPrimitiveType($type);
     return 1 if $object->IsTypedArrayType($type);
     return 1 if $type eq "Array";
-    return 1 if $type eq "DOMString";
+    return 1 if $type eq "DOMString" or $type eq "USVString";
     return 1 if $type eq "DOMTimeStamp";
     return 1 if $type eq "SVGNumber";
     return 1 if $type eq "any";
@@ -355,6 +370,15 @@ sub IsNumericType
 
     return 1 if $integerTypeHash{$type};
     return 1 if $floatingPointTypeHash{$type};
+    return 0;
+}
+
+sub IsStringOrEnumType
+{
+    my ($object, $type) = @_;
+    
+    return 1 if $type eq "DOMString" or $type eq "USVString";
+    return 1 if $object->IsEnumType($type);
     return 0;
 }
 
@@ -383,20 +407,19 @@ sub IsPrimitiveType
     return 0;
 }
 
-# Deprecated: Just check for "DOMString" instead.
 # Currently used outside WebKit in an internal Apple project; can be removed soon.
 sub IsStringType
 {
-    my $object = shift;
-    my $type = shift;
+    my ($object, $type) = @_;
 
-    return $type eq "DOMString";
+    return 1 if $type eq "DOMString";
+    return 1 if $type eq "USVString";
+    return 0;
 }
 
 sub IsEnumType
 {
-    my $object = shift;
-    my $type = shift;
+    my ($object, $type) = @_;
 
     return 1 if exists $enumTypeHash{$type};
     return 0;
@@ -404,17 +427,47 @@ sub IsEnumType
 
 sub ValidEnumValues
 {
-    my $object = shift;
-    my $type = shift;
+    my ($object, $type) = @_;
 
     return @{$enumTypeHash{$type}};
+}
+
+sub HasEnumImplementationNameOverride
+{
+    my ($object, $type) = @_;
+
+    return 1 if exists $enumTypeImplementationNameOverrides{$type};
+    return 0;
+}
+
+sub GetEnumImplementationNameOverride
+{
+    my ($object, $type) = @_;
+
+    return $enumTypeImplementationNameOverrides{$type};
 }
 
 sub IsDictionaryType
 {
     my ($object, $type) = @_;
 
-    return $dictionaryTypes{$type} || 0;
+    return 1 if exists $dictionaryTypes{$type};
+    return 0;
+}
+
+sub HasDictionaryImplementationNameOverride
+{
+    my ($object, $type) = @_;
+
+    return 1 if exists $dictionaryTypeImplementationNameOverrides{$type};
+    return 0;
+}
+
+sub GetDictionaryImplementationNameOverride
+{
+    my ($object, $type) = @_;
+
+    return $dictionaryTypeImplementationNameOverrides{$type};
 }
 
 sub IsNonPointerType
@@ -461,8 +514,8 @@ sub IsRefPtrType
     return 0 if $object->IsPrimitiveType($type);
     return 0 if $object->IsDictionaryType($type);
     return 0 if $object->IsEnumType($type);
-    return 0 if $object->GetArrayOrSequenceType($type);
-    return 0 if $type eq "DOMString";
+    return 0 if $object->IsSequenceOrFrozenArrayType($type);
+    return 0 if $type eq "DOMString" or $type eq "USVString";
     return 0 if $type eq "any";
 
     return 1;
@@ -507,7 +560,15 @@ sub IsSVGAnimatedType
     return $type =~ /^SVGAnimated/;
 }
 
-sub GetSequenceType
+sub IsSequenceType
+{
+    my $object = shift;
+    my $type = shift;
+
+    return $type =~ /^sequence</;
+}
+
+sub GetSequenceInnerType
 {
     my $object = shift;
     my $type = shift;
@@ -516,28 +577,39 @@ sub GetSequenceType
     return "";
 }
 
-sub GetArrayType
+sub IsFrozenArrayType
 {
     my $object = shift;
     my $type = shift;
 
-    return $1 if $type =~ /^([\w\d_\s]+)\[\]/;
+    return $type =~ /^FrozenArray</;
+}
+
+sub GetFrozenArrayInnerType
+{
+    my $object = shift;
+    my $type = shift;
+
+    return $1 if $type =~ /^FrozenArray<([\w\d_\s]+)>.*/;
     return "";
 }
 
-sub GetArrayOrSequenceType
+sub IsSequenceOrFrozenArrayType
 {
     my $object = shift;
     my $type = shift;
 
-    return $object->GetArrayType($type) || $object->GetSequenceType($type);
+    return $object->IsSequenceType($type) || $object->IsFrozenArrayType($type);
 }
 
-sub AssertNotSequenceType
+sub GetSequenceOrFrozenArrayInnerType
 {
     my $object = shift;
     my $type = shift;
-    die "Sequences must not be used as the type of an attribute, constant or exception field." if $object->GetSequenceType($type);
+
+    return $object->GetSequenceInnerType($type) if $object->IsSequenceType($type);
+    return $object->GetFrozenArrayInnerType($type) if $object->IsFrozenArrayType($type);
+    return "";
 }
 
 # These match WK_lcfirst and WK_ucfirst defined in builtins_generator.py.
@@ -604,6 +676,13 @@ sub LinkOverloadedFunctions
         push(@{$nameToFunctionsMap{$name}}, $function);
         $function->{overloads} = $nameToFunctionsMap{$name};
         $function->{overloadIndex} = @{$nameToFunctionsMap{$name}};
+    }
+
+    my $index = 1;
+    foreach my $constructor (@{$interface->constructors}) {
+        $constructor->{overloads} = $interface->constructors;
+        $constructor->{overloadIndex} = $index;
+        $index++;
     }
 }
 

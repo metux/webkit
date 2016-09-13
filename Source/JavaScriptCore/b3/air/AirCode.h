@@ -33,11 +33,11 @@
 #include "AirSpecial.h"
 #include "AirStackSlot.h"
 #include "AirTmp.h"
-#include "B3IndexMap.h"
 #include "B3SparseCollection.h"
 #include "CCallHelpers.h"
 #include "RegisterAtOffsetList.h"
 #include "StackAlignment.h"
+#include <wtf/IndexMap.h>
 
 namespace JSC { namespace B3 {
 
@@ -152,7 +152,7 @@ public:
     // Recomputes predecessors and deletes unreachable blocks.
     void resetReachability();
 
-    void dump(PrintStream&) const;
+    JS_EXPORT_PRIVATE void dump(PrintStream&) const;
 
     unsigned size() const { return m_blocks.size(); }
     BasicBlock* at(unsigned index) const { return m_blocks[index].get(); }

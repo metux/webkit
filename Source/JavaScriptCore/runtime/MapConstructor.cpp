@@ -29,12 +29,11 @@
 #include "Error.h"
 #include "GetterSetter.h"
 #include "IteratorOperations.h"
-#include "JSCJSValueInlines.h"
-#include "JSCellInlines.h"
+#include "JSCInlines.h"
 #include "JSGlobalObject.h"
 #include "JSMap.h"
+#include "JSObjectInlines.h"
 #include "MapPrototype.h"
-#include "StructureInlines.h"
 
 namespace JSC {
 
@@ -50,16 +49,23 @@ void MapConstructor::finishCreation(VM& vm, MapPrototype* mapPrototype, GetterSe
 
 static EncodedJSValue JSC_HOST_CALL callMap(ExecState* exec)
 {
-    return JSValue::encode(throwConstructorCannotBeCalledAsFunctionTypeError(exec, "Map"));
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+    return JSValue::encode(throwConstructorCannotBeCalledAsFunctionTypeError(exec, scope, "Map"));
 }
 
 static EncodedJSValue JSC_HOST_CALL constructMap(ExecState* exec)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     JSGlobalObject* globalObject = asInternalFunction(exec->callee())->globalObject();
     Structure* mapStructure = InternalFunction::createSubclassStructure(exec, exec->newTarget(), globalObject->mapStructure());
-    if (exec->hadException())
+    if (UNLIKELY(scope.exception()))
         return JSValue::encode(JSValue());
-    JSMap* map = JSMap::create(exec, mapStructure);
+    JSMap* map = JSMap::create(exec, vm, mapStructure);
+    if (UNLIKELY(scope.exception()))
+        return JSValue::encode(JSValue());
     JSValue iterable = exec->argument(0);
     if (iterable.isUndefinedOrNull())
         return JSValue::encode(map);
@@ -71,65 +77,28 @@ static EncodedJSValue JSC_HOST_CALL constructMap(ExecState* exec)
     CallData adderFunctionCallData;
     CallType adderFunctionCallType = getCallData(adderFunction, adderFunctionCallData);
     if (adderFunctionCallType == CallType::None)
-        return JSValue::encode(throwTypeError(exec));
+        return JSValue::encode(throwTypeError(exec, scope));
 
-    JSValue iteratorFunction = iterable.get(exec, exec->propertyNames().iteratorSymbol);
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
-
-    CallData iteratorFunctionCallData;
-    CallType iteratorFunctionCallType = getCallData(iteratorFunction, iteratorFunctionCallData);
-    if (iteratorFunctionCallType == CallType::None)
-        return JSValue::encode(throwTypeError(exec));
-
-    ArgList iteratorFunctionArguments;
-    JSValue iterator = call(exec, iteratorFunction, iteratorFunctionCallType, iteratorFunctionCallData, iterable, iteratorFunctionArguments);
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
-
-    if (!iterator.isObject())
-        return JSValue::encode(throwTypeError(exec));
-
-    while (true) {
-        JSValue next = iteratorStep(exec, iterator);
-        if (exec->hadException())
-            return JSValue::encode(jsUndefined());
-
-        if (next.isFalse())
-            return JSValue::encode(map);
-
-        JSValue nextItem = iteratorValue(exec, next);
-        if (exec->hadException())
-            return JSValue::encode(jsUndefined());
-
+    forEachInIterable(exec, iterable, [&](VM& vm, ExecState* exec, JSValue nextItem) {
         if (!nextItem.isObject()) {
-            throwTypeError(exec);
-            iteratorClose(exec, iterator);
-            return JSValue::encode(jsUndefined());
+            throwTypeError(exec, scope);
+            return;
         }
 
         JSValue key = nextItem.get(exec, static_cast<unsigned>(0));
-        if (exec->hadException()) {
-            iteratorClose(exec, iterator);
-            return JSValue::encode(jsUndefined());
-        }
+        if (vm.exception())
+            return;
 
         JSValue value = nextItem.get(exec, static_cast<unsigned>(1));
-        if (exec->hadException()) {
-            iteratorClose(exec, iterator);
-            return JSValue::encode(jsUndefined());
-        }
+        if (vm.exception())
+            return;
 
         MarkedArgumentBuffer arguments;
         arguments.append(key);
         arguments.append(value);
         call(exec, adderFunction, adderFunctionCallType, adderFunctionCallData, map, arguments);
-        if (exec->hadException()) {
-            iteratorClose(exec, iterator);
-            return JSValue::encode(jsUndefined());
-        }
-    }
-    RELEASE_ASSERT_NOT_REACHED();
+    });
+
     return JSValue::encode(map);
 }
 

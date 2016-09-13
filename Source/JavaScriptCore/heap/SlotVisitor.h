@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2013, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2013, 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,8 +37,10 @@ namespace JSC {
 class ConservativeRoots;
 class GCThreadSharedData;
 class Heap;
+class HeapCell;
 class HeapSnapshotBuilder;
 template<typename T> class JITWriteBarrier;
+class MarkedBlock;
 class UnconditionalFinalizer;
 template<typename T> class Weak;
 class WeakReferenceHarvester;
@@ -65,7 +67,6 @@ public:
 
     void append(ConservativeRoots&);
     
-    template<typename T> void append(JITWriteBarrier<T>*);
     template<typename T> void append(WriteBarrierBase<T>*);
     template<typename T> void appendHidden(WriteBarrierBase<T>*);
     template<typename Iterator> void append(Iterator begin , Iterator end);
@@ -105,6 +106,10 @@ public:
 
     void harvestWeakReferences();
     void finalizeUnconditionalFinalizers();
+    
+    // This informs the GC about auxiliary of some size that we are keeping alive. If you don't do
+    // this then the space will be freed at end of GC.
+    void markAuxiliary(const void* base);
 
     void copyLater(JSCell*, CopyToken, void*, size_t);
     
@@ -124,10 +129,20 @@ private:
     friend class ParallelModeEnabler;
     
     JS_EXPORT_PRIVATE void append(JSValue); // This is private to encourage clients to use WriteBarrier<T>.
+    void appendJSCellOrAuxiliary(HeapCell*);
     void appendHidden(JSValue);
 
     JS_EXPORT_PRIVATE void setMarkedAndAppendToMarkStack(JSCell*);
+    
+    template<typename ContainerType>
+    void setMarkedAndAppendToMarkStack(ContainerType&, JSCell*);
+    
     void appendToMarkStack(JSCell*);
+    
+    template<typename ContainerType>
+    void appendToMarkStack(ContainerType&, JSCell*);
+    
+    void noteLiveAuxiliaryCell(HeapCell*);
     
     JS_EXPORT_PRIVATE void mergeOpaqueRoots();
     void mergeOpaqueRootsIfNecessary();
@@ -144,6 +159,8 @@ private:
     size_t m_bytesCopied;
     size_t m_visitCount;
     bool m_isInParallelMode;
+    
+    uint64_t m_version;
     
     Heap& m_heap;
 

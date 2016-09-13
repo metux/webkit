@@ -149,16 +149,9 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         return;
         
     case ArithIMul:
-    case ArithAbs:
-    case ArithClz32:
     case ArithMin:
     case ArithMax:
     case ArithPow:
-    case ArithSqrt:
-    case ArithFRound:
-    case ArithSin:
-    case ArithCos:
-    case ArithLog:
     case GetScope:
     case SkipScope:
     case GetGlobalObject:
@@ -188,6 +181,37 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case BottomValue:
     case TypeOf:
         def(PureValue(node));
+        return;
+
+    case ArithCos:
+    case ArithFRound:
+    case ArithLog:
+    case ArithSin:
+    case ArithSqrt:
+        if (node->child1().useKind() == DoubleRepUse)
+            def(PureValue(node));
+        else {
+            read(World);
+            write(Heap);
+        }
+        return;
+
+    case ArithAbs:
+        if (node->child1().useKind() == Int32Use || node->child1().useKind() == DoubleRepUse)
+            def(PureValue(node));
+        else {
+            read(World);
+            write(Heap);
+        }
+        return;
+
+    case ArithClz32:
+        if (node->child1().useKind() == Int32Use || node->child1().useKind() == KnownInt32Use)
+            def(PureValue(node));
+        else {
+            read(World);
+            write(Heap);
+        }
         return;
 
     case BitAnd:
@@ -344,8 +368,8 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         def(PureValue(CheckNotEmpty, AdjacencyList(AdjacencyList::Fixed, node->child1())));
         return;
 
-    case CheckIdent:
-        def(PureValue(CheckIdent, AdjacencyList(AdjacencyList::Fixed, node->child1()), node->uidOperand()));
+    case CheckStringIdent:
+        def(PureValue(CheckStringIdent, AdjacencyList(AdjacencyList::Fixed, node->child1()), node->uidOperand()));
         return;
 
     case ConstantStoragePointer:
@@ -1097,9 +1121,16 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         return;
     }
 
-    case CopyRest: {
+    case CreateRest: {
+        if (!graph.isWatchingHavingABadTimeWatchpoint(node)) {
+            // This means we're already having a bad time.
+            read(World);
+            write(Heap);
+            return;
+        }
         read(Stack);
-        write(Heap);
+        read(HeapObjectCount);
+        write(HeapObjectCount);
         return;
     }
 
@@ -1219,6 +1250,27 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case LogShadowChickenPrologue:
     case LogShadowChickenTail:
         write(SideState);
+        return;
+
+    case MapHash:
+        def(PureValue(node));
+        return;
+    case GetMapBucket: {
+        read(MiscFields);
+        Edge& mapEdge = node->child1();
+        Edge& keyEdge = node->child2();
+        def(HeapLocation(MapBucketLoc, MiscFields, mapEdge, keyEdge), LazyNode(node));
+        return;
+    }
+    case LoadFromJSMapBucket: {
+        read(MiscFields);
+        Edge& bucketEdge = node->child1();
+        def(HeapLocation(JSMapGetLoc, MiscFields, bucketEdge), LazyNode(node));
+        return;
+    }
+    case IsNonEmptyMapBucket:
+        read(MiscFields);
+        def(HeapLocation(MapHasLoc, MiscFields, node->child1()), LazyNode(node));
         return;
         
     case LastNodeType:

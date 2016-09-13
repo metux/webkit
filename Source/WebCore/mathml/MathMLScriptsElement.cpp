@@ -25,9 +25,9 @@
  */
 
 #include "config.h"
+#include "MathMLScriptsElement.h"
 
 #if ENABLE(MATHML)
-#include "MathMLScriptsElement.h"
 
 #include "RenderMathMLScripts.h"
 
@@ -36,7 +36,7 @@ namespace WebCore {
 using namespace MathMLNames;
 
 MathMLScriptsElement::MathMLScriptsElement(const QualifiedName& tagName, Document& document)
-    : MathMLInlineContainerElement(tagName, document)
+    : MathMLPresentationElement(tagName, document)
 {
 }
 
@@ -58,9 +58,9 @@ const MathMLElement::Length& MathMLScriptsElement::superscriptShift()
 void MathMLScriptsElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == subscriptshiftAttr)
-        m_subscriptShift.dirty = true;
+        m_subscriptShift = Nullopt;
     else if (name == superscriptshiftAttr)
-        m_superscriptShift.dirty = true;
+        m_superscriptShift = Nullopt;
 
     MathMLElement::parseAttribute(name, value);
 }

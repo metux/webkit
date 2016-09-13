@@ -32,8 +32,9 @@
 #if ENABLE(FETCH_API)
 
 #include "Blob.h"
-#include "DOMFormData.h"
+#include "FetchBodyConsumer.h"
 #include "FetchLoader.h"
+#include "FormData.h"
 #include "JSDOMPromise.h"
 
 namespace JSC {
@@ -43,9 +44,11 @@ class JSValue;
 
 namespace WebCore {
 
+class DOMFormData;
 class FetchBodyOwner;
+class FetchHeaders;
 class FetchResponseSource;
-class FormData;
+class ScriptExecutionContext;
 
 class FetchBody {
 public:
@@ -61,55 +64,55 @@ public:
 
     bool isEmpty() const { return m_type == Type::None; }
 
-    void setMimeType(const String& mimeType) { m_mimeType = mimeType; }
-    String mimeType() const { return m_mimeType; }
+    void updateContentType(FetchHeaders&);
+    void setContentType(const String& contentType) { m_contentType = contentType; }
+    String contentType() const { return m_contentType; }
 
-    static FetchBody extract(JSC::ExecState&, JSC::JSValue);
+    static FetchBody extract(ScriptExecutionContext&, JSC::ExecState&, JSC::JSValue);
     static FetchBody extractFromBody(FetchBody*);
     static FetchBody loadingBody() { return { Type::Loading }; }
     FetchBody() = default;
 
     void loadingFailed();
-    void loadedAsArrayBuffer(RefPtr<ArrayBuffer>&&);
-    void loadedAsText(String&&);
+    void loadingSucceeded();
 
-    RefPtr<FormData> bodyForInternalRequest() const;
+    RefPtr<FormData> bodyForInternalRequest(ScriptExecutionContext&) const;
 
-    enum class Type { None, ArrayBuffer, Loading, Text, Blob, FormData };
+    enum class Type { None, ArrayBuffer, ArrayBufferView, Blob, FormData, Text, Loading, Loaded, ReadableStream };
     Type type() const { return m_type; }
+
+    FetchBodyConsumer& consumer() { return m_consumer; }
+
+    void cleanConsumePromise() { m_consumePromise = Nullopt; }
 
 private:
     FetchBody(Ref<Blob>&&);
-    FetchBody(Ref<DOMFormData>&&);
+    FetchBody(Ref<ArrayBuffer>&&);
+    FetchBody(Ref<ArrayBufferView>&&);
+    FetchBody(DOMFormData&, Document&);
     FetchBody(String&&);
     FetchBody(Type type) : m_type(type) { }
 
-    struct Consumer {
-        enum class Type { Text, Blob, JSON, ArrayBuffer };
-
-        Type type;
-        DeferredWrapper promise;
-    };
-    void consume(FetchBodyOwner&, Consumer::Type, DeferredWrapper&&);
+    void consume(FetchBodyOwner&, DeferredWrapper&&);
 
     Vector<uint8_t> extractFromText() const;
-    void consumeArrayBuffer(Consumer::Type, DeferredWrapper&);
-    void consumeText(Consumer::Type, DeferredWrapper&);
-    void consumeBlob(FetchBodyOwner&, Consumer::Type, DeferredWrapper&&);
-    static FetchLoader::Type loadingType(Consumer::Type);
-    static void fulfillTextPromise(FetchBody::Consumer::Type, const String&, DeferredWrapper&);
-    static void fulfillArrayBufferPromise(FetchBody::Consumer::Type, const String&, DeferredWrapper&);
+    void consumeArrayBuffer(DeferredWrapper&);
+    void consumeArrayBufferView(DeferredWrapper&);
+    void consumeText(DeferredWrapper&);
+    void consumeBlob(FetchBodyOwner&, DeferredWrapper&&);
 
     Type m_type { Type::None };
-    String m_mimeType;
+    String m_contentType;
 
-    // FIXME: Add support for BufferSource and URLSearchParams.
+    // FIXME: Add support for URLSearchParams.
     RefPtr<Blob> m_blob;
-    RefPtr<DOMFormData> m_formData;
+    RefPtr<FormData> m_formData;
     RefPtr<ArrayBuffer> m_data;
+    RefPtr<ArrayBufferView> m_dataView;
     String m_text;
 
-    Optional<Consumer> m_consumer;
+    FetchBodyConsumer m_consumer { FetchBodyConsumer::Type::None };
+    Optional<DeferredWrapper> m_consumePromise;
 };
 
 } // namespace WebCore

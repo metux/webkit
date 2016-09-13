@@ -37,7 +37,7 @@
 #include "Opcode.h"
 #include "SourceProvider.h"
 #include "StackAlignment.h"
-
+#include "StackFrame.h"
 #include <wtf/HashMap.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -66,8 +66,9 @@ namespace JSC {
     struct HandlerInfo;
     struct Instruction;
     struct ProtoCallFrame;
+    struct UnlinkedInstruction;
 
-    enum UnwindStart { UnwindFromCurrentFrame, UnwindFromCallerFrame };
+    enum UnwindStart : uint8_t { UnwindFromCurrentFrame, UnwindFromCallerFrame };
 
     enum DebugHookID {
         WillExecuteProgram,
@@ -84,20 +85,6 @@ namespace JSC {
         StackFrameModuleCode,
         StackFrameFunctionCode,
         StackFrameNativeCode
-    };
-
-    struct StackFrame {
-        Strong<JSObject> callee;
-        Strong<CodeBlock> codeBlock;
-        unsigned bytecodeOffset;
-
-        bool isNative() const { return !codeBlock; }
-
-        void computeLineAndColumn(unsigned& line, unsigned& column) const;
-        String functionName(VM&) const;
-        intptr_t sourceID() const;
-        String sourceURL() const;
-        String toString(VM&) const;
     };
 
     class SuspendExceptionScope {
@@ -208,7 +195,10 @@ namespace JSC {
             return opcode;
 #endif
         }
-        
+
+        OpcodeID getOpcodeID(const Instruction&);
+        OpcodeID getOpcodeID(const UnlinkedInstruction&);
+
         bool isOpcode(Opcode);
 
         JSValue execute(ProgramExecutable*, CallFrame*, JSObject* thisObj);

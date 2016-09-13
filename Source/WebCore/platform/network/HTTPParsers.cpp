@@ -33,6 +33,7 @@
 #include "config.h"
 #include "HTTPParsers.h"
 
+#include "HTTPHeaderNames.h"
 #include <wtf/DateMath.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/text/CString.h>
@@ -46,17 +47,12 @@ namespace WebCore {
 
 // true if there is more to parse, after incrementing pos past whitespace.
 // Note: Might return pos == str.length()
-static inline bool skipWhiteSpace(const String& str, unsigned& pos, bool fromHttpEquivMeta)
+static inline bool skipWhiteSpace(const String& str, unsigned& pos)
 {
     unsigned len = str.length();
 
-    if (fromHttpEquivMeta) {
-        while (pos < len && str[pos] <= ' ')
-            ++pos;
-    } else {
-        while (pos < len && (str[pos] == '\t' || str[pos] == ' '))
-            ++pos;
-    }
+    while (pos < len && (str[pos] == '\t' || str[pos] == ' '))
+        ++pos;
 
     return pos < len;
 }
@@ -85,7 +81,7 @@ static inline bool skipToken(const String& str, unsigned& pos, const char* token
 // True if the expected equals sign is seen and there is more to follow.
 static inline bool skipEquals(const String& str, unsigned &pos)
 {
-    return skipWhiteSpace(str, pos, false) && str[pos++] == '=' && skipWhiteSpace(str, pos, false);
+    return skipWhiteSpace(str, pos) && str[pos++] == '=' && skipWhiteSpace(str, pos);
 }
 
 // True if a value present, incrementing pos to next space or semicolon, if any.  
@@ -186,12 +182,12 @@ ContentDispositionType contentDispositionType(const String& contentDisposition)
     return ContentDispositionAttachment;  
 }
 
-bool parseHTTPRefresh(const String& refresh, bool fromHttpEquivMeta, double& delay, String& url)
+bool parseHTTPRefresh(const String& refresh, double& delay, String& url)
 {
     unsigned len = refresh.length();
     unsigned pos = 0;
     
-    if (!skipWhiteSpace(refresh, pos, fromHttpEquivMeta))
+    if (!skipWhiteSpace(refresh, pos))
         return false;
     
     while (pos != len && refresh[pos] != ',' && refresh[pos] != ';')
@@ -209,14 +205,14 @@ bool parseHTTPRefresh(const String& refresh, bool fromHttpEquivMeta, double& del
             return false;
         
         ++pos;
-        skipWhiteSpace(refresh, pos, fromHttpEquivMeta);
+        skipWhiteSpace(refresh, pos);
         unsigned urlStartPos = pos;
         if (refresh.find("url", urlStartPos, false) == urlStartPos) {
             urlStartPos += 3;
-            skipWhiteSpace(refresh, urlStartPos, fromHttpEquivMeta);
+            skipWhiteSpace(refresh, urlStartPos);
             if (refresh[urlStartPos] == '=') {
                 ++urlStartPos;
-                skipWhiteSpace(refresh, urlStartPos, fromHttpEquivMeta);
+                skipWhiteSpace(refresh, urlStartPos);
             } else
                 urlStartPos = pos;  // e.g. "Refresh: 0; url.html"
         }
@@ -387,7 +383,7 @@ XSSProtectionDisposition parseXSSProtectionHeader(const String& header, String& 
 
     unsigned pos = 0;
 
-    if (!skipWhiteSpace(header, pos, false))
+    if (!skipWhiteSpace(header, pos))
         return XSSProtectionDisposition::Enabled;
 
     if (header[pos] == '0')
@@ -404,7 +400,7 @@ XSSProtectionDisposition parseXSSProtectionHeader(const String& header, String& 
 
     while (1) {
         // At end of previous directive: consume whitespace, semicolon, and whitespace.
-        if (!skipWhiteSpace(header, pos, false))
+        if (!skipWhiteSpace(header, pos))
             return result;
 
         if (header[pos++] != ';') {
@@ -413,7 +409,7 @@ XSSProtectionDisposition parseXSSProtectionHeader(const String& header, String& 
             return XSSProtectionDisposition::Invalid;
         }
 
-        if (!skipWhiteSpace(header, pos, false))
+        if (!skipWhiteSpace(header, pos))
             return result;
 
         // At start of next directive.
@@ -669,7 +665,7 @@ size_t parseHTTPHeader(const char* start, size_t length, String& failureReason, 
     Vector<char> value;
 
     bool foundFirstNameChar = false;
-    const char* namePtr;
+    const char* namePtr = nullptr;
     size_t nameSize = 0;
 
     nameStr = StringView();
@@ -753,6 +749,122 @@ size_t parseHTTPRequestBody(const char* data, size_t length, Vector<unsigned cha
     body.append(data, length);
 
     return length;
+}
+
+void parseAccessControlExposeHeadersAllowList(const String& headerValue, HTTPHeaderSet& headerSet)
+{
+    Vector<String> headers;
+    headerValue.split(',', false, headers);
+    for (auto& header : headers) {
+        String strippedHeader = header.stripWhiteSpace();
+        if (!strippedHeader.isEmpty())
+            headerSet.add(strippedHeader);
+    }
+}
+
+// Implememtnation of https://fetch.spec.whatwg.org/#cors-safelisted-response-header-name
+bool isForbiddenHeaderName(const String& name)
+{
+    HTTPHeaderName headerName;
+    if (findHTTPHeaderName(name, headerName)) {
+        switch (headerName) {
+        case HTTPHeaderName::AcceptCharset:
+        case HTTPHeaderName::AcceptEncoding:
+        case HTTPHeaderName::AccessControlRequestHeaders:
+        case HTTPHeaderName::AccessControlRequestMethod:
+        case HTTPHeaderName::Connection:
+        case HTTPHeaderName::ContentLength:
+        case HTTPHeaderName::Cookie:
+        case HTTPHeaderName::Cookie2:
+        case HTTPHeaderName::Date:
+        case HTTPHeaderName::DNT:
+        case HTTPHeaderName::Expect:
+        case HTTPHeaderName::Host:
+        case HTTPHeaderName::KeepAlive:
+        case HTTPHeaderName::Origin:
+        case HTTPHeaderName::Referer:
+        case HTTPHeaderName::TE:
+        case HTTPHeaderName::Trailer:
+        case HTTPHeaderName::TransferEncoding:
+        case HTTPHeaderName::Upgrade:
+        case HTTPHeaderName::Via:
+            return true;
+        default:
+            break;
+        }
+    }
+    return startsWithLettersIgnoringASCIICase(name, "sec-") || startsWithLettersIgnoringASCIICase(name, "proxy-");
+}
+
+bool isForbiddenResponseHeaderName(const String& name)
+{
+    return equalLettersIgnoringASCIICase(name, "set-cookie") || equalLettersIgnoringASCIICase(name, "set-cookie2");
+}
+
+bool isSimpleHeader(const String& name, const String& value)
+{
+    HTTPHeaderName headerName;
+    if (!findHTTPHeaderName(name, headerName))
+        return false;
+    switch (headerName) {
+    case HTTPHeaderName::Accept:
+    case HTTPHeaderName::AcceptLanguage:
+    case HTTPHeaderName::ContentLanguage:
+        return true;
+    case HTTPHeaderName::ContentType: {
+        String mimeType = extractMIMETypeFromMediaType(value);
+        return equalLettersIgnoringASCIICase(mimeType, "application/x-www-form-urlencoded") || equalLettersIgnoringASCIICase(mimeType, "multipart/form-data") || equalLettersIgnoringASCIICase(mimeType, "text/plain");
+    }
+    default:
+        return false;
+    }
+}
+
+bool isCrossOriginSafeHeader(HTTPHeaderName name, const HTTPHeaderSet& accessControlExposeHeaderSet)
+{
+    switch (name) {
+    case HTTPHeaderName::CacheControl:
+    case HTTPHeaderName::ContentLanguage:
+    case HTTPHeaderName::ContentType:
+    case HTTPHeaderName::Expires:
+    case HTTPHeaderName::LastModified:
+    case HTTPHeaderName::Pragma:
+    case HTTPHeaderName::Accept:
+        return true;
+    case HTTPHeaderName::SetCookie:
+    case HTTPHeaderName::SetCookie2:
+        return false;
+    default:
+        break;
+    }
+    return accessControlExposeHeaderSet.contains(httpHeaderNameString(name).toStringWithoutCopying());
+}
+
+bool isCrossOriginSafeHeader(const String& name, const HTTPHeaderSet& accessControlExposeHeaderSet)
+{
+#ifndef ASSERT_DISABLED
+    HTTPHeaderName headerName;
+    ASSERT(!findHTTPHeaderName(name, headerName));
+#endif
+    return accessControlExposeHeaderSet.contains(name);
+}
+
+// Implements https://fetch.spec.whatwg.org/#cors-safelisted-request-header
+bool isCrossOriginSafeRequestHeader(HTTPHeaderName name, const String& value)
+{
+    switch (name) {
+    case HTTPHeaderName::Accept:
+    case HTTPHeaderName::AcceptLanguage:
+    case HTTPHeaderName::ContentLanguage:
+        return true;
+    case HTTPHeaderName::ContentType: {
+        String mimeType = extractMIMETypeFromMediaType(value);
+        return equalLettersIgnoringASCIICase(mimeType, "application/x-www-form-urlencoded") || equalLettersIgnoringASCIICase(mimeType, "multipart/form-data") || equalLettersIgnoringASCIICase(mimeType, "text/plain");
+    }
+    default:
+        // FIXME: Should we also make safe other headers (DPR, Downlink, Save-Data...)? That would require validating their values.
+        return false;
+    }
 }
 
 }

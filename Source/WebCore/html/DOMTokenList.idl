@@ -33,13 +33,9 @@
     [RaisesException] void add(DOMString... tokens);
     [RaisesException] void remove(DOMString... tokens);
     [RaisesException] boolean toggle(DOMString token, optional boolean force);
+    [RaisesException] void replace(DOMString token, DOMString newToken);
 
     iterable<DOMString>;
 
-    attribute DOMString value;
-
-#if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
-    DOMString toString();
-#endif
+    stringifier attribute DOMString value;
 };
-

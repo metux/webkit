@@ -31,6 +31,7 @@
 #include <limits>
 #include <wtf/MathExtras.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/dtoa.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -215,6 +216,58 @@ Optional<int> parseHTMLNonNegativeInteger(const String& input)
     return signedValue;
 }
 
+static inline bool isHTMLSpaceOrDelimiter(UChar character)
+{
+    return isHTMLSpace(character) || character == ',' || character == ';';
+}
+
+static inline bool isNumberStart(UChar character)
+{
+    return isASCIIDigit(character) || character == '.' || character == '-';
+}
+
+// https://html.spec.whatwg.org/multipage/infrastructure.html#rules-for-parsing-floating-point-number-values
+template <typename CharacterType>
+static Vector<double> parseHTMLListOfOfFloatingPointNumberValuesInternal(const CharacterType* position, const CharacterType* end)
+{
+    Vector<double> numbers;
+
+    // This skips past any leading delimiters.
+    while (position < end && isHTMLSpaceOrDelimiter(*position))
+        ++position;
+
+    while (position < end) {
+        // This skips past leading garbage.
+        while (position < end && !(isHTMLSpaceOrDelimiter(*position) || isNumberStart(*position)))
+            ++position;
+
+        const CharacterType* numberStart = position;
+        while (position < end && !isHTMLSpaceOrDelimiter(*position))
+            ++position;
+
+        size_t parsedLength = 0;
+        double number = parseDouble(numberStart, position - numberStart, parsedLength);
+        numbers.append(parsedLength > 0 && std::isfinite(number) ? number : 0);
+
+        // This skips past the delimiter.
+        while (position < end && isHTMLSpaceOrDelimiter(*position))
+            ++position;
+    }
+
+    return numbers;
+}
+
+Vector<double> parseHTMLListOfOfFloatingPointNumberValues(StringView input)
+{
+    if (LIKELY(input.is8Bit())) {
+        auto* start = input.characters8();
+        return parseHTMLListOfOfFloatingPointNumberValuesInternal(start, start + input.length());
+    }
+
+    auto* start = input.characters16();
+    return parseHTMLListOfOfFloatingPointNumberValuesInternal(start, start + input.length());
+}
+
 static bool threadSafeEqual(const StringImpl& a, const StringImpl& b)
 {
     if (&a == &b)
@@ -236,6 +289,109 @@ String parseCORSSettingsAttribute(const AtomicString& value)
     if (equalIgnoringASCIICase(value, "use-credentials"))
         return ASCIILiteral("use-credentials");
     return ASCIILiteral("anonymous");
+}
+
+// https://html.spec.whatwg.org/multipage/semantics.html#attr-meta-http-equiv-refresh
+template <typename CharacterType>
+static bool parseHTTPRefreshInternal(const CharacterType* position, const CharacterType* end, double& parsedDelay, String& parsedURL)
+{
+    while (position < end && isHTMLSpace(*position))
+        ++position;
+
+    const CharacterType* numberStart = position;
+    while (position < end && isASCIIDigit(*position))
+        ++position;
+
+    Optional<int> number = parseHTMLNonNegativeInteger(StringView(numberStart, position - numberStart).toStringWithoutCopying());
+    if (!number)
+        return false;
+
+    while (position < end && (isASCIIDigit(*position) || *position == '.'))
+        ++position;
+
+    if (position == end) {
+        parsedDelay = number.value();
+        return true;
+    }
+
+    if (*position != ';' && *position != ',' && !isHTMLSpace(*position))
+        return false;
+
+    parsedDelay = number.value();
+
+    while (position < end && isHTMLSpace(*position))
+        ++position;
+
+    if (position < end && (*position == ';' || *position == ','))
+        ++position;
+
+    while (position < end && isHTMLSpace(*position))
+        ++position;
+
+    if (position == end)
+        return true;
+
+    if (*position == 'U' || *position == 'u') {
+        StringView url(position, end - position);
+
+        ++position;
+
+        if (position < end && (*position == 'R' || *position == 'r'))
+            ++position;
+        else {
+            parsedURL = url.toString();
+            return true;
+        }
+
+        if (position < end && (*position == 'L' || *position == 'l'))
+            ++position;
+        else {
+            parsedURL = url.toString();
+            return true;
+        }
+
+        while (position < end && isHTMLSpace(*position))
+            ++position;
+
+        if (position < end && *position == '=')
+            ++position;
+        else {
+            parsedURL = url.toString();
+            return true;
+        }
+
+        while (position < end && isHTMLSpace(*position))
+            ++position;
+    }
+
+    CharacterType quote;
+    if (position < end && (*position == '\'' || *position == '"')) {
+        quote = *position;
+        ++position;
+    } else
+        quote = '\0';
+
+    StringView url(position, end - position);
+
+    if (quote != '\0') {
+        size_t index = url.find(quote);
+        if (index != notFound)
+            url = url.substring(0, index);
+    }
+
+    parsedURL = url.toString();
+    return true;
+}
+
+bool parseMetaHTTPEquivRefresh(const StringView& input, double& delay, String& url)
+{
+    if (LIKELY(input.is8Bit())) {
+        auto* start = input.characters8();
+        return parseHTTPRefreshInternal(start, start + input.length(), delay, url);
+    }
+
+    auto* start = input.characters16();
+    return parseHTTPRefreshInternal(start, start + input.length(), delay, url);
 }
 
 }

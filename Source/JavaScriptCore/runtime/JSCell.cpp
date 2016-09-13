@@ -58,7 +58,7 @@ size_t JSCell::estimatedSizeInBytes() const
 
 size_t JSCell::estimatedSize(JSCell* cell)
 {
-    return MarkedBlock::blockFor(cell)->cellSize();
+    return cell->cellSize();
 }
 
 void JSCell::copyBackingStore(JSCell*, CopyVisitor&, CopyToken)
@@ -217,6 +217,12 @@ void JSCell::getOwnNonIndexPropertyNames(JSObject*, ExecState*, PropertyNameArra
 }
 
 String JSCell::className(const JSObject*)
+{
+    RELEASE_ASSERT_NOT_REACHED();
+    return String();
+}
+
+String JSCell::toStringName(const JSObject*, ExecState*)
 {
     RELEASE_ASSERT_NOT_REACHED();
     return String();

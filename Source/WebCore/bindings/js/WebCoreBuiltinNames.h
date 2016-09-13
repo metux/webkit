@@ -35,14 +35,18 @@ namespace WebCore {
     macro(addTrack) \
     macro(appendFromJS) \
     macro(body) \
+    macro(cloneForJS) \
     macro(closeRequested) \
     macro(closedPromiseCapability) \
+    macro(consume) \
+    macro(consumeChunk) \
     macro(controlledReadableStream) \
     macro(controller) \
     macro(createReadableStreamSource) \
     macro(disturbed) \
     macro(fetchRequest) \
     macro(fillFromJS) \
+    macro(finishConsumingStream) \
     macro(firstReadCallback) \
     macro(getUserMediaFromJS) \
     macro(getRemoteStreams) \
@@ -50,7 +54,10 @@ namespace WebCore {
     macro(getTracks) \
     macro(initializeWith) \
     macro(isDisturbed) \
+    macro(isLoading) \
     macro(localStreams) \
+    macro(makeThisTypeError) \
+    macro(makeGetterTypeError) \
     macro(operations) \
     macro(ownerReadableStream) \
     macro(privateGetStats) \
@@ -72,6 +79,7 @@ namespace WebCore {
     macro(setBody) \
     macro(setStatus) \
     macro(state) \
+    macro(startConsumingStream) \
     macro(started) \
     macro(startedPromise) \
     macro(storedError) \
@@ -82,6 +90,8 @@ namespace WebCore {
     macro(streamReadable) \
     macro(streamWaiting) \
     macro(streamWritable) \
+    macro(structuredCloneArrayBuffer) \
+    macro(structuredCloneArrayBufferView) \
     macro(underlyingSink) \
     macro(underlyingSource) \
     macro(writing) \
@@ -89,8 +99,8 @@ namespace WebCore {
     macro(MediaStream) \
     macro(MediaStreamTrack) \
     macro(ReadableStream) \
-    macro(ReadableStreamReader) \
-    macro(ReadableStreamController) \
+    macro(ReadableStreamDefaultController) \
+    macro(ReadableStreamDefaultReader) \
     macro(Request) \
     macro(Response) \
     macro(RTCIceCandidate) \

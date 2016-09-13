@@ -129,7 +129,7 @@ bool doesGC(Graph& graph, Node* node)
     case PutGlobalVariable:
     case CheckCell:
     case CheckNotEmpty:
-    case CheckIdent:
+    case CheckStringIdent:
     case RegExpExec:
     case RegExpTest:
     case CompareLess:
@@ -185,6 +185,10 @@ bool doesGC(Graph& graph, Node* node)
     case ForceOSRExit:
     case CheckWatchdogTimer:
     case StringFromCharCode:
+    case MapHash:
+    case GetMapBucket:
+    case LoadFromJSMapBucket:
+    case IsNonEmptyMapBucket:
     case Unreachable:
     case ExtractOSREntryLocal:
     case CheckTierUpInLoop:
@@ -245,7 +249,6 @@ bool doesGC(Graph& graph, Node* node)
     case GetStack:
     case GetFromArguments:
     case PutToArguments:
-    case CopyRest:
     case LogShadowChickenPrologue:
     case LogShadowChickenTail:
     case GetDynamicVar:
@@ -285,6 +288,7 @@ bool doesGC(Graph& graph, Node* node)
     case StrCat:
     case StringReplace:
     case StringReplaceRegExp:
+    case CreateRest:
         return true;
         
     case MultiPutByOffset:

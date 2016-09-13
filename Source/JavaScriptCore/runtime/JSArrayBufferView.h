@@ -26,6 +26,7 @@
 #ifndef JSArrayBufferView_h
 #define JSArrayBufferView_h
 
+#include "CopyBarrier.h"
 #include "JSObject.h"
 
 namespace JSC {
@@ -178,6 +179,8 @@ protected:
     friend class LLIntOffsetsExtractor;
 
     ArrayBuffer* existingBufferInButterfly();
+
+    static String toStringName(const JSObject*, ExecState*);
 
     CopyBarrier<char> m_vector; // this is really a void*, but void would not work here.
     uint32_t m_length;
