@@ -1,6 +1,8 @@
 webkit2gtk (2.13.92-1) UNRELEASED; urgency=medium
 
   * New upstream development release.
+  * debian/patches/fix-ftbfs-armel.patch:
+    + Fix FTBFS in Armel.
 
  -- Alberto Garcia <berto@igalia.com>  Thu, 15 Sep 2016 12:26:01 +0300
 
