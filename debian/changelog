@@ -3,6 +3,8 @@ webkit2gtk (2.14.0-1) UNRELEASED; urgency=medium
   * New upstream release.
   * debian/watch:
     + Stop scanning the 2.13 branch.
+  * debian/gbp.conf:
+    + Update upstream branch name.
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 20 Sep 2016 15:31:35 +0300
 
