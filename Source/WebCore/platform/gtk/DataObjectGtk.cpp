@@ -139,26 +139,13 @@ void DataObjectGtk::clearAllExceptFilenames()
     m_url = URL();
     m_image = nullptr;
     m_unknownTypeData.clear();
+    m_canSmartReplace = false;
 }
 
 void DataObjectGtk::clearAll()
 {
     clearAllExceptFilenames();
     m_filenames.clear();
-}
-
-DataObjectGtk* DataObjectGtk::forClipboard(GtkClipboard* clipboard)
-{
-    static HashMap<GtkClipboard*, RefPtr<DataObjectGtk> > objectMap;
-
-    if (!objectMap.contains(clipboard)) {
-        RefPtr<DataObjectGtk> dataObject = DataObjectGtk::create();
-        objectMap.set(clipboard, dataObject);
-        return dataObject.get();
-    }
-
-    HashMap<GtkClipboard*, RefPtr<DataObjectGtk> >::iterator it = objectMap.find(clipboard);
-    return it->value.get();
 }
 
 }

@@ -46,14 +46,13 @@ public:
     bool prepareScript(const TextPosition& scriptStartPosition = TextPosition::minimumPosition(), LegacyTypeSupport = DisallowLegacyTypeInTypeAttribute);
 
     String scriptCharset() const { return m_characterEncoding; }
-    String scriptContent() const;
+    WEBCORE_EXPORT String scriptContent() const;
     void executeScript(const ScriptSourceCode&);
     void execute(CachedScript*);
 
     // XML parser calls these
     virtual void dispatchLoadEvent() = 0;
     void dispatchErrorEvent();
-    bool isScriptTypeSupported(LegacyTypeSupport) const;
 
     bool haveFiredLoadEvent() const { return m_haveFiredLoad; }
     bool willBeParserExecuted() const { return m_willBeParserExecuted; }
@@ -77,13 +76,16 @@ protected:
     void handleAsyncAttribute();
 
 private:
+    // https://html.spec.whatwg.org/multipage/scripting.html#concept-script-type
+    enum class ScriptType { Classic, Module };
+    Optional<ScriptType> determineScriptType(LegacyTypeSupport) const;
     bool ignoresLoadRequest() const;
     bool isScriptForEventSupported() const;
 
     bool requestScript(const String& sourceUrl);
     void stopLoadRequest();
 
-    virtual void notifyFinished(CachedResource*) override;
+    void notifyFinished(CachedResource*) override;
 
     virtual String sourceAttributeValue() const = 0;
     virtual String charsetAttributeValue() const = 0;
@@ -112,6 +114,7 @@ private:
     String m_fallbackCharacterEncoding;
 };
 
+// FIXME: replace with downcast<ScriptElement>.
 ScriptElement* toScriptElementIfPossible(Element*);
 
 }

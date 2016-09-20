@@ -39,8 +39,6 @@
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
 #include <gst/pbutils/missing-plugins.h>
-#include <wtf/Condition.h>
-#include <wtf/Lock.h>
 #include <wtf/MainThread.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/glib/GMutexLocker.h>
@@ -73,13 +71,13 @@ class CachedResourceStreamingClient final : public PlatformMediaResourceClient, 
     private:
         // PlatformMediaResourceClient virtual methods.
 #if USE(SOUP)
-        virtual char* getOrCreateReadBuffer(PlatformMediaResource&, size_t requestedSize, size_t& actualSize) override;
+        char* getOrCreateReadBuffer(PlatformMediaResource&, size_t requestedSize, size_t& actualSize) override;
 #endif
-        virtual void responseReceived(PlatformMediaResource&, const ResourceResponse&) override;
-        virtual void dataReceived(PlatformMediaResource&, const char*, int) override;
-        virtual void accessControlCheckFailed(PlatformMediaResource&, const ResourceError&) override;
-        virtual void loadFailed(PlatformMediaResource&, const ResourceError&) override;
-        virtual void loadFinished(PlatformMediaResource&) override;
+        void responseReceived(PlatformMediaResource&, const ResourceResponse&) override;
+        void dataReceived(PlatformMediaResource&, const char*, int) override;
+        void accessControlCheckFailed(PlatformMediaResource&, const ResourceError&) override;
+        void loadFailed(PlatformMediaResource&, const ResourceError&) override;
+        void loadFinished(PlatformMediaResource&) override;
 };
 
 class ResourceHandleStreamingClient : public ResourceHandleClient, public StreamingClient {
@@ -94,15 +92,17 @@ class ResourceHandleStreamingClient : public ResourceHandleClient, public Stream
 
     private:
         // ResourceHandleClient virtual methods.
-        virtual char* getOrCreateReadBuffer(size_t requestedSize, size_t& actualSize);
-        virtual void willSendRequest(ResourceHandle*, ResourceRequest&, const ResourceResponse&);
-        virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse&);
-        virtual void didReceiveData(ResourceHandle*, const char*, unsigned, int);
-        virtual void didReceiveBuffer(ResourceHandle*, PassRefPtr<SharedBuffer>, int encodedLength);
-        virtual void didFinishLoading(ResourceHandle*, double /*finishTime*/);
-        virtual void didFail(ResourceHandle*, const ResourceError&);
-        virtual void wasBlocked(ResourceHandle*);
-        virtual void cannotShowURL(ResourceHandle*);
+#if USE(SOUP)
+        char* getOrCreateReadBuffer(size_t requestedSize, size_t& actualSize) override;
+#endif
+        ResourceRequest willSendRequest(ResourceHandle*, ResourceRequest&&, ResourceResponse&&) override;
+        void didReceiveResponse(ResourceHandle*, ResourceResponse&&) override;
+        void didReceiveData(ResourceHandle*, const char*, unsigned, int) override;
+        void didReceiveBuffer(ResourceHandle*, Ref<SharedBuffer>&&, int encodedLength) override;
+        void didFinishLoading(ResourceHandle*, double /*finishTime*/) override;
+        void didFail(ResourceHandle*, const ResourceError&) override;
+        void wasBlocked(ResourceHandle*) override;
+        void cannotShowURL(ResourceHandle*) override;
 
         ThreadIdentifier m_thread { 0 };
         Lock m_initializeRunLoopConditionMutex;
@@ -389,8 +389,7 @@ static void webKitWebSrcStop(WebKitWebSrc* src)
     if (priv->resource || (priv->loader && !priv->keepAlive)) {
         GRefPtr<WebKitWebSrc> protector = WTF::ensureGRef(src);
         priv->notifier.cancelPendingNotifications(MainThreadSourceNotification::NeedData | MainThreadSourceNotification::EnoughData | MainThreadSourceNotification::Seek);
-        bool keepAlive = priv->keepAlive;
-        priv->notifier.notify(MainThreadSourceNotification::Stop, [protector, keepAlive] {
+        priv->notifier.notify(MainThreadSourceNotification::Stop, [protector, keepAlive = priv->keepAlive] {
             WebKitWebSrcPrivate* priv = protector->priv;
 
             WTF::GMutexLocker<GMutex> locker(*GST_OBJECT_GET_LOCK(protector.get()));
@@ -571,7 +570,7 @@ static void webKitWebSrcStart(WebKitWebSrc* src)
 
     locker.unlock();
     GRefPtr<WebKitWebSrc> protector = WTF::ensureGRef(src);
-    priv->notifier.notify(MainThreadSourceNotification::Start, [protector, request] {
+    priv->notifier.notify(MainThreadSourceNotification::Start, [protector, request = WTFMove(request)] {
         WebKitWebSrcPrivate* priv = protector->priv;
 
         WTF::GMutexLocker<GMutex> locker(*GST_OBJECT_GET_LOCK(protector.get()));
@@ -1069,7 +1068,7 @@ ResourceHandleStreamingClient::ResourceHandleStreamingClient(WebKitWebSrc* src, 
     : StreamingClient(src)
 {
     LockHolder locker(m_initializeRunLoopConditionMutex);
-    m_thread = createThread("ResourceHandleStreamingClient", [this, request] {
+    m_thread = createThread("ResourceHandleStreamingClient", [this, request = WTFMove(request)] {
         {
             LockHolder locker(m_initializeRunLoopConditionMutex);
             m_runLoop = &RunLoop::current();
@@ -1122,16 +1121,19 @@ void ResourceHandleStreamingClient::setDefersLoading(bool defers)
     });
 }
 
+#if USE(SOUP)
 char* ResourceHandleStreamingClient::getOrCreateReadBuffer(size_t requestedSize, size_t& actualSize)
 {
     return createReadBuffer(requestedSize, actualSize);
 }
+#endif
 
-void ResourceHandleStreamingClient::willSendRequest(ResourceHandle*, ResourceRequest&, const ResourceResponse&)
+ResourceRequest ResourceHandleStreamingClient::willSendRequest(ResourceHandle*, ResourceRequest&& request, ResourceResponse&&)
 {
+    return WTFMove(request);
 }
 
-void ResourceHandleStreamingClient::didReceiveResponse(ResourceHandle*, const ResourceResponse& response)
+void ResourceHandleStreamingClient::didReceiveResponse(ResourceHandle*, ResourceResponse&& response)
 {
     handleResponseReceived(response);
 }
@@ -1141,7 +1143,7 @@ void ResourceHandleStreamingClient::didReceiveData(ResourceHandle*, const char* 
     ASSERT_NOT_REACHED();
 }
 
-void ResourceHandleStreamingClient::didReceiveBuffer(ResourceHandle*, PassRefPtr<SharedBuffer> buffer, int /* encodedLength */)
+void ResourceHandleStreamingClient::didReceiveBuffer(ResourceHandle*, Ref<SharedBuffer>&& buffer, int /* encodedLength */)
 {
     // This pattern is suggested by SharedBuffer.h.
     const char* segment;

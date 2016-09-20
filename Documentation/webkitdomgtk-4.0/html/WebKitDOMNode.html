@@ -87,7 +87,7 @@
 <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
 </td>
 <td class="function_name">
-<a class="link" href="WebKitDOMNode.html#webkit-dom-node-clone-node" title="webkit_dom_node_clone_node ()">webkit_dom_node_clone_node</a> <span class="c_punctuation">()</span>
+<a class="link" href="WebKitDOMNode.html#webkit-dom-node-clone-node-with-error" title="webkit_dom_node_clone_node_with_error ()">webkit_dom_node_clone_node_with_error</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
 <tr>
@@ -132,18 +132,18 @@
 </tr>
 <tr>
 <td class="function_type">
-<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
-</td>
-<td class="function_name">
-<a class="link" href="WebKitDOMNode.html#webkit-dom-node-is-default-namespace" title="webkit_dom_node_is_default_namespace ()">webkit_dom_node_is_default_namespace</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="function_type">
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 </td>
 <td class="function_name">
 <a class="link" href="WebKitDOMNode.html#webkit-dom-node-lookup-namespace-uri" title="webkit_dom_node_lookup_namespace_uri ()">webkit_dom_node_lookup_namespace_uri</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitDOMNode.html#webkit-dom-node-is-default-namespace" title="webkit_dom_node_is_default_namespace ()">webkit_dom_node_is_default_namespace</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
 <tr>
@@ -255,38 +255,6 @@
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 </td>
 <td class="function_name">
-<a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-namespace-uri" title="webkit_dom_node_get_namespace_uri ()">webkit_dom_node_get_namespace_uri</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="function_type">
-<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
-</td>
-<td class="function_name">
-<a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-prefix" title="webkit_dom_node_get_prefix ()">webkit_dom_node_get_prefix</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="function_type">
-<span class="returnvalue">void</span>
-</td>
-<td class="function_name">
-<a class="link" href="WebKitDOMNode.html#webkit-dom-node-set-prefix" title="webkit_dom_node_set_prefix ()">webkit_dom_node_set_prefix</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="function_type">
-<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
-</td>
-<td class="function_name">
-<a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-local-name" title="webkit_dom_node_get_local_name ()">webkit_dom_node_get_local_name</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="function_type">
-<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
-</td>
-<td class="function_name">
 <a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-base-uri" title="webkit_dom_node_get_base_uri ()">webkit_dom_node_get_base_uri</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
@@ -312,6 +280,46 @@
 </td>
 <td class="function_name">
 <a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-parent-element" title="webkit_dom_node_get_parent_element ()">webkit_dom_node_get_parent_element</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitDOMNode.html#webkit-dom-node-clone-node" title="webkit_dom_node_clone_node ()">webkit_dom_node_clone_node</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-namespace-uri" title="webkit_dom_node_get_namespace_uri ()">webkit_dom_node_get_namespace_uri</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-prefix" title="webkit_dom_node_get_prefix ()">webkit_dom_node_get_prefix</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitDOMNode.html#webkit-dom-node-set-prefix" title="webkit_dom_node_set_prefix ()">webkit_dom_node_set_prefix</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-local-name" title="webkit_dom_node_get_local_name ()">webkit_dom_node_get_local_name</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
 </tbody>
@@ -345,21 +353,14 @@
 <td class="property_flags">Read</td>
 </tr>
 <tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
+<td class="property_name"><a class="link" href="WebKitDOMNode.html#WebKitDOMNode--is-connected" title="The “is-connected” property">is-connected</a></td>
+<td class="property_flags">Read</td>
+</tr>
+<tr>
 <td class="property_type">
 <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *</td>
 <td class="property_name"><a class="link" href="WebKitDOMNode.html#WebKitDOMNode--last-child" title="The “last-child” property">last-child</a></td>
-<td class="property_flags">Read</td>
-</tr>
-<tr>
-<td class="property_type">
-<a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
-<td class="property_name"><a class="link" href="WebKitDOMNode.html#WebKitDOMNode--local-name" title="The “local-name” property">local-name</a></td>
-<td class="property_flags">Read</td>
-</tr>
-<tr>
-<td class="property_type">
-<a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
-<td class="property_name"><a class="link" href="WebKitDOMNode.html#WebKitDOMNode--namespace-uri" title="The “namespace-uri” property">namespace-uri</a></td>
 <td class="property_flags">Read</td>
 </tr>
 <tr>
@@ -405,12 +406,6 @@
 </tr>
 <tr>
 <td class="property_type">
-<a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
-<td class="property_name"><a class="link" href="WebKitDOMNode.html#WebKitDOMNode--prefix" title="The “prefix” property">prefix</a></td>
-<td class="property_flags">Read / Write</td>
-</tr>
-<tr>
-<td class="property_type">
 <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *</td>
 <td class="property_name"><a class="link" href="WebKitDOMNode.html#WebKitDOMNode--previous-sibling" title="The “previous-sibling” property">previous-sibling</a></td>
 <td class="property_flags">Read</td>
@@ -420,12 +415,6 @@
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
 <td class="property_name"><a class="link" href="WebKitDOMNode.html#WebKitDOMNode--text-content" title="The “text-content” property">text-content</a></td>
 <td class="property_flags">Read / Write</td>
-</tr>
-<tr>
-<td class="property_type">
-<a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *</td>
-<td class="property_name"><a class="link" href="WebKitDOMNode.html#WebKitDOMNode--tree-root" title="The “tree-root” property">tree-root</a></td>
-<td class="property_flags">Read</td>
 </tr>
 </tbody>
 </table></div>
@@ -735,12 +724,13 @@ webkit_dom_node_has_child_nodes (<em class="parameter"><code><a class="link" hre
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-dom-node-clone-node"></a><h3>webkit_dom_node_clone_node ()</h3>
+<a name="webkit-dom-node-clone-node-with-error"></a><h3>webkit_dom_node_clone_node_with_error ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
-webkit_dom_node_clone_node (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
-                            <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> deep</code></em>);</pre>
+webkit_dom_node_clone_node_with_error (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
+                                       <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> deep</code></em>,
+                                       <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="webkit-dom-node-clone-node.parameters"></a><h4>Parameters</h4>
+<a name="webkit-dom-node-clone-node-with-error.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table class="informaltable" width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -758,14 +748,20 @@ webkit_dom_node_clone_node (<em class="parameter"><code><a class="link" href="We
 <td class="parameter_description"><p>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
+<tr>
+<td class="parameter_name"><p>error</p></td>
+<td class="parameter_description"><p><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr>
 </tbody>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="webkit-dom-node-clone-node.returns"></a><h4>Returns</h4>
+<a name="webkit-dom-node-clone-node-with-error.returns"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
+<p class="since">Since: 2.14</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -928,39 +924,6 @@ webkit_dom_node_lookup_prefix (<em class="parameter"><code><a class="link" href=
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-dom-node-is-default-namespace"></a><h3>webkit_dom_node_is_default_namespace ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
-webkit_dom_node_is_default_namespace (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
-                                      <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *namespaceURI</code></em>);</pre>
-<div class="refsect3">
-<a name="webkit-dom-node-is-default-namespace.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody>
-<tr>
-<td class="parameter_name"><p>self</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-<tr>
-<td class="parameter_name"><p>namespaceURI</p></td>
-<td class="parameter_description"><p>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-</tbody>
-</table></div>
-</div>
-<div class="refsect3">
-<a name="webkit-dom-node-is-default-namespace.returns"></a><h4>Returns</h4>
-<p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
-</div>
-</div>
-<hr>
-<div class="refsect2">
 <a name="webkit-dom-node-lookup-namespace-uri"></a><h3>webkit_dom_node_lookup_namespace_uri ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 webkit_dom_node_lookup_namespace_uri (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
@@ -990,6 +953,39 @@ webkit_dom_node_lookup_namespace_uri (<em class="parameter"><code><a class="link
 <div class="refsect3">
 <a name="webkit-dom-node-lookup-namespace-uri.returns"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
+</div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-node-is-default-namespace"></a><h3>webkit_dom_node_is_default_namespace ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
+webkit_dom_node_is_default_namespace (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
+                                      <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *namespaceURI</code></em>);</pre>
+<div class="refsect3">
+<a name="webkit-dom-node-is-default-namespace.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>self</p></td>
+<td class="parameter_description"><p>A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>namespaceURI</p></td>
+<td class="parameter_description"><p>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<div class="refsect3">
+<a name="webkit-dom-node-is-default-namespace.returns"></a><h4>Returns</h4>
+<p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 </div>
 </div>
 <hr>
@@ -1353,116 +1349,6 @@ webkit_dom_node_get_owner_document (<em class="parameter"><code><a class="link" 
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-dom-node-get-namespace-uri"></a><h3>webkit_dom_node_get_namespace_uri ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
-webkit_dom_node_get_namespace_uri (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
-<div class="refsect3">
-<a name="webkit-dom-node-get-namespace-uri.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody><tr>
-<td class="parameter_name"><p>self</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr></tbody>
-</table></div>
-</div>
-<div class="refsect3">
-<a name="webkit-dom-node-get-namespace-uri.returns"></a><h4>Returns</h4>
-<p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
-</div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-node-get-prefix"></a><h3>webkit_dom_node_get_prefix ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
-webkit_dom_node_get_prefix (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
-<div class="refsect3">
-<a name="webkit-dom-node-get-prefix.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody><tr>
-<td class="parameter_name"><p>self</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr></tbody>
-</table></div>
-</div>
-<div class="refsect3">
-<a name="webkit-dom-node-get-prefix.returns"></a><h4>Returns</h4>
-<p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
-</div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-node-set-prefix"></a><h3>webkit_dom_node_set_prefix ()</h3>
-<pre class="programlisting"><span class="returnvalue">void</span>
-webkit_dom_node_set_prefix (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
-                            <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>,
-                            <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
-<div class="refsect3">
-<a name="webkit-dom-node-set-prefix.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody>
-<tr>
-<td class="parameter_name"><p>self</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-<tr>
-<td class="parameter_name"><p>value</p></td>
-<td class="parameter_description"><p>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-<tr>
-<td class="parameter_name"><p>error</p></td>
-<td class="parameter_description"><p><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-</tbody>
-</table></div>
-</div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-node-get-local-name"></a><h3>webkit_dom_node_get_local_name ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
-webkit_dom_node_get_local_name (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
-<div class="refsect3">
-<a name="webkit-dom-node-get-local-name.parameters"></a><h4>Parameters</h4>
-<div class="informaltable"><table class="informaltable" width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody><tr>
-<td class="parameter_name"><p>self</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr></tbody>
-</table></div>
-</div>
-<div class="refsect3">
-<a name="webkit-dom-node-get-local-name.returns"></a><h4>Returns</h4>
-<p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
-</div>
-</div>
-<hr>
-<div class="refsect2">
 <a name="webkit-dom-node-get-base-uri"></a><h3>webkit_dom_node_get_base_uri ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 webkit_dom_node_get_base_uri (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
@@ -1571,6 +1457,45 @@ webkit_dom_node_get_parent_element (<em class="parameter"><code><a class="link" 
 <p> A <a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="type">WebKitDOMElement</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-node-clone-node"></a><h3>webkit_dom_node_clone_node ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
+webkit_dom_node_clone_node (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
+                            <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> deep</code></em>,
+                            <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
+<div class="warning"><p><code class="literal">webkit_dom_node_clone_node</code> is deprecated and should not be used in newly-written code.</p></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-node-get-namespace-uri"></a><h3>webkit_dom_node_get_namespace_uri ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
+webkit_dom_node_get_namespace_uri (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
+<div class="warning"><p><code class="literal">webkit_dom_node_get_namespace_uri</code> is deprecated and should not be used in newly-written code.</p></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-node-get-prefix"></a><h3>webkit_dom_node_get_prefix ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
+webkit_dom_node_get_prefix (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
+<div class="warning"><p><code class="literal">webkit_dom_node_get_prefix</code> is deprecated and should not be used in newly-written code.</p></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-node-set-prefix"></a><h3>webkit_dom_node_set_prefix ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+webkit_dom_node_set_prefix (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
+                            <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>,
+                            <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
+<div class="warning"><p><code class="literal">webkit_dom_node_set_prefix</code> is deprecated and should not be used in newly-written code.</p></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-node-get-local-name"></a><h3>webkit_dom_node_get_local_name ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
+webkit_dom_node_get_local_name (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
+<div class="warning"><p><code class="literal">webkit_dom_node_get_local_name</code> is deprecated and should not be used in newly-written code.</p></div>
 </div>
 </div>
 <div class="refsect1">
@@ -1707,26 +1632,18 @@ webkit_dom_node_get_parent_element (<em class="parameter"><code><a class="link" 
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitDOMNode--is-connected"></a><h3>The <code class="literal">“is-connected”</code> property</h3>
+<pre class="programlisting">  “is-connected”             <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
+<p>read-only gboolean Node:is-connected.</p>
+<p>Flags: Read</p>
+<p>Default value: FALSE</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitDOMNode--last-child"></a><h3>The <code class="literal">“last-child”</code> property</h3>
 <pre class="programlisting">  “last-child”               <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *</pre>
 <p>read-only WebKitDOMNode* Node:last-child.</p>
 <p>Flags: Read</p>
-</div>
-<hr>
-<div class="refsect2">
-<a name="WebKitDOMNode--local-name"></a><h3>The <code class="literal">“local-name”</code> property</h3>
-<pre class="programlisting">  “local-name”               <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
-<p>read-only gchar* Node:local-name.</p>
-<p>Flags: Read</p>
-<p>Default value: ""</p>
-</div>
-<hr>
-<div class="refsect2">
-<a name="WebKitDOMNode--namespace-uri"></a><h3>The <code class="literal">“namespace-uri”</code> property</h3>
-<pre class="programlisting">  “namespace-uri”            <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
-<p>read-only gchar* Node:namespace-uri.</p>
-<p>Flags: Read</p>
-<p>Default value: ""</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -1782,14 +1699,6 @@ webkit_dom_node_get_parent_element (<em class="parameter"><code><a class="link" 
 </div>
 <hr>
 <div class="refsect2">
-<a name="WebKitDOMNode--prefix"></a><h3>The <code class="literal">“prefix”</code> property</h3>
-<pre class="programlisting">  “prefix”                   <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
-<p>read-write gchar* Node:prefix.</p>
-<p>Flags: Read / Write</p>
-<p>Default value: ""</p>
-</div>
-<hr>
-<div class="refsect2">
 <a name="WebKitDOMNode--previous-sibling"></a><h3>The <code class="literal">“previous-sibling”</code> property</h3>
 <pre class="programlisting">  “previous-sibling”         <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *</pre>
 <p>read-only WebKitDOMNode* Node:previous-sibling.</p>
@@ -1802,13 +1711,6 @@ webkit_dom_node_get_parent_element (<em class="parameter"><code><a class="link" 
 <p>read-write gchar* Node:text-content.</p>
 <p>Flags: Read / Write</p>
 <p>Default value: ""</p>
-</div>
-<hr>
-<div class="refsect2">
-<a name="WebKitDOMNode--tree-root"></a><h3>The <code class="literal">“tree-root”</code> property</h3>
-<pre class="programlisting">  “tree-root”                <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *</pre>
-<p>read-only WebKitDOMNode* Node:tree-root.</p>
-<p>Flags: Read</p>
 </div>
 </div>
 </div>

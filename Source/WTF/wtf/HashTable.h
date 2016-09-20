@@ -19,8 +19,7 @@
  *
  */
 
-#ifndef WTF_HashTable_h
-#define WTF_HashTable_h
+#pragma once
 
 #include <atomic>
 #include <iterator>
@@ -279,11 +278,14 @@ namespace WTF {
         const_iterator m_iterator;
     };
 
-    template<typename HashFunctions> class IdentityHashTranslator {
+    template<typename ValueTraits, typename HashFunctions> class IdentityHashTranslator {
     public:
         template<typename T> static unsigned hash(const T& key) { return HashFunctions::hash(key); }
         template<typename T, typename U> static bool equal(const T& a, const U& b) { return HashFunctions::equal(a, b); }
-        template<typename T, typename U, typename V> static void translate(T& location, const U&, V&& value) { location = std::forward<V>(value); }
+        template<typename T, typename U, typename V> static void translate(T& location, const U&, V&& value)
+        { 
+            ValueTraits::assignToEmpty(location, std::forward<V>(value)); 
+        }
     };
 
     template<typename IteratorType> struct HashTableAddResult {
@@ -303,7 +305,7 @@ namespace WTF {
         typedef Traits ValueTraits;
         typedef Key KeyType;
         typedef Value ValueType;
-        typedef IdentityHashTranslator<HashFunctions> IdentityTranslatorType;
+        typedef IdentityHashTranslator<ValueTraits, HashFunctions> IdentityTranslatorType;
         typedef HashTableAddResult<iterator> AddResult;
 
 #if DUMP_HASHTABLE_STATS_PER_TABLE
@@ -845,7 +847,7 @@ namespace WTF {
             // This initializes the bucket without copying the empty value.
             // That makes it possible to use this with types that don't support copying.
             // The memset to 0 looks like a slow operation but is optimized by the compilers.
-            memset(&bucket, 0, sizeof(bucket));
+            memset(std::addressof(bucket), 0, sizeof(bucket));
         }
     };
     
@@ -1196,12 +1198,12 @@ namespace WTF {
         Value* newEntry = nullptr;
         for (unsigned i = 0; i != oldTableSize; ++i) {
             if (isEmptyOrDeletedBucket(oldTable[i])) {
-                ASSERT(&oldTable[i] != entry);
+                ASSERT(std::addressof(oldTable[i]) != entry);
                 continue;
             }
 
             Value* reinsertedEntry = reinsert(WTFMove(oldTable[i]));
-            if (&oldTable[i] == entry) {
+            if (std::addressof(oldTable[i]) == entry) {
                 ASSERT(!newEntry);
                 newEntry = reinsertedEntry;
             }
@@ -1527,5 +1529,3 @@ namespace WTF {
 } // namespace WTF
 
 #include <wtf/HashIterators.h>
-
-#endif // WTF_HashTable_h

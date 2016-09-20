@@ -50,6 +50,7 @@
 #include "WebKitWebViewPrivate.h"
 #include "WebKitWebsiteDataManagerPrivate.h"
 #include "WebNotificationManagerProxy.h"
+#include "WebsiteDataType.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/IconDatabase.h>
 #include <WebCore/Language.h>
@@ -261,6 +262,7 @@ static void webkitWebContextConstructed(GObject* object)
     API::ProcessPoolConfiguration configuration;
     configuration.setInjectedBundlePath(WebCore::filenameToString(bundleFilename.get()));
     configuration.setMaximumProcessCount(1);
+    configuration.setDiskCacheSpeculativeValidationEnabled(true);
 
     WebKitWebContext* webContext = WEBKIT_WEB_CONTEXT(object);
     WebKitWebContextPrivate* priv = webContext->priv;
@@ -550,9 +552,11 @@ void webkit_web_context_clear_cache(WebKitWebContext* context)
 {
     g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
 
+    OptionSet<WebsiteDataType> websiteDataTypes;
+    websiteDataTypes |= WebsiteDataType::MemoryCache;
+    websiteDataTypes |= WebsiteDataType::DiskCache;
     auto& websiteDataStore = webkitWebsiteDataManagerGetDataStore(context->priv->websiteDataManager.get()).websiteDataStore();
-    websiteDataStore.removeData(static_cast<WebsiteDataTypes>(WebsiteDataTypes::WebsiteDataTypeMemoryCache | WebsiteDataTypes::WebsiteDataTypeDiskCache),
-        std::chrono::system_clock::time_point::min(), [] { });
+    websiteDataStore.removeData(websiteDataTypes, std::chrono::system_clock::time_point::min(), [] { });
 }
 
 typedef HashMap<DownloadProxy*, GRefPtr<WebKitDownload> > DownloadsMap;

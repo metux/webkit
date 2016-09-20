@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef PlatformPasteboard_h
@@ -47,6 +47,10 @@ class URL;
 struct PasteboardImage;
 struct PasteboardWebContent;
 
+#if PLATFORM(GTK)
+class DataObjectGtk;
+#endif
+
 class PlatformPasteboard {
 public:
     // FIXME: probably we don't need a constructor that takes a pasteboard name for iOS.
@@ -55,9 +59,9 @@ public:
     WEBCORE_EXPORT PlatformPasteboard();
 #endif
     WEBCORE_EXPORT static String uniqueName();
-    
+
     WEBCORE_EXPORT void getTypes(Vector<String>& types);
-    WEBCORE_EXPORT PassRefPtr<SharedBuffer> bufferForType(const String& pasteboardType);
+    WEBCORE_EXPORT RefPtr<SharedBuffer> bufferForType(const String& pasteboardType);
     WEBCORE_EXPORT void getPathnamesForType(Vector<String>& pathnames, const String& pasteboardType);
     WEBCORE_EXPORT String stringForType(const String& pasteboardType);
     WEBCORE_EXPORT long changeCount() const;
@@ -70,16 +74,21 @@ public:
 
     // These methods will return 0 if pasteboard ownership has been taken from us.
     WEBCORE_EXPORT long copy(const String& fromPasteboard);
-    WEBCORE_EXPORT long setBufferForType(PassRefPtr<SharedBuffer>, const String& pasteboardType);
+    WEBCORE_EXPORT long setBufferForType(SharedBuffer*, const String& pasteboardType);
     WEBCORE_EXPORT long setPathnamesForType(const Vector<String>& pathnames, const String& pasteboardType);
     WEBCORE_EXPORT long setStringForType(const String&, const String& pasteboardType);
     WEBCORE_EXPORT void write(const PasteboardWebContent&);
     WEBCORE_EXPORT void write(const PasteboardImage&);
     WEBCORE_EXPORT void write(const String& pasteboardType, const String&);
-    WEBCORE_EXPORT PassRefPtr<SharedBuffer> readBuffer(int index, const String& pasteboardType);
+    WEBCORE_EXPORT RefPtr<SharedBuffer> readBuffer(int index, const String& pasteboardType);
     WEBCORE_EXPORT String readString(int index, const String& pasteboardType);
     WEBCORE_EXPORT URL readURL(int index, const String& pasteboardType);
     WEBCORE_EXPORT int count();
+
+#if PLATFORM(GTK)
+    WEBCORE_EXPORT void writeToClipboard(const RefPtr<DataObjectGtk>&, std::function<void()>&& primarySelectionCleared);
+    WEBCORE_EXPORT RefPtr<DataObjectGtk> readFromClipboard();
+#endif
 
 private:
 #if PLATFORM(MAC)
@@ -87,6 +96,9 @@ private:
 #endif
 #if PLATFORM(IOS)
     RetainPtr<UIPasteboard> m_pasteboard;
+#endif
+#if PLATFORM(GTK)
+    GtkClipboard* m_clipboard;
 #endif
 };
 

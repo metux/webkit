@@ -197,10 +197,9 @@ void FilterEffect::clearResult()
 {
     if (m_imageBufferResult)
         m_imageBufferResult.reset();
-    if (m_unmultipliedImageResult)
-        m_unmultipliedImageResult = nullptr;
-    if (m_premultipliedImageResult)
-        m_premultipliedImageResult = nullptr;
+
+    m_unmultipliedImageResult = nullptr;
+    m_premultipliedImageResult = nullptr;
 }
 
 void FilterEffect::clearResultsRecursive()
@@ -238,9 +237,9 @@ PassRefPtr<Uint8ClampedArray> FilterEffect::asUnmultipliedImage(const IntRect& r
     IntSize scaledSize(rect.size());
     ASSERT(!ImageBuffer::sizeNeedsClamping(scaledSize));
     scaledSize.scale(m_filter.filterScale());
-    RefPtr<Uint8ClampedArray> imageData = Uint8ClampedArray::createUninitialized(scaledSize.width() * scaledSize.height() * 4);
+    auto imageData = Uint8ClampedArray::createUninitialized(scaledSize.width() * scaledSize.height() * 4);
     copyUnmultipliedImage(imageData.get(), rect);
-    return imageData.release();
+    return WTFMove(imageData);
 }
 
 PassRefPtr<Uint8ClampedArray> FilterEffect::asPremultipliedImage(const IntRect& rect)
@@ -248,9 +247,9 @@ PassRefPtr<Uint8ClampedArray> FilterEffect::asPremultipliedImage(const IntRect& 
     IntSize scaledSize(rect.size());
     ASSERT(!ImageBuffer::sizeNeedsClamping(scaledSize));
     scaledSize.scale(m_filter.filterScale());
-    RefPtr<Uint8ClampedArray> imageData = Uint8ClampedArray::createUninitialized(scaledSize.width() * scaledSize.height() * 4);
+    auto imageData = Uint8ClampedArray::createUninitialized(scaledSize.width() * scaledSize.height() * 4);
     copyPremultipliedImage(imageData.get(), rect);
-    return imageData.release();
+    return WTFMove(imageData);
 }
 
 inline void FilterEffect::copyImageBytes(Uint8ClampedArray* source, Uint8ClampedArray* destination, const IntRect& rect)
