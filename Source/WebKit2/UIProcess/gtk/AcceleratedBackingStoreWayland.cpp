@@ -71,17 +71,13 @@ bool AcceleratedBackingStoreWayland::paint(cairo_t* cr, const IntRect& clipRect)
     cairo_save(cr);
     AcceleratedBackingStore::paint(cr, clipRect);
 
-#if 0
-    // FIXME: Use this when GTK+ >= 3.16. GTK+ expects the Y axis to be inverted to what we get, so we need to flip it somehow.
-    gdk_cairo_draw_from_gl(cr, gtk_widget_get_window(m_webPage.viewWidget()), texture, GL_TEXTURE, 1, clipRect.x(), clipRect.y(), clipRect.width(), clipRect.height());
+#if GTK_CHECK_VERSION(3, 16, 0)
+    gdk_cairo_draw_from_gl(cr, gtk_widget_get_window(m_webPage.viewWidget()), texture, GL_TEXTURE, m_webPage.deviceScaleFactor(), 0, 0, textureSize.width(), textureSize.height());
 #else
-    IntSize size = textureSize;
-    float deviceScaleFactor = m_webPage.deviceScaleFactor();
-    size.scale(deviceScaleFactor);
+    if (!m_surface || cairo_image_surface_get_width(m_surface.get()) != textureSize.width() || cairo_image_surface_get_height(m_surface.get()) != textureSize.height())
+        m_surface = adoptRef(cairo_image_surface_create(CAIRO_FORMAT_ARGB32, textureSize.width(), textureSize.height()));
 
-    if (!m_surface || cairo_image_surface_get_width(m_surface.get()) != size.width() || cairo_image_surface_get_height(m_surface.get()) != size.height())
-        m_surface = adoptRef(cairo_image_surface_create(CAIRO_FORMAT_ARGB32, size.width(), size.height()));
-    cairoSurfaceSetDeviceScale(m_surface.get(), deviceScaleFactor, deviceScaleFactor);
+    cairoSurfaceSetDeviceScale(m_surface.get(), m_webPage.deviceScaleFactor(), m_webPage.deviceScaleFactor());
 
     GLuint fb;
     glGenFramebuffers(1, &fb);
@@ -103,7 +99,7 @@ bool AcceleratedBackingStoreWayland::paint(cairo_t* cr, const IntRect& clipRect)
     }
 
     // Convert to BGRA.
-    int totalBytes = size.width() * size.height() * 4;
+    int totalBytes = textureSize.width() * textureSize.height() * 4;
     for (int i = 0; i < totalBytes; i += 4)
         std::swap(data[i], data[i + 2]);
 #else
@@ -118,6 +114,12 @@ bool AcceleratedBackingStoreWayland::paint(cairo_t* cr, const IntRect& clipRect)
     // The surface can be modified by the web process at any time, so we mark it
     // as dirty to ensure we always render the updated contents as soon as possible.
     cairo_surface_mark_dirty(m_surface.get());
+
+    // The compositor renders the texture flipped for gdk_cairo_draw_from_gl, fix that here.
+    cairo_matrix_t transform;
+    cairo_matrix_init(&transform, 1, 0, 0, -1, 0, textureSize.height() / deviceScaleFactor);
+    cairo_transform(cr, &transform);
+
     cairo_rectangle(cr, clipRect.x(), clipRect.y(), clipRect.width(), clipRect.height());
     cairo_set_source_surface(cr, m_surface.get(), 0, 0);
     cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
