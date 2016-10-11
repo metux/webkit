@@ -17,30 +17,38 @@
  */
 
 #include "config.h"
-#include "PasteboardContent.h"
+#include "WebSelectionData.h"
 
 #include "ArgumentCodersGtk.h"
-#include "DataObjectGtk.h"
 #include "Decoder.h"
 #include "Encoder.h"
 #include <wtf/RetainPtr.h>
 
 namespace WebKit {
 
-PasteboardContent::PasteboardContent(const RefPtr<WebCore::DataObjectGtk>& data)
-    : dataObject(data)
+WebSelectionData::WebSelectionData()
+    : selectionData(WebCore::SelectionData::create())
 {
-    ASSERT(dataObject);
 }
 
-void PasteboardContent::encode(IPC::Encoder& encoder) const
+WebSelectionData::WebSelectionData(const WebCore::SelectionData& data)
+    : selectionData(const_cast<WebCore::SelectionData&>(data))
 {
-    IPC::encode(encoder, dataObject.get());
 }
 
-bool PasteboardContent::decode(IPC::Decoder& decoder, PasteboardContent& pasteboardContent)
+WebSelectionData::WebSelectionData(Ref<WebCore::SelectionData>&& data)
+    : selectionData(WTFMove(data))
 {
-    return IPC::decode(decoder, pasteboardContent.dataObject);
+}
+
+void WebSelectionData::encode(IPC::Encoder& encoder) const
+{
+    encoder << selectionData.get();
+}
+
+bool WebSelectionData::decode(IPC::Decoder& decoder, WebSelectionData& selection)
+{
+    return decoder.decode(selection.selectionData.get());
 }
 
 } // namespace WebKit

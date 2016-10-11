@@ -16,10 +16,9 @@
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef PasteboardContent_h
-#define PasteboardContent_h
+#pragma once
 
-#include "DataObjectGtk.h"
+#include <WebCore/SelectionData.h>
 
 namespace IPC {
 class Decoder;
@@ -28,16 +27,16 @@ class Encoder;
 
 namespace WebKit {
 
-struct PasteboardContent {
-    PasteboardContent() = default;
-    explicit PasteboardContent(const RefPtr<WebCore::DataObjectGtk>&);
+struct WebSelectionData {
+    WebSelectionData();
+    explicit WebSelectionData(const WebCore::SelectionData&);
+    explicit WebSelectionData(Ref<WebCore::SelectionData>&&);
 
-    RefPtr<WebCore::DataObjectGtk> dataObject;
+    Ref<WebCore::SelectionData> selectionData;
 
     void encode(IPC::Encoder&) const;
-    static bool decode(IPC::Decoder&, PasteboardContent&);
+    static bool decode(IPC::Decoder&, WebSelectionData&);
 };
 
 } // namespace WebKit
 
-#endif // PasteboardContent_h

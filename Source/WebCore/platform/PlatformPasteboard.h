@@ -26,6 +26,7 @@
 #ifndef PlatformPasteboard_h
 #define PlatformPasteboard_h
 
+#include <functional>
 #include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RetainPtr.h>
@@ -42,14 +43,11 @@ OBJC_CLASS UIPasteboard;
 namespace WebCore {
 
 class Color;
+class SelectionData;
 class SharedBuffer;
 class URL;
 struct PasteboardImage;
 struct PasteboardWebContent;
-
-#if PLATFORM(GTK)
-class DataObjectGtk;
-#endif
 
 class PlatformPasteboard {
 public:
@@ -86,8 +84,8 @@ public:
     WEBCORE_EXPORT int count();
 
 #if PLATFORM(GTK)
-    WEBCORE_EXPORT void writeToClipboard(const RefPtr<DataObjectGtk>&, std::function<void()>&& primarySelectionCleared);
-    WEBCORE_EXPORT RefPtr<DataObjectGtk> readFromClipboard();
+    WEBCORE_EXPORT void writeToClipboard(const SelectionData&, std::function<void()>&& primarySelectionCleared);
+    WEBCORE_EXPORT Ref<SelectionData> readFromClipboard();
 #endif
 
 private:

@@ -81,7 +81,7 @@ SlotVisitor::SlotVisitor(Heap& heap)
     , m_bytesCopied(0)
     , m_visitCount(0)
     , m_isInParallelMode(false)
-    , m_version(42)
+    , m_version(MarkedSpace::initialVersion)
     , m_heap(heap)
 #if !ASSERT_DISABLED
     , m_isCheckingForDefaultMarkViolation(false)
@@ -227,7 +227,7 @@ void SlotVisitor::appendToMarkStack(JSCell* cell)
 template<typename ContainerType>
 ALWAYS_INLINE void SlotVisitor::appendToMarkStack(ContainerType& container, JSCell* cell)
 {
-    ASSERT(Heap::isMarked(cell));
+    ASSERT(Heap::isMarkedConcurrently(cell));
     ASSERT(!cell->isZapped());
     
     container.noteMarked();
@@ -248,7 +248,7 @@ void SlotVisitor::markAuxiliary(const void* base)
     HeapCell* cell = bitwise_cast<HeapCell*>(base);
     
     if (Heap::testAndSetMarked(m_version, cell)) {
-        RELEASE_ASSERT(Heap::isMarked(cell));
+        RELEASE_ASSERT(Heap::isMarkedConcurrently(cell));
         return;
     }
     
@@ -293,7 +293,7 @@ private:
 
 ALWAYS_INLINE void SlotVisitor::visitChildren(const JSCell* cell)
 {
-    ASSERT(Heap::isMarked(cell));
+    ASSERT(Heap::isMarkedConcurrently(cell));
     
     SetCurrentCellScope currentCellScope(*this, cell);
     

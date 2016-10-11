@@ -87,8 +87,8 @@ private:
     long setStringForType(const String&, const String& pasteboardType, const String& pasteboardName) override;
 #endif
 #if PLATFORM(GTK)
-    void writeToClipboard(const String& pasteboardName, const RefPtr<WebCore::DataObjectGtk>&) override;
-    RefPtr<WebCore::DataObjectGtk> readFromClipboard(const String& pasteboardName) override;
+    void writeToClipboard(const String& pasteboardName, const WebCore::SelectionData&) override;
+    Ref<WebCore::SelectionData> readFromClipboard(const String& pasteboardName) override;
 #endif
 };
 

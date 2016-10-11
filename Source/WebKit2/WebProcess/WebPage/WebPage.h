@@ -198,6 +198,7 @@ struct LoadParameters;
 struct PrintInfo;
 struct WebPageCreationParameters;
 struct WebPreferencesStore;
+struct WebSelectionData;
 
 #if PLATFORM(COCOA)
 class RemoteLayerTreeTransaction;
@@ -726,7 +727,7 @@ public:
 
 #if ENABLE(DRAG_SUPPORT)
 #if PLATFORM(GTK)
-    void performDragControllerAction(uint64_t action, WebCore::DragData);
+    void performDragControllerAction(uint64_t action, const WebCore::IntPoint& clientPosition, const WebCore::IntPoint& globalPosition, uint64_t draggingSourceOperationMask, WebSelectionData&&, uint32_t flags);
 #else
     void performDragControllerAction(uint64_t action, WebCore::IntPoint clientPosition, WebCore::IntPoint globalPosition, uint64_t draggingSourceOperationMask, const WTF::String& dragStorageName, uint32_t flags, const SandboxExtension::Handle&, const SandboxExtension::HandleArray&);
 #endif
