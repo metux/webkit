@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -25,35 +25,23 @@
 
 #pragma once
 
-#include "AcceleratedBackingStore.h"
+#include <cairo.h>
+#include <memory>
 
-#if PLATFORM(WAYLAND)
+namespace WebCore {
 
-#include <WebCore/RefPtrCairo.h>
-#include <gtk/gtk.h>
-
-namespace WebKit {
-
-class WebPageProxy;
-
-class AcceleratedBackingStoreWayland final : public AcceleratedBackingStore {
-    WTF_MAKE_NONCOPYABLE(AcceleratedBackingStoreWayland); WTF_MAKE_FAST_ALLOCATED;
-public:
-    static std::unique_ptr<AcceleratedBackingStoreWayland> create(WebPageProxy&);
-    ~AcceleratedBackingStoreWayland();
-
-#if GTK_CHECK_VERSION(3, 16, 0)
-    bool canGdkUseGL() const;
-#endif
-
-private:
-    AcceleratedBackingStoreWayland(WebPageProxy&);
-
-    bool paint(cairo_t*, const WebCore::IntRect&) override;
-
-    RefPtr<cairo_surface_t> m_surface;
+template<typename T> struct CairoPtrDeleter {
+    void operator()(T* ptr) const = delete;
 };
 
-} // namespace WebKit
+template<typename T>
+using CairoUniquePtr = std::unique_ptr<T, CairoPtrDeleter<T>>;
 
-#endif // PLATFORM(WAYLAND)
+template<> struct CairoPtrDeleter<cairo_font_options_t> {
+    void operator() (cairo_font_options_t* ptr) const
+    {
+        cairo_font_options_destroy(ptr);
+    }
+};
+
+} // namespace WebCore

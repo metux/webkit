@@ -1427,8 +1427,13 @@ public:
         if (allocator)
             add32(TrustedImm32(-allocator->cellSize()), resultGPR, scratchGPR);
         else {
-            move(resultGPR, scratchGPR);
-            sub32(Address(allocatorGPR, MarkedAllocator::offsetOfCellSize()), scratchGPR);
+            if (isX86()) {
+                move(resultGPR, scratchGPR);
+                sub32(Address(allocatorGPR, MarkedAllocator::offsetOfCellSize()), scratchGPR);
+            } else {
+                load32(Address(allocatorGPR, MarkedAllocator::offsetOfCellSize()), scratchGPR);
+                sub32(resultGPR, scratchGPR, scratchGPR);
+            }
         }
         negPtr(resultGPR);
         store32(scratchGPR, Address(allocatorGPR, MarkedAllocator::offsetOfFreeList() + OBJECT_OFFSETOF(FreeList, remaining)));
@@ -1521,6 +1526,8 @@ public:
         emitStoreStructureWithTypeInfo(structure, resultGPR, scratchGPR2);
         storePtr(TrustedImmPtr(0), Address(resultGPR, JSObject::butterflyOffset()));
     }
+
+    void emitConvertValueToBoolean(JSValueRegs value, GPRReg result, GPRReg scratchIfShouldCheckMasqueradesAsUndefined, FPRReg, FPRReg, bool shouldCheckMasqueradesAsUndefined, JSGlobalObject*, bool negateResult = false);
     
     template<typename ClassType>
     void emitAllocateDestructibleObject(GPRReg resultGPR, Structure* structure, GPRReg scratchGPR1, GPRReg scratchGPR2, JumpList& slowPath)
