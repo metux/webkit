@@ -11,6 +11,8 @@ webkit2gtk (2.14.1-1) UNRELEASED; urgency=medium
     + Add output message telling whether we need to build Atomics.cpp.
   * debian/control:
     + Update Vcs-* links (thanks, Jeremy Bicha) (Closes: #840483).
+  * debian/compat:
+    + Set debhelper compatibility level to 9.
 
  -- Alberto Garcia <berto@igalia.com>  Wed, 12 Oct 2016 01:31:33 +0300
 
