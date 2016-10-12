@@ -1,6 +1,10 @@
 webkit2gtk (2.14.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * debian/patches/install-minibrowser.patch:
+    + Drop patch, this has been merged upstream.
+  * debian/rules:
+    + Set -DENABLE_MINIBROWSER=ON.
 
  -- Alberto Garcia <berto@igalia.com>  Wed, 12 Oct 2016 01:31:33 +0300
 

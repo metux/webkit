@@ -1,4 +1,3 @@
-install-minibrowser.patch
 fix-ftbfs-sparc64.patch
 fix-ftbfs-alpha.patch
 fix-ftbfs-armel.patch
