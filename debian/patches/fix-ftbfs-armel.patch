@@ -13,7 +13,7 @@ Index: webkitgtk/Source/WTF/wtf/CMakeLists.txt
      BitVector.cpp
      CompilationThread.cpp
      CrossThreadCopier.cpp
-@@ -276,6 +275,15 @@ if (NOT USE_SYSTEM_MALLOC)
+@@ -276,6 +275,16 @@ if (NOT USE_SYSTEM_MALLOC)
      list(APPEND WTF_LIBRARIES bmalloc)
  endif ()
  
@@ -21,7 +21,8 @@ Index: webkitgtk/Source/WTF/wtf/CMakeLists.txt
 +     "int main(void)\n"
 +     "{ long long x = 1; return (int) __sync_add_and_fetch_8(&x, 1); }\n")
 +try_compile(ATOMICS_BUILD_SUCCEEDED ${CMAKE_BINARY_DIR} ${CMAKE_BINARY_DIR}/test_atomics.cpp)
-+if (NOT ATOMICS_BUILD_SUCCEEDED)
++message(STATUS "Found __sync_add_and_fetch_8(): ${ATOMICS_BUILD_SUCCEEDED}")
++if (ATOMICS_BUILD_SUCCEEDED)
 +    list(APPEND WTF_SOURCES Atomics.cpp)
 +endif ()
 +file(REMOVE ${CMAKE_BINARY_DIR}/test_atomics.cpp)
