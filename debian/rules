@@ -24,7 +24,7 @@ ifeq ($(DEB_BUILD_ARCH),alpha)
 	LDFLAGS += -Wl,--no-relax
 endif
 
-ifneq (,$(filter $(DEB_BUILD_ARCH),arm64 mips mipsel))
+ifneq (,$(filter $(DEB_BUILD_ARCH),arm64 mips mipsel kfreebsd-i386 kfreebsd-amd64))
 	EXTRA_CMAKE_ARGUMENTS += -DUSE_LD_GOLD=OFF
 endif
 
