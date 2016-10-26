@@ -12,6 +12,8 @@ webkit2gtk (2.15.1-1) UNRELEASED; urgency=medium
       we have binutils 2.27-9.
   * debian/watch, debian/gbp.conf:
     + Update for 2.15.x packages in experimental.
+  * debian/libwebkit2gtk-4.0-37.symbols:
+    + Update.
 
  -- Alberto Garcia <berto@igalia.com>  Thu, 13 Oct 2016 11:12:18 +0300
 
