@@ -25,7 +25,6 @@
 
 #pragma once
 
-#include "APISession.h"
 #include "APIUserInitiatedAction.h"
 #include "ChildProcessProxy.h"
 #include "CustomProtocolManagerProxy.h"
@@ -62,7 +61,8 @@ class WebPageGroup;
 class WebProcessPool;
 enum class WebsiteDataType;
 struct WebNavigationDataStore;
-    
+struct WebsiteData;
+
 class WebProcessProxy : public ChildProcessProxy, ResponsivenessTimer::Client, private ProcessThrottlerClient {
 public:
     typedef HashMap<uint64_t, RefPtr<WebBackForwardListItem>> WebBackForwardListItemMap;
@@ -118,9 +118,9 @@ public:
     void didSaveToPageCache();
     void releasePageCache();
 
-    void fetchWebsiteData(WebCore::SessionID, OptionSet<WebsiteDataType>, std::function<void (WebsiteData)> completionHandler);
-    void deleteWebsiteData(WebCore::SessionID, OptionSet<WebsiteDataType>, std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler);
-    void deleteWebsiteDataForOrigins(WebCore::SessionID, OptionSet<WebsiteDataType>, const Vector<RefPtr<WebCore::SecurityOrigin>>& origins, std::function<void ()> completionHandler);
+    void fetchWebsiteData(WebCore::SessionID, OptionSet<WebsiteDataType>, Function<void (WebsiteData)> completionHandler);
+    void deleteWebsiteData(WebCore::SessionID, OptionSet<WebsiteDataType>, std::chrono::system_clock::time_point modifiedSince, Function<void ()> completionHandler);
+    void deleteWebsiteDataForOrigins(WebCore::SessionID, OptionSet<WebsiteDataType>, const Vector<RefPtr<WebCore::SecurityOrigin>>& origins, Function<void ()> completionHandler);
 
     void enableSuddenTermination();
     void disableSuddenTermination();
@@ -169,10 +169,6 @@ private:
 
     void shouldTerminate(bool& shouldTerminate);
 
-    void didFetchWebsiteData(uint64_t callbackID, const WebsiteData&);
-    void didDeleteWebsiteData(uint64_t callbackID);
-    void didDeleteWebsiteDataForOrigins(uint64_t callbackID);
-
     // Plugins
 #if ENABLE(NETSCAPE_PLUGIN_API)
     void getPlugins(bool refresh, Vector<WebCore::PluginInfo>& plugins, Vector<WebCore::PluginInfo>& applicationPlugins);
@@ -189,6 +185,8 @@ private:
     void releaseIconForPageURL(const String& pageURL);
     void releaseRemainingIconsForPageURLs();
 
+    bool platformIsBeingDebugged() const;
+
     static const HashSet<String>& platformPathsWithAssumedReadAccess();
 
     // IPC::Connection::Client
@@ -203,12 +201,14 @@ private:
     void didBecomeResponsive() override;
     void willChangeIsResponsive() override;
     void didChangeIsResponsive() override;
+    bool mayBecomeUnresponsive() override;
 
     // ProcessThrottlerClient
     void sendProcessWillSuspendImminently() override;
     void sendPrepareToSuspend() override;
     void sendCancelPrepareToSuspend() override;
     void sendProcessDidResume() override;
+    bool alwaysRunsAtBackgroundPriority() override;
     void didSetAssertionState(AssertionState) override;
 
     // ProcessLauncher::Client
@@ -237,10 +237,6 @@ private:
     HashSet<WebUserContentControllerProxy*> m_webUserContentControllerProxies;
 
     CustomProtocolManagerProxy m_customProtocolManagerProxy;
-
-    HashMap<uint64_t, std::function<void (WebsiteData)>> m_pendingFetchWebsiteDataCallbacks;
-    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataCallbacks;
-    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataForOriginsCallbacks;
 
     int m_numberOfTimesSuddenTerminationWasDisabled;
     ProcessThrottler m_throttler;

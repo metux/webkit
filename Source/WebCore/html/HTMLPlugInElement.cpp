@@ -300,7 +300,7 @@ void HTMLPlugInElement::didAddUserAgentShadowRoot(ShadowRoot* root)
     root->setResetStyleInheritance(true);
     if (m_pluginReplacement->installReplacement(*root)) {
         setDisplayState(DisplayingPluginReplacement);
-        setNeedsStyleRecalc(ReconstructRenderTree);
+        invalidateStyleAndRenderersForSubtree();
     }
 }
 
@@ -374,9 +374,6 @@ static ReplacementPlugin* pluginReplacementForType(const URL& url, const String&
 
 bool HTMLPlugInElement::requestObject(const String& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues)
 {
-    if (!RuntimeEnabledFeatures::sharedFeatures().pluginReplacementEnabled())
-        return false;
-
     if (m_pluginReplacement)
         return true;
 
@@ -385,7 +382,7 @@ bool HTMLPlugInElement::requestObject(const String& url, const String& mimeType,
         completedURL = document().completeURL(url);
 
     ReplacementPlugin* replacement = pluginReplacementForType(completedURL, mimeType);
-    if (!replacement)
+    if (!replacement || !replacement->isEnabledBySettings(document().settings()))
         return false;
 
     LOG(Plugins, "%p - Found plug-in replacement for %s.", this, completedURL.string().utf8().data());

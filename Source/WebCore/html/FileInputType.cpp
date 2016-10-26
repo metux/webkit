@@ -205,16 +205,6 @@ bool FileInputType::canSetStringValue() const
     return false;
 }
 
-bool FileInputType::canChangeFromAnotherType() const
-{
-    // Don't allow the type to be changed to file after the first type change.
-    // In other engines this might mean a JavaScript programmer could set a text
-    // field's value to something like /etc/passwd and then change it to a file input.
-    // I don't think this would actually occur in WebKit, but this rule still may be
-    // important for compatibility.
-    return false;
-}
-
 FileList* FileInputType::files()
 {
     return m_fileList.get();
@@ -251,7 +241,7 @@ void FileInputType::setValue(const String&, bool, TextFieldEventBehavior)
     // FIXME: Should we clear the file list, or replace it with a new empty one here? This is observable from JavaScript through custom properties.
     m_fileList->clear();
     m_icon = nullptr;
-    element().setNeedsStyleRecalc();
+    element().invalidateStyleForSubtree();
 }
 
 PassRefPtr<FileList> FileInputType::createFileList(const Vector<FileChooserFileInfo>& files) const

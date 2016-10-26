@@ -166,8 +166,6 @@ public:
     MainFrame& mainFrame() { return m_mainFrame.get(); }
     const MainFrame& mainFrame() const { return m_mainFrame.get(); }
 
-    bool inPageCache() const;
-
     bool openedByDOM() const;
     void setOpenedByDOM();
 
@@ -307,7 +305,7 @@ public:
     void setEnclosedInScrollableAncestorView(bool f) { m_enclosedInScrollableAncestorView = f; }
 #endif
 
-#if ENABLE(IOS_TEXT_AUTOSIZING)
+#if ENABLE(TEXT_AUTOSIZING)
     float textAutosizingWidth() const { return m_textAutosizingWidth; }
     void setTextAutosizingWidth(float textAutosizingWidth) { m_textAutosizingWidth = textAutosizingWidth; }
 #endif
@@ -337,7 +335,8 @@ public:
 
     // Notifications when the Page starts and stops being presented via a native window.
     WEBCORE_EXPORT void setViewState(ViewState::Flags);
-    void setPageActivityState(PageActivityState::Flags);
+    bool isVisibleAndActive() const;
+    void pageActivityStateChanged() { updateTimerThrottlingState(); }
     WEBCORE_EXPORT void setIsVisible(bool);
     WEBCORE_EXPORT void setIsPrerender();
     bool isVisible() const { return m_viewState & ViewState::IsVisible; }
@@ -481,8 +480,10 @@ public:
 
     MediaProducer::MediaStateFlags mediaState() const { return m_mediaState; }
     void updateIsPlayingMedia(uint64_t);
-    bool isMuted() const { return m_muted; }
-    WEBCORE_EXPORT void setMuted(bool);
+    MediaProducer::MutedStateFlags mutedState() const { return m_mutedState; }
+    bool isAudioMuted() const { return m_mutedState & MediaProducer::AudioIsMuted; }
+    bool isMediaCaptureMuted() const { return m_mutedState & MediaProducer::CaptureDevicesAreMuted; };
+    WEBCORE_EXPORT void setMuted(MediaProducer::MutedStateFlags);
 
 #if ENABLE(MEDIA_SESSION)
     WEBCORE_EXPORT void handleMediaEvent(MediaEventType);
@@ -511,6 +512,9 @@ public:
     bool allowsMediaDocumentInlinePlayback() const { return m_allowsMediaDocumentInlinePlayback; }
     WEBCORE_EXPORT void setAllowsMediaDocumentInlinePlayback(bool);
 #endif
+
+    bool allowsPlaybackControlsForAutoplayingAudio() const { return m_allowsPlaybackControlsForAutoplayingAudio; }
+    void setAllowsPlaybackControlsForAutoplayingAudio(bool allowsPlaybackControlsForAutoplayingAudio) { m_allowsPlaybackControlsForAutoplayingAudio = allowsPlaybackControlsForAutoplayingAudio; }
 
 #if ENABLE(INDEXED_DATABASE)
     IDBClient::IDBConnectionToServer& idbConnection();
@@ -607,7 +611,7 @@ private:
     bool m_inLowQualityInterpolationMode;
     bool m_areMemoryCacheClientCallsEnabled;
     float m_mediaVolume;
-    bool m_muted;
+    MediaProducer::MutedStateFlags m_mutedState { MediaProducer::NoneMuted };
 
     float m_pageScaleFactor;
     float m_zoomedOutPageScaleFactor;
@@ -622,7 +626,7 @@ private:
     bool m_enclosedInScrollableAncestorView { false };
 #endif
 
-#if ENABLE(IOS_TEXT_AUTOSIZING)
+#if ENABLE(TEXT_AUTOSIZING)
     float m_textAutosizingWidth;
 #endif
     
@@ -720,6 +724,7 @@ private:
     MediaProducer::MediaStateFlags m_mediaState { MediaProducer::IsNotPlaying };
     
     bool m_allowsMediaDocumentInlinePlayback { false };
+    bool m_allowsPlaybackControlsForAutoplayingAudio { false };
     bool m_showAllPlugins { false };
     bool m_controlledByAutomation { false };
     bool m_resourceCachingDisabled { false };

@@ -118,6 +118,11 @@ void WebIDBConnectionToServer::deleteObjectStore(const IDBRequestData& requestDa
     send(Messages::WebIDBConnectionToClient::DeleteObjectStore(requestData, objectStoreName));
 }
 
+void WebIDBConnectionToServer::renameObjectStore(const IDBRequestData& requestData, uint64_t objectStoreIdentifier, const String& newName)
+{
+    send(Messages::WebIDBConnectionToClient::RenameObjectStore(requestData, objectStoreIdentifier, newName));
+}
+
 void WebIDBConnectionToServer::clearObjectStore(const IDBRequestData& requestData, uint64_t objectStoreIdentifier)
 {
     send(Messages::WebIDBConnectionToClient::ClearObjectStore(requestData, objectStoreIdentifier));
@@ -131,6 +136,11 @@ void WebIDBConnectionToServer::createIndex(const IDBRequestData& requestData, co
 void WebIDBConnectionToServer::deleteIndex(const IDBRequestData& requestData, uint64_t objectStoreIdentifier, const String& indexName)
 {
     send(Messages::WebIDBConnectionToClient::DeleteIndex(requestData, objectStoreIdentifier, indexName));
+}
+
+void WebIDBConnectionToServer::renameIndex(const IDBRequestData& requestData, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName)
+{
+    send(Messages::WebIDBConnectionToClient::RenameIndex(requestData, objectStoreIdentifier, indexIdentifier, newName));
 }
 
 void WebIDBConnectionToServer::putOrAdd(const IDBRequestData& requestData, const IDBKeyData& keyData, const IDBValue& value, const IndexedDB::ObjectStoreOverwriteMode mode)
@@ -228,6 +238,11 @@ void WebIDBConnectionToServer::didDeleteObjectStore(const IDBResultData& result)
     m_connectionToServer->didDeleteObjectStore(result);
 }
 
+void WebIDBConnectionToServer::didRenameObjectStore(const IDBResultData& result)
+{
+    m_connectionToServer->didRenameObjectStore(result);
+}
+
 void WebIDBConnectionToServer::didClearObjectStore(const IDBResultData& result)
 {
     m_connectionToServer->didClearObjectStore(result);
@@ -241,6 +256,11 @@ void WebIDBConnectionToServer::didCreateIndex(const IDBResultData& result)
 void WebIDBConnectionToServer::didDeleteIndex(const IDBResultData& result)
 {
     m_connectionToServer->didDeleteIndex(result);
+}
+
+void WebIDBConnectionToServer::didRenameIndex(const IDBResultData& result)
+{
+    m_connectionToServer->didRenameIndex(result);
 }
 
 void WebIDBConnectionToServer::didPutOrAdd(const IDBResultData& result)

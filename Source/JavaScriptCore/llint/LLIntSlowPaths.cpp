@@ -41,11 +41,11 @@
 #include "JIT.h"
 #include "JITExceptions.h"
 #include "JITWorklist.h"
-#include "JSLexicalEnvironment.h"
 #include "JSCInlines.h"
 #include "JSCJSValue.h"
 #include "JSGeneratorFunction.h"
 #include "JSGlobalObjectFunctions.h"
+#include "JSLexicalEnvironment.h"
 #include "JSString.h"
 #include "JSWithScope.h"
 #include "LLIntCommon.h"
@@ -55,6 +55,7 @@
 #include "ObjectConstructor.h"
 #include "ObjectPropertyConditionSet.h"
 #include "ProtoCallFrame.h"
+#include "RegExpObject.h"
 #include "ShadowChicken.h"
 #include "StructureRareDataInlines.h"
 #include "VMInlines.h"
@@ -783,7 +784,7 @@ LLINT_SLOW_PATH_DECL(slow_path_del_by_id)
     bool couldDelete = baseObject->methodTable()->deleteProperty(baseObject, exec, codeBlock->identifier(pc[3].u.operand));
     LLINT_CHECK_EXCEPTION();
     if (!couldDelete && codeBlock->isStrictMode())
-        LLINT_THROW(createTypeError(exec, "Unable to delete property."));
+        LLINT_THROW(createTypeError(exec, UnableToDeletePropertyError));
     LLINT_RETURN(jsBoolean(couldDelete));
 }
 
@@ -810,11 +811,9 @@ static ALWAYS_INLINE JSValue getByVal(VM& vm, ExecState* exec, JSValue baseValue
     }
 
     baseValue.requireObjectCoercible(exec);
-    if (scope.exception())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
     auto property = subscript.toPropertyKey(exec);
-    if (scope.exception())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
     return baseValue.get(exec, property);
 }
 
@@ -882,7 +881,7 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_val_direct)
 
     // Don't put to an object if toString threw an exception.
     auto property = subscript.toPropertyKey(exec);
-    if (exec->vm().exception())
+    if (UNLIKELY(throwScope.exception()))
         LLINT_END();
 
     if (Optional<uint32_t> index = parseIndex(property))
@@ -916,7 +915,7 @@ LLINT_SLOW_PATH_DECL(slow_path_del_by_val)
     }
     
     if (!couldDelete && exec->codeBlock()->isStrictMode())
-        LLINT_THROW(createTypeError(exec, "Unable to delete property."));
+        LLINT_THROW(createTypeError(exec, UnableToDeletePropertyError));
     
     LLINT_RETURN(jsBoolean(couldDelete));
 }
@@ -1276,7 +1275,7 @@ inline SlowPathReturnType setUpCall(ExecState* execCallee, Instruction* pc, Code
             LLINT_CALL_THROW(exec, createNotAConstructorError(exec, callee));
 
         CodeBlock** codeBlockSlot = execCallee->addressOfCodeBlock();
-        JSObject* error = functionExecutable->prepareForExecution<FunctionExecutable>(execCallee, callee, scope, kind, *codeBlockSlot);
+        JSObject* error = functionExecutable->prepareForExecution<FunctionExecutable>(vm, callee, scope, kind, *codeBlockSlot);
         if (error)
             LLINT_CALL_THROW(exec, error);
         codeBlock = *codeBlockSlot;
@@ -1475,18 +1474,6 @@ LLINT_SLOW_PATH_DECL(slow_path_throw)
     LLINT_THROW(LLINT_OP_C(1).jsValue());
 }
 
-LLINT_SLOW_PATH_DECL(slow_path_throw_static_error)
-{
-    LLINT_BEGIN();
-    JSValue errorMessageValue = LLINT_OP_C(1).jsValue();
-    RELEASE_ASSERT(errorMessageValue.isString());
-    String errorMessage = asString(errorMessageValue)->value(exec);
-    if (pc[2].u.operand)
-        LLINT_THROW(createReferenceError(exec, errorMessage));
-    else
-        LLINT_THROW(createTypeError(exec, errorMessage));
-}
-
 LLINT_SLOW_PATH_DECL(slow_path_handle_watchdog_timer)
 {
     LLINT_BEGIN_NO_SET_PC();
@@ -1499,8 +1486,8 @@ LLINT_SLOW_PATH_DECL(slow_path_handle_watchdog_timer)
 LLINT_SLOW_PATH_DECL(slow_path_debug)
 {
     LLINT_BEGIN();
-    int debugHookID = pc[1].u.operand;
-    vm.interpreter->debug(exec, static_cast<DebugHookID>(debugHookID));
+    int debugHookType = pc[1].u.operand;
+    vm.interpreter->debug(exec, static_cast<DebugHookType>(debugHookType));
     
     LLINT_END();
 }

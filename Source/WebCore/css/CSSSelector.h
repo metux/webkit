@@ -81,13 +81,16 @@ namespace WebCore {
             PagePseudoClass
         };
 
-        enum Relation {
-            Descendant = 0,
+        enum RelationType {
+            Subselector,
+            Descendant,
             Child,
             DirectAdjacent,
             IndirectAdjacent,
-            SubSelector,
-            ShadowDescendant,
+            ShadowDescendant, // FIXME-NEWPARSER: Remove this in favor of the new shadow values below.
+            ShadowPseudo, // Special case of shadow DOM pseudo elements / shadow pseudo element
+            ShadowDeep, // /deep/ combinator
+            ShadowSlot // slotted to <slot> e
         };
 
         enum PseudoClassType {
@@ -217,6 +220,11 @@ namespace WebCore {
             RightBottomMarginBox,
         };
 
+        enum AttributeMatchType {
+            CaseSensitive,
+            CaseInsensitive,
+        };
+
         static PseudoElementType parsePseudoElementType(const String&);
         static PseudoId pseudoId(PseudoElementType);
 
@@ -236,9 +244,13 @@ namespace WebCore {
         const CSSSelectorList* selectorList() const { return m_hasRareData ? m_data.m_rareData->m_selectorList.get() : nullptr; }
 
         void setValue(const AtomicString&);
-        void setAttribute(const QualifiedName&, bool isCaseInsensitive);
-        void setArgument(const AtomicString&);
+        
+        // FIXME-NEWPARSER: These two methods can go away once the old parser is gone.
+        void setAttribute(const QualifiedName&, bool);
         void setAttributeValueMatchingIsCaseInsensitive(bool);
+        void setAttribute(const QualifiedName&, bool convertToLowercase, AttributeMatchType);
+        void setNth(int a, int b);
+        void setArgument(const AtomicString&);
         void setLangArgumentList(std::unique_ptr<Vector<AtomicString>>);
         void setSelectorList(std::unique_ptr<CSSSelectorList>);
 
@@ -287,8 +299,8 @@ namespace WebCore {
         bool isSiblingSelector() const;
         bool isAttributeSelector() const;
 
-        Relation relation() const { return static_cast<Relation>(m_relation); }
-        void setRelation(Relation relation)
+        RelationType relation() const { return static_cast<RelationType>(m_relation); }
+        void setRelation(RelationType relation)
         {
             m_relation = relation;
             ASSERT(m_relation == relation);
@@ -318,7 +330,7 @@ namespace WebCore {
         void setForPage() { m_isForPage = true; }
 
     private:
-        unsigned m_relation              : 3; // enum Relation.
+        unsigned m_relation              : 3; // enum RelationType.
         mutable unsigned m_match         : 4; // enum Match.
         mutable unsigned m_pseudoType    : 8; // PseudoType.
         mutable unsigned m_parsedNth     : 1; // Used for :nth-*.
@@ -577,7 +589,7 @@ inline void CSSSelector::setAttributeValueMatchingIsCaseInsensitive(bool isCaseI
     ASSERT(isAttributeSelector() && match() != CSSSelector::Set);
     m_caseInsensitiveAttributeValueMatching = isCaseInsensitive;
 }
-
+    
 inline bool CSSSelector::attributeValueMatchingIsCaseInsensitive() const
 {
     return m_caseInsensitiveAttributeValueMatching;

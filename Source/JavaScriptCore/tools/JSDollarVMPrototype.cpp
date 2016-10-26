@@ -31,6 +31,7 @@
 #include "HeapIterationScope.h"
 #include "JSCInlines.h"
 #include "JSFunction.h"
+#include "MarkedSpaceInlines.h"
 #include "StackVisitor.h"
 #include <wtf/DataLog.h>
 #include <wtf/StringPrintStream.h>
@@ -129,7 +130,7 @@ void JSDollarVMPrototype::edenGC(ExecState* exec)
 {
     if (!ensureCurrentThreadOwnsJSLock(exec))
         return;
-    exec->heap()->collect(EdenCollection);
+    exec->heap()->collect(CollectionScope::Eden);
 }
 
 static EncodedJSValue JSC_HOST_CALL functionEdenGC(ExecState* exec)
@@ -155,10 +156,11 @@ bool JSDollarVMPrototype::isInObjectSpace(Heap* heap, void* ptr)
     return false;
 }
 
-bool JSDollarVMPrototype::isInStorageSpace(Heap* heap, void* ptr)
+bool JSDollarVMPrototype::isInStorageSpace(Heap*, void*)
 {
-    CopiedBlock* candidate = CopiedSpace::blockFor(ptr);
-    return heap->storageSpace().contains(candidate);
+    // FIXME: Do something with this.
+    // https://bugs.webkit.org/show_bug.cgi?id=161753
+    return false;
 }
 
 struct CellAddressCheckFunctor : MarkedBlock::CountFunctor {
@@ -307,10 +309,10 @@ static EncodedJSValue JSC_HOST_CALL functionPrintByteCodeFor(ExecState* exec)
 
 static EncodedJSValue JSC_HOST_CALL functionPrint(ExecState* exec)
 {
+    auto scope = DECLARE_THROW_SCOPE(exec->vm());
     for (unsigned i = 0; i < exec->argumentCount(); ++i) {
         String argStr = exec->uncheckedArgument(i).toString(exec)->value(exec);
-        if (exec->hadException())
-            return JSValue::encode(jsUndefined());
+        RETURN_IF_EXCEPTION(scope, encodedJSValue());
         dataLog(argStr);
     }
     return JSValue::encode(jsUndefined());
@@ -409,6 +411,13 @@ static EncodedJSValue JSC_HOST_CALL functionValue(ExecState* exec)
     return JSValue::encode(jsString(exec, stream.toString()));
 }
 
+#if !PLATFORM(WIN)
+static EncodedJSValue JSC_HOST_CALL functionGetPID(ExecState*)
+{
+    return JSValue::encode(jsNumber(getpid()));
+}
+#endif
+
 void JSDollarVMPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject)
 {
     Base::finishCreation(vm);
@@ -432,6 +441,9 @@ void JSDollarVMPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject)
     addFunction(vm, globalObject, "printStack", functionPrintStack, 0);
 
     addFunction(vm, globalObject, "value", functionValue, 1);
+#if !PLATFORM(WIN)
+    addFunction(vm, globalObject, "getpid", functionGetPID, 0);
+#endif
 }
 
 } // namespace JSC

@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef JSGenericTypedArrayViewInlines_h
-#define JSGenericTypedArrayViewInlines_h
+#pragma once
 
 #include "ArrayBufferView.h"
 #include "DeferGC.h"
@@ -32,7 +31,7 @@
 #include "ExceptionHelpers.h"
 #include "JSArrayBuffer.h"
 #include "JSGenericTypedArrayView.h"
-#include "Reject.h"
+#include "TypeError.h"
 #include "TypedArrays.h"
 
 namespace JSC {
@@ -55,6 +54,20 @@ JSGenericTypedArrayView<Adaptor>* JSGenericTypedArrayView<Adaptor>::create(
         throwOutOfMemoryError(exec, scope);
         return nullptr;
     }
+    JSGenericTypedArrayView* result =
+        new (NotNull, allocateCell<JSGenericTypedArrayView>(vm.heap))
+        JSGenericTypedArrayView(vm, context);
+    result->finishCreation(vm);
+    return result;
+}
+
+template<typename Adaptor>
+JSGenericTypedArrayView<Adaptor>* JSGenericTypedArrayView<Adaptor>::createWithFastVector(
+    ExecState* exec, Structure* structure, unsigned length, void* vector)
+{
+    VM& vm = exec->vm();
+    ConstructionContext context(structure, length, vector);
+    RELEASE_ASSERT(context);
     JSGenericTypedArrayView* result =
         new (NotNull, allocateCell<JSGenericTypedArrayView>(vm.heap))
         JSGenericTypedArrayView(vm, context);
@@ -347,17 +360,19 @@ bool JSGenericTypedArrayView<Adaptor>::defineOwnProperty(
     JSObject* object, ExecState* exec, PropertyName propertyName,
     const PropertyDescriptor& descriptor, bool shouldThrow)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     JSGenericTypedArrayView* thisObject = jsCast<JSGenericTypedArrayView*>(object);
 
     if (parseIndex(propertyName)) {
         if (descriptor.isAccessorDescriptor())
-            return reject(exec, shouldThrow, "Attempting to store accessor indexed property on a typed array.");
+            return typeError(exec, scope, shouldThrow, ASCIILiteral("Attempting to store accessor indexed property on a typed array."));
 
         if (descriptor.configurable())
-            return reject(exec, shouldThrow, "Attempting to configure non-configurable property.");
+            return typeError(exec, scope, shouldThrow, ASCIILiteral("Attempting to configure non-configurable property."));
 
         if (!descriptor.enumerable() || !descriptor.writable())
-            return reject(exec, shouldThrow, "Attempting to store non-enumerable or non-writable indexed property on a typed array.");
+            return typeError(exec, scope, shouldThrow, ASCIILiteral("Attempting to store non-enumerable or non-writable indexed property on a typed array."));
 
         if (descriptor.value()) {
             PutPropertySlot unused(JSValue(thisObject), shouldThrow);
@@ -373,10 +388,12 @@ template<typename Adaptor>
 bool JSGenericTypedArrayView<Adaptor>::deleteProperty(
     JSCell* cell, ExecState* exec, PropertyName propertyName)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     JSGenericTypedArrayView* thisObject = jsCast<JSGenericTypedArrayView*>(cell);
 
     if (thisObject->isNeutered())
-        return reject(exec, true, typedArrayBufferHasBeenDetachedErrorMessage);
+        return typeError(exec, scope, true, ASCIILiteral(typedArrayBufferHasBeenDetachedErrorMessage));
 
     if (parseIndex(propertyName))
         return false;
@@ -463,7 +480,7 @@ void JSGenericTypedArrayView<Adaptor>::visitChildren(JSCell* cell, SlotVisitor& 
     switch (thisObject->m_mode) {
     case FastTypedArray: {
         if (thisObject->m_vector)
-            visitor.copyLater(thisObject, TypedArrayVectorCopyToken, thisObject->m_vector.get(), thisObject->byteSize());
+            visitor.markAuxiliary(thisObject->m_vector.get());
         break;
     }
         
@@ -481,25 +498,6 @@ void JSGenericTypedArrayView<Adaptor>::visitChildren(JSCell* cell, SlotVisitor& 
     }
     
     Base::visitChildren(thisObject, visitor);
-}
-
-template<typename Adaptor>
-void JSGenericTypedArrayView<Adaptor>::copyBackingStore(
-    JSCell* cell, CopyVisitor& visitor, CopyToken token)
-{
-    JSGenericTypedArrayView* thisObject = jsCast<JSGenericTypedArrayView*>(cell);
-    
-    if (token == TypedArrayVectorCopyToken
-        && visitor.checkIfShouldCopy(thisObject->m_vector.get())) {
-        ASSERT(thisObject->m_vector);
-        void* oldVector = thisObject->vector();
-        void* newVector = visitor.allocateNewSpace(thisObject->byteSize());
-        memcpy(newVector, oldVector, thisObject->byteSize());
-        thisObject->m_vector.setWithoutBarrier(static_cast<char*>(newVector));
-        visitor.didCopy(oldVector, thisObject->byteSize());
-    }
-    
-    Base::copyBackingStore(thisObject, visitor, token);
 }
 
 template<typename Adaptor>
@@ -550,7 +548,7 @@ ArrayBuffer* JSGenericTypedArrayView<Adaptor>::slowDownAndWasteMemory(JSArrayBuf
     }
 
     thisObject->butterfly()->indexingHeader()->setArrayBuffer(buffer.get());
-    thisObject->m_vector.setWithoutBarrier(static_cast<char*>(buffer->data()));
+    thisObject->m_vector.setWithoutBarrier(buffer->data());
     thisObject->m_mode = WastefulTypedArray;
     heap->addReference(thisObject, buffer.get());
     
@@ -566,6 +564,3 @@ JSGenericTypedArrayView<Adaptor>::getTypedArrayImpl(JSArrayBufferView* object)
 }
 
 } // namespace JSC
-
-#endif // JSGenericTypedArrayViewInlines_h
-

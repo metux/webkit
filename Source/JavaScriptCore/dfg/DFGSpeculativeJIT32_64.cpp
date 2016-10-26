@@ -37,9 +37,9 @@
 #include "DFGSlowPathGenerator.h"
 #include "DirectArguments.h"
 #include "GetterSetter.h"
+#include "HasOwnPropertyCache.h"
 #include "HashMapImpl.h"
 #include "JSEnvironmentRecord.h"
-#include "JSLexicalEnvironment.h"
 #include "JSPropertyNameEnumerator.h"
 #include "ObjectPrototype.h"
 #include "JSCInlines.h"
@@ -657,6 +657,7 @@ void SpeculativeJIT::emitCall(Node* node)
     bool isVarargs = false;
     bool isForwardVarargs = false;
     bool isTail = false;
+    bool isDirect = false;
     bool isEmulatedTail = false;
     switch (node->op()) {
     case Call:
@@ -710,6 +711,24 @@ void SpeculativeJIT::emitCall(Node* node)
         callType = CallLinkInfo::ConstructVarargs;
         isForwardVarargs = true;
         break;
+    case DirectCall:
+        callType = CallLinkInfo::DirectCall;
+        isDirect = true;
+        break;
+    case DirectConstruct:
+        callType = CallLinkInfo::DirectConstruct;
+        isDirect = true;
+        break;
+    case DirectTailCall:
+        callType = CallLinkInfo::DirectTailCall;
+        isTail = true;
+        isDirect = true;
+        break;
+    case DirectTailCallInlinedCaller:
+        callType = CallLinkInfo::DirectCall;
+        isEmulatedTail = true;
+        isDirect = true;
+        break;
     default:
         DFG_CRASH(m_jit.graph(), node, "bad node type");
         break;
@@ -720,8 +739,19 @@ void SpeculativeJIT::emitCall(Node* node)
     GPRReg calleePayloadGPR = InvalidGPRReg;
     CallFrameShuffleData shuffleData;
     
+    ExecutableBase* executable = nullptr;
+    FunctionExecutable* functionExecutable = nullptr;
+    if (isDirect) {
+        executable = node->castOperand<ExecutableBase*>();
+        functionExecutable = jsDynamicCast<FunctionExecutable*>(executable);
+    }
+    
+    unsigned numPassedArgs = 0;
+    unsigned numAllocatedArgs = 0;
+    
     // Gotta load the arguments somehow. Varargs is trickier.
     if (isVarargs || isForwardVarargs) {
+        RELEASE_ASSERT(!isDirect);
         CallVarargsData* data = node->callVarargsData();
 
         GPRReg resultGPR;
@@ -817,28 +847,53 @@ void SpeculativeJIT::emitCall(Node* node)
     } else {        
         // The call instruction's first child is either the function (normal call) or the
         // receiver (method call). subsequent children are the arguments.
-        int numPassedArgs = node->numChildren() - 1;
+        numPassedArgs = node->numChildren() - 1;
+        numAllocatedArgs = numPassedArgs;
+        
+        if (functionExecutable) {
+            // Allocate more args if this would let us avoid arity checks. This is throttled by
+            // CallLinkInfo's limit. It's probably good to throttle it - if the callee wants a
+            // ginormous amount of argument space then it's better for them to do it so that when we
+            // make calls to other things, we don't waste space.
+            unsigned desiredNumAllocatedArgs = static_cast<unsigned>(functionExecutable->parameterCount()) + 1;
+            if (desiredNumAllocatedArgs <= Options::maximumDirectCallStackSize()) {
+                numAllocatedArgs = std::max(numAllocatedArgs, desiredNumAllocatedArgs);
+                
+                // Whoever converts to DirectCall should do this adjustment. It's too late for us to
+                // do this adjustment now since we will have already emitted code that relied on the
+                // value of m_parameterSlots.
+                DFG_ASSERT(
+                    m_jit.graph(), node,
+                    Graph::parameterSlotsForArgCount(numAllocatedArgs)
+                    <= m_jit.graph().m_parameterSlots);
+            }
+        }
 
-        if (node->op() == TailCall) {
+        if (isTail) {
             JSValueOperand callee(this, calleeEdge);
             calleeTagGPR = callee.tagGPR();
             calleePayloadGPR = callee.payloadGPR();
-            use(calleeEdge);
+            if (!isDirect)
+                use(calleeEdge);
 
             shuffleData.numLocals = m_jit.graph().frameRegisterCount();
             shuffleData.callee = ValueRecovery::inPair(calleeTagGPR, calleePayloadGPR);
-            shuffleData.args.resize(numPassedArgs);
+            shuffleData.args.resize(numAllocatedArgs);
 
-            for (int i = 0; i < numPassedArgs; ++i) {
+            for (unsigned i = 0; i < numPassedArgs; ++i) {
                 Edge argEdge = m_jit.graph().varArgChild(node, i + 1);
                 GenerationInfo& info = generationInfo(argEdge.node());
-                use(argEdge);
+                if (!isDirect)
+                    use(argEdge);
                 shuffleData.args[i] = info.recovery(argEdge->virtualRegister());
             }
+            
+            for (unsigned i = numPassedArgs; i < numAllocatedArgs; ++i)
+                shuffleData.args[i] = ValueRecovery::constant(jsUndefined());
         } else {
             m_jit.store32(MacroAssembler::TrustedImm32(numPassedArgs), m_jit.calleeFramePayloadSlot(CallFrameSlot::argumentCount));
         
-            for (int i = 0; i < numPassedArgs; i++) {
+            for (unsigned i = 0; i < numPassedArgs; i++) {
                 Edge argEdge = m_jit.graph().m_varArgChildren[node->firstChild() + 1 + i];
                 JSValueOperand arg(this, argEdge);
                 GPRReg argTagGPR = arg.tagGPR();
@@ -848,10 +903,13 @@ void SpeculativeJIT::emitCall(Node* node)
                 m_jit.store32(argTagGPR, m_jit.calleeArgumentTagSlot(i));
                 m_jit.store32(argPayloadGPR, m_jit.calleeArgumentPayloadSlot(i));
             }
+            
+            for (unsigned i = numPassedArgs; i < numAllocatedArgs; ++i)
+                m_jit.storeTrustedValue(jsUndefined(), JITCompiler::calleeArgumentSlot(i));
         }
     }
 
-    if (node->op() != TailCall) {
+    if (!isTail || isVarargs || isForwardVarargs) {
         JSValueOperand callee(this, calleeEdge);
         calleeTagGPR = callee.tagGPR();
         calleePayloadGPR = callee.payloadGPR();
@@ -863,11 +921,6 @@ void SpeculativeJIT::emitCall(Node* node)
             flushRegisters();
     }
 
-    GPRFlushedCallResult resultPayload(this);
-    GPRFlushedCallResult2 resultTag(this);
-    GPRReg resultPayloadGPR = resultPayload.gpr();
-    GPRReg resultTagGPR = resultTag.gpr();
-
     JITCompiler::DataLabelPtr targetToCheck;
     JITCompiler::JumpList slowPath;
 
@@ -877,12 +930,16 @@ void SpeculativeJIT::emitCall(Node* node)
     CodeOrigin dynamicOrigin =
         isEmulatedTail ? *staticOrigin.inlineCallFrame->getCallerSkippingTailCalls() : staticOrigin;
     CallSiteIndex callSite = m_jit.recordCallSiteAndGenerateExceptionHandlingOSRExitIfNeeded(dynamicOrigin, m_stream->size());
-    m_jit.emitStoreCallSiteIndex(callSite);
     
     CallLinkInfo* info = m_jit.codeBlock()->addCallLinkInfo();
     info->setUpCall(callType, node->origin.semantic, calleePayloadGPR);
     
     auto setResultAndResetStack = [&] () {
+        GPRFlushedCallResult resultPayload(this);
+        GPRFlushedCallResult2 resultTag(this);
+        GPRReg resultPayloadGPR = resultPayload.gpr();
+        GPRReg resultTagGPR = resultTag.gpr();
+        
         m_jit.setupResults(resultPayloadGPR, resultTagGPR);
 
         jsValueResult(resultTagGPR, resultPayloadGPR, node, DataFormatJS, UseChildrenCalledExplicitly);
@@ -898,6 +955,7 @@ void SpeculativeJIT::emitCall(Node* node)
         // subtract stack to make room for the call. Lucky for us, at this point we have the whole
         // register file to ourselves.
         
+        m_jit.emitStoreCallSiteIndex(callSite);
         m_jit.addPtr(TrustedImm32(-static_cast<ptrdiff_t>(sizeof(CallerFrameAndPC))), JITCompiler::stackPointerRegister, GPRInfo::regT0);
         m_jit.storePtr(GPRInfo::callFrameRegister, JITCompiler::Address(GPRInfo::regT0, CallFrame::callerFrameOffset()));
         
@@ -924,6 +982,63 @@ void SpeculativeJIT::emitCall(Node* node)
         return;
     }
 
+    if (isDirect) {
+        info->setExecutableDuringCompilation(executable);
+        info->setMaxNumArguments(numAllocatedArgs);
+
+        if (isTail) {
+            RELEASE_ASSERT(node->op() == DirectTailCall);
+            
+            JITCompiler::PatchableJump patchableJump = m_jit.patchableJump();
+            JITCompiler::Label mainPath = m_jit.label();
+            
+            m_jit.emitStoreCallSiteIndex(callSite);
+            
+            info->setFrameShuffleData(shuffleData);
+            CallFrameShuffler(m_jit, shuffleData).prepareForTailCall();
+            
+            JITCompiler::Call call = m_jit.nearTailCall();
+            
+            JITCompiler::Label slowPath = m_jit.label();
+            patchableJump.m_jump.linkTo(slowPath, &m_jit);
+            
+            silentSpillAllRegisters(InvalidGPRReg);
+            callOperation(operationLinkDirectCall, info, calleePayloadGPR);
+            silentFillAllRegisters(InvalidGPRReg);
+            m_jit.exceptionCheck();
+            m_jit.jump().linkTo(mainPath, &m_jit);
+            
+            useChildren(node);
+            
+            m_jit.addJSDirectTailCall(patchableJump, call, slowPath, info);
+            return;
+        }
+        
+        JITCompiler::Label mainPath = m_jit.label();
+        
+        m_jit.emitStoreCallSiteIndex(callSite);
+        
+        JITCompiler::Call call = m_jit.nearCall();
+        JITCompiler::Jump done = m_jit.jump();
+        
+        JITCompiler::Label slowPath = m_jit.label();
+        if (isX86())
+            m_jit.pop(JITCompiler::selectScratchGPR(calleePayloadGPR));
+
+        callOperation(operationLinkDirectCall, info, calleePayloadGPR);
+        m_jit.exceptionCheck();
+        m_jit.jump().linkTo(mainPath, &m_jit);
+        
+        done.link(&m_jit);
+        
+        setResultAndResetStack();
+        
+        m_jit.addJSDirectCall(call, slowPath, info);
+        return;
+    }
+    
+    m_jit.emitStoreCallSiteIndex(callSite);
+    
     slowPath.append(m_jit.branchIfNotCell(JSValueRegs(calleeTagGPR, calleePayloadGPR)));
     slowPath.append(m_jit.branchPtrWithPatch(MacroAssembler::NotEqual, calleePayloadGPR, targetToCheck));
 
@@ -1266,18 +1381,6 @@ GPRReg SpeculativeJIT::fillSpeculateBoolean(Edge edge)
         RELEASE_ASSERT_NOT_REACHED();
         return InvalidGPRReg;
     }
-}
-
-void SpeculativeJIT::compileBaseValueStoreBarrier(Edge& baseEdge, Edge& valueEdge)
-{
-    ASSERT(!isKnownNotCell(valueEdge.node()));
-
-    SpeculateCellOperand base(this, baseEdge);
-    JSValueOperand value(this, valueEdge);
-    GPRTemporary scratch1(this);
-    GPRTemporary scratch2(this);
-
-    writeBarrier(base.gpr(), value.tagGPR(), valueEdge, scratch1.gpr(), scratch2.gpr());
 }
 
 void SpeculativeJIT::compileObjectEquality(Node* node)
@@ -2348,6 +2451,10 @@ void SpeculativeJIT::compile(Node* node)
         compileArithCos(node);
         break;
 
+    case ArithTan:
+        compileArithTan(node);
+        break;
+
     case ArithLog:
         compileArithLog(node);
         break;
@@ -2684,6 +2791,11 @@ void SpeculativeJIT::compile(Node* node)
             else
                 compileGetByValOnFloatTypedArray(node, type);
         } }
+        break;
+    }
+    
+    case ToLowerCase: {
+        compileToLowerCase(node);
         break;
     }
 
@@ -3482,7 +3594,7 @@ void SpeculativeJIT::compile(Node* node)
     }
         
     case Throw:
-    case ThrowReferenceError: {
+    case ThrowStaticError: {
         // We expect that throw statements are rare and are intended to exit the code block
         // anyway, so we just OSR back to the old JIT for now.
         terminateSpeculativeExecution(Uncountable, JSValueRegs(), 0);
@@ -4487,6 +4599,16 @@ void SpeculativeJIT::compile(Node* node)
         break;
     }
 
+    case DefineDataProperty: {
+        compileDefineDataProperty(node);
+        break;
+    }
+
+    case DefineAccessorProperty: {
+        compileDefineAccessorProperty(node);
+        break;
+    }
+
     case GetGlobalLexicalVariable:
     case GetGlobalVar: {
         GPRTemporary resultPayload(this);
@@ -4636,31 +4758,6 @@ void SpeculativeJIT::compile(Node* node)
         break;
     }
 
-    case IsString: {
-        JSValueOperand value(this, node->child1());
-        GPRTemporary result(this, Reuse, value, TagWord);
-        
-        JITCompiler::Jump isNotCell = m_jit.branchIfNotCell(value.jsValueRegs());
-        
-        m_jit.compare8(JITCompiler::Equal, 
-            JITCompiler::Address(value.payloadGPR(), JSCell::typeInfoTypeOffset()), 
-            TrustedImm32(StringType), 
-            result.gpr());
-        JITCompiler::Jump done = m_jit.jump();
-        
-        isNotCell.link(&m_jit);
-        m_jit.move(TrustedImm32(0), result.gpr());
-        
-        done.link(&m_jit);
-        booleanResult(result.gpr(), node);
-        break;
-    }
-
-    case IsJSArray: {
-        compileIsJSArray(node);
-        break;
-    }
-
     case IsObject: {
         JSValueOperand value(this, node->child1());
         GPRTemporary result(this, Reuse, value, TagWord);
@@ -4691,8 +4788,8 @@ void SpeculativeJIT::compile(Node* node)
         break;
     }
 
-    case IsRegExpObject: {
-        compileIsRegExpObject(node);
+    case IsCellWithType: {
+        compileIsCellWithType(node);
         break;
     }
 
@@ -4798,6 +4895,10 @@ void SpeculativeJIT::compile(Node* node)
     case TailCallForwardVarargsInlinedCaller:
     case ConstructForwardVarargs:
     case CallEval:
+    case DirectCall:
+    case DirectConstruct:
+    case DirectTailCall:
+    case DirectTailCallInlinedCaller:
         emitCall(node);
         break;
 
@@ -4909,7 +5010,127 @@ void SpeculativeJIT::compile(Node* node)
         compileIn(node);
         break;
 
-    case StoreBarrier: {
+    case HasOwnProperty: {
+#if CPU(X86)
+        ASSERT(node->child2().useKind() == UntypedUse);
+        SpeculateCellOperand object(this, node->child1());
+        JSValueOperand key(this, node->child2());
+        GPRTemporary result(this, Reuse, object);
+
+        JSValueRegs keyRegs = key.jsValueRegs();
+        GPRReg objectGPR = object.gpr();
+        GPRReg resultGPR = result.gpr();
+
+        speculateObject(node->child1());
+
+        flushRegisters();
+        callOperation(operationHasOwnProperty, resultGPR, objectGPR, keyRegs);
+        booleanResult(resultGPR, node);
+#else
+        SpeculateCellOperand object(this, node->child1());
+        GPRTemporary uniquedStringImpl(this);
+        GPRTemporary temp(this);
+        GPRTemporary hash(this);
+        GPRTemporary structureID(this);
+        GPRTemporary result(this);
+
+        Optional<SpeculateCellOperand> keyAsCell;
+        Optional<JSValueOperand> keyAsValue;
+        JSValueRegs keyRegs;
+        if (node->child2().useKind() == UntypedUse) {
+            keyAsValue = JSValueOperand(this, node->child2());
+            keyRegs = keyAsValue->jsValueRegs();
+        } else {
+            ASSERT(node->child2().useKind() == StringUse || node->child2().useKind() == SymbolUse);
+            keyAsCell = SpeculateCellOperand(this, node->child2());
+            keyRegs = JSValueRegs::payloadOnly(keyAsCell->gpr());
+        }
+
+        GPRReg objectGPR = object.gpr();
+        GPRReg implGPR = uniquedStringImpl.gpr();
+        GPRReg tempGPR = temp.gpr();
+        GPRReg hashGPR = hash.gpr();
+        GPRReg structureIDGPR = structureID.gpr();
+        GPRReg resultGPR = result.gpr();
+
+        speculateObject(node->child1());
+
+        MacroAssembler::JumpList slowPath;
+        switch (node->child2().useKind()) {
+        case SymbolUse: {
+            speculateSymbol(node->child2(), keyRegs.payloadGPR());
+            m_jit.loadPtr(MacroAssembler::Address(keyRegs.payloadGPR(), Symbol::offsetOfSymbolImpl()), implGPR);
+            break;
+        }
+        case StringUse: {
+            speculateString(node->child2(), keyRegs.payloadGPR());
+            m_jit.loadPtr(MacroAssembler::Address(keyRegs.payloadGPR(), JSString::offsetOfValue()), implGPR);
+            slowPath.append(m_jit.branchTestPtr(MacroAssembler::Zero, implGPR));
+            slowPath.append(m_jit.branchTest32(
+                MacroAssembler::Zero, MacroAssembler::Address(implGPR, StringImpl::flagsOffset()),
+                MacroAssembler::TrustedImm32(StringImpl::flagIsAtomic())));
+            break;
+        }
+        case UntypedUse: {
+            slowPath.append(m_jit.branchIfNotCell(keyRegs));
+            auto isNotString = m_jit.branchIfNotString(keyRegs.payloadGPR());
+            m_jit.loadPtr(MacroAssembler::Address(keyRegs.payloadGPR(), JSString::offsetOfValue()), implGPR);
+            slowPath.append(m_jit.branchTestPtr(MacroAssembler::Zero, implGPR));
+            slowPath.append(m_jit.branchTest32(
+                MacroAssembler::Zero, MacroAssembler::Address(implGPR, StringImpl::flagsOffset()),
+                MacroAssembler::TrustedImm32(StringImpl::flagIsAtomic())));
+            auto hasUniquedImpl = m_jit.jump();
+
+            isNotString.link(&m_jit);
+            slowPath.append(m_jit.branchIfNotSymbol(keyRegs.payloadGPR()));
+            m_jit.loadPtr(MacroAssembler::Address(keyRegs.payloadGPR(), Symbol::offsetOfSymbolImpl()), implGPR);
+
+            hasUniquedImpl.link(&m_jit);
+            break;
+        }
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+        }
+
+        // Note that we don't test if the hash is zero here. AtomicStringImpl's can't have a zero
+        // hash, however, a SymbolImpl may. But, because this is a cache, we don't care. We only
+        // ever load the result from the cache if the cache entry matches what we are querying for.
+        // So we either get super lucky and use zero for the hash and somehow collide with the entity
+        // we're looking for, or we realize we're comparing against another entity, and go to the
+        // slow path anyways.
+        m_jit.load32(MacroAssembler::Address(implGPR, UniquedStringImpl::flagsOffset()), hashGPR);
+        m_jit.urshift32(MacroAssembler::TrustedImm32(StringImpl::s_flagCount), hashGPR);
+        m_jit.load32(MacroAssembler::Address(objectGPR, JSCell::structureIDOffset()), structureIDGPR);
+        m_jit.add32(structureIDGPR, hashGPR);
+        m_jit.and32(TrustedImm32(HasOwnPropertyCache::mask), hashGPR);
+        m_jit.mul32(TrustedImm32(sizeof(HasOwnPropertyCache::Entry)), hashGPR, hashGPR);
+        ASSERT(m_jit.vm()->hasOwnPropertyCache());
+        m_jit.move(TrustedImmPtr(m_jit.vm()->hasOwnPropertyCache()), tempGPR);
+        slowPath.append(m_jit.branchPtr(MacroAssembler::NotEqual, 
+            MacroAssembler::BaseIndex(tempGPR, hashGPR, MacroAssembler::TimesOne, HasOwnPropertyCache::Entry::offsetOfImpl()), implGPR));
+        m_jit.load8(MacroAssembler::BaseIndex(tempGPR, hashGPR, MacroAssembler::TimesOne, HasOwnPropertyCache::Entry::offsetOfResult()), resultGPR);
+        m_jit.load32(MacroAssembler::BaseIndex(tempGPR, hashGPR, MacroAssembler::TimesOne, HasOwnPropertyCache::Entry::offsetOfStructureID()), tempGPR);
+        slowPath.append(m_jit.branch32(MacroAssembler::NotEqual, tempGPR, structureIDGPR));
+        auto done = m_jit.jump();
+
+        slowPath.link(&m_jit);
+        silentSpillAllRegisters(resultGPR);
+        if (node->child2().useKind() != UntypedUse) {
+            m_jit.move(MacroAssembler::TrustedImm32(JSValue::CellTag), tempGPR);
+            keyRegs = JSValueRegs(tempGPR, keyRegs.payloadGPR());
+        }
+        callOperation(operationHasOwnProperty, resultGPR, objectGPR, keyRegs);
+        silentFillAllRegisters(resultGPR);
+        m_jit.exceptionCheck();
+
+        done.link(&m_jit);
+        booleanResult(resultGPR, node);
+#endif // CPU(X86)
+        break;
+    }
+
+    case StoreBarrier:
+    case FencedStoreBarrier: {
         compileStoreBarrier(node);
         break;
     }
@@ -5333,6 +5554,14 @@ void SpeculativeJIT::compile(Node* node)
         break;
     }
 
+    case CallDOM:
+        compileCallDOM(node);
+        break;
+
+    case CheckDOM:
+        compileCheckDOM(node);
+        break;
+
     case Unreachable:
         unreachable(node);
         break;
@@ -5374,20 +5603,6 @@ void SpeculativeJIT::compile(Node* node)
     
     if (node->hasResult() && node->mustGenerate())
         use(node);
-}
-
-void SpeculativeJIT::writeBarrier(GPRReg ownerGPR, GPRReg valueTagGPR, Edge valueUse, GPRReg scratch1, GPRReg scratch2)
-{
-    JITCompiler::Jump isNotCell;
-    if (!isKnownCell(valueUse.node()))
-        isNotCell = m_jit.branch32(JITCompiler::NotEqual, valueTagGPR, JITCompiler::TrustedImm32(JSValue::CellTag));
-
-    JITCompiler::Jump ownerIsRememberedOrInEden = m_jit.jumpIfIsRememberedOrInEden(ownerGPR);
-    storeToWriteBarrierBuffer(ownerGPR, scratch1, scratch2);
-    ownerIsRememberedOrInEden.link(&m_jit);
-
-    if (!isKnownCell(valueUse.node()))
-        isNotCell.link(&m_jit);
 }
 
 void SpeculativeJIT::moveTrueTo(GPRReg gpr)

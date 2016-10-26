@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef JSArrayBuffer_h
-#define JSArrayBuffer_h
+#pragma once
 
 #include "ArrayBuffer.h"
 #include "JSObject.h"
@@ -47,6 +46,8 @@ public:
     ArrayBuffer* impl() const { return m_impl; }
     
     static Structure* createStructure(VM&, JSGlobalObject*, JSValue prototype);
+
+    static ArrayBuffer* toWrapped(JSValue);
     
     DECLARE_EXPORT_INFO;
     
@@ -68,11 +69,13 @@ inline ArrayBuffer* toArrayBuffer(JSValue value)
 {
     JSArrayBuffer* wrapper = jsDynamicCast<JSArrayBuffer*>(value);
     if (!wrapper)
-        return 0;
+        return nullptr;
     return wrapper->impl();
 }
 
+inline ArrayBuffer* JSArrayBuffer::toWrapped(JSValue value)
+{
+    return toArrayBuffer(value);
+}
+
 } // namespace JSC
-
-#endif // JSArrayBuffer_h
-

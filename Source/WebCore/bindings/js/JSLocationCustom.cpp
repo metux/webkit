@@ -52,9 +52,17 @@ bool JSLocation::getOwnPropertySlotDelegate(ExecState* exec, PropertyName proper
         return false;
 
     // We only allow access to Location.replace() cross origin.
-    // Make it read-only / non-configurable to prevent writes via defineProperty.
     if (propertyName == exec->propertyNames().replace) {
-        slot.setCustom(this, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsLocationInstanceFunctionReplace, 1>);
+        slot.setCustom(this, ReadOnly | DontEnum, nonCachingStaticFunctionGetter<jsLocationInstanceFunctionReplace, 1>);
+        return true;
+    }
+
+    // Getting location.href cross origin needs to throw. However, getOwnPropertyDescriptor() needs to return
+    // a descriptor that has a setter but no getter.
+    if (slot.internalMethodType() == PropertySlot::InternalMethodType::GetOwnProperty && propertyName == exec->propertyNames().href) {
+        auto* entry = JSLocation::info()->staticPropHashTable->entry(propertyName);
+        CustomGetterSetter* customGetterSetter = CustomGetterSetter::create(vm, nullptr, entry->propertyPutter());
+        slot.setCustomGetterSetter(this, DontEnum | CustomAccessor, customGetterSetter);
         return true;
     }
 
@@ -108,20 +116,63 @@ bool JSLocation::deletePropertyByIndex(JSCell* cell, ExecState* exec, unsigned p
     return Base::deletePropertyByIndex(thisObject, exec, propertyName);
 }
 
+static void addCrossOriginLocationPropertyNames(ExecState& state, PropertyNameArray& propertyNames)
+{
+    // https://html.spec.whatwg.org/#crossoriginproperties-(-o-)
+    static const Identifier* const properties[] = { &state.propertyNames().href, &state.propertyNames().replace };
+    for (auto* property : properties)
+        propertyNames.add(*property);
+}
+
 void JSLocation::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
     JSLocation* thisObject = jsCast<JSLocation*>(object);
-    // Only allow the location object to enumerated by frames in the same origin.
-    if (!shouldAllowAccessToFrame(exec, thisObject->wrapped().frame()))
+    if (!BindingSecurity::shouldAllowAccessToFrame(exec, thisObject->wrapped().frame(), DoNotReportSecurityError)) {
+        if (mode.includeDontEnumProperties())
+            addCrossOriginLocationPropertyNames(*exec, propertyNames);
         return;
+    }
     Base::getOwnPropertyNames(thisObject, exec, propertyNames, mode);
 }
 
 bool JSLocation::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName propertyName, const PropertyDescriptor& descriptor, bool throwException)
 {
+    JSLocation* thisObject = jsCast<JSLocation*>(object);
+    if (!BindingSecurity::shouldAllowAccessToFrame(exec, thisObject->wrapped().frame(), ThrowSecurityError))
+        return false;
+
     if (descriptor.isAccessorDescriptor() && (propertyName == exec->propertyNames().toString || propertyName == exec->propertyNames().valueOf))
         return false;
     return Base::defineOwnProperty(object, exec, propertyName, descriptor, throwException);
+}
+
+bool JSLocation::setPrototype(JSObject*, ExecState* exec, JSValue, bool shouldThrowIfCantSet)
+{
+    auto scope = DECLARE_THROW_SCOPE(exec->vm());
+
+    if (shouldThrowIfCantSet)
+        throwTypeError(exec, scope, ASCIILiteral("Cannot set prototype of this object"));
+
+    return false;
+}
+
+JSValue JSLocation::getPrototype(JSObject* object, ExecState* exec)
+{
+    JSLocation* thisObject = jsCast<JSLocation*>(object);
+    if (!BindingSecurity::shouldAllowAccessToFrame(exec, thisObject->wrapped().frame(), DoNotReportSecurityError))
+        return jsNull();
+
+    return Base::getPrototype(object, exec);
+}
+
+bool JSLocation::preventExtensions(JSObject* object, ExecState* exec)
+{
+    JSLocation* thisObject = jsCast<JSLocation*>(object);
+    if (!BindingSecurity::shouldAllowAccessToFrame(exec, thisObject->wrapped().frame(), ThrowSecurityError))
+        return false;
+    // FIXME: The specification says to return false in the same origin case as well but other browsers have
+    // not implemented this yet.
+    return Base::preventExtensions(object, exec);
 }
 
 bool JSLocationPrototype::putDelegate(ExecState* exec, PropertyName propertyName, JSValue, PutPropertySlot&, bool& putResult)

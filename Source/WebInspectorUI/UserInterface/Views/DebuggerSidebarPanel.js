@@ -50,11 +50,18 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         WebInspector.timelineManager.addEventListener(WebInspector.TimelineManager.Event.CapturingStopped, this._timelineCapturingStopped, this);
 
         this._timelineRecordingWarningElement = document.createElement("div");
-        this._timelineRecordingWarningElement.classList.add("timeline-recording-warning");
+        this._timelineRecordingWarningElement.classList.add("warning-banner");
         this._timelineRecordingWarningElement.append(WebInspector.UIString("Debugger is disabled during a Timeline recording."), " ");
         let stopRecordingLink = this._timelineRecordingWarningElement.appendChild(document.createElement("a"));
         stopRecordingLink.textContent = WebInspector.UIString("Stop recording.");
         stopRecordingLink.addEventListener("click", () => { WebInspector.timelineManager.stopCapturing(); });
+
+        this._breakpointsDisabledWarningElement = document.createElement("div");
+        this._breakpointsDisabledWarningElement.classList.add("warning-banner");
+        this._breakpointsDisabledWarningElement.append(WebInspector.UIString("Breakpoints are disabled."), document.createElement("br"));
+        let enableBreakpointsLink = this._breakpointsDisabledWarningElement.appendChild(document.createElement("a"));
+        enableBreakpointsLink.textContent = WebInspector.UIString("Enable breakpoints.");
+        enableBreakpointsLink.addEventListener("click", () => { WebInspector.debuggerToggleBreakpoints(); });
 
         this._navigationBar = new WebInspector.NavigationBar;
         this.addSubview(this._navigationBar);
@@ -100,8 +107,10 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         this.element.classList.add(WebInspector.DebuggerSidebarPanel.OffsetSectionsStyleClassName);
 
         this._allExceptionsBreakpointTreeElement = new WebInspector.BreakpointTreeElement(WebInspector.debuggerManager.allExceptionsBreakpoint, WebInspector.DebuggerSidebarPanel.ExceptionIconStyleClassName, WebInspector.UIString("All Exceptions"));
-        this._allUncaughtExceptionsBreakpointTreeElement = new WebInspector.BreakpointTreeElement(WebInspector.debuggerManager.allUncaughtExceptionsBreakpoint, WebInspector.DebuggerSidebarPanel.ExceptionIconStyleClassName, WebInspector.UIString("All Uncaught Exceptions"));
-        this.suppressFilteringOnTreeElements([this._allExceptionsBreakpointTreeElement, this._allUncaughtExceptionsBreakpointTreeElement]);
+        this._allUncaughtExceptionsBreakpointTreeElement = new WebInspector.BreakpointTreeElement(WebInspector.debuggerManager.allUncaughtExceptionsBreakpoint, WebInspector.DebuggerSidebarPanel.ExceptionIconStyleClassName, WebInspector.UIString("Uncaught Exceptions"));
+        this._assertionsBreakpointTreeElement = new WebInspector.BreakpointTreeElement(WebInspector.debuggerManager.assertionsBreakpoint, WebInspector.DebuggerSidebarPanel.AssertionIconStyleClassName, WebInspector.UIString("Assertion Failures"));
+
+        this.suppressFilteringOnTreeElements([this._allExceptionsBreakpointTreeElement, this._allUncaughtExceptionsBreakpointTreeElement, this._assertionsBreakpointTreeElement]);
 
         this.filterBar.placeholder = WebInspector.UIString("Filter List");
 
@@ -123,7 +132,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
                 }
             }
             return false;
-        };
+        }
 
         this.filterBar.addFilterBarButton("debugger-show-resources-with-issues-only", showResourcesWithIssuesOnlyFilterFunction.bind(this), true, WebInspector.UIString("Only show resources with issues"), WebInspector.UIString("Show all resources"), "Images/Errors.svg", 15, 15);
 
@@ -143,6 +152,10 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         this._breakpointsContentTreeOutline.appendChild(this._allExceptionsBreakpointTreeElement);
         this._breakpointsContentTreeOutline.appendChild(this._allUncaughtExceptionsBreakpointTreeElement);
 
+        // COMPATIBILITY (iOS 10): DebuggerAgent.setPauseOnAssertions did not exist yet.
+        if (DebuggerAgent.setPauseOnAssertions)
+            this._breakpointsContentTreeOutline.appendChild(this._assertionsBreakpointTreeElement);
+
         this._scriptsContentTreeOutline = this.createContentTreeOutline(true);
         this._scriptsContentTreeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
 
@@ -155,6 +168,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
 
         this._callStackContentTreeOutline = this.createContentTreeOutline(true, true);
         this._callStackContentTreeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
+        this._activeCallFrameTreeElement = null;
 
         this._callStackRow = new WebInspector.DetailsSectionRow(WebInspector.UIString("No Call Frames"));
         this._callStackRow.showEmptyMessage();
@@ -185,6 +199,8 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
 
         if (WebInspector.timelineManager.isCapturing() && WebInspector.debuggerManager.breakpointsDisabledTemporarily)
             this._timelineCapturingWillStart(null);
+
+        this._updateBreakpointsDisabledBanner();
     }
 
     // Public
@@ -271,6 +287,11 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
             return;
         }
 
+        if (representedObject === WebInspector.debuggerManager.assertionsBreakpoint) {
+            cookie[WebInspector.DebuggerSidebarPanel.SelectedAssertionsCookieKey] = true;
+            return;
+        }
+
         super.saveStateToCookie(cookie);
     }
 
@@ -283,6 +304,8 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
             this._allExceptionsBreakpointTreeElement.revealAndSelect();
         else if (cookie[WebInspector.DebuggerSidebarPanel.SelectedAllUncaughtExceptionsCookieKey])
             this._allUncaughtExceptionsBreakpointTreeElement.revealAndSelect();
+        else if (cookie[WebInspector.DebuggerSidebarPanel.SelectedAssertionsCookieKey])
+            this._assertionsBreakpointTreeElement.revealAndSelect();
         else
             super.restoreStateFromCookie(cookie, relaxedMatchDelay);
     }
@@ -325,6 +348,8 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
     _breakpointsEnabledDidChange(event)
     {
         this._debuggerBreakpointsButtonItem.activated = WebInspector.debuggerManager.breakpointsEnabled;
+
+        this._updateBreakpointsDisabledBanner();
     }
 
     _addBreakpoint(breakpoint)
@@ -377,7 +402,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
 
         if (!treeElement) {
             console.error("Unknown sourceCode instance", sourceCode);
-            return;
+            return null;
         }
 
         if (!treeElement.parent) {
@@ -443,6 +468,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         this._debuggerPauseResumeButtonItem.enabled = false;
 
         this.contentView.element.insertBefore(this._timelineRecordingWarningElement, this.contentView.element.firstChild);
+        this._updateBreakpointsDisabledBanner();
     }
 
     _timelineCapturingStopped(event)
@@ -451,6 +477,18 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         this._debuggerPauseResumeButtonItem.enabled = true;
 
         this._timelineRecordingWarningElement.remove();
+        this._updateBreakpointsDisabledBanner();
+    }
+
+    _updateBreakpointsDisabledBanner()
+    {
+        let breakpointsEnabled = WebInspector.debuggerManager.breakpointsEnabled;
+        let timelineWarningShowing = !!this._timelineRecordingWarningElement.parentElement;
+
+        if (!breakpointsEnabled && !timelineWarningShowing)
+            this.contentView.element.insertBefore(this._breakpointsDisabledWarningElement, this.contentView.element.firstChild);
+        else
+            this._breakpointsDisabledWarningElement.remove();
     }
 
     _scriptAdded(event)
@@ -561,7 +599,13 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
 
     _removeDebuggerTreeElement(debuggerTreeElement)
     {
-        var parentTreeElement = debuggerTreeElement.parent;
+        // If this is a BreakpointTreeElement being deleted because of a cause
+        // outside of the TreeOutline then deselect if it is selected to avoid
+        // TreeOutline selection changes causing unexpected ContentView changes.
+        if (!debuggerTreeElement.__deletedViaDeleteKeyboardShortcut)
+            debuggerTreeElement.deselect();
+
+        let parentTreeElement = debuggerTreeElement.parent;
         parentTreeElement.removeChild(debuggerTreeElement);
 
         console.assert(parentTreeElement.parent === this._breakpointsContentTreeOutline);
@@ -574,6 +618,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
     _debuggerCallFramesDidChange()
     {
         this._callStackContentTreeOutline.removeChildren();
+        this._activeCallFrameTreeElement = null;
 
         var callFrames = WebInspector.debuggerManager.callFrames;
         if (!callFrames || !callFrames.length) {
@@ -584,18 +629,18 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         this._callStackRow.hideEmptyMessage();
         this._callStackRow.element.appendChild(this._callStackContentTreeOutline.element);
 
-        var treeElementToSelect = null;
-
         var activeCallFrame = WebInspector.debuggerManager.activeCallFrame;
         for (var i = 0; i < callFrames.length; ++i) {
             var callFrameTreeElement = new WebInspector.CallFrameTreeElement(callFrames[i]);
             if (callFrames[i] === activeCallFrame)
-                treeElementToSelect = callFrameTreeElement;
+                this._activeCallFrameTreeElement = callFrameTreeElement;
             this._callStackContentTreeOutline.appendChild(callFrameTreeElement);
         }
 
-        if (treeElementToSelect)
-            treeElementToSelect.select(true, true);
+        if (this._activeCallFrameTreeElement) {
+            this._activeCallFrameTreeElement.select(true, true);
+            this._activeCallFrameTreeElement.isActiveCallFrame = true;
+        }
     }
 
     _debuggerActiveCallFrameDidChange()
@@ -603,6 +648,13 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         var callFrames = WebInspector.debuggerManager.callFrames;
         if (!callFrames)
             return;
+
+        if (this._activeCallFrameTreeElement)
+            this._activeCallFrameTreeElement.isActiveCallFrame = false;
+
+        this._activeCallFrameTreeElement = this._callStackContentTreeOutline.findTreeElement(WebInspector.debuggerManager.activeCallFrame);
+        if (this._activeCallFrameTreeElement)
+            this._activeCallFrameTreeElement.isActiveCallFrame = true;
 
         var indexOfActiveCallFrame = callFrames.indexOf(WebInspector.debuggerManager.activeCallFrame);
         // It is useful to turn off the step out button when there is no call frame to go through
@@ -652,7 +704,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
         if (!(treeElement instanceof WebInspector.ResourceTreeElement) && !(treeElement instanceof WebInspector.ScriptTreeElement))
             return false;
 
-        var wasTopResourceTreeElement = treeElement.previousSibling === this._allUncaughtExceptionsBreakpointTreeElement;
+        var wasTopResourceTreeElement = treeElement.previousSibling === this._assertionsBreakpointTreeElement || treeElement.previousSibling === this._allUncaughtExceptionsBreakpointTreeElement;
         var nextSibling = treeElement.nextSibling;
 
         var breakpoints = this._breakpointsBeneathTreeElement(treeElement);
@@ -735,7 +787,9 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
     {
         function isSpecialBreakpoint(treeElement)
         {
-            return treeElement.representedObject === WebInspector.debuggerManager.allExceptionsBreakpoint || treeElement.representedObject === WebInspector.debuggerManager.allUncaughtExceptionsBreakpoint;
+            return treeElement.representedObject === WebInspector.debuggerManager.allExceptionsBreakpoint
+                || treeElement.representedObject === WebInspector.debuggerManager.allUncaughtExceptionsBreakpoint
+                || treeElement.representedObject === WebInspector.debuggerManager.assertionsBreakpoint;
         }
 
         if (isSpecialBreakpoint(a))
@@ -750,7 +804,7 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
     {
         if (!a.debuggerObject || !b.debuggerObject)
             return 0;
-        
+
         var aLocation = a.debuggerObject.sourceCodeLocation;
         var bLocation = b.debuggerObject.sourceCodeLocation;
 
@@ -865,6 +919,8 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
 
         if (debuggerObject instanceof WebInspector.IssueMessage)
             return this._addIssue(debuggerObject);
+
+        return null;
     }
 
     _addIssue(issueMessage)
@@ -914,7 +970,9 @@ WebInspector.DebuggerSidebarPanel = class DebuggerSidebarPanel extends WebInspec
 
 WebInspector.DebuggerSidebarPanel.DebuggerPausedStyleClassName = "paused";
 WebInspector.DebuggerSidebarPanel.ExceptionIconStyleClassName = "breakpoint-exception-icon";
+WebInspector.DebuggerSidebarPanel.AssertionIconStyleClassName = "breakpoint-assertion-icon";
 WebInspector.DebuggerSidebarPanel.PausedBreakpointIconStyleClassName = "breakpoint-paused-icon";
 
 WebInspector.DebuggerSidebarPanel.SelectedAllExceptionsCookieKey = "debugger-sidebar-panel-all-exceptions-breakpoint";
 WebInspector.DebuggerSidebarPanel.SelectedAllUncaughtExceptionsCookieKey = "debugger-sidebar-panel-all-uncaught-exceptions-breakpoint";
+WebInspector.DebuggerSidebarPanel.SelectedAssertionsCookieKey = "debugger-sidebar-panel-assertions-breakpoint";

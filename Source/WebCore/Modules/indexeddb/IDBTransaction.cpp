@@ -29,6 +29,7 @@
 #if ENABLE(INDEXED_DATABASE)
 
 #include "DOMError.h"
+#include "DOMStringList.h"
 #include "DOMWindow.h"
 #include "Event.h"
 #include "EventNames.h"
@@ -88,16 +89,14 @@ const AtomicString& IDBTransaction::modeReadWriteLegacy()
     return readwrite;
 }
 
-IndexedDB::TransactionMode IDBTransaction::stringToMode(const String& modeString, ExceptionCode& ec)
+Optional<IndexedDB::TransactionMode> IDBTransaction::stringToMode(const String& modeString)
 {
-    if (modeString.isNull()
-        || modeString == IDBTransaction::modeReadOnly())
+    if (modeString.isNull() || modeString == IDBTransaction::modeReadOnly())
         return IndexedDB::TransactionMode::ReadOnly;
     if (modeString == IDBTransaction::modeReadWrite())
         return IndexedDB::TransactionMode::ReadWrite;
 
-    ec = TypeError;
-    return IndexedDB::TransactionMode::ReadOnly;
+    return Nullopt;
 }
 
 const AtomicString& IDBTransaction::modeToString(IndexedDB::TransactionMode mode)
@@ -170,6 +169,20 @@ IDBClient::IDBConnectionProxy& IDBTransaction::connectionProxy()
     return m_database->connectionProxy();
 }
 
+Ref<DOMStringList> IDBTransaction::objectStoreNames() const
+{
+    ASSERT(currentThread() == m_database->originThreadID());
+
+    const Vector<String> names = isVersionChange() ? m_database->info().objectStoreNames() : m_info.objectStores();
+
+    Ref<DOMStringList> objectStoreNames = DOMStringList::create();
+    for (auto& name : names)
+        objectStoreNames->append(name);
+
+    objectStoreNames->sort();
+    return objectStoreNames;
+}
+
 const String& IDBTransaction::mode() const
 {
     ASSERT(currentThread() == m_database->originThreadID());
@@ -186,35 +199,32 @@ const String& IDBTransaction::mode() const
     RELEASE_ASSERT_NOT_REACHED();
 }
 
-WebCore::IDBDatabase* IDBTransaction::db()
+IDBDatabase* IDBTransaction::db()
 {
     ASSERT(currentThread() == m_database->originThreadID());
-    return &m_database.get();
+    return m_database.ptr();
 }
 
-RefPtr<DOMError> IDBTransaction::error() const
+DOMError* IDBTransaction::error() const
 {
     ASSERT(currentThread() == m_database->originThreadID());
-    return m_domError;
+    return m_domError.get();
 }
 
-RefPtr<WebCore::IDBObjectStore> IDBTransaction::objectStore(const String& objectStoreName, ExceptionCodeWithMessage& ec)
+ExceptionOr<Ref<IDBObjectStore>> IDBTransaction::objectStore(const String& objectStoreName)
 {
     LOG(IndexedDB, "IDBTransaction::objectStore");
     ASSERT(currentThread() == m_database->originThreadID());
 
     if (!scriptExecutionContext())
-        return nullptr;
+        return Exception { IDBDatabaseException::InvalidStateError };
 
-    if (isFinishedOrFinishing()) {
-        ec.code = IDBDatabaseException::InvalidStateError;
-        ec.message = ASCIILiteral("Failed to execute 'objectStore' on 'IDBTransaction': The transaction finished.");
-        return nullptr;
-    }
+    if (isFinishedOrFinishing())
+        return Exception { IDBDatabaseException::InvalidStateError, ASCIILiteral("Failed to execute 'objectStore' on 'IDBTransaction': The transaction finished.") };
 
     auto iterator = m_referencedObjectStores.find(objectStoreName);
     if (iterator != m_referencedObjectStores.end())
-        return iterator->value;
+        return Ref<IDBObjectStore> { *iterator->value };
 
     bool found = false;
     for (auto& objectStore : m_info.objectStores()) {
@@ -225,23 +235,17 @@ RefPtr<WebCore::IDBObjectStore> IDBTransaction::objectStore(const String& object
     }
 
     auto* info = m_database->info().infoForExistingObjectStore(objectStoreName);
-    if (!info) {
-        ec.code = IDBDatabaseException::NotFoundError;
-        ec.message = ASCIILiteral("Failed to execute 'objectStore' on 'IDBTransaction': The specified object store was not found.");
-        return nullptr;
-    }
+    if (!info)
+        return Exception { IDBDatabaseException::NotFoundError, ASCIILiteral("Failed to execute 'objectStore' on 'IDBTransaction': The specified object store was not found.") };
 
     // Version change transactions are scoped to every object store in the database.
-    if (!info || (!found && !isVersionChange())) {
-        ec.code = IDBDatabaseException::NotFoundError;
-        ec.message = ASCIILiteral("Failed to execute 'objectStore' on 'IDBTransaction': The specified object store was not found.");
-        return nullptr;
-    }
+    if (!info || (!found && !isVersionChange()))
+        return Exception { IDBDatabaseException::NotFoundError, ASCIILiteral("Failed to execute 'objectStore' on 'IDBTransaction': The specified object store was not found.") };
 
     auto objectStore = IDBObjectStore::create(*scriptExecutionContext(), *info, *this);
-    m_referencedObjectStores.set(objectStoreName, &objectStore.get());
+    m_referencedObjectStores.set(objectStoreName, objectStore.ptr());
 
-    return adoptRef(&objectStore.leakRef());
+    return WTFMove(objectStore);
 }
 
 
@@ -254,8 +258,7 @@ void IDBTransaction::abortDueToFailedRequest(DOMError& error)
         return;
 
     m_domError = &error;
-    ExceptionCodeWithMessage ec;
-    abort(ec);
+    internalAbort();
 }
 
 void IDBTransaction::transitionedToFinishing(IndexedDB::TransactionState state)
@@ -268,30 +271,37 @@ void IDBTransaction::transitionedToFinishing(IndexedDB::TransactionState state)
     m_referencedObjectStores.clear();
 }
 
-void IDBTransaction::abort(ExceptionCodeWithMessage& ec)
+ExceptionOr<void> IDBTransaction::abort()
 {
     LOG(IndexedDB, "IDBTransaction::abort");
     ASSERT(currentThread() == m_database->originThreadID());
 
-    if (isFinishedOrFinishing()) {
-        ec.code = IDBDatabaseException::InvalidStateError;
-        ec.message = ASCIILiteral("Failed to execute 'abort' on 'IDBTransaction': The transaction is inactive or finished.");
-        return;
-    }
+    if (isFinishedOrFinishing())
+        return Exception { IDBDatabaseException::InvalidStateError, ASCIILiteral("Failed to execute 'abort' on 'IDBTransaction': The transaction is inactive or finished.") };
+
+    internalAbort();
+
+    return { };
+}
+
+void IDBTransaction::internalAbort()
+{
+    LOG(IndexedDB, "IDBTransaction::internalAbort");
+    ASSERT(currentThread() == m_database->originThreadID());
+    ASSERT(!isFinishedOrFinishing());
 
     m_database->willAbortTransaction(*this);
 
     if (isVersionChange()) {
         for (auto& objectStore : m_referencedObjectStores.values())
-            objectStore->rollbackInfoForVersionChangeAbort();
+            objectStore->rollbackForVersionChangeAbort();
     }
 
     transitionedToFinishing(IndexedDB::TransactionState::Aborting);
     
     m_abortQueue.swap(m_transactionOperationQueue);
 
-    auto operation = IDBClient::createTransactionOperation(*this, nullptr, &IDBTransaction::abortOnServerAndCancelRequests);
-    scheduleOperation(WTFMove(operation));
+    scheduleOperation(IDBClient::createTransactionOperation(*this, nullptr, &IDBTransaction::abortOnServerAndCancelRequests));
 }
 
 void IDBTransaction::abortOnServerAndCancelRequests(IDBClient::TransactionOperation& operation)
@@ -348,8 +358,7 @@ void IDBTransaction::stop()
     if (isFinishedOrFinishing())
         return;
 
-    ExceptionCodeWithMessage ec;
-    abort(ec);
+    internalAbort();
 }
 
 bool IDBTransaction::isActive() const
@@ -607,6 +616,40 @@ void IDBTransaction::didCreateObjectStoreOnServer(const IDBResultData& resultDat
     ASSERT_UNUSED(resultData, resultData.type() == IDBResultType::CreateObjectStoreSuccess || resultData.type() == IDBResultType::Error);
 }
 
+void IDBTransaction::renameObjectStore(IDBObjectStore& objectStore, const String& newName)
+{
+    LOG(IndexedDB, "IDBTransaction::renameObjectStore");
+    ASSERT(isVersionChange());
+    ASSERT(scriptExecutionContext());
+    ASSERT(currentThread() == m_database->originThreadID());
+
+    ASSERT(m_referencedObjectStores.contains(objectStore.info().name()));
+    ASSERT(!m_referencedObjectStores.contains(newName));
+    ASSERT(m_referencedObjectStores.get(objectStore.info().name()) == &objectStore);
+
+    uint64_t objectStoreIdentifier = objectStore.info().identifier();
+    auto operation = IDBClient::createTransactionOperation(*this, &IDBTransaction::didRenameObjectStoreOnServer, &IDBTransaction::renameObjectStoreOnServer, objectStoreIdentifier, newName);
+    scheduleOperation(WTFMove(operation));
+
+    m_referencedObjectStores.set(newName, m_referencedObjectStores.take(objectStore.info().name()));
+}
+
+void IDBTransaction::renameObjectStoreOnServer(IDBClient::TransactionOperation& operation, const uint64_t& objectStoreIdentifier, const String& newName)
+{
+    LOG(IndexedDB, "IDBTransaction::renameObjectStoreOnServer");
+    ASSERT(currentThread() == m_database->originThreadID());
+    ASSERT(isVersionChange());
+
+    m_database->connectionProxy().renameObjectStore(operation, objectStoreIdentifier, newName);
+}
+
+void IDBTransaction::didRenameObjectStoreOnServer(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "IDBTransaction::didRenameObjectStoreOnServer");
+    ASSERT(currentThread() == m_database->originThreadID());
+    ASSERT_UNUSED(resultData, resultData.type() == IDBResultType::RenameObjectStoreSuccess || resultData.type() == IDBResultType::Error);
+}
+
 std::unique_ptr<IDBIndex> IDBTransaction::createIndex(IDBObjectStore& objectStore, const IDBIndexInfo& info)
 {
     LOG(IndexedDB, "IDBTransaction::createIndex");
@@ -649,10 +692,47 @@ void IDBTransaction::didCreateIndexOnServer(const IDBResultData& resultData)
     abortDueToFailedRequest(DOMError::create(IDBDatabaseException::getErrorName(resultData.error().code()), resultData.error().message()));
 }
 
+void IDBTransaction::renameIndex(IDBIndex& index, const String& newName)
+{
+    LOG(IndexedDB, "IDBTransaction::renameIndex");
+    ASSERT(isVersionChange());
+    ASSERT(scriptExecutionContext());
+    ASSERT(currentThread() == m_database->originThreadID());
+
+    ASSERT(m_referencedObjectStores.contains(index.objectStore().info().name()));
+    ASSERT(m_referencedObjectStores.get(index.objectStore().info().name()) == &index.objectStore());
+
+    index.objectStore().renameReferencedIndex(index, newName);
+
+    uint64_t objectStoreIdentifier = index.objectStore().info().identifier();
+    uint64_t indexIdentifier = index.info().identifier();
+    auto operation = IDBClient::createTransactionOperation(*this, &IDBTransaction::didRenameIndexOnServer, &IDBTransaction::renameIndexOnServer, objectStoreIdentifier, indexIdentifier, newName);
+    scheduleOperation(WTFMove(operation));
+}
+
+void IDBTransaction::renameIndexOnServer(IDBClient::TransactionOperation& operation, const uint64_t& objectStoreIdentifier, const uint64_t& indexIdentifier, const String& newName)
+{
+    LOG(IndexedDB, "IDBTransaction::renameIndexOnServer");
+    ASSERT(currentThread() == m_database->originThreadID());
+    ASSERT(isVersionChange());
+
+    m_database->connectionProxy().renameIndex(operation, objectStoreIdentifier, indexIdentifier, newName);
+}
+
+void IDBTransaction::didRenameIndexOnServer(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "IDBTransaction::didRenameIndexOnServer");
+    ASSERT(currentThread() == m_database->originThreadID());
+    ASSERT_UNUSED(resultData, resultData.type() == IDBResultType::RenameIndexSuccess || resultData.type() == IDBResultType::Error);
+}
+
 Ref<IDBRequest> IDBTransaction::requestOpenCursor(ExecState& execState, IDBObjectStore& objectStore, const IDBCursorInfo& info)
 {
     LOG(IndexedDB, "IDBTransaction::requestOpenCursor");
     ASSERT(currentThread() == m_database->originThreadID());
+
+    if (info.cursorType() == IndexedDB::CursorType::KeyOnly)
+        return doRequestOpenCursor(execState, IDBCursor::create(*this, objectStore, info));
 
     return doRequestOpenCursor(execState, IDBCursorWithValue::create(*this, objectStore, info));
 }

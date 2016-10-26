@@ -245,17 +245,23 @@ private:
             break;
         }
 
-        case ArithNegate:
-            if (node->child1()->prediction()) {
-                if (m_graph.unaryArithShouldSpeculateInt32(node, m_pass))
+        case ArithNegate: {
+            SpeculatedType prediction = node->child1()->prediction();
+            if (prediction) {
+                if (isInt32OrBooleanSpeculation(prediction) && node->canSpeculateInt32(m_pass))
                     changed |= mergePrediction(SpecInt32Only);
                 else if (m_graph.unaryArithShouldSpeculateAnyInt(node, m_pass))
                     changed |= mergePrediction(SpecInt52Only);
-                else
+                else if (isBytecodeNumberSpeculation(prediction))
                     changed |= mergePrediction(speculatedDoubleTypeForPrediction(node->child1()->prediction()));
+                else {
+                    changed |= mergePrediction(SpecInt32Only);
+                    if (node->mayHaveDoubleResult())
+                        changed |= mergePrediction(SpecBytecodeDouble);
+                }
             }
             break;
-            
+        }
         case ArithMin:
         case ArithMax: {
             SpeculatedType left = node->child1()->prediction();
@@ -315,17 +321,6 @@ private:
                 } else
                     changed |= mergePrediction(SpecInt32Only | SpecBytecodeDouble);
             }
-            break;
-        }
-
-        case ArithRound:
-        case ArithFloor:
-        case ArithCeil:
-        case ArithTrunc: {
-            if (isInt32OrBooleanSpeculation(node->getHeapPrediction()) && m_graph.roundShouldSpeculateInt32(node, m_pass))
-                changed |= setPrediction(SpecInt32Only);
-            else
-                changed |= setPrediction(SpecBytecodeDouble);
             break;
         }
 
@@ -561,6 +556,7 @@ private:
         case ArithSqrt:
         case ArithCos:
         case ArithSin:
+        case ArithTan:
         case ArithLog:
             if (node->child1()->shouldSpeculateNumber())
                 m_graph.voteNode(node->child1(), VoteDouble, weight);
@@ -695,8 +691,11 @@ private:
         case MultiGetByOffset:
         case GetDirectPname:
         case Call:
+        case DirectCall:
         case TailCallInlinedCaller:
+        case DirectTailCallInlinedCaller:
         case Construct:
+        case DirectConstruct:
         case CallVarargs:
         case CallEval:
         case TailCallVarargsInlinedCaller:
@@ -709,7 +708,8 @@ private:
         case GetClosureVar:
         case GetFromArguments:
         case LoadFromJSMapBucket:
-        case ToNumber: {
+        case ToNumber:
+        case CallDOM: {
             setPrediction(m_currentNode->getHeapPrediction());
             break;
         }
@@ -764,13 +764,31 @@ private:
             setPrediction(SpecInt32Only);
             break;
         }
+
+        case ToLowerCase:
+            setPrediction(SpecString);
+            break;
+
         case ArithPow:
         case ArithSqrt:
         case ArithFRound:
         case ArithSin:
         case ArithCos:
+        case ArithTan:
         case ArithLog: {
             setPrediction(SpecBytecodeDouble);
+            break;
+        }
+
+        case ArithRound:
+        case ArithFloor:
+        case ArithCeil:
+        case ArithTrunc: {
+            if (isInt32OrBooleanSpeculation(m_currentNode->getHeapPrediction())
+                && m_graph.roundShouldSpeculateInt32(m_currentNode, m_pass))
+                setPrediction(SpecInt32Only);
+            else
+                setPrediction(SpecBytecodeDouble);
             break;
         }
 
@@ -791,16 +809,14 @@ private:
         case OverridesHasInstance:
         case InstanceOf:
         case InstanceOfCustom:
-        case IsJSArray:
         case IsEmpty:
         case IsUndefined:
         case IsBoolean:
         case IsNumber:
-        case IsString:
         case IsObject:
         case IsObjectOrNull:
         case IsFunction:
-        case IsRegExpObject:
+        case IsCellWithType:
         case IsTypedArrayView: {
             setPrediction(SpecBoolean);
             break;
@@ -817,6 +833,9 @@ private:
             setPrediction(SpecOther);
             break;
         }
+
+        case CheckDOM:
+            break;
 
         case CallObjectConstructor: {
             setPrediction(SpecObject);
@@ -909,6 +928,10 @@ private:
             setPrediction(SpecBoolean);
             break;
 
+        case HasOwnProperty:
+            setPrediction(SpecBoolean);
+            break;
+
         case GetEnumerableLength: {
             setPrediction(SpecInt32Only);
             break;
@@ -948,10 +971,6 @@ private:
         case ArithMul:
         case ArithDiv:
         case ArithMod:
-        case ArithRound:
-        case ArithFloor:
-        case ArithCeil:
-        case ArithTrunc:
         case ArithAbs:
         case GetByVal:
         case ToThis:
@@ -994,6 +1013,7 @@ private:
         case PutStack:
         case KillStack:
         case StoreBarrier:
+        case FencedStoreBarrier:
         case GetStack:
         case GetRegExpObjectLastIndex:
         case SetRegExpObjectLastIndex:
@@ -1026,6 +1046,7 @@ private:
         case PutToArguments:
         case Return:
         case TailCall:
+        case DirectTailCall:
         case TailCallVarargs:
         case TailCallForwardVarargs:
         case Throw:
@@ -1039,12 +1060,14 @@ private:
         case PutGetterSetterById:
         case PutGetterByVal:
         case PutSetterByVal:
+        case DefineDataProperty:
+        case DefineAccessorProperty:
         case DFG::Jump:
         case Branch:
         case Switch:
         case ProfileType:
         case ProfileControlFlow:
-        case ThrowReferenceError:
+        case ThrowStaticError:
         case ForceOSRExit:
         case SetArgument:
         case SetFunctionName:

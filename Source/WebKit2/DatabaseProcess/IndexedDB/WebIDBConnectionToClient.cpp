@@ -107,6 +107,11 @@ void WebIDBConnectionToClient::didDeleteObjectStore(const WebCore::IDBResultData
     send(Messages::WebIDBConnectionToServer::DidDeleteObjectStore(resultData));
 }
 
+void WebIDBConnectionToClient::didRenameObjectStore(const WebCore::IDBResultData& resultData)
+{
+    send(Messages::WebIDBConnectionToServer::DidRenameObjectStore(resultData));
+}
+
 void WebIDBConnectionToClient::didClearObjectStore(const WebCore::IDBResultData& resultData)
 {
     send(Messages::WebIDBConnectionToServer::DidClearObjectStore(resultData));
@@ -120,6 +125,11 @@ void WebIDBConnectionToClient::didCreateIndex(const WebCore::IDBResultData& resu
 void WebIDBConnectionToClient::didDeleteIndex(const WebCore::IDBResultData& resultData)
 {
     send(Messages::WebIDBConnectionToServer::DidDeleteIndex(resultData));
+}
+
+void WebIDBConnectionToClient::didRenameIndex(const WebCore::IDBResultData& resultData)
+{
+    send(Messages::WebIDBConnectionToServer::DidRenameIndex(resultData));
 }
 
 void WebIDBConnectionToClient::didPutOrAdd(const WebCore::IDBResultData& resultData)
@@ -235,6 +245,11 @@ void WebIDBConnectionToClient::deleteObjectStore(const IDBRequestData& request, 
     DatabaseProcess::singleton().idbServer().deleteObjectStore(request, name);
 }
 
+void WebIDBConnectionToClient::renameObjectStore(const IDBRequestData& request, uint64_t objectStoreIdentifier, const String& newName)
+{
+    DatabaseProcess::singleton().idbServer().renameObjectStore(request, objectStoreIdentifier, newName);
+}
+
 void WebIDBConnectionToClient::clearObjectStore(const IDBRequestData& request, uint64_t objectStoreIdentifier)
 {
     DatabaseProcess::singleton().idbServer().clearObjectStore(request, objectStoreIdentifier);
@@ -248,6 +263,11 @@ void WebIDBConnectionToClient::createIndex(const IDBRequestData& request, const 
 void WebIDBConnectionToClient::deleteIndex(const IDBRequestData& request, uint64_t objectStoreIdentifier, const String& name)
 {
     DatabaseProcess::singleton().idbServer().deleteIndex(request, objectStoreIdentifier, name);
+}
+
+void WebIDBConnectionToClient::renameIndex(const IDBRequestData& request, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName)
+{
+    DatabaseProcess::singleton().idbServer().renameIndex(request, objectStoreIdentifier, indexIdentifier, newName);
 }
 
 void WebIDBConnectionToClient::putOrAdd(const IDBRequestData& request, const IDBKeyData& key, const IDBValue& value, unsigned overwriteMode)

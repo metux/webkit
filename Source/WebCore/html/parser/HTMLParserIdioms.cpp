@@ -191,7 +191,7 @@ static Optional<int> parseHTMLIntegerInternal(const CharacterType* position, con
 }
 
 // https://html.spec.whatwg.org/multipage/infrastructure.html#rules-for-parsing-integers
-Optional<int> parseHTMLInteger(const String& input)
+Optional<int> parseHTMLInteger(StringView input)
 {
     unsigned length = input.length();
     if (!length)
@@ -207,13 +207,74 @@ Optional<int> parseHTMLInteger(const String& input)
 }
 
 // https://html.spec.whatwg.org/multipage/infrastructure.html#rules-for-parsing-non-negative-integers
-Optional<int> parseHTMLNonNegativeInteger(const String& input)
+Optional<unsigned> parseHTMLNonNegativeInteger(StringView input)
 {
     Optional<int> signedValue = parseHTMLInteger(input);
     if (!signedValue || signedValue.value() < 0)
         return Nullopt;
 
+    return static_cast<unsigned>(signedValue.value());
+}
+
+template <typename CharacterType>
+static Optional<int> parseValidHTMLNonNegativeIntegerInternal(const CharacterType* position, const CharacterType* end)
+{
+    // A string is a valid non-negative integer if it consists of one or more ASCII digits.
+    for (auto* c = position; c < end; ++c) {
+        if (!isASCIIDigit(*c))
+            return Nullopt;
+    }
+
+    Optional<int> signedValue = parseHTMLIntegerInternal(position, end);
+    if (!signedValue || signedValue.value() < 0)
+        return Nullopt;
+
     return signedValue;
+}
+
+// https://html.spec.whatwg.org/#valid-non-negative-integer
+Optional<int> parseValidHTMLNonNegativeInteger(StringView input)
+{
+    if (input.isEmpty())
+        return Nullopt;
+
+    if (LIKELY(input.is8Bit())) {
+        auto* start = input.characters8();
+        return parseValidHTMLNonNegativeIntegerInternal(start, start + input.length());
+    }
+
+    auto* start = input.characters16();
+    return parseValidHTMLNonNegativeIntegerInternal(start, start + input.length());
+}
+
+template <typename CharacterType>
+static Optional<double> parseValidHTMLFloatingPointNumberInternal(const CharacterType* position, size_t length)
+{
+    ASSERT(length > 0);
+
+    // parseDouble() allows the string to start with a '+' or to end with a '.' but those
+    // are not valid floating point numbers as per HTML.
+    if (*position == '+' || *(position + length - 1) == '.')
+        return Nullopt;
+
+    size_t parsedLength = 0;
+    double number = parseDouble(position, length, parsedLength);
+    return parsedLength == length && std::isfinite(number) ? number : Optional<double>();
+}
+
+// https://html.spec.whatwg.org/#valid-floating-point-number
+Optional<double> parseValidHTMLFloatingPointNumber(StringView input)
+{
+    if (input.isEmpty())
+        return Nullopt;
+
+    if (LIKELY(input.is8Bit())) {
+        auto* start = input.characters8();
+        return parseValidHTMLFloatingPointNumberInternal(start, input.length());
+    }
+
+    auto* start = input.characters16();
+    return parseValidHTMLFloatingPointNumberInternal(start, input.length());
 }
 
 static inline bool isHTMLSpaceOrDelimiter(UChar character)
@@ -302,7 +363,7 @@ static bool parseHTTPRefreshInternal(const CharacterType* position, const Charac
     while (position < end && isASCIIDigit(*position))
         ++position;
 
-    Optional<int> number = parseHTMLNonNegativeInteger(StringView(numberStart, position - numberStart).toStringWithoutCopying());
+    Optional<unsigned> number = parseHTMLNonNegativeInteger(StringView(numberStart, position - numberStart));
     if (!number)
         return false;
 

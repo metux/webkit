@@ -171,6 +171,32 @@ IDBError MemoryIDBBackingStore::deleteObjectStore(const IDBResourceIdentifier& t
     return IDBError();
 }
 
+IDBError MemoryIDBBackingStore::renameObjectStore(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const String& newName)
+{
+    LOG(IndexedDB, "MemoryIDBBackingStore::renameObjectStore");
+
+    ASSERT(m_databaseInfo);
+    if (!m_databaseInfo->infoForExistingObjectStore(objectStoreIdentifier))
+        return IDBError(IDBDatabaseException::ConstraintError);
+
+    auto transaction = m_transactions.get(transactionIdentifier);
+    ASSERT(transaction);
+    ASSERT(transaction->isVersionChange());
+
+    auto objectStore = m_objectStoresByIdentifier.get(objectStoreIdentifier);
+    ASSERT(objectStore);
+    if (!objectStore)
+        return IDBError(IDBDatabaseException::ConstraintError);
+
+    String oldName = objectStore->info().name();
+    objectStore->rename(newName);
+    transaction->objectStoreRenamed(*objectStore, oldName);
+
+    m_databaseInfo->renameObjectStore(objectStoreIdentifier, newName);
+
+    return IDBError();
+}
+
 IDBError MemoryIDBBackingStore::clearObjectStore(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier)
 {
     LOG(IndexedDB, "MemoryIDBBackingStore::clearObjectStore");
@@ -220,6 +246,42 @@ IDBError MemoryIDBBackingStore::deleteIndex(const IDBResourceIdentifier& transac
         return IDBError(IDBDatabaseException::ConstraintError);
 
     return objectStore->deleteIndex(*rawTransaction, indexIdentifier);
+}
+
+IDBError MemoryIDBBackingStore::renameIndex(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName)
+{
+    LOG(IndexedDB, "MemoryIDBBackingStore::renameIndex");
+
+    ASSERT(m_databaseInfo);
+    auto* objectStoreInfo = m_databaseInfo->infoForExistingObjectStore(objectStoreIdentifier);
+    if (!objectStoreInfo)
+        return IDBError(IDBDatabaseException::ConstraintError);
+
+    auto* indexInfo = objectStoreInfo->infoForExistingIndex(indexIdentifier);
+    if (!indexInfo)
+        return IDBError(IDBDatabaseException::ConstraintError);
+
+    auto transaction = m_transactions.get(transactionIdentifier);
+    ASSERT(transaction);
+    ASSERT(transaction->isVersionChange());
+
+    auto objectStore = m_objectStoresByIdentifier.get(objectStoreIdentifier);
+    ASSERT(objectStore);
+    if (!objectStore)
+        return IDBError(IDBDatabaseException::ConstraintError);
+
+    auto* index = objectStore->indexForIdentifier(indexIdentifier);
+    ASSERT(index);
+    if (!index)
+        return IDBError(IDBDatabaseException::ConstraintError);
+
+    String oldName = index->info().name();
+    objectStore->renameIndex(*index, newName);
+    transaction->indexRenamed(*index, oldName);
+
+    indexInfo->rename(newName);
+
+    return IDBError();
 }
 
 void MemoryIDBBackingStore::removeObjectStoreForVersionChangeAbort(MemoryObjectStore& objectStore)

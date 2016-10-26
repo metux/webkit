@@ -241,12 +241,13 @@ void InspectorDOMAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReaso
 {
     m_history.reset();
     m_domEditor.reset();
+    m_mousedOverNode = nullptr;
 
     ErrorString unused;
-    setSearchingForNode(unused, false, 0);
+    setSearchingForNode(unused, false, nullptr);
     hideHighlight(unused);
 
-    m_instrumentingAgents.setInspectorDOMAgent(0);
+    m_instrumentingAgents.setInspectorDOMAgent(nullptr);
     m_documentRequested = false;
     reset();
 }
@@ -1005,10 +1006,17 @@ void InspectorDOMAgent::focusNode()
 
 void InspectorDOMAgent::mouseDidMoveOverElement(const HitTestResult& result, unsigned)
 {
+    m_mousedOverNode = result.innerNode();
+
     if (!m_searchingForNode)
         return;
 
-    Node* node = result.innerNode();
+    highlightMousedOverNode();
+}
+
+void InspectorDOMAgent::highlightMousedOverNode()
+{
+    Node* node = m_mousedOverNode.get();
     while (node && node->nodeType() == Node::TEXT_NODE)
         node = node->parentNode();
     if (node && m_inspectModeHighlightConfig)
@@ -1026,6 +1034,7 @@ void InspectorDOMAgent::setSearchingForNode(ErrorString& errorString, bool enabl
         m_inspectModeHighlightConfig = highlightConfigFromInspectorObject(errorString, highlightInspectorObject);
         if (!m_inspectModeHighlightConfig)
             return;
+        highlightMousedOverNode();
     } else
         hideHighlight(errorString);
 
@@ -1590,6 +1599,9 @@ RefPtr<Inspector::Protocol::DOM::AccessibilityProperties> InspectorDOMAgent::bui
     bool supportsPressed = false;
     bool supportsRequired = false;
     bool supportsFocused = false;
+    int headingLevel = 0;
+    unsigned hierarchicalLevel = 0;
+    unsigned level = 0;
 
     if (AXObjectCache* axObjectCache = node->document().axObjectCache()) {
         if (AccessibilityObject* axObject = axObjectCache->getOrCreate(node)) {
@@ -1666,7 +1678,7 @@ RefPtr<Inspector::Protocol::DOM::AccessibilityProperties> InspectorDOMAgent::bui
             }
             
             if (is<Element>(*node)) {
-                supportsFocused = downcast<Element>(*node).isFocusable();
+                supportsFocused = axObject->canSetFocusAttribute();
                 if (supportsFocused)
                     focused = axObject->isFocused();
             }
@@ -1763,6 +1775,11 @@ RefPtr<Inspector::Protocol::DOM::AccessibilityProperties> InspectorDOMAgent::bui
                         selectedChildNodeIds->addItem(pushNodePathToFrontend(selectedChildNode));
                 }
             }
+            
+            headingLevel = axObject->headingLevel();
+            hierarchicalLevel = axObject->hierarchicalLevel();
+            
+            level = hierarchicalLevel ? hierarchicalLevel : headingLevel;
         }
     }
     
@@ -1824,6 +1841,15 @@ RefPtr<Inspector::Protocol::DOM::AccessibilityProperties> InspectorDOMAgent::bui
             value->setSelected(selected);
         if (selectedChildNodeIds)
             value->setSelectedChildNodeIds(selectedChildNodeIds);
+        
+        // H1 -- H6 always have a headingLevel property that can be complimented by a hierarchicalLevel
+        // property when aria-level is set on the element, in which case we want to remain calling
+        // this value the "Heading Level" in the inspector.
+        // Also, we do not want it to say Hierarchy Level: 0
+        if (headingLevel)
+            value->setHeadingLevel(level);
+        else if (level)
+            value->setHierarchyLevel(level);
     }
 
     return WTFMove(value);

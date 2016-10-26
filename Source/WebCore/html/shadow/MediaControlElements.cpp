@@ -190,8 +190,8 @@ void MediaControlPanelElement::makeOpaque()
 
     double duration = document().page() ? document().page()->theme().mediaControlsFadeInDuration() : 0;
 
-    setInlineStyleProperty(CSSPropertyWebkitTransitionProperty, CSSPropertyOpacity);
-    setInlineStyleProperty(CSSPropertyWebkitTransitionDuration, duration, CSSPrimitiveValue::CSS_S);
+    setInlineStyleProperty(CSSPropertyTransitionProperty, CSSPropertyOpacity);
+    setInlineStyleProperty(CSSPropertyTransitionDuration, duration, CSSPrimitiveValue::CSS_S);
     setInlineStyleProperty(CSSPropertyOpacity, 1.0, CSSPrimitiveValue::CSS_NUMBER);
 
     m_opaque = true;
@@ -207,8 +207,8 @@ void MediaControlPanelElement::makeTransparent()
 
     double duration = document().page() ? document().page()->theme().mediaControlsFadeOutDuration() : 0;
 
-    setInlineStyleProperty(CSSPropertyWebkitTransitionProperty, CSSPropertyOpacity);
-    setInlineStyleProperty(CSSPropertyWebkitTransitionDuration, duration, CSSPrimitiveValue::CSS_S);
+    setInlineStyleProperty(CSSPropertyTransitionProperty, CSSPropertyOpacity);
+    setInlineStyleProperty(CSSPropertyTransitionDuration, duration, CSSPrimitiveValue::CSS_S);
     setInlineStyleProperty(CSSPropertyOpacity, 0.0, CSSPrimitiveValue::CSS_NUMBER);
 
     m_opaque = false;
@@ -863,7 +863,7 @@ void MediaControlTimelineElement::defaultEventHandler(Event& event)
         return;
 
     double time = value().toDouble();
-    if (event.type() == eventNames().inputEvent && time != mediaController()->currentTime())
+    if ((event.isInputEvent() || event.type() == eventNames().inputEvent) && time != mediaController()->currentTime())
         mediaController()->setCurrentTime(time);
 
     RenderSlider& slider = downcast<RenderSlider>(*renderer());
@@ -1172,7 +1172,7 @@ void MediaControlTextTrackContainerElement::updateDisplay()
 
         LOG(Media, "MediaControlTextTrackContainerElement::updateDisplay(%p) - adding and positioning cue #%zu: \"%s\", start=%.2f, end=%.2f, line=%.2f", this, i, cue->text().utf8().data(), cue->startTime(), cue->endTime(), cue->line());
 
-        RefPtr<VTTCueBox> displayBox = cue->getDisplayTree(m_videoDisplaySize.size(), m_fontSize);
+        Ref<VTTCueBox> displayBox = cue->getDisplayTree(m_videoDisplaySize.size(), m_fontSize);
         if (cue->track()->mode() == TextTrack::Mode::Disabled)
             continue;
 
@@ -1181,9 +1181,9 @@ void MediaControlTextTrackContainerElement::updateDisplay()
             // If cue has an empty text track cue region identifier or there is no
             // WebVTT region whose region identifier is identical to cue's text
             // track cue region identifier, run the following substeps:
-            if (displayBox->hasChildNodes() && !contains(displayBox.get())) {
+            if (displayBox->hasChildNodes() && !contains(displayBox.ptr())) {
                 // Note: the display tree of a cue is removed when the active flag of the cue is unset.
-                appendChild(*displayBox, ASSERT_NO_EXCEPTION);
+                appendChild(displayBox, ASSERT_NO_EXCEPTION);
                 cue->setFontSize(m_fontSize, m_videoDisplaySize.size(), m_fontSizeIsImportant);
             }
         } else {
@@ -1195,7 +1195,7 @@ void MediaControlTextTrackContainerElement::updateDisplay()
             if (!contains(regionNode.ptr()))
                 appendChild(region->getDisplayTree());
 
-            region->appendTextTrackCueBox(displayBox);
+            region->appendTextTrackCueBox(WTFMove(displayBox));
         }
     }
 

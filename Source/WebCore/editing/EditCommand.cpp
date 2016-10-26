@@ -33,10 +33,85 @@
 #include "Element.h"
 #include "EventNames.h"
 #include "Frame.h"
+#include "HTMLInputElement.h"
+#include "HTMLTextAreaElement.h"
 #include "NodeTraversal.h"
 #include "htmlediting.h"
 
 namespace WebCore {
+
+String inputTypeNameForEditingAction(EditAction action)
+{
+    switch (action) {
+    case EditActionJustify:
+    case EditActionAlignLeft:
+        return ASCIILiteral("formatJustifyLeft");
+    case EditActionAlignRight:
+        return ASCIILiteral("formatJustifyRight");
+    case EditActionCenter:
+        return ASCIILiteral("formatJustifyCenter");
+    case EditActionSubscript:
+        return ASCIILiteral("formatSubscript");
+    case EditActionSuperscript:
+        return ASCIILiteral("formatSuperscript");
+    case EditActionUnderline:
+        return ASCIILiteral("formatUnderline");
+    case EditActionSetColor:
+        return ASCIILiteral("formatForeColor");
+    case EditActionDrag:
+        return ASCIILiteral("deleteByDrag");
+    case EditActionCut:
+        return ASCIILiteral("deleteByCut");
+    case EditActionBold:
+        return ASCIILiteral("formatBold");
+    case EditActionItalics:
+        return ASCIILiteral("formatItalic");
+    case EditActionPaste:
+        return ASCIILiteral("insertFromPaste");
+    case EditActionDelete:
+    case EditActionTypingDeleteSelection:
+        return ASCIILiteral("deleteContent");
+    case EditActionTypingDeleteBackward:
+        return ASCIILiteral("deleteContentBackward");
+    case EditActionTypingDeleteForward:
+        return ASCIILiteral("deleteContentForward");
+    case EditActionTypingDeleteWordBackward:
+        return ASCIILiteral("deleteWordBackward");
+    case EditActionTypingDeleteWordForward:
+        return ASCIILiteral("deleteWordForward");
+    case EditActionTypingDeleteLineBackward:
+        return ASCIILiteral("deleteHardLineBackward");
+    case EditActionTypingDeleteLineForward:
+        return ASCIILiteral("deleteHardLineForward");
+    case EditActionTypingDeletePendingComposition:
+        return ASCIILiteral("deleteCompositionText");
+    case EditActionTypingDeleteFinalComposition:
+        return ASCIILiteral("deleteByComposition");
+    case EditActionInsert:
+    case EditActionTypingInsertText:
+        return ASCIILiteral("insertText");
+    case EditActionInsertReplacement:
+        return ASCIILiteral("insertReplacementText");
+    case EditActionTypingInsertLineBreak:
+        return ASCIILiteral("insertLineBreak");
+    case EditActionTypingInsertParagraph:
+        return ASCIILiteral("insertParagraph");
+    case EditActionInsertOrderedList:
+        return ASCIILiteral("insertOrderedList");
+    case EditActionInsertUnorderedList:
+        return ASCIILiteral("insertUnorderedList");
+    case EditActionTypingInsertPendingComposition:
+        return ASCIILiteral("insertCompositionText");
+    case EditActionTypingInsertFinalComposition:
+        return ASCIILiteral("insertFromComposition");
+    case EditActionIndent:
+        return ASCIILiteral("formatIndent");
+    case EditActionOutdent:
+        return ASCIILiteral("formatOutdent");
+    default:
+        return emptyString();
+    }
+}
 
 EditCommand::EditCommand(Document& document, EditAction editingAction)
     : m_document(document)
@@ -65,6 +140,12 @@ Frame& EditCommand::frame()
     return *document().frame();
 }
 
+const Frame& EditCommand::frame() const
+{
+    ASSERT(document().frame());
+    return *document().frame();
+}
+
 EditAction EditCommand::editingAction() const
 {
     return m_editingAction;
@@ -75,6 +156,23 @@ static inline EditCommandComposition* compositionIfPossible(EditCommand* command
     if (!command->isCompositeEditCommand())
         return 0;
     return toCompositeEditCommand(command)->composition();
+}
+
+bool EditCommand::isEditingTextAreaOrTextInput() const
+{
+    auto* frame = m_document->frame();
+    if (!frame)
+        return false;
+
+    auto* container = frame->selection().selection().start().containerNode();
+    if (!container)
+        return false;
+
+    auto* ancestor = container->shadowHost();
+    if (!ancestor)
+        return false;
+
+    return is<HTMLTextAreaElement>(*ancestor) || (is<HTMLInputElement>(*ancestor) && downcast<HTMLInputElement>(*ancestor).isText());
 }
 
 void EditCommand::setStartingSelection(const VisibleSelection& s)

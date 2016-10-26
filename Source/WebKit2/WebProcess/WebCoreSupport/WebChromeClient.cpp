@@ -379,8 +379,19 @@ void WebChromeClient::closeWindowSoon()
     m_page->sendClose();
 }
 
+static bool shouldSuppressJavaScriptDialogs(Frame& frame)
+{
+    if (frame.loader().opener() && frame.loader().stateMachine().isDisplayingInitialEmptyDocument() && frame.loader().provisionalDocumentLoader())
+        return true;
+
+    return false;
+}
+
 void WebChromeClient::runJavaScriptAlert(Frame* frame, const String& alertText)
 {
+    if (shouldSuppressJavaScriptDialogs(*frame))
+        return;
+
     WebFrame* webFrame = WebFrame::fromCoreFrame(*frame);
     ASSERT(webFrame);
 
@@ -394,6 +405,9 @@ void WebChromeClient::runJavaScriptAlert(Frame* frame, const String& alertText)
 
 bool WebChromeClient::runJavaScriptConfirm(Frame* frame, const String& message)
 {
+    if (shouldSuppressJavaScriptDialogs(*frame))
+        return false;
+
     WebFrame* webFrame = WebFrame::fromCoreFrame(*frame);
     ASSERT(webFrame);
 
@@ -411,6 +425,9 @@ bool WebChromeClient::runJavaScriptConfirm(Frame* frame, const String& message)
 
 bool WebChromeClient::runJavaScriptPrompt(Frame* frame, const String& message, const String& defaultValue, String& result)
 {
+    if (shouldSuppressJavaScriptDialogs(*frame))
+        return false;
+
     WebFrame* webFrame = WebFrame::fromCoreFrame(*frame);
     ASSERT(webFrame);
 
@@ -437,6 +454,19 @@ KeyboardUIMode WebChromeClient::keyboardUIMode()
 {
     return m_page->keyboardUIMode();
 }
+
+#if ENABLE(POINTER_LOCK)
+bool WebChromeClient::requestPointerLock()
+{
+    m_page->send(Messages::WebPageProxy::RequestPointerLock());
+    return true;
+}
+
+void WebChromeClient::requestPointerUnlock()
+{
+    m_page->send(Messages::WebPageProxy::RequestPointerUnlock());
+}
+#endif
 
 void WebChromeClient::invalidateRootView(const IntRect&)
 {
@@ -1037,11 +1067,6 @@ void WebChromeClient::focusedContentMediaElementDidChange(uint64_t elementID)
     m_page->send(Messages::WebPageProxy::FocusedContentMediaElementDidChange(elementID));
 }
 #endif
-
-void WebChromeClient::setPageActivityState(PageActivityState::Flags activityState)
-{
-    m_page->setPageActivityState(activityState);
-}
 
 #if ENABLE(SUBTLE_CRYPTO)
 bool WebChromeClient::wrapCryptoKey(const Vector<uint8_t>& key, Vector<uint8_t>& wrappedKey) const

@@ -34,6 +34,7 @@
 #include "IDBConnectionProxy.h"
 #include "IDBConnectionToServer.h"
 #include "IDBDatabaseInfo.h"
+#include "IDBKeyPath.h"
 
 namespace WebCore {
 
@@ -55,12 +56,20 @@ public:
     uint64_t version() const;
     RefPtr<DOMStringList> objectStoreNames() const;
 
-    RefPtr<IDBObjectStore> createObjectStore(const String& name, const Dictionary&, ExceptionCodeWithMessage&);
-    RefPtr<IDBObjectStore> createObjectStore(const String& name, const IDBKeyPath&, bool autoIncrement, ExceptionCodeWithMessage&);
-    RefPtr<IDBTransaction> transaction(const Vector<String>&, const String& mode, ExceptionCodeWithMessage&);
-    RefPtr<IDBTransaction> transaction(const String&, const String& mode, ExceptionCodeWithMessage&);
-    void deleteObjectStore(const String& name, ExceptionCodeWithMessage&);
+    struct ObjectStoreParameters {
+        Optional<IDBKeyPathVariant> keyPath;
+        bool autoIncrement;
+    };
+
+    ExceptionOr<Ref<IDBObjectStore>> createObjectStore(const String& name, ObjectStoreParameters&&);
+
+    using StringOrVectorOfStrings = WTF::Variant<String, Vector<String>>;
+    ExceptionOr<Ref<IDBTransaction>> transaction(StringOrVectorOfStrings&& storeNames, const String& mode);
+    ExceptionOr<void> deleteObjectStore(const String& name);
     void close();
+
+    void renameObjectStore(IDBObjectStore&, const String& newName);
+    void renameIndex(IDBIndex&, const String& newName);
 
     // EventTarget
     EventTargetInterface eventTargetInterface() const final { return IDBDatabaseEventTargetInterfaceType; }

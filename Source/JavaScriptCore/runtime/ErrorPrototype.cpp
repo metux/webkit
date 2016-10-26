@@ -85,8 +85,7 @@ EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState* exec)
 
     // 3. Let name be the result of calling the [[Get]] internal method of O with argument "name".
     JSValue name = thisObj->get(exec, exec->propertyNames().name);
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     // 4. If name is undefined, then let name be "Error"; else let name be ToString(name).
     String nameString;
@@ -94,14 +93,12 @@ EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState* exec)
         nameString = ASCIILiteral("Error");
     else {
         nameString = name.toString(exec)->value(exec);
-        if (exec->hadException())
-            return JSValue::encode(jsUndefined());
+        RETURN_IF_EXCEPTION(scope, encodedJSValue());
     }
 
     // 5. Let msg be the result of calling the [[Get]] internal method of O with argument "message".
     JSValue message = thisObj->get(exec, exec->propertyNames().message);
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     // (sic)
     // 6. If msg is undefined, then let msg be the empty String; else let msg be ToString(msg).
@@ -111,8 +108,7 @@ EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState* exec)
         messageString = String();
     else {
         messageString = message.toString(exec)->value(exec);
-        if (exec->hadException())
-            return JSValue::encode(jsUndefined());
+        RETURN_IF_EXCEPTION(scope, encodedJSValue());
     }
 
     // 8. If name is the empty String, return msg.
@@ -124,6 +120,7 @@ EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState* exec)
         return JSValue::encode(name.isString() ? name : jsString(exec, nameString));
 
     // 10. Return the result of concatenating name, ":", a single space character, and msg.
+    scope.release();
     return JSValue::encode(jsMakeNontrivialString(exec, nameString, ": ", messageString));
 }
 

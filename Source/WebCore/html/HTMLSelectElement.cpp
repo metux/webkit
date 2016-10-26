@@ -196,9 +196,7 @@ void HTMLSelectElement::listBoxSelectItem(int listIndex, bool allowMultiplySelec
 bool HTMLSelectElement::usesMenuList() const
 {
 #if !PLATFORM(IOS)
-    const Page* page = document().page();
-    RefPtr<RenderTheme> renderTheme = page ? &page->theme() : RenderTheme::defaultTheme();
-    if (renderTheme->delegatesMenuListRendering())
+    if (RenderTheme::themeForPage(document().page())->delegatesMenuListRendering())
         return true;
 
     return !m_multiple && m_size <= 1;
@@ -221,16 +219,25 @@ int HTMLSelectElement::activeSelectionEndListIndex() const
     return lastSelectedListIndex();
 }
 
-void HTMLSelectElement::add(HTMLElement& element, HTMLElement* beforeElement, ExceptionCode& ec)
+ExceptionOr<void> HTMLSelectElement::add(const OptionOrOptGroupElement& element, Optional<HTMLElementOrInt> before)
 {
-    if (!(is<HTMLOptionElement>(element) || is<HTMLHRElement>(element) || is<HTMLOptGroupElement>(element)))
-        return;
-    insertBefore(element, beforeElement, ec);
-}
+    HTMLElement* beforeElement = nullptr;
+    if (before) {
+        beforeElement = WTF::switchOn(before.value(),
+            [](const RefPtr<HTMLElement>& element) -> HTMLElement* { return element.get(); },
+            [this](int index) -> HTMLElement* { return item(index); }
+        );
+    }
+    HTMLElement& toInsert = WTF::switchOn(element,
+        [](const auto& htmlElement) -> HTMLElement& { return *htmlElement; }
+    );
 
-void HTMLSelectElement::add(HTMLElement& element, int beforeIndex, ExceptionCode& ec)
-{
-    add(element, item(beforeIndex), ec);
+
+    ExceptionCode ec = 0;
+    insertBefore(toInsert, beforeElement, ec);
+    if (ec)
+        return Exception { ec };
+    return { };
 }
 
 void HTMLSelectElement::removeByIndex(int optionIndex)
@@ -303,7 +310,7 @@ void HTMLSelectElement::parseAttribute(const QualifiedName& name, const AtomicSt
         m_size = size;
         updateValidity();
         if (m_size != oldSize) {
-            setNeedsStyleRecalc(ReconstructRenderTree);
+            invalidateStyleAndRenderersForSubtree();
             setRecalcListItems();
             updateValidity();
         }
@@ -440,7 +447,9 @@ void HTMLSelectElement::setOption(unsigned index, HTMLOptionElement& option, Exc
     }
     // Finally add the new element.
     if (!ec) {
-        add(option, before.get(), ec);
+        auto exception = add(&option, HTMLElementOrInt(before.get()));
+        if (exception.hasException())
+            ec = exception.releaseException().code();
         if (diff >= 0 && option.selected())
             optionSelectionStateChanged(option, true);
     }
@@ -456,9 +465,11 @@ void HTMLSelectElement::setLength(unsigned newLength, ExceptionCode& ec)
     if (diff < 0) { // Add dummy elements.
         do {
             auto option = document().createElement(optionTag, false);
-            add(downcast<HTMLElement>(option.get()), nullptr, ec);
-            if (ec)
+            auto exception = add(downcast<HTMLOptionElement>(option.ptr()), Nullopt);
+            if (exception.hasException()) {
+                ec = exception.releaseException().code();
                 break;
+        }
         } while (++diff);
     } else {
         auto& items = listItems();
@@ -744,7 +755,7 @@ void HTMLSelectElement::setRecalcListItems()
     // Manual selection anchor is reset when manipulating the select programmatically.
     m_activeSelectionAnchorIndex = -1;
     setOptionsChangedOnRenderer();
-    setNeedsStyleRecalc();
+    invalidateStyleForSubtree();
     if (!inDocument()) {
         if (HTMLCollection* collection = cachedHTMLCollection(SelectOptions))
             collection->invalidateCache(document());
@@ -770,10 +781,8 @@ void HTMLSelectElement::recalcListItems(bool updateSelectedStates) const
         }
         HTMLElement& current = downcast<HTMLElement>(*currentElement);
 
-        // optgroup tags may not nest. However, both FireFox and IE will
-        // flatten the tree automatically, so we follow suit.
-        // (http://www.w3.org/TR/html401/interact/forms.html#h-17.6)
-        if (is<HTMLOptGroupElement>(current)) {
+        // Only consider optgroup elements that are direct children of the select element.
+        if (is<HTMLOptGroupElement>(current) && current.parentNode() == this) {
             m_listItems.append(&current);
             if (Element* nextElement = ElementTraversal::firstWithin(current)) {
                 currentElement = nextElement;
@@ -1024,7 +1033,7 @@ void HTMLSelectElement::parseMultipleAttribute(const AtomicString& value)
     m_multiple = !value.isNull();
     updateValidity();
     if (oldUsesMenuList != usesMenuList())
-        setNeedsStyleRecalc(ReconstructRenderTree);
+        invalidateStyleAndRenderersForSubtree();
 }
 
 bool HTMLSelectElement::appendFormData(FormDataList& list, bool)
@@ -1073,7 +1082,7 @@ void HTMLSelectElement::reset()
         firstOption->setSelectedState(true);
 
     setOptionsChangedOnRenderer();
-    setNeedsStyleRecalc();
+    invalidateStyleForSubtree();
     updateValidity();
 }
 
@@ -1081,10 +1090,7 @@ void HTMLSelectElement::reset()
 
 bool HTMLSelectElement::platformHandleKeydownEvent(KeyboardEvent* event)
 {
-    const Page* page = document().page();
-    RefPtr<RenderTheme> renderTheme = page ? &page->theme() : RenderTheme::defaultTheme();
-
-    if (!renderTheme->popsMenuByArrowKeys())
+    if (!RenderTheme::themeForPage(document().page())->popsMenuByArrowKeys())
         return false;
 
     if (!isSpatialNavigationEnabled(document().frame())) {
@@ -1118,8 +1124,7 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event& event)
     ASSERT(renderer());
     ASSERT(renderer()->isMenuList());
 
-    const Page* page = document().page();
-    RefPtr<RenderTheme> renderTheme = page ? &page->theme() : RenderTheme::defaultTheme();
+    RefPtr<RenderTheme> renderTheme = RenderTheme::themeForPage(document().page());
 
     if (event.type() == eventNames().keydownEvent) {
         if (!is<KeyboardEvent>(event))

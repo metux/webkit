@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef DFGNode_h
-#define DFGNode_h
+#pragma once
 
 #if ENABLE(DFG_JIT)
 
@@ -58,6 +57,12 @@
 #include <wtf/ListDump.h>
 
 namespace JSC {
+
+namespace DOMJIT {
+class GetterSetter;
+class Patchpoint;
+class CallDOMPatchpoint;
+}
 
 namespace Profiler {
 class ExecutionCounter;
@@ -225,6 +230,11 @@ struct StackAccessData {
     FlushFormat format;
     
     FlushedAt flushedAt() { return FlushedAt(format, machineLocal); }
+};
+
+struct CallDOMData {
+    DOMJIT::GetterSetter* domJIT { nullptr };
+    DOMJIT::CallDOMPatchpoint* patchpoint { nullptr };
 };
 
 // === Node ===
@@ -639,6 +649,8 @@ public:
         m_op = ArithNegate;
     }
     
+    void convertToDirectCall(FrozenValue*);
+    
     JSValue asJSValue()
     {
         return constant()->value();
@@ -897,7 +909,7 @@ public:
 
     bool isStoreBarrier()
     {
-        return op() == StoreBarrier;
+        return op() == StoreBarrier || op() == FencedStoreBarrier;
     }
 
     bool hasIdentifier()
@@ -1160,6 +1172,27 @@ public:
         ASSERT(hasLoadVarargsData());
         return m_opInfo.as<LoadVarargsData*>();
     }
+
+    bool hasQueriedType()
+    {
+        return op() == IsCellWithType;
+    }
+
+    JSType queriedType()
+    {
+        static_assert(std::is_same<uint8_t, std::underlying_type<JSType>::type>::value, "Ensure that uint8_t is the underlying type for JSType.");
+        return static_cast<JSType>(m_opInfo.as<uint32_t>());
+    }
+
+    bool hasSpeculatedTypeForQuery()
+    {
+        return op() == IsCellWithType;
+    }
+
+    SpeculatedType speculatedTypeForQuery()
+    {
+        return speculationFromJSType(queriedType());
+    }
     
     bool hasResult()
     {
@@ -1229,6 +1262,7 @@ public:
         case Switch:
         case Return:
         case TailCall:
+        case DirectTailCall:
         case TailCallVarargs:
         case TailCallForwardVarargs:
         case Unreachable:
@@ -1400,8 +1434,11 @@ public:
         case GetByVal:
         case GetByValWithThis:
         case Call:
+        case DirectCall:
         case TailCallInlinedCaller:
+        case DirectTailCallInlinedCaller:
         case Construct:
+        case DirectConstruct:
         case CallVarargs:
         case CallEval:
         case TailCallVarargsInlinedCaller:
@@ -1422,6 +1459,7 @@ public:
         case StringReplaceRegExp:
         case ToNumber:
         case LoadFromJSMapBucket:
+        case CallDOM:
             return true;
         default:
             return false;
@@ -1451,6 +1489,10 @@ public:
         case MaterializeCreateActivation:
         case NewRegexp:
         case CompareEqPtr:
+        case DirectCall:
+        case DirectTailCall:
+        case DirectConstruct:
+        case DirectTailCallInlinedCaller:
             return true;
         default:
             return false;
@@ -2059,6 +2101,16 @@ public:
     {
         return isArraySpeculation(prediction());
     }
+
+    bool shouldSpeculateProxyObject()
+    {
+        return isProxyObjectSpeculation(prediction());
+    }
+
+    bool shouldSpeculateDerivedArray()
+    {
+        return isDerivedArraySpeculation(prediction());
+    }
     
     bool shouldSpeculateDirectArguments()
     {
@@ -2278,7 +2330,39 @@ public:
         ASSERT(hasBasicBlockLocation());
         return m_opInfo.as<BasicBlockLocation*>();
     }
-    
+
+    bool hasCheckDOMPatchpoint() const
+    {
+        return op() == CheckDOM;
+    }
+
+    DOMJIT::Patchpoint* checkDOMPatchpoint()
+    {
+        ASSERT(hasCheckDOMPatchpoint());
+        return m_opInfo.as<DOMJIT::Patchpoint*>();
+    }
+
+    bool hasCallDOMData() const
+    {
+        return op() == CallDOM;
+    }
+
+    CallDOMData* callDOMData()
+    {
+        ASSERT(hasCallDOMData());
+        return m_opInfo.as<CallDOMData*>();
+    }
+
+    bool hasClassInfo() const
+    {
+        return op() == CheckDOM;
+    }
+
+    const ClassInfo* classInfo()
+    {
+        return m_opInfo2.as<const ClassInfo*>();
+    }
+
     Node* replacement() const
     {
         return m_misc.replacement;
@@ -2337,8 +2421,7 @@ private:
     unsigned m_refCount;
     // The prediction ascribed to this node after propagation.
     SpeculatedType m_prediction { SpecNone };
-    // Immediate values, accesses type-checked via accessors above. The first one is
-    // big enough to store a pointer.
+    // Immediate values, accesses type-checked via accessors above.
     struct OpInfoWrapper {
         OpInfoWrapper()
         {
@@ -2357,6 +2440,11 @@ private:
         {
             u.int64 = 0;
             u.pointer = pointer;
+        }
+        OpInfoWrapper(const void* constPointer)
+        {
+            u.int64 = 0;
+            u.constPointer = constPointer;
         }
         OpInfoWrapper& operator=(uint32_t int32)
         {
@@ -2381,10 +2469,21 @@ private:
             u.pointer = pointer;
             return *this;
         }
+        OpInfoWrapper& operator=(const void* constPointer)
+        {
+            u.int64 = 0;
+            u.constPointer = constPointer;
+            return *this;
+        }
         template <typename T>
-        ALWAYS_INLINE auto as() const -> typename std::enable_if<std::is_pointer<T>::value, T>::type
+        ALWAYS_INLINE auto as() const -> typename std::enable_if<std::is_pointer<T>::value && !std::is_const<typename std::remove_pointer<T>::type>::value, T>::type
         {
             return static_cast<T>(u.pointer);
+        }
+        template <typename T>
+        ALWAYS_INLINE auto as() const -> typename std::enable_if<std::is_pointer<T>::value && std::is_const<typename std::remove_pointer<T>::type>::value, T>::type
+        {
+            return static_cast<T>(u.constPointer);
         }
         template <typename T>
         ALWAYS_INLINE auto as() const -> typename std::enable_if<std::is_integral<T>::value && sizeof(T) == 4, T>::type
@@ -2400,6 +2499,7 @@ private:
             uint32_t int32;
             uint64_t int64;
             void* pointer;
+            const void* constPointer;
         } u;
     };
     OpInfoWrapper m_opInfo;
@@ -2480,5 +2580,4 @@ inline JSC::DFG::Node* inContext(JSC::DFG::Node* node, JSC::DumpContext*) { retu
 
 using WTF::inContext;
 
-#endif
 #endif

@@ -96,21 +96,12 @@ void WeakBlock::sweep()
     ASSERT(!m_sweepResult.isNull());
 }
 
-void WeakBlock::visit(HeapRootVisitor& heapRootVisitor)
+template<typename ContainerType>
+void WeakBlock::specializedVisit(ContainerType& container, HeapRootVisitor& heapRootVisitor)
 {
-    // If a block is completely empty, a visit won't have any effect.
-    if (isEmpty())
-        return;
-
-    // If this WeakBlock doesn't belong to a CellContainer, we won't even be here.
-    ASSERT(m_container);
-    
-    m_container.flipIfNecessary();
-
-    // We only visit after marking.
-    ASSERT(m_container.isMarked());
-
     SlotVisitor& visitor = heapRootVisitor.visitor();
+    
+    HeapVersion markingVersion = visitor.markingVersion();
 
     for (size_t i = 0; i < weakImplCount(); ++i) {
         WeakImpl* weakImpl = &weakImpls()[i];
@@ -122,7 +113,7 @@ void WeakBlock::visit(HeapRootVisitor& heapRootVisitor)
             continue;
 
         const JSValue& jsValue = weakImpl->jsValue();
-        if (m_container.isMarkedOrNewlyAllocated(jsValue.asCell()))
+        if (container.isMarkedConcurrently(markingVersion, jsValue.asCell()))
             continue;
         
         if (!weakHandleOwner->isReachableFromOpaqueRoots(Handle<Unknown>::wrapSlot(&const_cast<JSValue&>(jsValue)), weakImpl->context(), visitor))
@@ -130,6 +121,21 @@ void WeakBlock::visit(HeapRootVisitor& heapRootVisitor)
 
         heapRootVisitor.visit(&const_cast<JSValue&>(jsValue));
     }
+}
+
+void WeakBlock::visit(HeapRootVisitor& heapRootVisitor)
+{
+    // If a block is completely empty, a visit won't have any effect.
+    if (isEmpty())
+        return;
+
+    // If this WeakBlock doesn't belong to a CellContainer, we won't even be here.
+    ASSERT(m_container);
+    
+    if (m_container.isLargeAllocation())
+        specializedVisit(m_container.largeAllocation(), heapRootVisitor);
+    else
+        specializedVisit(m_container.markedBlock(), heapRootVisitor);
 }
 
 void WeakBlock::reap()
@@ -141,17 +147,14 @@ void WeakBlock::reap()
     // If this WeakBlock doesn't belong to a CellContainer, we won't even be here.
     ASSERT(m_container);
     
-    m_container.flipIfNecessary();
-
-    // We only reap after marking.
-    ASSERT(m_container.isMarked());
+    HeapVersion markingVersion = m_container.heap()->objectSpace().markingVersion();
 
     for (size_t i = 0; i < weakImplCount(); ++i) {
         WeakImpl* weakImpl = &weakImpls()[i];
         if (weakImpl->state() > WeakImpl::Dead)
             continue;
 
-        if (m_container.isMarkedOrNewlyAllocated(weakImpl->jsValue().asCell())) {
+        if (m_container.isMarked(markingVersion, weakImpl->jsValue().asCell())) {
             ASSERT(weakImpl->state() == WeakImpl::Live);
             continue;
         }

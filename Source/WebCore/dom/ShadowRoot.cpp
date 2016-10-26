@@ -28,21 +28,20 @@
 #include "config.h"
 #include "ShadowRoot.h"
 
-#include "AuthorStyleSheets.h"
 #include "CSSStyleSheet.h"
 #include "ElementTraversal.h"
 #include "RenderElement.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SlotAssignment.h"
 #include "StyleResolver.h"
+#include "StyleScope.h"
 #include "markup.h"
 
 namespace WebCore {
 
 struct SameSizeAsShadowRoot : public DocumentFragment, public TreeScope {
     unsigned countersAndFlags[1];
-    void* styleResolver;
-    void* authorStyleSheets;
+    void* styleScope;
     void* host;
     void* slotAssignment;
 };
@@ -53,6 +52,7 @@ ShadowRoot::ShadowRoot(Document& document, Mode type)
     : DocumentFragment(document, CreateShadowRoot)
     , TreeScope(*this, document)
     , m_type(type)
+    , m_styleScope(std::make_unique<Style::Scope>(*this))
 {
 }
 
@@ -61,6 +61,7 @@ ShadowRoot::ShadowRoot(Document& document, std::unique_ptr<SlotAssignment>&& slo
     : DocumentFragment(document, CreateShadowRoot)
     , TreeScope(*this, document)
     , m_type(Mode::UserAgent)
+    , m_styleScope(std::make_unique<Style::Scope>(*this))
     , m_slotAssignment(WTFMove(slotAssignment))
 {
 }
@@ -80,43 +81,24 @@ ShadowRoot::~ShadowRoot()
     removeDetachedChildren();
 }
 
-StyleResolver& ShadowRoot::styleResolver()
+Node::InsertionNotificationRequest ShadowRoot::insertedInto(ContainerNode& insertionPoint)
 {
-    if (m_type == Mode::UserAgent)
-        return document().userAgentShadowTreeStyleResolver();
-
-    if (!m_styleResolver) {
-        // FIXME: We could share style resolver with shadow roots that have identical style.
-        m_styleResolver = std::make_unique<StyleResolver>(document());
-        if (m_authorStyleSheets)
-            m_styleResolver->appendAuthorStyleSheets(m_authorStyleSheets->activeStyleSheets());
-    }
-    return *m_styleResolver;
+    auto result = DocumentFragment::insertedInto(insertionPoint);
+    if (inDocument())
+        document().didInsertInDocumentShadowRoot(*this);
+    return result;
 }
 
-void ShadowRoot::resetStyleResolver()
+void ShadowRoot::removedFrom(ContainerNode& insertionPoint)
 {
-    m_styleResolver = nullptr;
+    if (inDocument())
+        document().didRemoveInDocumentShadowRoot(*this);
+    DocumentFragment::removedFrom(insertionPoint);
 }
 
-AuthorStyleSheets& ShadowRoot::authorStyleSheets()
+Style::Scope& ShadowRoot::styleScope()
 {
-    if (!m_authorStyleSheets)
-        m_authorStyleSheets = std::make_unique<AuthorStyleSheets>(*this);
-    return *m_authorStyleSheets;
-}
-
-void ShadowRoot::updateStyle()
-{
-    bool shouldRecalcStyle = false;
-
-    if (m_authorStyleSheets) {
-        // FIXME: Make optimized updated work.
-        shouldRecalcStyle = m_authorStyleSheets->updateActiveStyleSheets(AuthorStyleSheets::FullUpdate);
-    }
-
-    if (shouldRecalcStyle)
-        setNeedsStyleRecalc();
+    return *m_styleScope;
 }
 
 String ShadowRoot::innerHTML() const
@@ -151,14 +133,8 @@ bool ShadowRoot::childTypeAllowed(NodeType type) const
 
 void ShadowRoot::setResetStyleInheritance(bool value)
 {
-    if (isOrphan())
-        return;
-
-    if (value != m_resetStyleInheritance) {
-        m_resetStyleInheritance = value;
-        if (host())
-            setNeedsStyleRecalc();
-    }
+    // If this was ever changed after initialization, child styles would need to be invalidated here.
+    m_resetStyleInheritance = value;
 }
 
 Ref<Node> ShadowRoot::cloneNodeInternal(Document&, CloningOperation)

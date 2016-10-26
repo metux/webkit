@@ -267,6 +267,8 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* 
             }
         }
     }
+    if (node->hasSpeculatedTypeForQuery())
+        out.print(comma, SpeculationDump(node->speculatedTypeForQuery()));
     if (node->hasStorageAccessData()) {
         StorageAccessData& storageAccessData = node->storageAccessData();
         out.print(comma, "id", storageAccessData.identifierNumber, "{", identifiers()[storageAccessData.identifierNumber], "}");
@@ -1155,6 +1157,13 @@ BitVector Graph::localsLiveInBytecode(CodeOrigin codeOrigin)
             result.quickSet(reg.toLocal());
         });
     return result;
+}
+
+unsigned Graph::parameterSlotsForArgCount(unsigned argCount)
+{
+    size_t frameSize = CallFrame::headerSizeInRegisters + argCount;
+    size_t alignedFrameSize = WTF::roundUpToMultipleOf(stackAlignmentRegisters(), frameSize);
+    return alignedFrameSize - CallerFrameAndPC::sizeInRegisters;
 }
 
 unsigned Graph::frameRegisterCount()

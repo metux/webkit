@@ -68,6 +68,7 @@ class SharedBuffer;
 class Font;
 class SpellCheckRequest;
 class SpellChecker;
+class StaticRange;
 class StyleProperties;
 class Text;
 class TextCheckerClient;
@@ -197,6 +198,11 @@ public:
     WEBCORE_EXPORT void applyStyleToSelection(StyleProperties*, EditAction);
     WEBCORE_EXPORT void applyStyleToSelection(Ref<EditingStyle>&&, EditAction);
     void applyParagraphStyleToSelection(StyleProperties*, EditAction);
+
+    // Returns whether or not we should proceed with editing.
+    bool willApplyEditing(CompositeEditCommand&, Vector<RefPtr<StaticRange>>&&) const;
+    bool willUnapplyEditing(const EditCommandComposition&) const;
+    bool willReapplyEditing(const EditCommandComposition&) const;
 
     void appliedEditing(PassRefPtr<CompositeEditCommand>);
     void unappliedEditing(PassRefPtr<EditCommandComposition>);
@@ -372,7 +378,6 @@ public:
     WEBCORE_EXPORT bool findString(const String&, FindOptions);
 
     RefPtr<Range> rangeOfString(const String&, Range*, FindOptions);
-    RefPtr<Range> findStringAndScrollToVisible(const String&, Range*, FindOptions);
 
     const VisibleSelection& mark() const; // Mark, to be used as emacs uses it.
     void setMark(const VisibleSelection&);
@@ -466,6 +471,8 @@ public:
 
     WEBCORE_EXPORT String stringForCandidateRequest() const;
     WEBCORE_EXPORT void handleAcceptedCandidate(TextCheckingResult);
+    WEBCORE_EXPORT RefPtr<Range> contextRangeForCandidateRequest() const;
+    RefPtr<Range> rangeForTextCheckingResult(const TextCheckingResult&) const;
     bool isHandlingAcceptedCandidate() const { return m_isHandlingAcceptedCandidate; }
 
 private:
@@ -502,6 +509,8 @@ private:
 
 #if PLATFORM(COCOA)
     RefPtr<SharedBuffer> selectionInWebArchiveFormat();
+    String selectionInHTMLFormat();
+    RefPtr<SharedBuffer> imageInWebArchiveFormat(Element&);
     RefPtr<Range> adjustedSelectionRange();
     RefPtr<DocumentFragment> createFragmentForImageResourceAndAddResource(RefPtr<ArchiveResource>&&);
     RefPtr<DocumentFragment> createFragmentAndAddResources(NSAttributedString *);

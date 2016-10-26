@@ -30,7 +30,7 @@
 
 namespace WebCore {
 
-class TypingCommand : public TextInsertionBaseCommand {
+class TypingCommand final : public TextInsertionBaseCommand {
 public:
     enum ETypingCommand { 
         DeleteSelection,
@@ -44,8 +44,8 @@ public:
 
     enum TextCompositionType {
         TextCompositionNone,
-        TextCompositionUpdate,
-        TextCompositionConfirm
+        TextCompositionPending,
+        TextCompositionFinal,
     };
 
     enum Option {
@@ -57,7 +57,7 @@ public:
     };
     typedef unsigned Options;
 
-    static void deleteSelection(Document&, Options = 0);
+    static void deleteSelection(Document&, Options = 0, TextCompositionType = TextCompositionNone);
     static void deleteKeyPressed(Document&, Options = 0, TextGranularity = CharacterGranularity);
     static void forwardDeleteKeyPressed(Document&, Options = 0, TextGranularity = CharacterGranularity);
     static void insertText(Document&, const String&, Options, TextCompositionType = TextCompositionNone);
@@ -85,9 +85,9 @@ public:
 #endif
 
 private:
-    static Ref<TypingCommand> create(Document& document, ETypingCommand command, const String& text = emptyString(), Options options = 0, TextGranularity granularity = CharacterGranularity)
+    static Ref<TypingCommand> create(Document& document, ETypingCommand command, const String& text = emptyString(), Options options = 0, TextGranularity granularity = CharacterGranularity, TextCompositionType compositionType = TextCompositionNone)
     {
-        return adoptRef(*new TypingCommand(document, command, text, options, granularity, TextCompositionNone));
+        return adoptRef(*new TypingCommand(document, command, text, options, granularity, compositionType));
     }
 
     static Ref<TypingCommand> create(Document& document, ETypingCommand command, const String& text, Options options, TextCompositionType compositionType)
@@ -104,21 +104,26 @@ private:
 
     static RefPtr<TypingCommand> lastTypingCommandIfStillOpenForTyping(Frame&);
 
-    virtual void doApply();
-    virtual bool isTypingCommand() const;
-    virtual bool preservesTypingStyle() const { return m_preservesTypingStyle; }
-    virtual bool shouldRetainAutocorrectionIndicator() const
+    void doApply() final;
+    bool isTypingCommand() const final;
+    bool preservesTypingStyle() const final { return m_preservesTypingStyle; }
+    bool shouldRetainAutocorrectionIndicator() const final
     {
         ASSERT(isTopLevelCommand());
         return m_shouldRetainAutocorrectionIndicator;
     }
-    virtual void setShouldRetainAutocorrectionIndicator(bool retain) { m_shouldRetainAutocorrectionIndicator = retain; }
-    virtual bool shouldStopCaretBlinking() const { return true; }
+    void setShouldRetainAutocorrectionIndicator(bool retain) final { m_shouldRetainAutocorrectionIndicator = retain; }
+    bool shouldStopCaretBlinking() const final { return true; }
     void setShouldPreventSpellChecking(bool prevent) { m_shouldPreventSpellChecking = prevent; }
+
+    String inputEventTypeName() const final;
+    String inputEventData() const final;
+    bool isBeforeInputEventCancelable() const final;
 
     static void updateSelectionIfDifferentFromCurrentSelection(TypingCommand*, Frame*);
 
     void updatePreservesTypingStyle(ETypingCommand);
+    bool willAddTypingToOpenCommand(ETypingCommand, TextGranularity, const String& = emptyString(), RefPtr<Range>&& = nullptr);
     void markMisspellingsAfterTyping(ETypingCommand);
     void typingAddedToOpenCommand(ETypingCommand);
     bool makeEditableRootEmpty();
@@ -129,11 +134,19 @@ private:
     void insertParagraphSeparatorInQuotedContentAndNotifyAccessibility();
     void insertParagraphSeparatorAndNotifyAccessibility();
 
+    bool willApplyCommand() final;
+    void didApplyCommand() final;
+
+    bool shouldDeferWillApplyCommandUntilAddingTypingCommand() const;
+
     ETypingCommand m_commandType;
+    EditAction m_currentTypingEditAction;
     String m_textToInsert;
+    String m_currentTextToInsert;
     bool m_openForMoreTyping;
     bool m_selectInsertedText;
     bool m_smartDelete;
+    bool m_isHandlingInitialTypingCommand { true };
     TextGranularity m_granularity;
     TextCompositionType m_compositionType;
     bool m_shouldAddToKillRing;

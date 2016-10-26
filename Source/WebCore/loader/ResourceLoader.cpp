@@ -450,7 +450,7 @@ void ResourceLoader::didReceiveResponse(const ResourceResponse& r)
             didFail(error);
             return;
         }
-        if (!isDefaultPortForProtocol(url.port(), url.protocol())) {
+        if (url.port() && !isDefaultPortForProtocol(url.port().value(), url.protocol())) {
             String message = "Cancelled resource load from '" + url.string() + "' because it is using HTTP/0.9 on a non-default port.";
             m_frame->document()->addConsoleMessage(MessageSource::Security, MessageLevel::Error, message, identifier());
             ResourceError error(emptyString(), 0, url, message);
@@ -713,14 +713,8 @@ void ResourceLoader::didReceiveAuthenticationChallenge(const AuthenticationChall
             return;
         }
     }
-    // Only these platforms provide a way to continue without credentials.
-    // If we can't continue with credentials, we need to cancel the load altogether.
-#if PLATFORM(COCOA) || USE(CFNETWORK) || USE(CURL) || PLATFORM(GTK) || PLATFORM(EFL)
     challenge.authenticationClient()->receivedRequestToContinueWithoutCredential(challenge);
     ASSERT(!m_handle || !m_handle->hasAuthenticationChallenge());
-#else
-    didFail(blockedError());
-#endif
 }
 
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
@@ -747,7 +741,7 @@ void ResourceLoader::receivedCancellation(const AuthenticationChallenge&)
     cancel();
 }
 
-#if PLATFORM(COCOA) && !USE(CFNETWORK)
+#if PLATFORM(COCOA) && !USE(CFURLCONNECTION)
 
 void ResourceLoader::schedule(SchedulePair& pair)
 {

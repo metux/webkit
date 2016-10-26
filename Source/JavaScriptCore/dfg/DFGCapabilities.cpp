@@ -140,10 +140,9 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_is_undefined:
     case op_is_boolean:
     case op_is_number:
-    case op_is_string:
-    case op_is_jsarray:
     case op_is_object:
     case op_is_object_or_null:
+    case op_is_cell_with_type:
     case op_is_function:
     case op_not:
     case op_less:
@@ -174,6 +173,8 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_put_getter_setter_by_id:
     case op_put_getter_by_val:
     case op_put_setter_by_val:
+    case op_define_data_property:
+    case op_define_accessor_property:
     case op_del_by_id:
     case op_del_by_val:
     case op_jmp:

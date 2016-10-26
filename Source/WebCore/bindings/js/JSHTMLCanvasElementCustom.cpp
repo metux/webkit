@@ -46,12 +46,15 @@ namespace WebCore {
 #if ENABLE(WEBGL)
 static void get3DContextAttributes(ExecState& state, RefPtr<CanvasContextAttributes>& attrs)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     JSValue initializerValue = state.argument(1);
     if (initializerValue.isUndefinedOrNull())
         return;
     
     JSObject* initializerObject = initializerValue.toObject(&state);
-    ASSERT(!state.hadException());
+    ASSERT_UNUSED(scope, !scope.exception());
     JSDictionary dictionary(&state, initializerObject);
     
     GraphicsContext3D::Attributes graphicsAttrs;
@@ -83,8 +86,7 @@ JSValue JSHTMLCanvasElement::getContext(ExecState& state)
 #if ENABLE(WEBGL)
     if (HTMLCanvasElement::is3dType(contextId)) {
         get3DContextAttributes(state, attrs);
-        if (state.hadException())
-            return jsUndefined();
+        RETURN_IF_EXCEPTION(scope, JSValue());
     }
 #endif
     
@@ -98,31 +100,6 @@ JSValue JSHTMLCanvasElement::getContext(ExecState& state)
 #endif
 
     return toJS(&state, globalObject(), downcast<CanvasRenderingContext2D>(*context));
-}
-
-JSValue JSHTMLCanvasElement::probablySupportsContext(ExecState& state)
-{
-    VM& vm = state.vm();
-    auto scope = DECLARE_THROW_SCOPE(vm);
-
-    if (UNLIKELY(state.argumentCount() < 1))
-        return throwException(&state, scope, createNotEnoughArgumentsError(&state));
-
-    HTMLCanvasElement& canvas = wrapped();
-    const String& contextId = state.uncheckedArgument(0).toWTFString(&state);
-    if (state.hadException())
-        return jsUndefined();
-    
-    RefPtr<CanvasContextAttributes> attrs;
-#if ENABLE(WEBGL)
-    if (HTMLCanvasElement::is3dType(contextId)) {
-        get3DContextAttributes(state, attrs);
-        if (state.hadException())
-            return jsUndefined();
-    }
-#endif
-    
-    return jsBoolean(canvas.probablySupportsContext(contextId, attrs.get()));
 }
 
 JSValue JSHTMLCanvasElement::toDataURL(ExecState& state)

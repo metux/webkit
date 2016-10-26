@@ -126,7 +126,7 @@ messages -> WebPageProxy {
     DidReceiveServerRedirectForProvisionalLoadForFrame(uint64_t frameID, uint64_t navigationID, String url, WebKit::UserData userData)
     DidChangeProvisionalURLForFrame(uint64_t frameID, uint64_t navigationID, String url)
     DidFailProvisionalLoadForFrame(uint64_t frameID, struct WebCore::SecurityOriginData frameSecurityOrigin, uint64_t navigationID, String provisionalURL, WebCore::ResourceError error, WebKit::UserData userData)
-    DidCommitLoadForFrame(uint64_t frameID, uint64_t navigationID, String mimeType, bool hasCustomContentProvider, uint32_t loadType, WebCore::CertificateInfo certificateInfo, bool containsPluginDocument, WebKit::UserData userData)
+    DidCommitLoadForFrame(uint64_t frameID, uint64_t navigationID, String mimeType, bool hasCustomContentProvider, uint32_t loadType, WebCore::CertificateInfo certificateInfo, bool containsPluginDocument, Optional<WebCore::HasInsecureContent> forcedHasInsecureContent, WebKit::UserData userData)
     DidFailLoadForFrame(uint64_t frameID, uint64_t navigationID, WebCore::ResourceError error, WebKit::UserData userData)
     DidFinishDocumentLoadForFrame(uint64_t frameID, uint64_t navigationID, WebKit::UserData userData)
     DidFinishLoadForFrame(uint64_t frameID, uint64_t navigationID, WebKit::UserData userData)
@@ -139,6 +139,8 @@ messages -> WebPageProxy {
     DidDetectXSSForFrame(uint64_t frameID, WebKit::UserData userData)
     DidSameDocumentNavigationForFrame(uint64_t frameID, uint64_t navigationID, uint32_t type, String url, WebKit::UserData userData)
     DidDestroyNavigation(uint64_t navigationID)
+
+    HasInsecureContent() -> (enum WebCore::HasInsecureContent hasInsecureContent)
 
     MainFramePluginHandlesPageScaleGestureDidChange(bool mainFramePluginHandlesPageScaleGesture)
 
@@ -161,6 +163,7 @@ messages -> WebPageProxy {
     DataCallback(IPC::DataReference resultData, uint64_t callbackID)
     ImageCallback(WebKit::ShareableBitmap::Handle bitmapHandle, uint64_t callbackID)
     StringCallback(String resultString, uint64_t callbackID)
+    InvalidateStringCallback(uint64_t callbackID)
     ScriptValueCallback(IPC::DataReference resultData, bool hadException, struct WebCore::ExceptionDetails details, uint64_t callbackID)
     ComputedPagesCallback(Vector<WebCore::IntRect> pageRects, double totalScaleFactorForPrinting, uint64_t callbackID)
     ValidateCommandCallback(String command, bool isEnabled, int32_t state, uint64_t callbackID)
@@ -234,6 +237,8 @@ messages -> WebPageProxy {
     EditorStateChanged(struct WebKit::EditorState editorState)
     CompositionWasCanceled(struct WebKit::EditorState editorState)
     SetHasHadSelectionChangesFromUserInteraction(bool hasHadUserSelectionChanges)
+    SetNeedsHiddenContentEditableQuirk(bool needsHiddenContentEditableQuirk)
+    SetNeedsPlainTextQuirk(bool needsPlainTextQuirk)
 
     # Find messages
     DidCountStringMatches(String string, uint32_t matchCount)
@@ -266,8 +271,8 @@ messages -> WebPageProxy {
     
 #if ENABLE(MEDIA_STREAM)
     # MediaSteam messages
-    RequestUserMediaPermissionForFrame(uint64_t userMediaID, uint64_t frameID, String userMediaDocumentOriginIdentifier, String topLevelDocumentOriginIdentifier, Vector<String> audioDeviceUIDs, Vector<String> videoDeviceUIDs)
-    CheckUserMediaPermissionForFrame(uint64_t userMediaID, uint64_t frameID, String userMediaDocumentOriginIdentifier, String topLevelDocumentOriginIdentifier)
+    RequestUserMediaPermissionForFrame(uint64_t userMediaID, uint64_t frameID, String userMediaDocumentOriginIdentifier, String topLevelDocumentOriginIdentifier, struct WebCore::MediaConstraintsData audioConstraintsData, struct WebCore::MediaConstraintsData videoConstraintsData)
+    EnumerateMediaDevicesForFrame(uint64_t userMediaID, uint64_t frameID, String userMediaDocumentOriginIdentifier, String topLevelDocumentOriginIdentifier)
 #endif
 
     # Notification messages
@@ -336,6 +341,13 @@ messages -> WebPageProxy {
 #if USE(APPKIT)
     SubstitutionsPanelIsShowing() -> (bool isShowing)
 #endif
+#if USE(AUTOMATIC_TEXT_REPLACEMENT)
+    toggleSmartInsertDelete()
+    toggleAutomaticQuoteSubstitution()
+    toggleAutomaticLinkDetection()
+    toggleAutomaticDashSubstitution()
+    toggleAutomaticTextReplacement()
+#endif
 #if PLATFORM(MAC)
     # Autocorrection messages
     ShowCorrectionPanel(int32_t panelType, WebCore::FloatRect boundingBoxOfReplacedString, String replacedString, String replacementString, Vector<String> alternativeReplacementStrings)
@@ -396,7 +408,7 @@ messages -> WebPageProxy {
 #endif
 
     DidUpdateViewState()
-    
+
     DidSaveToPageCache()
 
 #if ENABLE(SUBTLE_CRYPTO)
@@ -445,6 +457,11 @@ messages -> WebPageProxy {
     SetMockMediaPlaybackTargetPickerState(String name, unsigned pickerState)
 #endif
 
+#if ENABLE(POINTER_LOCK)
+    RequestPointerLock()
+    RequestPointerUnlock()
+#endif
+
     ImageOrMediaDocumentSizeChanged(WebCore::IntSize newSize)
 
     UseFixedLayoutDidChange(bool useFixedLayout)
@@ -458,5 +475,6 @@ messages -> WebPageProxy {
 
 #if PLATFORM(MAC)
     DidHandleAcceptedCandidate()
+    HandleActiveNowPlayingSessionInfoResponse(bool hasActiveSession, String title, double duration, double elapsedTime)
 #endif
 }

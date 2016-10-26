@@ -23,8 +23,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef BytecodeUseDef_h
-#define BytecodeUseDef_h
+#pragma once
 
 #include "CodeBlock.h"
 #include "Interpreter.h"
@@ -144,6 +143,23 @@ void computeUsesForBytecodeOffset(Block* codeBlock, OpcodeID opcodeID, Instructi
         functor(codeBlock, instruction, opcodeID, instruction[4].u.operand);
         return;
     }
+    case op_define_data_property: {
+        ASSERT(opcodeLengths[opcodeID] > 4);
+        functor(codeBlock, instruction, opcodeID, instruction[1].u.operand);
+        functor(codeBlock, instruction, opcodeID, instruction[2].u.operand);
+        functor(codeBlock, instruction, opcodeID, instruction[3].u.operand);
+        functor(codeBlock, instruction, opcodeID, instruction[4].u.operand);
+        return;
+    }
+    case op_define_accessor_property: {
+        ASSERT(opcodeLengths[opcodeID] > 5);
+        functor(codeBlock, instruction, opcodeID, instruction[1].u.operand);
+        functor(codeBlock, instruction, opcodeID, instruction[2].u.operand);
+        functor(codeBlock, instruction, opcodeID, instruction[3].u.operand);
+        functor(codeBlock, instruction, opcodeID, instruction[4].u.operand);
+        functor(codeBlock, instruction, opcodeID, instruction[5].u.operand);
+        return;
+    }
     case op_get_property_enumerator:
     case op_get_enumerable_length:
     case op_new_func_exp:
@@ -163,10 +179,9 @@ void computeUsesForBytecodeOffset(Block* codeBlock, OpcodeID opcodeID, Instructi
     case op_is_undefined:
     case op_is_boolean:
     case op_is_number:
-    case op_is_string:
-    case op_is_jsarray:
     case op_is_object:
     case op_is_object_or_null:
+    case op_is_cell_with_type:
     case op_is_function:
     case op_to_number:
     case op_to_string:
@@ -333,6 +348,8 @@ void computeDefsForBytecodeOffset(Block* codeBlock, OpcodeID opcodeID, Instructi
     case op_put_by_val:
     case op_put_by_val_direct:
     case op_put_by_index:
+    case op_define_data_property:
+    case op_define_accessor_property:
     case op_profile_type:
     case op_profile_control_flow:
     case op_put_to_arguments:
@@ -396,10 +413,9 @@ void computeDefsForBytecodeOffset(Block* codeBlock, OpcodeID opcodeID, Instructi
     case op_is_undefined:
     case op_is_boolean:
     case op_is_number:
-    case op_is_string:
-    case op_is_jsarray:
     case op_is_object:
     case op_is_object_or_null:
+    case op_is_cell_with_type:
     case op_is_function:
     case op_in:
     case op_to_number:
@@ -463,6 +479,3 @@ void computeDefsForBytecodeOffset(Block* codeBlock, OpcodeID opcodeID, Instructi
 }
 
 } // namespace JSC
-
-#endif // BytecodeUseDef_h
-

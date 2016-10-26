@@ -37,8 +37,10 @@
 #include "IDBValue.h"
 #include "IndexKey.h"
 #include "JSDOMBinding.h"
+#include "JSDOMConvert.h"
 #include "JSDOMStringList.h"
 #include "Logging.h"
+#include "MessagePort.h"
 #include "ScriptExecutionContext.h"
 #include "SerializedScriptValue.h"
 #include "SharedBuffer.h"
@@ -90,14 +92,14 @@ JSValue toJS(ExecState& state, JSGlobalObject& globalObject, IDBKey* key)
 
     VM& vm = state.vm();
     Locker<JSLock> locker(vm.apiLock());
+    auto scope = DECLARE_THROW_SCOPE(vm);
 
     switch (key->type()) {
     case KeyType::Array: {
         auto& inArray = key->array();
         unsigned size = inArray.size();
         auto outArray = constructEmptyArray(&state, 0, &globalObject, size);
-        if (UNLIKELY(vm.exception()))
-            return jsUndefined();
+        RETURN_IF_EXCEPTION(scope, JSValue());
         for (size_t i = 0; i < size; ++i)
             outArray->putDirectIndex(&state, i, toJS(state, globalObject, inArray.at(i).get()));
         return outArray;
@@ -105,7 +107,9 @@ JSValue toJS(ExecState& state, JSGlobalObject& globalObject, IDBKey* key)
     case KeyType::String:
         return jsStringWithCache(&state, key->string());
     case KeyType::Date:
-        return jsDateOrNull(&state, key->date());
+        // FIXME: This should probably be toJS<IDLDate>(...) as per:
+        // http://w3c.github.io/IndexedDB/#request-convert-a-key-to-a-value
+        return toJS<IDLNullable<IDLDate>>(state, key->date());
     case KeyType::Number:
         return jsNumber(key->number());
     case KeyType::Min:
@@ -170,16 +174,6 @@ static Ref<IDBKey> createIDBKeyFromValue(ExecState& exec, JSValue value)
     if (key)
         return *key;
     return IDBKey::createInvalid();
-}
-
-IDBKeyPath idbKeyPathFromValue(ExecState& exec, JSValue keyPathValue)
-{
-    IDBKeyPath keyPath;
-    if (isJSArray(keyPathValue))
-        keyPath = IDBKeyPath(toNativeArray<String>(exec, keyPathValue));
-    else
-        keyPath = IDBKeyPath(keyPathValue.toWTFString(&exec));
-    return keyPath;
 }
 
 static JSValue getNthValueOnKeyPath(ExecState& exec, JSValue rootValue, const Vector<String>& keyPathElements, size_t index)
@@ -325,7 +319,8 @@ JSValue deserializeIDBValueToJSValue(ExecState& exec, const IDBValue& value)
     auto serializedValue = SerializedScriptValue::createFromWireBytes(Vector<uint8_t>(data));
 
     exec.vm().apiLock().lock();
-    JSValue result = serializedValue->deserialize(&exec, exec.lexicalGlobalObject(), 0, NonThrowing, value.blobURLs(), value.blobFilePaths());
+    Vector<RefPtr<MessagePort>> messagePorts;
+    JSValue result = serializedValue->deserialize(exec, exec.lexicalGlobalObject(), messagePorts, value.blobURLs(), value.blobFilePaths(), NonThrowing);
     exec.vm().apiLock().unlock();
 
     return result;

@@ -59,6 +59,7 @@
 #include "RenderElement.h"
 #include "ScriptController.h"
 #include "Settings.h"
+#include "SimulatedClick.h"
 #include "StyleProperties.h"
 #include "SubframeLoader.h"
 #include "Text.h"
@@ -101,7 +102,7 @@ static inline CSSValueID unicodeBidiAttributeForDirAuto(HTMLElement& element)
 
 unsigned HTMLElement::parseBorderWidthAttribute(const AtomicString& value) const
 {
-    if (Optional<int> borderWidth = parseHTMLNonNegativeInteger(value))
+    if (Optional<unsigned> borderWidth = parseHTMLNonNegativeInteger(value))
         return borderWidth.value();
 
     return hasTagName(tableTag) ? 1 : 0;
@@ -230,6 +231,7 @@ HTMLElement::EventHandlerNameMap HTMLElement::createEventHandlerNameMap()
         &onautocompleteerrorAttr,
         &onbeforecopyAttr,
         &onbeforecutAttr,
+        &onbeforeinputAttr,
         &onbeforeloadAttr,
         &onbeforepasteAttr,
         &onblurAttr,
@@ -293,6 +295,7 @@ HTMLElement::EventHandlerNameMap HTMLElement::createEventHandlerNameMap()
         &onsubmitAttr,
         &onsuspendAttr,
         &ontimeupdateAttr,
+        &ontoggleAttr,
         &ontouchcancelAttr,
         &ontouchendAttr,
         &ontouchforcechangeAttr,
@@ -698,7 +701,7 @@ void HTMLElement::setSpellcheck(bool enable)
 
 void HTMLElement::click()
 {
-    dispatchSimulatedClickForBindings(nullptr);
+    simulateClick(*this, nullptr, SendNoEvents, DoNotShowPressedLook, SimulatedClickSource::Bindings);
 }
 
 void HTMLElement::accessKeyAction(bool sendMouseEvents)
@@ -895,7 +898,7 @@ void HTMLElement::adjustDirectionalityIfNeededAfterChildAttributeChanged(Element
         return;
     for (auto& elementToAdjust : elementLineage(this)) {
         if (elementAffectsDirectionality(elementToAdjust)) {
-            elementToAdjust.setNeedsStyleRecalc();
+            elementToAdjust.invalidateStyleForSubtree();
             return;
         }
     }
@@ -907,7 +910,7 @@ void HTMLElement::calculateAndAdjustDirectionality()
     TextDirection textDirection = directionality(&strongDirectionalityTextNode);
     setHasDirAutoFlagRecursively(this, true, strongDirectionalityTextNode);
     if (renderer() && renderer()->style().direction() != textDirection)
-        setNeedsStyleRecalc();
+        invalidateStyleForSubtree();
 }
 
 void HTMLElement::adjustDirectionalityIfNeededAfterChildrenChanged(Element* beforeChange, ChildChangeType changeType)
@@ -1035,18 +1038,13 @@ void HTMLElement::addHTMLColorToStyle(MutableStyleProperties& style, CSSProperty
     if (equalLettersIgnoringASCIICase(colorString, "transparent"))
         return;
 
-    // If the string is a named CSS color or a 3/6-digit hex color, use that.
-    // We can't use the default Color constructor because it accepts
-    // 4/8-digit hex, which conflict with some legacy HTML content using attributes.
-
     Color color;
-
-    if ((colorString.length() == 4 || colorString.length() == 7) && colorString[0] == '#')
+    // We can't always use the default Color constructor because it accepts
+    // 4/8-digit hex, which conflict with some legacy HTML content using attributes.
+    if ((colorString.length() != 5 && colorString.length() != 9) || colorString[0] != '#')
         color = Color(colorString);
     if (!color.isValid())
-        color.setNamedColor(colorString);
-    if (!color.isValid())
-        color.setRGB(parseColorStringWithCrazyLegacyRules(colorString));
+        color = Color(parseColorStringWithCrazyLegacyRules(colorString));
 
     style.setProperty(propertyID, CSSValuePool::singleton().createColorValue(color.rgb()));
 }

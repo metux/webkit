@@ -23,11 +23,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SlotVisitor_h
-#define SlotVisitor_h
+#pragma once
 
 #include "CellState.h"
-#include "CopyToken.h"
 #include "HandleTypes.h"
 #include "MarkStack.h"
 #include "OpaqueRootSet.h"
@@ -39,7 +37,6 @@ class GCThreadSharedData;
 class Heap;
 class HeapCell;
 class HeapSnapshotBuilder;
-template<typename T> class JITWriteBarrier;
 class MarkedBlock;
 class UnconditionalFinalizer;
 template<typename T> class Weak;
@@ -113,8 +110,6 @@ public:
     // this then the space will be freed at end of GC.
     void markAuxiliary(const void* base);
 
-    void copyLater(JSCell*, CopyToken, void*, size_t);
-    
     void reportExtraMemoryVisited(size_t);
 #if ENABLE(RESOURCE_USAGE)
     void reportExternalMemoryVisited(size_t);
@@ -126,6 +121,8 @@ public:
     void dump(PrintStream&) const;
 
     bool isBuildingHeapSnapshot() const { return !!m_heapSnapshotBuilder; }
+    
+    HeapVersion markingVersion() const { return m_markingVersion; }
 
 private:
     friend class ParallelModeEnabler;
@@ -162,14 +159,13 @@ private:
     size_t m_visitCount;
     bool m_isInParallelMode;
     
-    HeapVersion m_version;
+    HeapVersion m_markingVersion;
     
     Heap& m_heap;
 
     HeapSnapshotBuilder* m_heapSnapshotBuilder { nullptr };
     JSCell* m_currentCell { nullptr };
-
-    CellState m_currentObjectCellStateBeforeVisiting { CellState::NewWhite };
+    CellState m_oldCellState;
 
 public:
 #if !ASSERT_DISABLED
@@ -198,5 +194,3 @@ private:
 };
 
 } // namespace JSC
-
-#endif // SlotVisitor_h

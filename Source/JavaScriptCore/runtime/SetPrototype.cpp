@@ -29,13 +29,11 @@
 #include "BuiltinNames.h"
 #include "Error.h"
 #include "ExceptionHelpers.h"
-#include "GetterSetter.h"
 #include "IteratorOperations.h"
 #include "JSCInlines.h"
 #include "JSSet.h"
 #include "JSSetIterator.h"
 #include "Lookup.h"
-#include "MapDataInlines.h"
 
 #include "SetPrototype.lut.h"
 
@@ -158,11 +156,6 @@ EncodedJSValue JSC_HOST_CALL setProtoFuncEntries(CallFrame* callFrame)
     if (!thisObj)
         return JSValue::encode(throwTypeError(callFrame, scope, ASCIILiteral("Cannot create a Set entry iterator for a non-Set object.")));
     return JSValue::encode(JSSetIterator::create(vm, callFrame->callee()->globalObject()->setIteratorStructure(), thisObj, IterateKeyValue));
-}
-
-EncodedJSValue JSC_HOST_CALL privateFuncIsSet(ExecState* exec)
-{
-    return JSValue::encode(jsBoolean(jsDynamicCast<JSSet*>(exec->uncheckedArgument(0))));
 }
 
 EncodedJSValue JSC_HOST_CALL privateFuncSetIterator(ExecState* exec)

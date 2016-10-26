@@ -661,7 +661,7 @@ bool RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
 
     m_updateCompositingLayersTimer.stop();
 
-    ASSERT(!m_renderView.document().inPageCache());
+    ASSERT(m_renderView.document().pageCacheState() == Document::NotInPageCache);
     
     // Compositing layers will be updated in Document::setVisualUpdatesAllowed(bool) if suppressed here.
     if (!m_renderView.document().visualUpdatesAllowed())
@@ -2544,7 +2544,7 @@ bool RenderLayerCompositor::requiresCompositingForCanvas(RenderLayerModelObject&
         bool isCanvasLargeEnoughToForceCompositing = true;
 #else
         HTMLCanvasElement* canvas = downcast<HTMLCanvasElement>(renderer.element());
-        bool isCanvasLargeEnoughToForceCompositing = canvas->size().area() >= canvasAreaThresholdRequiringCompositing;
+        bool isCanvasLargeEnoughToForceCompositing = canvas->size().area().unsafeGet() >= canvasAreaThresholdRequiringCompositing;
 #endif
         CanvasCompositingStrategy compositingStrategy = canvasCompositingStrategy(renderer);
         return compositingStrategy == CanvasAsLayerContents || (compositingStrategy == CanvasPaintedToLayer && isCanvasLargeEnoughToForceCompositing);
@@ -3233,7 +3233,7 @@ void RenderLayerCompositor::rootOrBodyStyleChanged(RenderElement& renderer, cons
         rootBackgroundTransparencyChanged();
 
     bool hadFixedBackground = oldStyle && oldStyle->hasEntirelyFixedBackground();
-    if (hadFixedBackground != renderer.hasEntirelyFixedBackground()) {
+    if (hadFixedBackground != renderer.style().hasEntirelyFixedBackground()) {
         setCompositingLayersNeedRebuild();
         scheduleCompositingLayerUpdate();
     }
@@ -3549,7 +3549,7 @@ void RenderLayerCompositor::attachRootLayer(RootLayerAttachment attachment)
         case RootLayerAttachedViaEnclosingFrame: {
             // The layer will get hooked up via RenderLayerBacking::updateConfiguration()
             // for the frame's renderer in the parent document.
-            m_renderView.document().ownerElement()->scheduleSetNeedsStyleRecalc(SyntheticStyleChange);
+            m_renderView.document().ownerElement()->scheduleinvalidateStyleAndLayerComposition();
             break;
         }
     }
@@ -3578,7 +3578,7 @@ void RenderLayerCompositor::detachRootLayer()
             m_rootContentLayer->removeFromParent();
 
         if (HTMLFrameOwnerElement* ownerElement = m_renderView.document().ownerElement())
-            ownerElement->scheduleSetNeedsStyleRecalc(SyntheticStyleChange);
+            ownerElement->scheduleinvalidateStyleAndLayerComposition();
         break;
     }
     case RootLayerAttachedViaChromeClient: {
@@ -3637,7 +3637,7 @@ void RenderLayerCompositor::notifyIFramesOfCompositingChange()
     // Compositing affects the answer to RenderIFrame::requiresAcceleratedCompositing(), so
     // we need to schedule a style recalc in our parent document.
     if (HTMLFrameOwnerElement* ownerElement = m_renderView.document().ownerElement())
-        ownerElement->scheduleSetNeedsStyleRecalc(SyntheticStyleChange);
+        ownerElement->scheduleinvalidateStyleAndLayerComposition();
 }
 
 bool RenderLayerCompositor::layerHas3DContent(const RenderLayer& layer) const
@@ -4097,7 +4097,7 @@ void RenderLayerCompositor::willRemoveScrollingLayerWithBacking(RenderLayer& lay
     m_scrollingLayersNeedingUpdate.remove(&layer);
     m_scrollingLayers.remove(&layer);
 
-    if (m_renderView.document().inPageCache())
+    if (m_renderView.document().pageCacheState() != Document::NotInPageCache)
         return;
 
     if (ChromeClient* client = this->chromeClient()) {
@@ -4119,7 +4119,7 @@ void RenderLayerCompositor::didAddScrollingLayer(RenderLayer& layer)
     }
 
 #if PLATFORM(IOS)
-    ASSERT(!m_renderView.document().inPageCache());
+    ASSERT(m_renderView.document().pageCacheState() == Document::NotInPageCache);
     m_scrollingLayers.add(&layer);
 #endif
 }

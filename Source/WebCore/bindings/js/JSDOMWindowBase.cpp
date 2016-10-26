@@ -57,14 +57,9 @@ using namespace JSC;
 
 namespace WebCore {
 
-static bool shouldAllowAccessFrom(const JSGlobalObject* thisObject, ExecState* exec)
-{
-    return BindingSecurity::shouldAllowAccessToDOMWindow(exec, asJSDOMWindow(thisObject)->wrapped());
-}
-
 const ClassInfo JSDOMWindowBase::s_info = { "Window", &JSDOMGlobalObject::s_info, 0, CREATE_METHOD_TABLE(JSDOMWindowBase) };
 
-const GlobalObjectMethodTable JSDOMWindowBase::s_globalObjectMethodTable = { &shouldAllowAccessFrom, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptRuntimeFlags, &queueTaskToEventLoop, &shouldInterruptScriptBeforeTimeout, &moduleLoaderResolve, &moduleLoaderFetch, nullptr, nullptr, &moduleLoaderEvaluate, &defaultLanguage };
+const GlobalObjectMethodTable JSDOMWindowBase::s_globalObjectMethodTable = { &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptRuntimeFlags, &queueTaskToEventLoop, &shouldInterruptScriptBeforeTimeout, &moduleLoaderResolve, &moduleLoaderFetch, nullptr, nullptr, &moduleLoaderEvaluate, &defaultLanguage };
 
 JSDOMWindowBase::JSDOMWindowBase(VM& vm, Structure* structure, RefPtr<DOMWindow>&& window, JSDOMWindowShell* shell)
     : JSDOMGlobalObject(vm, structure, shell->world(), &s_globalObjectMethodTable)
@@ -197,13 +192,15 @@ public:
     void call()
     {
         Ref<JSDOMWindowMicrotaskCallback> protectedThis(*this);
-        JSLockHolder lock(m_globalObject->vm());
+        VM& vm = m_globalObject->vm();
+        JSLockHolder lock(vm);
+        auto scope = DECLARE_THROW_SCOPE(vm);
 
         ExecState* exec = m_globalObject->globalExec();
 
         JSMainThreadExecState::runTask(exec, m_task);
 
-        ASSERT(!exec->hadException());
+        ASSERT_UNUSED(scope, !scope.exception());
     }
 
 private:

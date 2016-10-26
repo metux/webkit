@@ -42,7 +42,7 @@ void WeakSetConstructor::finishCreation(VM& vm, WeakSetPrototype* prototype)
 {
     Base::finishCreation(vm, prototype->classInfo()->className);
     putDirectWithoutTransition(vm, vm.propertyNames->prototype, prototype, DontEnum | DontDelete | ReadOnly);
-    putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum | DontDelete);
+    putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(0), DontEnum | ReadOnly);
 }
 
 static EncodedJSValue JSC_HOST_CALL callWeakSet(ExecState* exec)
@@ -59,16 +59,14 @@ static EncodedJSValue JSC_HOST_CALL constructWeakSet(ExecState* exec)
 
     JSGlobalObject* globalObject = asInternalFunction(exec->callee())->globalObject();
     Structure* weakSetStructure = InternalFunction::createSubclassStructure(exec, exec->newTarget(), globalObject->weakSetStructure());
-    if (exec->hadException())
-        return JSValue::encode(JSValue());
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
     JSWeakSet* weakSet = JSWeakSet::create(exec, weakSetStructure);
     JSValue iterable = exec->argument(0);
     if (iterable.isUndefinedOrNull())
         return JSValue::encode(weakSet);
 
     JSValue adderFunction = weakSet->JSObject::get(exec, exec->propertyNames().add);
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     CallData adderFunctionCallData;
     CallType adderFunctionCallType = getCallData(adderFunction, adderFunctionCallData);

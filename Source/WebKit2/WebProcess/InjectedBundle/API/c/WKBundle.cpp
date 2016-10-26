@@ -155,14 +155,14 @@ void WKBundleSetJavaScriptCanAccessClipboard(WKBundleRef bundleRef, WKBundlePage
     toImpl(bundleRef)->setJavaScriptCanAccessClipboard(toImpl(pageGroupRef), enabled);
 }
 
-void WKBundleSetAutomaticLinkDetectionEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
-{
-    toImpl(bundleRef)->setAutomaticLinkDetectionEnabled(toImpl(pageGroupRef), enabled);
-}
-
 void WKBundleSetPrivateBrowsingEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
 {
     toImpl(bundleRef)->setPrivateBrowsingEnabled(toImpl(pageGroupRef), enabled);
+}
+
+void WKBundleSetUseDashboardCompatibilityMode(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
+{
+    toImpl(bundleRef)->setUseDashboardCompatibilityMode(toImpl(pageGroupRef), enabled);
 }
 
 void WKBundleSetPopupBlockingEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)

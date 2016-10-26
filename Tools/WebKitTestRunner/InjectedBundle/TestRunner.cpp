@@ -361,6 +361,13 @@ void TestRunner::setDOMIteratorEnabled(bool enabled)
     WKBundleOverrideBoolPreferenceForTestRunner(injectedBundle.bundle(), injectedBundle.pageGroup(), key.get(), enabled);
 }
 
+void TestRunner::setModernMediaControlsEnabled(bool enabled)
+{
+    WKRetainPtr<WKStringRef> key(AdoptWK, WKStringCreateWithUTF8CString("WebKitModernMediaControlsEnabled"));
+    auto& injectedBundle = InjectedBundle::singleton();
+    WKBundleOverrideBoolPreferenceForTestRunner(injectedBundle.bundle(), injectedBundle.pageGroup(), key.get(), enabled);
+}
+
 void TestRunner::setWebGL2Enabled(bool enabled)
 {
     WKRetainPtr<WKStringRef> key(AdoptWK, WKStringCreateWithUTF8CString("WebKitWebGL2Enabled"));
@@ -408,31 +415,33 @@ void TestRunner::setPluginsEnabled(bool enabled)
 void TestRunner::setJavaScriptCanAccessClipboard(bool enabled)
 {
     auto& injectedBundle = InjectedBundle::singleton();
-     WKBundleSetJavaScriptCanAccessClipboard(injectedBundle.bundle(), injectedBundle.pageGroup(), enabled);
-}
-
-void TestRunner::setAutomaticLinkDetectionEnabled(bool enabled)
-{
-    auto& injectedBundle = InjectedBundle::singleton();
-    WKBundleSetAutomaticLinkDetectionEnabled(injectedBundle.bundle(), injectedBundle.pageGroup(), enabled);
+    WKBundleSetJavaScriptCanAccessClipboard(injectedBundle.bundle(), injectedBundle.pageGroup(), enabled);
 }
 
 void TestRunner::setPrivateBrowsingEnabled(bool enabled)
 {
     auto& injectedBundle = InjectedBundle::singleton();
-     WKBundleSetPrivateBrowsingEnabled(injectedBundle.bundle(), injectedBundle.pageGroup(), enabled);
+    WKBundleSetPrivateBrowsingEnabled(injectedBundle.bundle(), injectedBundle.pageGroup(), enabled);
 }
 
+void TestRunner::setUseDashboardCompatibilityMode(bool enabled)
+{
+#if ENABLE(DASHBOARD_SUPPORT)
+    auto& injectedBundle = InjectedBundle::singleton();
+    WKBundleSetUseDashboardCompatibilityMode(injectedBundle.bundle(), injectedBundle.pageGroup(), enabled);
+#endif
+}
+    
 void TestRunner::setPopupBlockingEnabled(bool enabled)
 {
     auto& injectedBundle = InjectedBundle::singleton();
-     WKBundleSetPopupBlockingEnabled(injectedBundle.bundle(), injectedBundle.pageGroup(), enabled);
+    WKBundleSetPopupBlockingEnabled(injectedBundle.bundle(), injectedBundle.pageGroup(), enabled);
 }
 
 void TestRunner::setAuthorAndUserStylesEnabled(bool enabled)
 {
     auto& injectedBundle = InjectedBundle::singleton();
-     WKBundleSetAuthorAndUserStylesEnabled(injectedBundle.bundle(), injectedBundle.pageGroup(), enabled);
+    WKBundleSetAuthorAndUserStylesEnabled(injectedBundle.bundle(), injectedBundle.pageGroup(), enabled);
 }
 
 void TestRunner::addOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains)

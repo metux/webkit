@@ -32,10 +32,14 @@
 #ifndef CSSParserIdioms_h
 #define CSSParserIdioms_h
 
+#include "CSSParserMode.h"
 #include <wtf/ASCIICType.h>
+#include <wtf/text/StringView.h>
 
 namespace WebCore {
 
+class URL;
+    
 // Space characters as defined by the CSS specification.
 // http://www.w3.org/TR/css3-syntax/#whitespace
 inline bool isCSSSpace(UChar c)
@@ -56,6 +60,12 @@ bool isNameCodePoint(CharacterType c)
 {
     return isNameStartCodePoint(c) || isASCIIDigit(c) || c == '-';
 }
+
+void convertToASCIILowercaseInPlace(StringView&);
+
+bool isValueAllowedInMode(unsigned short, CSSParserMode);
+
+URL completeURL(const CSSParserContext&, const String& url);
 
 }
 

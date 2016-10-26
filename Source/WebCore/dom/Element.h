@@ -30,6 +30,7 @@
 #include "ElementData.h"
 #include "HTMLNames.h"
 #include "RegionOversetState.h"
+#include "ScrollToOptions.h"
 #include "ScrollTypes.h"
 #include "SimulatedClickOptions.h"
 #include "StyleChange.h"
@@ -38,6 +39,7 @@ namespace WebCore {
 
 class ClientRect;
 class ClientRectList;
+class CustomElementReactionQueue;
 class DatasetDOMStringMap;
 class Dictionary;
 class DOMTokenList;
@@ -136,6 +138,11 @@ public:
     WEBCORE_EXPORT void scrollIntoViewIfNeeded(bool centerIfNeeded = true);
     WEBCORE_EXPORT void scrollIntoViewIfNotVisible(bool centerIfNotVisible = true);
 
+    void scrollBy(const ScrollToOptions&);
+    void scrollBy(double x, double y);
+    virtual void scrollTo(const ScrollToOptions&);
+    void scrollTo(double x, double y);
+
     WEBCORE_EXPORT void scrollByLines(int lines);
     WEBCORE_EXPORT void scrollByPages(int pages);
 
@@ -157,6 +164,7 @@ public:
     WEBCORE_EXPORT double clientTop();
     WEBCORE_EXPORT double clientWidth();
     WEBCORE_EXPORT double clientHeight();
+
     virtual int scrollLeft();
     virtual int scrollTop();
     virtual void setScrollLeft(int);
@@ -260,7 +268,7 @@ public:
     virtual bool rendererIsNeeded(const RenderStyle&);
 
     WEBCORE_EXPORT ShadowRoot* shadowRoot() const;
-    WEBCORE_EXPORT RefPtr<ShadowRoot> createShadowRoot(ExceptionCode&);
+    WEBCORE_EXPORT ShadowRoot* createShadowRoot(ExceptionCode&);
 
     enum class ShadowRootMode { Open, Closed };
     struct ShadowRootInit {
@@ -274,8 +282,11 @@ public:
     WEBCORE_EXPORT ShadowRoot& ensureUserAgentShadowRoot();
 
 #if ENABLE(CUSTOM_ELEMENTS)
-    void setCustomElementIsResolved(JSCustomElementInterface&);
-    JSCustomElementInterface* customElementInterface() const;
+    void setIsDefinedCustomElement(JSCustomElementInterface&);
+    void setIsFailedCustomElement(JSCustomElementInterface&);
+    void setIsCustomElementUpgradeCandidate();
+    void enqueueToUpgrade(JSCustomElementInterface&);
+    CustomElementReactionQueue* reactionQueue() const;
 #endif
 
     // FIXME: this should not be virtual, do not override this.
@@ -468,7 +479,7 @@ public:
 #endif
 
 #if ENABLE(POINTER_LOCK)
-    void requestPointerLock();
+    WEBCORE_EXPORT void requestPointerLock();
 #endif
 
 #if ENABLE(INDIE_UI)
@@ -499,7 +510,6 @@ public:
     bool dispatchWheelEvent(const PlatformWheelEvent&);
     bool dispatchKeyEvent(const PlatformKeyboardEvent&);
     void dispatchSimulatedClick(Event* underlyingEvent, SimulatedClickMouseEventOptions = SendNoEvents, SimulatedClickVisualOptions = ShowPressedLook);
-    void dispatchSimulatedClickForBindings(Event* underlyingEvent);
     void dispatchFocusInEvent(const AtomicString& eventType, RefPtr<Element>&& oldFocusedElement);
     void dispatchFocusOutEvent(const AtomicString& eventType, RefPtr<Element>&& newFocusedElement);
     virtual void dispatchFocusEvent(RefPtr<Element>&& oldFocusedElement, FocusDirection);
@@ -534,6 +544,26 @@ public:
 
     StyleResolver& styleResolver();
     ElementStyle resolveStyle(const RenderStyle* parentStyle);
+
+    // Invalidates the style of a single element. Style is resolved lazily.
+    // Descendant elements are resolved as needed, for example if an inherited property changes.
+    // This should be called whenever an element changes in a manner that can affect its style.
+    void invalidateStyle();
+
+    // As above but also call RenderElement::setStyle with StyleDifferenceRecompositeLayer flag for
+    // the element even when the style doesn't change. This is mostly needed by the animation code.
+    WEBCORE_EXPORT void invalidateStyleAndLayerComposition();
+
+    // Invalidate the element and all its descendants. This is used when there is some sort of change
+    // in the tree that may affect the style of any of the descendants and we don't know how to optimize
+    // the case to limit the scope. This is expensive and should be avoided.
+    void invalidateStyleForSubtree();
+
+    // Invalidates renderers for the element and all its descendants causing them to be torn down
+    // and rebuild during style resolution. Style is also recomputed. This is used in code dealing with
+    // custom (not style based) renderers. This is expensive and should be avoided.
+    // Elements newly added to the tree are also in this state.
+    void invalidateStyleAndRenderersForSubtree();
 
     bool hasDisplayContents() const;
     void setHasDisplayContents(bool);
@@ -800,7 +830,7 @@ inline void Element::setHasFocusWithin(bool flag)
         return;
     setFlag(flag, HasFocusWithin);
     if (styleAffectedByFocusWithin())
-        setNeedsStyleRecalc();
+        invalidateStyleForSubtree();
 }
 
 } // namespace WebCore

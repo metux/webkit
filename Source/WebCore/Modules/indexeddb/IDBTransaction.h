@@ -42,6 +42,7 @@
 namespace WebCore {
 
 class DOMError;
+class DOMStringList;
 class IDBCursor;
 class IDBCursorInfo;
 class IDBDatabase;
@@ -69,7 +70,7 @@ public:
     static const AtomicString& modeReadOnlyLegacy();
     static const AtomicString& modeReadWriteLegacy();
 
-    static IndexedDB::TransactionMode stringToMode(const String&, ExceptionCode&);
+    static Optional<IndexedDB::TransactionMode> stringToMode(const String&);
     static const AtomicString& modeToString(IndexedDB::TransactionMode);
 
     static Ref<IDBTransaction> create(IDBDatabase&, const IDBTransactionInfo&);
@@ -78,11 +79,12 @@ public:
     ~IDBTransaction() final;
 
     // IDBTransaction IDL
+    Ref<DOMStringList> objectStoreNames() const;
     const String& mode() const;
     IDBDatabase* db();
-    RefPtr<DOMError> error() const;
-    RefPtr<IDBObjectStore> objectStore(const String& name, ExceptionCodeWithMessage&);
-    void abort(ExceptionCodeWithMessage&);
+    DOMError* error() const;
+    ExceptionOr<Ref<IDBObjectStore>> objectStore(const String& name);
+    ExceptionOr<void> abort();
 
     EventTargetInterface eventTargetInterface() const final { return IDBTransactionEventTargetInterfaceType; }
     ScriptExecutionContext* scriptExecutionContext() const final { return ActiveDOMObject::scriptExecutionContext(); }
@@ -113,7 +115,9 @@ public:
     bool isActive() const;
 
     Ref<IDBObjectStore> createObjectStore(const IDBObjectStoreInfo&);
+    void renameObjectStore(IDBObjectStore&, const String& newName);
     std::unique_ptr<IDBIndex> createIndex(IDBObjectStore&, const IDBIndexInfo&);
+    void renameIndex(IDBIndex&, const String& newName);
 
     Ref<IDBRequest> requestPutOrAdd(JSC::ExecState&, IDBObjectStore&, IDBKey*, SerializedScriptValue&, IndexedDB::ObjectStoreOverwriteMode);
     Ref<IDBRequest> requestGetRecord(JSC::ExecState&, IDBObjectStore&, const IDBGetRecordData&);
@@ -152,6 +156,7 @@ private:
 
     void commit();
 
+    void internalAbort();
     void notifyDidAbort(const IDBError&);
     void finishAbortOrCommit();
 
@@ -170,8 +175,14 @@ private:
     void createObjectStoreOnServer(IDBClient::TransactionOperation&, const IDBObjectStoreInfo&);
     void didCreateObjectStoreOnServer(const IDBResultData&);
 
+    void renameObjectStoreOnServer(IDBClient::TransactionOperation&, const uint64_t& objectStoreIdentifier, const String& newName);
+    void didRenameObjectStoreOnServer(const IDBResultData&);
+
     void createIndexOnServer(IDBClient::TransactionOperation&, const IDBIndexInfo&);
     void didCreateIndexOnServer(const IDBResultData&);
+
+    void renameIndexOnServer(IDBClient::TransactionOperation&, const uint64_t& objectStoreIdentifier, const uint64_t& indexIdentifier, const String& newName);
+    void didRenameIndexOnServer(const IDBResultData&);
 
     void clearObjectStoreOnServer(IDBClient::TransactionOperation&, const uint64_t& objectStoreIdentifier);
     void didClearObjectStoreOnServer(IDBRequest&, const IDBResultData&);

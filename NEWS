@@ -1,74 +1,20 @@
-==================
-WebKitGTK+  2.14.1
-==================
+=================
+WebKitGTK+ 2.15.1
+=================
 
-What's new in WebKitGTK+ 2.14.1?
+What's new in WebKitGTK+ 2.15.1?
 
-  - MiniBrowser and jsc binaries are now installed in pkglibexecdir instead of bindir.
-  - Improve performance when resizing a window with multiple web views in X11.
-  - Check whether GDK can use GL before using gdk_cairo_draw_from_gl() in Wayland.
-  - Updated default UserAgent string or better compatibility.
-  - Fix a crash on github.com in IntlDateTimeFormat::resolvedOptions when using the C locale.
-  - Fix BadDamage X errors when closing the web view in X11.
-  - Fix UIProcess crash when using Japanese input method.
-  - Fix build with clang due to missing header includes.
-  - Fix the build with USE_REDIRECTED_XCOMPOSITE_WINDOW disabled.
+  - GObject DOM bindings API marked as unstable has been removed.
+  - Expose WebKitDOMHTMLInputElement APIs for form autofill.
+  - Properly update WebKitWebView and WebKitWebPage URI properties when request is modified by
+    WebKitWebPage:send-request signal.
+  - Switch to use GMenu internally in the context menu implementation.
+  - Dot not leak the default WebKitWebsiteDataManager in WebKitWebContext.
+  - The network backend now always sniff contents for Downloads.
+  - Use eglGetPlatformDisplay when available instead of eglGetDisplay.
+  - Avoid strstr() when checking (E)GL extensions.
+  - Fix the build with ENABLE_OPENGL=OFF and allow to build on Wayland without OpenGL again.
   - Fix several crashes and rendering issues.
-  - Translation updates: German.
-
-==================
-WebKitGTK+  2.14.0
-==================
-
-What's new in WebKitGTK+ 2.14.0?
-
-  - Use gdk_cairo_draw_from_gl() when possible in Wayland to render directly using the GPU in the UI process.
-  - Ensure we don't send an empty referrer header after session restore.
-  - Fix a web process crash in pages using filter animations.
-  - Fix main frame scrolling jumps when scrolling acclerated subframes.
-  - Fix the size of the cairo surface created in the UI process on Wayland.
-  - Fix memory leak in JavaScriptCore.
-  - Fix the build when '.' is not in @INC by default in perl.
-  - Translation updates: Ukrainian.
-
-==================
-WebKitGTK+ 2.13.92
-==================
-
-What's new in WebKitGTK+ 2.13.92?
-
-  - Add clipboard support in Wayland.
-  - Improve rendering of scrollbars with themes setting a minimum width for the scrollbar CSS gadget.
-  - Fix another WebProcess crash when the last WebView is destroyed.
-  - Fix the build with GCC 6.
-
-==================
-WebKitGTK+ 2.13.91
-==================
-
-What's new in WebKitGTK+ 2.13.91?
-
-  - Improve the performance when resizing the WebView with the threaded compositor.
-  - Do not try to use GL_PACK_ROW_LENGTH when compiling with GLES2, since it's not available.
-  - Use a different plugins cache file in Wayland and X11.
-  - Fix UI process crash visiting sites protected with HTTP auth when using GTK+ < 3.14.
-  - Fix a WebProcess crash when the last WebView is destroyed.
-  - Fix build configure without Wayland support.
-  - Fix the build when compiling with Clang.
-  - Fix several crashes and rendering issues.
-  - Translation updates: Polish.
-
-==================
-WebKitGTK+ 2.13.90
-==================
-
-What's new in WebKitGTK+ 2.13.90?
-
-  - Add initial implementation of accelerating compositing support under Wayland.
-  - Fix performance with the modesetting intel driver and DRI3 enabled.
-  - Improved performance when resizing the web view on X11.
-  - Fix several crashes and rendering issues.
-  - Translation updates: German, Polish.
 
 =================
 WebKitGTK+ 2.13.4

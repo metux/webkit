@@ -244,16 +244,12 @@ bool TextFieldInputType::needsContainer() const
 
 bool TextFieldInputType::shouldHaveSpinButton() const
 {
-    Document& document = element().document();
-    RefPtr<RenderTheme> theme = document.page() ? &document.page()->theme() : RenderTheme::defaultTheme();
-    return theme->shouldHaveSpinButton(element());
+    return RenderTheme::themeForPage(element().document().page())->shouldHaveSpinButton(element());
 }
 
 bool TextFieldInputType::shouldHaveCapsLockIndicator() const
 {
-    Document& document = element().document();
-    RefPtr<RenderTheme> theme = document.page() ? &document.page()->theme() : RenderTheme::defaultTheme();
-    return theme->shouldHaveCapsLockIndicator(element());
+    return RenderTheme::themeForPage(element().document().page())->shouldHaveCapsLockIndicator(element());
 }
 
 void TextFieldInputType::createShadowSubtree()
@@ -470,7 +466,7 @@ void TextFieldInputType::handleBeforeTextInsertedEvent(BeforeTextInsertedEvent& 
         int selectionStart = element().selectionStart();
         ASSERT(selectionStart <= element().selectionEnd());
         int selectionCodeUnitCount = element().selectionEnd() - selectionStart;
-        selectionLength = selectionCodeUnitCount ? numGraphemeClusters(innerText.substring(selectionStart, selectionCodeUnitCount)) : 0;
+        selectionLength = selectionCodeUnitCount ? numGraphemeClusters(StringView(innerText).substring(selectionStart, selectionCodeUnitCount)) : 0;
     }
     ASSERT(oldLength >= selectionLength);
 
@@ -550,7 +546,7 @@ void TextFieldInputType::subtreeHasChanged()
     element().setValueFromRenderer(innerText);
     element().updatePlaceholderVisibility();
     // Recalc for :invalid change.
-    element().setNeedsStyleRecalc();
+    element().invalidateStyleForSubtree();
 
     didSetValueByUserEdit();
 }

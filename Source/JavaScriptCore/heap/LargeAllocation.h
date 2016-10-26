@@ -70,8 +70,9 @@ public:
     
     bool isNewlyAllocated() const { return m_isNewlyAllocated; }
     ALWAYS_INLINE bool isMarked() { return m_isMarked.load(std::memory_order_relaxed); }
-    bool isMarkedOrNewlyAllocated() { return isMarked() || isNewlyAllocated(); }
-    bool isLive() { return isMarkedOrNewlyAllocated(); }
+    ALWAYS_INLINE bool isMarked(HeapCell*) { return m_isMarked.load(std::memory_order_relaxed); }
+    ALWAYS_INLINE bool isMarkedConcurrently(HeapVersion, HeapCell*) { return m_isMarked.load(std::memory_order_relaxed); }
+    bool isLive() { return isMarked() || isNewlyAllocated(); }
     
     bool hasValidCell() const { return m_hasValidCell; }
     
@@ -104,8 +105,7 @@ public:
     
     const AllocatorAttributes& attributes() const { return m_attributes; }
     
-    void flipIfNecessary(uint64_t) { }
-    void flipIfNecessaryConcurrently(uint64_t) { }
+    void aboutToMark(HeapVersion) { }
     
     ALWAYS_INLINE bool testAndSetMarked()
     {
@@ -117,7 +117,6 @@ public:
         return !m_isMarked.compareExchangeStrong(false, true);
     }
     ALWAYS_INLINE bool testAndSetMarked(HeapCell*) { return testAndSetMarked(); }
-    void setMarked() { m_isMarked.store(true); }
     void clearMarked() { m_isMarked.store(false); }
     
     void noteMarked() { }
