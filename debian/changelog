@@ -3,6 +3,7 @@ webkit2gtk (2.15.1-1) UNRELEASED; urgency=medium
   * New upstream development release.
   * debian/patches/fix-ftbfs-armel.patch:
     + The previous update broke this patch, fix it now.
+  * Refresh all other patches.
   * debian/rules:
     + Don't use the gold linker in kFreeBSD, its version of libxslt is
       still affected by #801989. We should be able to revert this change
