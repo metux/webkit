@@ -23,8 +23,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WeakBlock_h
-#define WeakBlock_h
+#pragma once
 
 #include "CellContainer.h"
 #include "WeakImpl.h"
@@ -72,6 +71,9 @@ public:
 
 private:
     static FreeCell* asFreeCell(WeakImpl*);
+    
+    template<typename ContainerType>
+    void specializedVisit(ContainerType&, HeapRootVisitor&);
 
     explicit WeakBlock(CellContainer);
     void finalize(WeakImpl*);
@@ -139,5 +141,3 @@ inline bool WeakBlock::isLogicallyEmptyButNotFree() const
 }
 
 } // namespace JSC
-
-#endif // WeakBlock_h

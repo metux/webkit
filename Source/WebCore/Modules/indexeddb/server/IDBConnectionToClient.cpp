@@ -73,6 +73,11 @@ void IDBConnectionToClient::didDeleteObjectStore(const IDBResultData& result)
     m_delegate->didDeleteObjectStore(result);
 }
 
+void IDBConnectionToClient::didRenameObjectStore(const IDBResultData& result)
+{
+    m_delegate->didRenameObjectStore(result);
+}
+
 void IDBConnectionToClient::didClearObjectStore(const IDBResultData& result)
 {
     m_delegate->didClearObjectStore(result);
@@ -86,6 +91,11 @@ void IDBConnectionToClient::didCreateIndex(const IDBResultData& result)
 void IDBConnectionToClient::didDeleteIndex(const IDBResultData& result)
 {
     m_delegate->didDeleteIndex(result);
+}
+
+void IDBConnectionToClient::didRenameIndex(const IDBResultData& result)
+{
+    m_delegate->didRenameIndex(result);
 }
 
 void IDBConnectionToClient::didPutOrAdd(const IDBResultData& result)

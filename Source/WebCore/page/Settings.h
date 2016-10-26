@@ -98,6 +98,9 @@ public:
 
     void pageDestroyed() { m_page = nullptr; }
 
+    enum class ForcedPrefersReducedMotionValue { System, On, Off };
+    static const Settings::ForcedPrefersReducedMotionValue defaultForcedPrefersReducedMotionValue = ForcedPrefersReducedMotionValue::System;
+
     WEBCORE_EXPORT void setStandardFontFamily(const AtomicString&, UScriptCode = USCRIPT_COMMON);
     WEBCORE_EXPORT const AtomicString& standardFontFamily(UScriptCode = USCRIPT_COMMON) const;
 
@@ -118,11 +121,6 @@ public:
 
     WEBCORE_EXPORT void setPictographFontFamily(const AtomicString&, UScriptCode = USCRIPT_COMMON);
     WEBCORE_EXPORT const AtomicString& pictographFontFamily(UScriptCode = USCRIPT_COMMON) const;
-
-#if ENABLE(TEXT_AUTOSIZING)
-    void setTextAutosizingFontScaleFactor(float);
-    float textAutosizingFontScaleFactor() const { return m_textAutosizingFontScaleFactor; }
-#endif
 
     WEBCORE_EXPORT static bool defaultTextAutosizingEnabled();
     WEBCORE_EXPORT static float defaultMinimumZoomFontSize();
@@ -284,7 +282,7 @@ public:
     static bool shouldManageAudioSessionCategory() { return gManageAudioSession; }
 #endif
 
-#if ENABLE(ENCRYPTED_MEDIA_V2)
+#if ENABLE(LEGACY_ENCRYPTED_MEDIA)
     void setMediaKeysStorageDirectory(const String& directory) { m_mediaKeysStorageDirectory = directory; }
     const String& mediaKeysStorageDirectory() const { return m_mediaKeysStorageDirectory; }
 #endif
@@ -324,10 +322,6 @@ private:
     SecurityOrigin::StorageBlockingPolicy m_storageBlockingPolicy;
     std::chrono::milliseconds m_layoutInterval;
     std::chrono::milliseconds m_minimumDOMTimerInterval;
-
-#if ENABLE(TEXT_AUTOSIZING)
-    float m_textAutosizingFontScaleFactor;
-#endif
 
     SETTINGS_MEMBER_VARIABLES
 
@@ -392,7 +386,7 @@ private:
     WEBCORE_EXPORT static bool gManageAudioSession;
 #endif
 
-#if ENABLE(ENCRYPTED_MEDIA_V2)
+#if ENABLE(LEGACY_ENCRYPTED_MEDIA)
     String m_mediaKeysStorageDirectory;
 #endif
     

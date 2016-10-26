@@ -34,6 +34,7 @@
 #include "IDBConnectionProxy.h"
 #include "IDBConnectionToServer.h"
 #include "IDBDatabaseException.h"
+#include "IDBIndex.h"
 #include "IDBObjectStore.h"
 #include "IDBOpenDBRequest.h"
 #include "IDBResultData.h"
@@ -106,145 +107,122 @@ RefPtr<DOMStringList> IDBDatabase::objectStoreNames() const
     return objectStoreNames;
 }
 
-RefPtr<WebCore::IDBObjectStore> IDBDatabase::createObjectStore(const String&, const Dictionary&, ExceptionCodeWithMessage&)
+void IDBDatabase::renameObjectStore(IDBObjectStore& objectStore, const String& newName)
 {
-    ASSERT_NOT_REACHED();
-    return nullptr;
+    ASSERT(currentThread() == originThreadID());
+    ASSERT(m_versionChangeTransaction);
+    ASSERT(m_info.hasObjectStore(objectStore.info().name()));
+
+    m_info.renameObjectStore(objectStore.info().identifier(), newName);
+
+    m_versionChangeTransaction->renameObjectStore(objectStore, newName);
 }
 
-RefPtr<WebCore::IDBObjectStore> IDBDatabase::createObjectStore(const String& name, const IDBKeyPath& keyPath, bool autoIncrement, ExceptionCodeWithMessage& ec)
+void IDBDatabase::renameIndex(IDBIndex& index, const String& newName)
+{
+    ASSERT(currentThread() == originThreadID());
+    ASSERT(m_versionChangeTransaction);
+    ASSERT(m_info.hasObjectStore(index.objectStore().info().name()));
+    ASSERT(m_info.infoForExistingObjectStore(index.objectStore().info().name())->hasIndex(index.info().name()));
+
+    m_info.infoForExistingObjectStore(index.objectStore().info().name())->infoForExistingIndex(index.info().identifier())->rename(newName);
+
+    m_versionChangeTransaction->renameIndex(index, newName);
+}
+
+ExceptionOr<Ref<IDBObjectStore>> IDBDatabase::createObjectStore(const String& name, ObjectStoreParameters&& parameters)
 {
     LOG(IndexedDB, "IDBDatabase::createObjectStore - (%s %s)", m_info.name().utf8().data(), name.utf8().data());
 
     ASSERT(currentThread() == originThreadID());
     ASSERT(!m_versionChangeTransaction || m_versionChangeTransaction->isVersionChange());
 
-    if (!m_versionChangeTransaction) {
-        ec.code = IDBDatabaseException::InvalidStateError;
-        ec.message = ASCIILiteral("Failed to execute 'createObjectStore' on 'IDBDatabase': The database is not running a version change transaction.");
-        return nullptr;
-    }
+    if (!m_versionChangeTransaction)
+        return Exception { IDBDatabaseException::InvalidStateError, ASCIILiteral("Failed to execute 'createObjectStore' on 'IDBDatabase': The database is not running a version change transaction.") };
 
-    if (!m_versionChangeTransaction->isActive()) {
-        ec.code = IDBDatabaseException::TransactionInactiveError;
-        return nullptr;
-    }
+    if (!m_versionChangeTransaction->isActive())
+        return Exception { IDBDatabaseException::TransactionInactiveError };
 
-    if (m_info.hasObjectStore(name)) {
-        ec.code = IDBDatabaseException::ConstraintError;
-        ec.message = ASCIILiteral("Failed to execute 'createObjectStore' on 'IDBDatabase': An object store with the specified name already exists.");
-        return nullptr;
-    }
+    if (m_info.hasObjectStore(name))
+        return Exception { IDBDatabaseException::ConstraintError, ASCIILiteral("Failed to execute 'createObjectStore' on 'IDBDatabase': An object store with the specified name already exists.") };
 
-    if (!keyPath.isNull() && !keyPath.isValid()) {
-        ec.code = IDBDatabaseException::SyntaxError;
-        ec.message = ASCIILiteral("Failed to execute 'createObjectStore' on 'IDBDatabase': The keyPath option is not a valid key path.");
-        return nullptr;
-    }
+    auto& keyPath = parameters.keyPath;
+    if (keyPath && !isIDBKeyPathValid(keyPath.value()))
+        return Exception { IDBDatabaseException::SyntaxError, ASCIILiteral("Failed to execute 'createObjectStore' on 'IDBDatabase': The keyPath option is not a valid key path.") };
 
-    if (autoIncrement && !keyPath.isNull()) {
-        if ((keyPath.type() == IDBKeyPath::Type::String && keyPath.string().isEmpty()) || keyPath.type() == IDBKeyPath::Type::Array) {
-            ec.code = IDBDatabaseException::InvalidAccessError;
-            ec.message = ASCIILiteral("Failed to execute 'createObjectStore' on 'IDBDatabase': The autoIncrement option was set but the keyPath option was empty or an array.");
-            return nullptr;
-        }
-    }
+    if (keyPath && parameters.autoIncrement && ((WTF::holds_alternative<String>(keyPath.value()) && WTF::get<String>(keyPath.value()).isEmpty()) || WTF::holds_alternative<Vector<String>>(keyPath.value())))
+        return Exception { IDBDatabaseException::InvalidAccessError, ASCIILiteral("Failed to execute 'createObjectStore' on 'IDBDatabase': The autoIncrement option was set but the keyPath option was empty or an array.") };
 
     // Install the new ObjectStore into the connection's metadata.
-    IDBObjectStoreInfo info = m_info.createNewObjectStore(name, keyPath, autoIncrement);
+    auto info = m_info.createNewObjectStore(name, WTFMove(keyPath), parameters.autoIncrement);
 
     // Create the actual IDBObjectStore from the transaction, which also schedules the operation server side.
-    Ref<IDBObjectStore> objectStore = m_versionChangeTransaction->createObjectStore(info);
-    return adoptRef(&objectStore.leakRef());
+    return m_versionChangeTransaction->createObjectStore(info);
 }
 
-RefPtr<WebCore::IDBTransaction> IDBDatabase::transaction(const Vector<String>& objectStores, const String& modeString, ExceptionCodeWithMessage& ec)
+ExceptionOr<Ref<IDBTransaction>> IDBDatabase::transaction(StringOrVectorOfStrings&& storeNames, const String& modeString)
 {
     LOG(IndexedDB, "IDBDatabase::transaction");
 
     ASSERT(currentThread() == originThreadID());
 
-    if (m_closePending) {
-        ec.code = IDBDatabaseException::InvalidStateError;
-        ec.message = ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.");
-        return nullptr;
-    }
+    if (m_closePending)
+        return Exception { IDBDatabaseException::InvalidStateError, ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.") };
 
-    if (objectStores.isEmpty()) {
-        ec.code = IDBDatabaseException::InvalidAccessError;
-        ec.message = ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': The storeNames parameter was empty.");
-        return nullptr;
-    }
+    Vector<String> objectStores;
+    if (WTF::holds_alternative<Vector<String>>(storeNames))
+        objectStores = WTFMove(WTF::get<Vector<String>>(storeNames));
+    else
+        objectStores.append(WTFMove(WTF::get<String>(storeNames)));
 
-    IndexedDB::TransactionMode mode = IDBTransaction::stringToMode(modeString, ec.code);
-    if (ec.code) {
-        ec.message = makeString(ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': The mode provided ('"), modeString, ASCIILiteral("') is not one of 'readonly' or 'readwrite'."));
-        return nullptr;
-    }
+    if (objectStores.isEmpty())
+        return Exception { IDBDatabaseException::InvalidAccessError, ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': The storeNames parameter was empty.") };
 
-    if (mode != IndexedDB::TransactionMode::ReadOnly && mode != IndexedDB::TransactionMode::ReadWrite) {
-        ec.code = TypeError;
-        return nullptr;
-    }
+    auto mode = IDBTransaction::stringToMode(modeString);
+    if (!mode)
+        return Exception { TypeError, "Failed to execute 'transaction' on 'IDBDatabase': The mode provided ('" + modeString + "') is not one of 'readonly' or 'readwrite'." };
 
-    if (m_versionChangeTransaction && !m_versionChangeTransaction->isFinishedOrFinishing()) {
-        ec.code = IDBDatabaseException::InvalidStateError;
-        ec.message = ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': A version change transaction is running.");
-        return nullptr;
-    }
+    if (mode.value() != IndexedDB::TransactionMode::ReadOnly && mode.value() != IndexedDB::TransactionMode::ReadWrite)
+        return Exception { TypeError };
+
+    if (m_versionChangeTransaction && !m_versionChangeTransaction->isFinishedOrFinishing())
+        return Exception { IDBDatabaseException::InvalidStateError, ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': A version change transaction is running.") };
 
     for (auto& objectStoreName : objectStores) {
         if (m_info.hasObjectStore(objectStoreName))
             continue;
-        ec.code = IDBDatabaseException::NotFoundError;
-        ec.message = ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': One of the specified object stores was not found.");
-        return nullptr;
+        return Exception { IDBDatabaseException::NotFoundError, ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': One of the specified object stores was not found.") };
     }
 
-    auto info = IDBTransactionInfo::clientTransaction(m_connectionProxy.get(), objectStores, mode);
+    auto info = IDBTransactionInfo::clientTransaction(m_connectionProxy.get(), objectStores, mode.value());
     auto transaction = IDBTransaction::create(*this, info);
 
     LOG(IndexedDB, "IDBDatabase::transaction - Added active transaction %s", info.identifier().loggingString().utf8().data());
 
-    m_activeTransactions.set(info.identifier(), &transaction.get());
+    m_activeTransactions.set(info.identifier(), transaction.ptr());
 
-    return adoptRef(&transaction.leakRef());
+    return WTFMove(transaction);
 }
 
-RefPtr<WebCore::IDBTransaction> IDBDatabase::transaction(const String& objectStore, const String& mode, ExceptionCodeWithMessage& ec)
-{
-    ASSERT(currentThread() == originThreadID());
-
-    Vector<String> objectStores(1);
-    objectStores[0] = objectStore;
-    return transaction(objectStores, mode, ec);
-}
-
-void IDBDatabase::deleteObjectStore(const String& objectStoreName, ExceptionCodeWithMessage& ec)
+ExceptionOr<void> IDBDatabase::deleteObjectStore(const String& objectStoreName)
 {
     LOG(IndexedDB, "IDBDatabase::deleteObjectStore");
 
     ASSERT(currentThread() == originThreadID());
 
-    if (!m_versionChangeTransaction) {
-        ec.code = IDBDatabaseException::InvalidStateError;
-        ec.message = ASCIILiteral("Failed to execute 'deleteObjectStore' on 'IDBDatabase': The database is not running a version change transaction.");
-        return;
-    }
+    if (!m_versionChangeTransaction)
+        return Exception { IDBDatabaseException::InvalidStateError, ASCIILiteral("Failed to execute 'deleteObjectStore' on 'IDBDatabase': The database is not running a version change transaction.") };
 
-    if (!m_versionChangeTransaction->isActive()) {
-        ec.code = IDBDatabaseException::TransactionInactiveError;
-        return;
-    }
+    if (!m_versionChangeTransaction->isActive())
+        return Exception { IDBDatabaseException::TransactionInactiveError };
 
-    if (!m_info.hasObjectStore(objectStoreName)) {
-        ec.code = IDBDatabaseException::NotFoundError;
-        ec.message = ASCIILiteral("Failed to execute 'deleteObjectStore' on 'IDBDatabase': The specified object store was not found.");
-        return;
-    }
+    if (!m_info.hasObjectStore(objectStoreName))
+        return Exception { IDBDatabaseException::NotFoundError, ASCIILiteral("Failed to execute 'deleteObjectStore' on 'IDBDatabase': The specified object store was not found.") };
 
     m_info.deleteObjectStore(objectStoreName);
     m_versionChangeTransaction->deleteObjectStore(objectStoreName);
+
+    return { };
 }
 
 void IDBDatabase::close()

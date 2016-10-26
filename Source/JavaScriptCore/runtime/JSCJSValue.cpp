@@ -158,14 +158,11 @@ bool JSValue::putToPrimitive(ExecState* exec, PropertyName propertyName, JSValue
     if (UNLIKELY(!obj))
         return false;
     JSValue prototype;
-    if (propertyName != exec->propertyNames().underscoreProto) {
+    if (propertyName != vm.propertyNames->underscoreProto) {
         for (; !obj->structure()->hasReadOnlyOrGetterSetterPropertiesExcludingProto(); obj = asObject(prototype)) {
             prototype = obj->getPrototypeDirect();
-            if (prototype.isNull()) {
-                if (slot.isStrictMode())
-                    throwTypeError(exec, scope, StrictModeReadonlyPropertyWriteError);
-                return false;
-            }
+            if (prototype.isNull())
+                return typeError(exec, scope, slot.isStrictMode(), ASCIILiteral(ReadonlyPropertyWriteError));
         }
     }
 
@@ -173,11 +170,8 @@ bool JSValue::putToPrimitive(ExecState* exec, PropertyName propertyName, JSValue
         unsigned attributes;
         PropertyOffset offset = obj->structure()->get(vm, propertyName, attributes);
         if (offset != invalidOffset) {
-            if (attributes & ReadOnly) {
-                if (slot.isStrictMode())
-                    throwTypeError(exec, scope, StrictModeReadonlyPropertyWriteError);
-                return false;
-            }
+            if (attributes & ReadOnly)
+                return typeError(exec, scope, slot.isStrictMode(), ASCIILiteral(ReadonlyPropertyWriteError));
 
             JSValue gs = obj->getDirect(offset);
             if (gs.isGetterSetter())
@@ -192,15 +186,12 @@ bool JSValue::putToPrimitive(ExecState* exec, PropertyName propertyName, JSValue
         }
 
         prototype = obj->getPrototype(vm, exec);
-        if (vm.exception())
-            return false;
+        RETURN_IF_EXCEPTION(scope, false);
         if (prototype.isNull())
             break;
     }
     
-    if (slot.isStrictMode())
-        throwTypeError(exec, scope, StrictModeReadonlyPropertyWriteError);
-    return false;
+    return typeError(exec, scope, slot.isStrictMode(), ASCIILiteral(ReadonlyPropertyWriteError));
 }
 
 bool JSValue::putToPrimitiveByIndex(ExecState* exec, unsigned propertyName, JSValue value, bool shouldThrow)
@@ -215,16 +206,14 @@ bool JSValue::putToPrimitiveByIndex(ExecState* exec, unsigned propertyName, JSVa
     
     JSObject* prototype = synthesizePrototype(exec);
     if (UNLIKELY(!prototype)) {
-        ASSERT(exec->hadException());
+        ASSERT(scope.exception());
         return false;
     }
     bool putResult = false;
     if (prototype->attemptToInterceptPutByIndexOnHoleForPrototype(exec, *this, propertyName, value, shouldThrow, putResult))
         return putResult;
     
-    if (shouldThrow)
-        throwTypeError(exec, scope, StrictModeReadonlyPropertyWriteError);
-    return false;
+    return typeError(exec, scope, shouldThrow, ASCIILiteral(ReadonlyPropertyWriteError));
 }
 
 void JSValue::dump(PrintStream& out) const
@@ -381,12 +370,10 @@ JSString* JSValue::toStringSlowCase(ExecState* exec, bool returnEmptyStringOnErr
 
     ASSERT(isCell());
     JSValue value = asCell()->toPrimitive(exec, PreferString);
-    if (vm.exception())
-        return errorValue();
+    RETURN_IF_EXCEPTION(scope, errorValue());
     ASSERT(!value.isObject());
     JSString* result = value.toString(exec);
-    if (vm.exception())
-        return errorValue();
+    RETURN_IF_EXCEPTION(scope, errorValue());
     return result;
 }
 

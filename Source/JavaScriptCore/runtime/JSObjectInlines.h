@@ -21,8 +21,7 @@
  *
  */
 
-#ifndef JSObjectInlines_h
-#define JSObjectInlines_h
+#pragma once
 
 #include "AuxiliaryBarrierInlines.h"
 #include "Error.h"
@@ -40,17 +39,14 @@ void createListFromArrayLike(ExecState* exec, JSValue arrayLikeValue, RuntimeTyp
     
     Vector<JSValue> result;
     JSValue lengthProperty = arrayLikeValue.get(exec, vm.propertyNames->length);
-    if (vm.exception())
-        return;
+    RETURN_IF_EXCEPTION(scope, void());
     double lengthAsDouble = lengthProperty.toLength(exec);
-    if (vm.exception())
-        return;
+    RETURN_IF_EXCEPTION(scope, void());
     RELEASE_ASSERT(lengthAsDouble >= 0.0 && lengthAsDouble == std::trunc(lengthAsDouble));
     uint64_t length = static_cast<uint64_t>(lengthAsDouble);
     for (uint64_t index = 0; index < length; index++) {
         JSValue next = arrayLikeValue.get(exec, index);
-        if (vm.exception())
-            return;
+        RETURN_IF_EXCEPTION(scope, void());
         
         RuntimeType type = runtimeTypeForValue(next);
         if (!(type & legalTypesFilter)) {
@@ -96,15 +92,17 @@ ALWAYS_INLINE typename std::result_of<CallbackWhenNoException(bool, PropertySlot
 template<typename CallbackWhenNoException>
 ALWAYS_INLINE typename std::result_of<CallbackWhenNoException(bool, PropertySlot&)>::type JSObject::getPropertySlot(ExecState* exec, PropertyName propertyName, PropertySlot& slot, CallbackWhenNoException callback) const
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     bool found = const_cast<JSObject*>(this)->getPropertySlot(exec, propertyName, slot);
-    if (UNLIKELY(exec->hadException()))
-        return { };
+    RETURN_IF_EXCEPTION(scope, { });
     return callback(found, slot);
 }
 
 ALWAYS_INLINE bool JSObject::getPropertySlot(ExecState* exec, unsigned propertyName, PropertySlot& slot)
 {
     VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     auto& structureIDTable = vm.heap.structureIDTable();
     JSObject* object = this;
     MethodTable::GetPrototypeFunctionPtr defaultGetPrototype = JSObject::getPrototype;
@@ -112,15 +110,13 @@ ALWAYS_INLINE bool JSObject::getPropertySlot(ExecState* exec, unsigned propertyN
         Structure& structure = *structureIDTable.get(object->structureID());
         if (structure.classInfo()->methodTable.getOwnPropertySlotByIndex(object, exec, propertyName, slot))
             return true;
-        if (UNLIKELY(vm.exception()))
-            return false;
+        RETURN_IF_EXCEPTION(scope, false);
         JSValue prototype;
         if (LIKELY(structure.classInfo()->methodTable.getPrototype == defaultGetPrototype || slot.internalMethodType() == PropertySlot::InternalMethodType::VMInquiry))
             prototype = structure.storedPrototype();
         else {
             prototype = object->getPrototype(vm, exec);
-            if (vm.exception())
-                return false;
+            RETURN_IF_EXCEPTION(scope, false);
         }
         if (!prototype.isObject())
             return false;
@@ -134,6 +130,7 @@ ALWAYS_INLINE bool JSObject::getNonIndexPropertySlot(ExecState* exec, PropertyNa
     ASSERT(!parseIndex(propertyName));
 
     VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     auto& structureIDTable = vm.heap.structureIDTable();
     JSObject* object = this;
     MethodTable::GetPrototypeFunctionPtr defaultGetPrototype = JSObject::getPrototype;
@@ -145,16 +142,14 @@ ALWAYS_INLINE bool JSObject::getNonIndexPropertySlot(ExecState* exec, PropertyNa
         } else {
             if (structure.classInfo()->methodTable.getOwnPropertySlot(object, exec, propertyName, slot))
                 return true;
-            if (UNLIKELY(vm.exception()))
-                return false;
+            RETURN_IF_EXCEPTION(scope, false);
         }
         JSValue prototype;
         if (LIKELY(structure.classInfo()->methodTable.getPrototype == defaultGetPrototype || slot.internalMethodType() == PropertySlot::InternalMethodType::VMInquiry))
             prototype = structure.storedPrototype();
         else {
             prototype = object->getPrototype(vm, exec);
-            if (vm.exception())
-                return false;
+            RETURN_IF_EXCEPTION(scope, false);
         }
         if (!prototype.isObject())
             return false;
@@ -182,11 +177,8 @@ ALWAYS_INLINE bool JSObject::putInline(JSCell* cell, ExecState* exec, PropertyNa
 
     if (thisObject->canPerformFastPutInline(exec, vm, propertyName)) {
         ASSERT(!thisObject->structure(vm)->prototypeChainMayInterceptStoreTo(vm, propertyName));
-        if (!thisObject->putDirectInternal<PutModePut>(vm, propertyName, value, 0, slot)) {
-            if (slot.isStrictMode())
-                throwTypeError(exec, scope, ASCIILiteral(StrictModeReadonlyPropertyWriteError));
-            return false;
-        }
+        if (!thisObject->putDirectInternal<PutModePut>(vm, propertyName, value, 0, slot))
+            return typeError(exec, scope, slot.isStrictMode(), ASCIILiteral(ReadonlyPropertyWriteError));
         return true;
     }
 
@@ -195,12 +187,18 @@ ALWAYS_INLINE bool JSObject::putInline(JSCell* cell, ExecState* exec, PropertyNa
 
 // HasOwnProperty(O, P) from section 7.3.11 in the spec.
 // http://www.ecma-international.org/ecma-262/6.0/index.html#sec-hasownproperty
-ALWAYS_INLINE bool JSObject::hasOwnProperty(ExecState* exec, PropertyName propertyName) const
+ALWAYS_INLINE bool JSObject::hasOwnProperty(ExecState* exec, PropertyName propertyName, PropertySlot& slot) const
 {
-    PropertySlot slot(this, PropertySlot::InternalMethodType::GetOwnProperty);
+    ASSERT(slot.internalMethodType() == PropertySlot::InternalMethodType::GetOwnProperty);
     if (LIKELY(const_cast<JSObject*>(this)->methodTable(exec->vm())->getOwnPropertySlot == JSObject::getOwnPropertySlot))
         return JSObject::getOwnPropertySlot(const_cast<JSObject*>(this), exec, propertyName, slot);
     return const_cast<JSObject*>(this)->methodTable(exec->vm())->getOwnPropertySlot(const_cast<JSObject*>(this), exec, propertyName, slot);
+}
+
+ALWAYS_INLINE bool JSObject::hasOwnProperty(ExecState* exec, PropertyName propertyName) const
+{
+    PropertySlot slot(this, PropertySlot::InternalMethodType::GetOwnProperty);
+    return hasOwnProperty(exec, propertyName, slot);
 }
 
 ALWAYS_INLINE bool JSObject::hasOwnProperty(ExecState* exec, unsigned propertyName) const
@@ -210,6 +208,3 @@ ALWAYS_INLINE bool JSObject::hasOwnProperty(ExecState* exec, unsigned propertyNa
 }
 
 } // namespace JSC
-
-#endif // JSObjectInlines_h
-

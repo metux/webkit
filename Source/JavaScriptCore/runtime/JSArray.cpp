@@ -26,7 +26,6 @@
 #include "ArrayPrototype.h"
 #include "ButterflyInlines.h"
 #include "CodeBlock.h"
-#include "CopiedSpace.h"
 #include "Error.h"
 #include "Executable.h"
 #include "GetterSetter.h"
@@ -34,7 +33,7 @@
 #include "JSArrayInlines.h"
 #include "JSCInlines.h"
 #include "PropertyNameArray.h"
-#include "Reject.h"
+#include "TypeError.h"
 #include <wtf/Assertions.h>
 
 using namespace std;
@@ -60,7 +59,7 @@ Butterfly* createArrayButterflyInDictionaryIndexingMode(
     return butterfly;
 }
 
-JSArray* JSArray::tryCreateUninitialized(VM& vm, Structure* structure, unsigned initialLength)
+JSArray* JSArray::tryCreateUninitialized(VM& vm, GCDeferralContext* deferralContext, Structure* structure, unsigned initialLength)
 {
     if (initialLength > MAX_STORAGE_VECTOR_LENGTH)
         return 0;
@@ -77,7 +76,7 @@ JSArray* JSArray::tryCreateUninitialized(VM& vm, Structure* structure, unsigned 
             || hasContiguous(indexingType));
 
         unsigned vectorLength = Butterfly::optimalContiguousVectorLength(structure, initialLength);
-        void* temp = vm.heap.tryAllocateAuxiliary(nullptr, Butterfly::totalSize(0, outOfLineStorage, true, vectorLength * sizeof(EncodedJSValue)));
+        void* temp = vm.heap.tryAllocateAuxiliary(deferralContext, nullptr, Butterfly::totalSize(0, outOfLineStorage, true, vectorLength * sizeof(EncodedJSValue)));
         if (!temp)
             return nullptr;
         butterfly = Butterfly::fromBase(temp, 0, outOfLineStorage);
@@ -105,7 +104,7 @@ JSArray* JSArray::tryCreateUninitialized(VM& vm, Structure* structure, unsigned 
             storage->m_vector[i].clear();
     }
 
-    return createWithButterfly(vm, structure, butterfly);
+    return createWithButterfly(vm, deferralContext, structure, butterfly);
 }
 
 void JSArray::setLengthWritable(ExecState* exec, bool writable)
@@ -130,22 +129,22 @@ bool JSArray::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName 
     JSArray* array = jsCast<JSArray*>(object);
 
     // 3. If P is "length", then
-    if (propertyName == exec->propertyNames().length) {
+    if (propertyName == vm.propertyNames->length) {
         // All paths through length definition call the default [[DefineOwnProperty]], hence:
         // from ES5.1 8.12.9 7.a.
         if (descriptor.configurablePresent() && descriptor.configurable())
-            return reject(exec, throwException, "Attempting to change configurable attribute of unconfigurable property.");
+            return typeError(exec, scope, throwException, ASCIILiteral(UnconfigurablePropertyChangeConfigurabilityError));
         // from ES5.1 8.12.9 7.b.
         if (descriptor.enumerablePresent() && descriptor.enumerable())
-            return reject(exec, throwException, "Attempting to change enumerable attribute of unconfigurable property.");
+            return typeError(exec, scope, throwException, ASCIILiteral(UnconfigurablePropertyChangeEnumerabilityError));
 
         // a. If the [[Value]] field of Desc is absent, then
         // a.i. Return the result of calling the default [[DefineOwnProperty]] internal method (8.12.9) on A passing "length", Desc, and Throw as arguments.
         if (descriptor.isAccessorDescriptor())
-            return reject(exec, throwException, UnconfigurablePropertyChangeAccessMechanismError);
+            return typeError(exec, scope, throwException, ASCIILiteral(UnconfigurablePropertyChangeAccessMechanismError));
         // from ES5.1 8.12.9 10.a.
         if (!array->isLengthWritable() && descriptor.writablePresent() && descriptor.writable())
-            return reject(exec, throwException, "Attempting to change writable attribute of unconfigurable property.");
+            return typeError(exec, scope, throwException, ASCIILiteral(UnconfigurablePropertyChangeWritabilityError));
         // This descriptor is either just making length read-only, or changing nothing!
         if (!descriptor.value()) {
             if (descriptor.writablePresent())
@@ -175,7 +174,7 @@ bool JSArray::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName 
         // f.i. Return the result of calling the default [[DefineOwnProperty]] internal method (8.12.9) on A passing "length", newLenDesc, and Throw as arguments.
         // g. Reject if oldLenDesc.[[Writable]] is false.
         if (!array->isLengthWritable())
-            return reject(exec, throwException, "Attempting to change value of a readonly property.");
+            return typeError(exec, scope, throwException, ASCIILiteral(ReadonlyPropertyChangeError));
         
         // h. If newLenDesc.[[Writable]] is absent or has the value true, let newWritable be true.
         // i. Else,
@@ -215,7 +214,7 @@ bool JSArray::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName 
         uint32_t index = optionalIndex.value();
         // FIXME: Nothing prevents this from being called on a RuntimeArray, and the length function will always return 0 in that case.
         if (index >= array->length() && !array->isLengthWritable())
-            return reject(exec, throwException, "Attempting to define numeric property on array with non-writable length property.");
+            return typeError(exec, scope, throwException, ASCIILiteral("Attempting to define numeric property on array with non-writable length property."));
         // c. Let succeeded be the result of calling the default [[DefineOwnProperty]] internal method (8.12.9) on A passing P, Desc, and false as arguments.
         // d. Reject if succeeded is false.
         // e. If index >= oldLen
@@ -399,6 +398,9 @@ bool JSArray::unshiftCountSlowCase(VM& vm, DeferGC&, bool addToFront, unsigned c
 
 bool JSArray::setLengthWithArrayStorage(ExecState* exec, unsigned newLength, bool throwException, ArrayStorage* storage)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     unsigned length = storage->length();
     
     // If the length is read only then we enter sparse mode, so should enter the following 'if'.
@@ -407,7 +409,7 @@ bool JSArray::setLengthWithArrayStorage(ExecState* exec, unsigned newLength, boo
     if (SparseArrayValueMap* map = storage->m_sparseMap.get()) {
         // Fail if the length is not writable.
         if (map->lengthIsReadOnly())
-            return reject(exec, throwException, StrictModeReadonlyPropertyWriteError);
+            return typeError(exec, scope, throwException, ASCIILiteral(ReadonlyPropertyWriteError));
 
         if (newLength < length) {
             // Copy any keys we might be interested in into a vector.
@@ -432,7 +434,7 @@ bool JSArray::setLengthWithArrayStorage(ExecState* exec, unsigned newLength, boo
                     ASSERT(it != map->notFound());
                     if (it->value.attributes & DontDelete) {
                         storage->setLength(index + 1);
-                        return reject(exec, throwException, "Unable to delete property.");
+                        return typeError(exec, scope, throwException, ASCIILiteral(UnableToDeletePropertyError));
                     }
                     map->remove(it);
                 }
@@ -626,7 +628,7 @@ JSValue JSArray::pop(ExecState* exec)
         unsigned length = storage->length();
         if (!length) {
             if (!isLengthWritable())
-                throwTypeError(exec, scope, StrictModeReadonlyPropertyWriteError);
+                throwTypeError(exec, scope, ASCIILiteral(ReadonlyPropertyWriteError));
             return jsUndefined();
         }
 
@@ -654,11 +656,10 @@ JSValue JSArray::pop(ExecState* exec)
     unsigned index = getArrayLength() - 1;
     // Let element be the result of calling the [[Get]] internal method of O with argument indx.
     JSValue element = get(exec, index);
-    if (exec->hadException())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
     // Call the [[Delete]] internal method of O with arguments indx and true.
     if (!deletePropertyByIndex(this, exec, index)) {
-        throwTypeError(exec, scope, ASCIILiteral("Unable to delete property."));
+        throwTypeError(exec, scope, ASCIILiteral(UnableToDeletePropertyError));
         return jsUndefined();
     }
     // Call the [[Put]] internal method of O with arguments "length", indx, and true.
@@ -706,7 +707,7 @@ void JSArray::push(ExecState* exec, JSValue value)
         
         if (length > MAX_ARRAY_INDEX) {
             methodTable(vm)->putByIndex(this, exec, length, value, true);
-            if (!exec->hadException())
+            if (!scope.exception())
                 throwException(exec, scope, createRangeError(exec, ASCIILiteral("Invalid array length")));
             return;
         }
@@ -726,7 +727,7 @@ void JSArray::push(ExecState* exec, JSValue value)
         
         if (length > MAX_ARRAY_INDEX) {
             methodTable(vm)->putByIndex(this, exec, length, value, true);
-            if (!exec->hadException())
+            if (!scope.exception())
                 throwException(exec, scope, createRangeError(exec, ASCIILiteral("Invalid array length")));
             return;
         }
@@ -758,7 +759,7 @@ void JSArray::push(ExecState* exec, JSValue value)
         
         if (length > MAX_ARRAY_INDEX) {
             methodTable(vm)->putByIndex(this, exec, length, value, true);
-            if (!exec->hadException())
+            if (!scope.exception())
                 throwException(exec, scope, createRangeError(exec, ASCIILiteral("Invalid array length")));
             return;
         }
@@ -771,7 +772,7 @@ void JSArray::push(ExecState* exec, JSValue value)
         unsigned oldLength = length();
         bool putResult = false;
         if (attemptToInterceptPutByIndexOnHole(exec, oldLength, value, true, putResult)) {
-            if (!exec->hadException() && oldLength < 0xFFFFFFFFu)
+            if (!scope.exception() && oldLength < 0xFFFFFFFFu)
                 setLength(exec, oldLength + 1, true);
             return;
         }
@@ -794,7 +795,7 @@ void JSArray::push(ExecState* exec, JSValue value)
         if (storage->length() > MAX_ARRAY_INDEX) {
             methodTable(vm)->putByIndex(this, exec, storage->length(), value, true);
             // Per ES5.1 15.4.4.7 step 6 & 15.4.5.1 step 3.d.
-            if (!exec->hadException())
+            if (!scope.exception())
                 throwException(exec, scope, createRangeError(exec, ASCIILiteral("Invalid array length")));
             return;
         }
@@ -1257,6 +1258,9 @@ void JSArray::fillArgList(ExecState* exec, MarkedArgumentBuffer& args)
 
 void JSArray::copyToArguments(ExecState* exec, VirtualRegister firstElementDest, unsigned offset, unsigned length)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     unsigned i = offset;
     WriteBarrier<Unknown>* vector;
     unsigned vectorEnd;
@@ -1321,8 +1325,7 @@ void JSArray::copyToArguments(ExecState* exec, VirtualRegister firstElementDest,
     
     for (; i < length; ++i) {
         exec->r(firstElementDest + i - offset) = get(exec, i);
-        if (UNLIKELY(exec->vm().exception()))
-            return;
+        RETURN_IF_EXCEPTION(scope, void());
     }
 }
 

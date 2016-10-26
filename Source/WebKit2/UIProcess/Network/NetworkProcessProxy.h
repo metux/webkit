@@ -51,6 +51,7 @@ class WebProcessPool;
 enum class WebsiteDataFetchOption;
 enum class WebsiteDataType;
 struct NetworkProcessCreationParameters;
+struct WebsiteData;
 
 class NetworkProcessProxy : public ChildProcessProxy, private ProcessThrottlerClient {
 public:
@@ -90,6 +91,7 @@ private:
     void sendPrepareToSuspend() override;
     void sendCancelPrepareToSuspend() override;
     void sendProcessDidResume() override;
+    bool alwaysRunsAtBackgroundPriority() override;
     void didSetAssertionState(AssertionState) override;
 
     // IPC::Connection::Client

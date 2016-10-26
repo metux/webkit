@@ -23,10 +23,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebCoreArgumentCoders_h
-#define WebCoreArgumentCoders_h
+#pragma once
 
 #include "ArgumentCoders.h"
+#include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/PaymentHeaders.h>
 
 namespace WebCore {
@@ -124,6 +124,13 @@ class MediaPlaybackTargetContext;
 #if ENABLE(MEDIA_SESSION)
 namespace WebCore {
 class MediaSessionMetadata;
+}
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+namespace WebCore {
+class CaptureDevice;
+struct MediaConstraintsData;
 }
 #endif
 
@@ -528,6 +535,28 @@ template<> struct ArgumentCoder<WebCore::PaymentRequest::TotalAndLineItems> {
 
 #endif
 
+#if ENABLE(MEDIA_STREAM)
+template<> struct ArgumentCoder<WebCore::MediaConstraintsData> {
+    static void encode(Encoder&, const WebCore::MediaConstraintsData&);
+    static bool decode(Decoder&, WebCore::MediaConstraintsData&);
+};
+
+template<> struct ArgumentCoder<WebCore::CaptureDevice> {
+    static void encode(Encoder&, const WebCore::CaptureDevice&);
+    static bool decode(Decoder&, WebCore::CaptureDevice&);
+};
+#endif
+
 } // namespace IPC
 
-#endif // WebCoreArgumentCoders_h
+namespace WTF {
+
+template<> struct EnumTraits<WebCore::HasInsecureContent> {
+    using values = EnumValues<
+        WebCore::HasInsecureContent,
+        WebCore::HasInsecureContent::No,
+        WebCore::HasInsecureContent::Yes
+    >;
+};
+
+} // namespace WTF

@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef BuiltinNames_h
-#define BuiltinNames_h
+#pragma once
 
 #include "BuiltinUtils.h"
 #include "BytecodeIntrinsicRegistry.h"
@@ -126,17 +125,14 @@ namespace JSC {
     macro(isBoundFunction) \
     macro(hasInstanceBoundFunction) \
     macro(instanceOf) \
-    macro(isArray) \
+    macro(isArraySlow) \
     macro(isArrayConstructor) \
     macro(isConstructor) \
     macro(isDerivedConstructor) \
-    macro(isRegExpObject) \
     macro(concatMemcpy) \
     macro(appendMemcpy) \
     macro(predictFinalLengthFromArgumunts) \
     macro(print) \
-    macro(isSet) \
-    macro(isMap) \
     macro(regExpCreate) \
     macro(SetIterator) \
     macro(setIteratorNext) \
@@ -160,7 +156,16 @@ namespace JSC {
     macro(regExpTestFast) \
     macro(stringIncludesInternal) \
     macro(stringSplitFast) \
-    macro(stringSubstrInternal)
+    macro(stringSubstrInternal) \
+    macro(makeBoundFunction) \
+    macro(hasOwnLengthProperty) \
+    macro(WebAssembly) \
+    macro(Module) \
+    macro(Instance) \
+    macro(Memory) \
+    macro(Table) \
+    macro(CompileError) \
+    macro(RuntimeError) \
 
 
 #define INITIALIZE_PRIVATE_TO_PUBLIC_ENTRY(name) m_privateToPublicMap.add(m_##name##PrivateName.impl(), &m_##name);
@@ -267,6 +272,4 @@ inline void BuiltinNames::appendExternalName(const Identifier& publicName, const
     m_publicToPrivateMap.add(publicName.impl(), &privateName);
 }
 
-}
-
-#endif
+} // namespace JSC

@@ -103,14 +103,15 @@ public:
     void setShadowDOMEnabled(bool);
     void setCustomElementsEnabled(bool);
     void setDOMIteratorEnabled(bool);
+    void setModernMediaControlsEnabled(bool);
     void setWebGL2Enabled(bool);
     void setFetchAPIEnabled(bool);
     void setAllowUniversalAccessFromFileURLs(bool);
     void setAllowFileAccessFromFileURLs(bool);
     void setPluginsEnabled(bool);
     void setJavaScriptCanAccessClipboard(bool);
-    void setAutomaticLinkDetectionEnabled(bool);
     void setPrivateBrowsingEnabled(bool);
+    void setUseDashboardCompatibilityMode(bool);
     void setPopupBlockingEnabled(bool);
     void setAuthorAndUserStylesEnabled(bool);
     void setCustomPolicyDelegate(bool enabled, bool permissive = false);

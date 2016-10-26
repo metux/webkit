@@ -101,19 +101,19 @@ static bool jsDOMWindowGetOwnPropertySlotRestrictedAccess(JSDOMWindow* thisObjec
     // These are the functions we allow access to cross-origin (DoNotCheckSecurity in IDL).
     // Always provide the original function, on a fresh uncached function object.
     if (propertyName == exec->propertyNames().blur) {
-        slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowInstanceFunctionBlur, 0>);
+        slot.setCustom(thisObject, ReadOnly | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowInstanceFunctionBlur, 0>);
         return true;
     }
     if (propertyName == exec->propertyNames().close) {
-        slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowInstanceFunctionClose, 0>);
+        slot.setCustom(thisObject, ReadOnly | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowInstanceFunctionClose, 0>);
         return true;
     }
     if (propertyName == exec->propertyNames().focus) {
-        slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowInstanceFunctionFocus, 0>);
+        slot.setCustom(thisObject, ReadOnly | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowInstanceFunctionFocus, 0>);
         return true;
     }
     if (propertyName == exec->propertyNames().postMessage) {
-        slot.setCustom(thisObject, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowInstanceFunctionPostMessage, 2>);
+        slot.setCustom(thisObject, ReadOnly | DontEnum, nonCachingStaticFunctionGetter<jsDOMWindowInstanceFunctionPostMessage, 2>);
         return true;
     }
 
@@ -131,7 +131,9 @@ static bool jsDOMWindowGetOwnPropertySlotRestrictedAccess(JSDOMWindow* thisObjec
             || propertyName == exec->propertyNames().opener
             || propertyName == exec->propertyNames().parent
             || propertyName == exec->propertyNames().top) {
-            slot.setCacheableCustom(thisObject, ReadOnly | DontDelete | DontEnum, entry->propertyGetter());
+            bool shouldExposeSetter = propertyName == exec->propertyNames().location;
+            CustomGetterSetter* customGetterSetter = CustomGetterSetter::create(vm, entry->propertyGetter(), shouldExposeSetter ? entry->propertyPutter() : nullptr);
+            slot.setCustomGetterSetter(thisObject, DontEnum | CustomAccessor, customGetterSetter);
             return true;
         }
 
@@ -319,12 +321,28 @@ void JSDOMWindow::getPropertyNames(JSObject* object, ExecState* exec, PropertyNa
     Base::getPropertyNames(thisObject, exec, propertyNames, mode);
 }
 
+static void addCrossOriginWindowPropertyNames(ExecState& state, PropertyNameArray& propertyNames)
+{
+    // https://html.spec.whatwg.org/#crossoriginproperties-(-o-)
+    static const Identifier* const properties[] = {
+        &state.propertyNames().blur, &state.propertyNames().close, &state.propertyNames().closed,
+        &state.propertyNames().focus, &state.propertyNames().frames, &state.propertyNames().length,
+        &state.propertyNames().location, &state.propertyNames().opener, &state.propertyNames().parent,
+        &state.propertyNames().postMessage, &state.propertyNames().self, &state.propertyNames().top,
+        &state.propertyNames().window
+    };
+    for (auto* property : properties)
+        propertyNames.add(*property);
+}
+
 void JSDOMWindow::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
     JSDOMWindow* thisObject = jsCast<JSDOMWindow*>(object);
-    // Only allow the window to enumerated by frames in the same origin.
-    if (!BindingSecurity::shouldAllowAccessToDOMWindow(exec, thisObject->wrapped()))
+    if (!BindingSecurity::shouldAllowAccessToDOMWindow(exec, thisObject->wrapped(), DoNotReportSecurityError)) {
+        if (mode.includeDontEnumProperties())
+            addCrossOriginWindowPropertyNames(*exec, propertyNames);
         return;
+    }
     Base::getOwnPropertyNames(thisObject, exec, propertyNames, mode);
 }
 
@@ -332,7 +350,7 @@ bool JSDOMWindow::defineOwnProperty(JSC::JSObject* object, JSC::ExecState* exec,
 {
     JSDOMWindow* thisObject = jsCast<JSDOMWindow*>(object);
     // Only allow defining properties in this way by frames in the same origin, as it allows setters to be introduced.
-    if (!BindingSecurity::shouldAllowAccessToDOMWindow(exec, thisObject->wrapped()))
+    if (!BindingSecurity::shouldAllowAccessToDOMWindow(exec, thisObject->wrapped(), ThrowSecurityError))
         return false;
 
     // Don't allow shadowing location using accessor properties.
@@ -342,10 +360,30 @@ bool JSDOMWindow::defineOwnProperty(JSC::JSObject* object, JSC::ExecState* exec,
     return Base::defineOwnProperty(thisObject, exec, propertyName, descriptor, shouldThrow);
 }
 
+JSValue JSDOMWindow::getPrototype(JSObject* object, ExecState* exec)
+{
+    JSDOMWindow* thisObject = jsCast<JSDOMWindow*>(object);
+    if (!BindingSecurity::shouldAllowAccessToDOMWindow(exec, thisObject->wrapped(), DoNotReportSecurityError))
+        return jsNull();
+
+    return Base::getPrototype(object, exec);
+}
+
+bool JSDOMWindow::preventExtensions(JSObject*, ExecState* exec)
+{
+    auto scope = DECLARE_THROW_SCOPE(exec->vm());
+
+    throwTypeError(exec, scope, ASCIILiteral("Cannot prevent extensions on this object"));
+    return false;
+}
+
 // Custom Attributes
 
 void JSDOMWindow::setLocation(ExecState& state, JSValue value)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
 #if ENABLE(DASHBOARD_SUPPORT)
     // To avoid breaking old widgets, make "var location =" in a top-level frame create
     // a property named "location" instead of performing a navigation (<rdar://problem/5688039>).
@@ -359,8 +397,7 @@ void JSDOMWindow::setLocation(ExecState& state, JSValue value)
 #endif
 
     String locationString = value.toString(&state)->value(&state);
-    if (state.hadException())
-        return;
+    RETURN_IF_EXCEPTION(scope, void());
 
     if (Location* location = wrapped().location())
         location->setHref(activeDOMWindow(&state), firstDOMWindow(&state), locationString);
@@ -383,20 +420,20 @@ JSValue JSDOMWindow::image(ExecState& state) const
 
 JSValue JSDOMWindow::open(ExecState& state)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     String urlString = valueToUSVStringWithUndefinedOrNullCheck(&state, state.argument(0));
-    if (state.hadException())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
     JSValue targetValue = state.argument(1);
     AtomicString target = targetValue.isUndefinedOrNull() ? AtomicString("_blank", AtomicString::ConstructFromLiteral) : targetValue.toString(&state)->toAtomicString(&state);
-    if (state.hadException())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
     String windowFeaturesString = valueToStringWithUndefinedOrNullCheck(&state, state.argument(2));
-    if (state.hadException())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
 
     RefPtr<DOMWindow> openedWindow = wrapped().open(urlString, target, windowFeaturesString, activeDOMWindow(&state), firstDOMWindow(&state));
     if (!openedWindow)
-        return jsUndefined();
+        return jsNull();
     return toJS(&state, openedWindow.get());
 }
 
@@ -447,11 +484,9 @@ JSValue JSDOMWindow::showModalDialog(ExecState& state)
         return throwException(&state, scope, createNotEnoughArgumentsError(&state));
 
     String urlString = valueToStringWithUndefinedOrNullCheck(&state, state.argument(0));
-    if (state.hadException())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
     String dialogFeaturesString = valueToStringWithUndefinedOrNullCheck(&state, state.argument(2));
-    if (state.hadException())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
 
     DialogHandler handler(state);
 
@@ -470,8 +505,8 @@ static JSValue handlePostMessage(DOMWindow& impl, ExecState& state)
     if (UNLIKELY(state.argumentCount() < 2))
         return throwException(&state, scope, createNotEnoughArgumentsError(&state));
 
-    MessagePortArray messagePorts;
-    ArrayBufferArray arrayBuffers;
+    Vector<RefPtr<MessagePort>> messagePorts;
+    Vector<RefPtr<JSC::ArrayBuffer>> arrayBuffers;
 
     // This function has variable arguments and can be:
     // Per current spec:
@@ -486,23 +521,17 @@ static JSValue handlePostMessage(DOMWindow& impl, ExecState& state)
             targetOriginArgIndex = 2;
             transferablesArgIndex = 1;
         }
-        fillMessagePortArray(state, state.argument(transferablesArgIndex), messagePorts, arrayBuffers);
+        extractTransferables(state, state.argument(transferablesArgIndex), messagePorts, arrayBuffers);
     }
-    if (state.hadException())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
 
-    auto message = SerializedScriptValue::create(&state, state.uncheckedArgument(0), &messagePorts, &arrayBuffers);
-
-    if (state.hadException())
-        return jsUndefined();
+    auto message = SerializedScriptValue::create(state, state.uncheckedArgument(0), messagePorts, WTFMove(arrayBuffers));
+    RETURN_IF_EXCEPTION(scope, JSValue());
 
     String targetOrigin = valueToUSVStringWithUndefinedOrNullCheck(&state, state.uncheckedArgument(targetOriginArgIndex));
-    if (state.hadException())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
 
-    ExceptionCode ec = 0;
-    impl.postMessage(WTFMove(message), &messagePorts, targetOrigin, callerDOMWindow(&state), ec);
-    setDOMException(&state, ec);
+    propagateException(state, scope, impl.postMessage(message.releaseNonNull(), WTFMove(messagePorts), targetOrigin, callerDOMWindow(&state)));
 
     return jsUndefined();
 }
@@ -520,21 +549,14 @@ JSValue JSDOMWindow::setTimeout(ExecState& state)
     if (UNLIKELY(state.argumentCount() < 1))
         return throwException(&state, scope, createNotEnoughArgumentsError(&state));
 
-    ContentSecurityPolicy* contentSecurityPolicy = wrapped().document() ? wrapped().document()->contentSecurityPolicy() : nullptr;
-    std::unique_ptr<ScheduledAction> action = ScheduledAction::create(&state, globalObject()->world(), contentSecurityPolicy);
-    if (state.hadException())
-        return jsUndefined();
-
+    auto* contentSecurityPolicy = wrapped().document() ? wrapped().document()->contentSecurityPolicy() : nullptr;
+    auto action = ScheduledAction::create(&state, globalObject()->world(), contentSecurityPolicy);
+    RETURN_IF_EXCEPTION(scope, JSValue());
     if (!action)
         return jsNumber(0);
 
     int delay = state.argument(1).toInt32(&state);
-
-    ExceptionCode ec = 0;
-    int result = wrapped().setTimeout(WTFMove(action), delay, ec);
-    setDOMException(&state, ec);
-
-    return jsNumber(result);
+    return toJS<IDLLong>(state, scope, wrapped().setTimeout(WTFMove(action), delay));
 }
 
 JSValue JSDOMWindow::setInterval(ExecState& state)
@@ -545,23 +567,17 @@ JSValue JSDOMWindow::setInterval(ExecState& state)
     if (UNLIKELY(state.argumentCount() < 1))
         return throwException(&state, scope, createNotEnoughArgumentsError(&state));
 
-    ContentSecurityPolicy* contentSecurityPolicy = wrapped().document() ? wrapped().document()->contentSecurityPolicy() : nullptr;
-    std::unique_ptr<ScheduledAction> action = ScheduledAction::create(&state, globalObject()->world(), contentSecurityPolicy);
-    if (state.hadException())
-        return jsUndefined();
-    int delay = state.argument(1).toInt32(&state);
-
+    auto* contentSecurityPolicy = wrapped().document() ? wrapped().document()->contentSecurityPolicy() : nullptr;
+    auto action = ScheduledAction::create(&state, globalObject()->world(), contentSecurityPolicy);
+    RETURN_IF_EXCEPTION(scope, JSValue());
     if (!action)
         return jsNumber(0);
 
-    ExceptionCode ec = 0;
-    int result = wrapped().setInterval(WTFMove(action), delay, ec);
-    setDOMException(&state, ec);
-
-    return jsNumber(result);
+    int delay = state.argument(1).toInt32(&state);
+    return toJS<IDLLong>(state, scope, wrapped().setInterval(WTFMove(action), delay));
 }
 
-DOMWindow* JSDOMWindow::toWrapped(ExecState&, JSValue value)
+DOMWindow* JSDOMWindow::toWrapped(JSValue value)
 {
     if (!value.isObject())
         return nullptr;

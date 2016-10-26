@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef ArrayBufferView_h
-#define ArrayBufferView_h
+#pragma once
 
 #include "ArrayBuffer.h"
 #include "TypedArrayType.h"
@@ -62,6 +61,8 @@ public:
             return 0;
         return m_baseAddress;
     }
+
+    void* data() const { return baseAddress(); }
 
     unsigned byteOffset() const
     {
@@ -207,5 +208,3 @@ void ArrayBufferView::calculateOffsetAndLength(
 } // namespace JSC
 
 using JSC::ArrayBufferView;
-
-#endif // ArrayBufferView_h

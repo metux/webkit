@@ -25,8 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MacroAssemblerARM_h
-#define MacroAssemblerARM_h
+#pragma once
 
 #if ENABLE(ASSEMBLER) && CPU(ARM_TRADITIONAL)
 
@@ -651,6 +650,12 @@ public:
         move(TrustedImmPtr(left.m_ptr), ARMRegisters::S1);
         load8(Address(ARMRegisters::S1), ARMRegisters::S1);
         return branch32(cond, ARMRegisters::S1, right8);
+    }
+
+    Jump branchPtr(RelationalCondition cond, BaseIndex left, RegisterID right)
+    {
+        load32(left, ARMRegisters::S1);
+        return branch32(cond, ARMRegisters::S1, right);
     }
 
     Jump branch32(RelationalCondition cond, RegisterID left, RegisterID right, int useConstantPool = 0)
@@ -1600,8 +1605,6 @@ private:
     static const bool s_isVFPPresent;
 };
 
-}
+} // namespace JSC
 
 #endif // ENABLE(ASSEMBLER) && CPU(ARM_TRADITIONAL)
-
-#endif // MacroAssemblerARM_h

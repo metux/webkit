@@ -26,9 +26,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ExceptionHelpers_h
-#define ExceptionHelpers_h
+#pragma once
 
+#include "CatchScope.h"
 #include "ErrorInstance.h"
 #include "JSObject.h"
 #include "ThrowScope.h"
@@ -36,6 +36,8 @@
 namespace JSC {
 
 typedef JSObject* (*ErrorFactory)(ExecState*, const String&, ErrorInstance::SourceAppender);
+
+String defaultSourceAppender(const String&, const String&, RuntimeType, ErrorInstance::SourceTextWhereErrorOccurred);
 
 JSObject* createTerminatedExecutionException(VM*);
 JS_EXPORT_PRIVATE bool isTerminatedExecutionException(Exception*);
@@ -88,5 +90,3 @@ private:
 };
 
 } // namespace JSC
-
-#endif // ExceptionHelpers_h

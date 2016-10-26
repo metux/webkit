@@ -23,13 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef ButterflyInlines_h
-#define ButterflyInlines_h
+#pragma once
 
 #include "ArrayStorage.h"
 #include "Butterfly.h"
-#include "CopiedSpaceInlines.h"
-#include "CopyVisitor.h"
 #include "VM.h"
 #include "Structure.h"
 
@@ -85,15 +82,6 @@ inline Butterfly* Butterfly::create(VM& vm, JSCell* intendedOwner, Structure* st
     return create(
         vm, intendedOwner, 0, structure->outOfLineCapacity(),
         structure->hasIndexingHeader(intendedOwner), IndexingHeader(), 0);
-}
-
-inline Butterfly* Butterfly::createUninitializedDuringCollection(CopyVisitor& visitor, size_t preCapacity, size_t propertyCapacity, bool hasIndexingHeader, size_t indexingPayloadSizeInBytes)
-{
-    size_t size = totalSize(preCapacity, propertyCapacity, hasIndexingHeader, indexingPayloadSizeInBytes);
-    Butterfly* result = fromBase(
-        visitor.allocateNewSpace(size),
-        preCapacity, propertyCapacity);
-    return result;
 }
 
 inline void* Butterfly::base(Structure* structure)
@@ -224,6 +212,3 @@ inline Butterfly* Butterfly::shift(Structure* structure, size_t numberOfSlots)
 }
 
 } // namespace JSC
-
-#endif // ButterflyInlines_h
-

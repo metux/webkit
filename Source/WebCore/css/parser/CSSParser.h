@@ -32,7 +32,6 @@
 #include "CSSValueKeywords.h"
 #include "Color.h"
 #include "MediaQuery.h"
-#include "SourceSizeList.h"
 #include "StyleRuleImport.h"
 #include "WebKitCSSFilterValue.h"
 #include <memory>
@@ -132,12 +131,12 @@ public:
     RefPtr<StyleKeyframe> parseKeyframeRule(StyleSheetContents*, const String&);
     bool parseSupportsCondition(const String&);
 
-    static ParseResult parseValue(MutableStyleProperties&, CSSPropertyID, const String&, bool important, CSSParserMode, StyleSheetContents*);
-    static ParseResult parseCustomPropertyValue(MutableStyleProperties&, const AtomicString& propertyName, const String&, bool important, CSSParserMode, StyleSheetContents* contextStyleSheet);
+    static ParseResult parseValue(MutableStyleProperties&, CSSPropertyID, const String&, bool important, const CSSParserContext&, StyleSheetContents*);
+    static ParseResult parseCustomPropertyValue(MutableStyleProperties&, const AtomicString& propertyName, const String&, bool important, const CSSParserContext&, StyleSheetContents* contextStyleSheet);
 
-    static bool parseColor(RGBA32& color, const String&, bool strict = false);
+    static Color parseColor(const String&, bool strict = false);
     static bool isValidSystemColorValue(CSSValueID);
-    static bool parseSystemColor(RGBA32& color, const String&, Document*);
+    static Color parseSystemColor(const String&, Document*);
     static RefPtr<CSSValueList> parseFontFaceValue(const AtomicString&);
     RefPtr<CSSPrimitiveValue> parseValidPrimitive(CSSValueID ident, ValueWithCalculation&);
 
@@ -145,7 +144,6 @@ public:
     static Ref<ImmutableStyleProperties> parseInlineStyleDeclaration(const String&, Element*);
     std::unique_ptr<MediaQuery> parseMediaQuery(const String&);
 
-    void addPropertyWithPrefixingVariant(CSSPropertyID, RefPtr<CSSValue>&&, bool important, bool implicit = false);
     void addProperty(CSSPropertyID, RefPtr<CSSValue>&&, bool important, bool implicit = false);
     void rollbackLastProperties(int num);
     bool hasProperties() const { return !m_parsedProperties.isEmpty(); }
@@ -223,7 +221,7 @@ public:
     RefPtr<CSSPrimitiveValue> parseColumnCount();
     bool parseColumnsShorthand(bool important);
 
-#if ENABLE(IOS_TEXT_AUTOSIZING)
+#if ENABLE(TEXT_AUTOSIZING)
     bool isTextAutosizingEnabled() const;
 #endif
 
@@ -257,9 +255,7 @@ public:
     bool parseItemPositionOverflowPosition(CSSPropertyID, bool important);
     RefPtr<CSSContentDistributionValue> parseContentDistributionOverflowPosition();
 
-#if ENABLE(CSS_SHAPES)
     RefPtr<CSSValue> parseShapeProperty(CSSPropertyID);
-#endif
 
     RefPtr<CSSValueList> parseBasicShapeAndOrBox(CSSPropertyID propId);
     RefPtr<CSSPrimitiveValue> parseBasicShape();
@@ -277,14 +273,14 @@ public:
     bool parseCounter(CSSPropertyID, int defaultValue, bool important);
     RefPtr<CSSPrimitiveValue> parseCounterContent(CSSParserValueList& args, bool counters);
 
-    bool parseColorParameters(CSSParserValue&, int* colorValues, bool parseAlpha);
+    bool parseRGBParameters(CSSParserValue&, int* colorValues, bool parseAlpha);
     bool parseHSLParameters(CSSParserValue&, double* colorValues, bool parseAlpha);
     RefPtr<CSSPrimitiveValue> parseColor(CSSParserValue* = nullptr);
-    bool parseColorFromValue(CSSParserValue&, RGBA32&);
+    Color parseColorFromValue(CSSParserValue&);
     void parseSelector(const String&, CSSSelectorList&);
 
     template<typename StringType>
-    static bool fastParseColor(RGBA32&, const StringType&, bool strict);
+    static Color fastParseColor(const StringType&, bool strict);
 
     bool parseLineHeight(bool important);
     bool parseFontSize(bool important);
@@ -361,10 +357,13 @@ public:
     bool parseHangingPunctuation(bool important);
 
     bool parseLineBoxContain(bool important);
-    RefPtr<CSSCalcValue> parseCalculation(CSSParserValue&, CalculationPermittedValueRange);
+    RefPtr<CSSCalcValue> parseCalculation(CSSParserValue&, ValueRange);
 
     bool parseFontFeatureTag(CSSValueList&);
     bool parseFontFeatureSettings(bool important);
+
+    bool parseFontVariationTag(CSSValueList&);
+    bool parseFontVariationSettings(bool important);
 
     bool parseFlowThread(CSSPropertyID, bool important);
     bool parseRegionThread(CSSPropertyID, bool important);
@@ -428,7 +427,6 @@ public:
     RefPtr<StyleRuleBase> m_rule;
     RefPtr<StyleKeyframe> m_keyframe;
     std::unique_ptr<MediaQuery> m_mediaQuery;
-    std::unique_ptr<Vector<SourceSize>> m_sourceSizeList;
     std::unique_ptr<CSSParserValueList> m_valueList;
     bool m_supportsCondition { false };
 
@@ -571,8 +569,8 @@ private:
 
     void setStyleSheet(StyleSheetContents* styleSheet) { m_styleSheet = styleSheet; }
 
-    inline bool inStrictMode() const { return m_context.mode == CSSStrictMode || m_context.mode == SVGAttributeMode; }
-    inline bool inQuirksMode() const { return m_context.mode == CSSQuirksMode; }
+    inline bool inStrictMode() const { return m_context.mode == UASheetMode || m_context.mode == HTMLStandardMode || m_context.mode == SVGAttributeMode; }
+    inline bool inQuirksMode() const { return m_context.mode == HTMLQuirksMode; }
     
     URL completeURL(const String& url) const;
 
@@ -618,7 +616,7 @@ private:
     bool parseFontFaceSrcURI(CSSValueList&);
     bool parseFontFaceSrcLocal(CSSValueList&);
 
-    bool parseColor(const String&);
+    bool parseColorFromString(const String&);
 
 #if ENABLE(CSS_GRID_LAYOUT)
     bool parseIntegerOrCustomIdentFromGridPosition(RefPtr<CSSPrimitiveValue>& numericValue, RefPtr<CSSPrimitiveValue>& gridLineName);

@@ -1,6 +1,34 @@
 {
     "specification": [
     {
+        "name": "Beacon API",
+        "status": {
+            "status": "Under Consideration",
+            "enabled-by-default": false
+        },
+        "url": "https://www.w3.org/TR/beacon/",
+        "webkit-url": "https://webkit.org/b/147885",
+        "keywords": ["beacon","analytics","diagnostics","request"],
+        "category": "webapps",
+        "description": "Schedules asynchronous and non-blocking data delivery while the current page is unloading to mitigate resource contention for other time-critical requests.",
+        "contact": {
+            "name": "Jonathan Davis",
+            "email": "web-evangelist@apple.com",
+            "twitter": "@jonathandavis"
+        }
+    },
+    {
+        "name": "CSS Fonts Level 4",
+        "url": "https://drafts.csswg.org/css-fonts-4/",
+        "keywords": ["css fonts", "fonts"],
+        "category": "css",
+        "contact": {
+            "name": "Myles C. Maxfield",
+            "twitter": "@Litherum",
+            "email": "mmaxfield@apple.com"
+        }
+    },
+    {
         "name": "CSS Grid Layout Level 1",
         "status": {
             "status": "In Development",
@@ -175,6 +203,16 @@
         "category": "css"
     },
     {
+        "name": "Geometry Interfaces",
+        "url": "https://drafts.fxtf.org/geometry/",
+        "keywords": ["geometry", "dompointreadonly", "dompoint", "domrectreadonly", "domrect", "domquad", "dommatrixreadonly", "dommatrix"],
+        "category": "html",
+        "status": {
+            "status": "In Development"
+        },
+        "webkit-url": "https://bugs.webkit.org/show_bug.cgi?id=163505"
+    },
+    {
         "name": "HTML5",
         "url": "https://html.spec.whatwg.org",
         "keywords": ["html", "html5", "html5.1"],
@@ -194,6 +232,16 @@
             "twitter": "@bradeeoh",
             "email": "beidson@webkit.org"
         }
+    },
+    {
+        "name": "Intersection Observer",
+        "status": {
+            "status": "In Development"
+        },
+        "url": "https://wicg.github.io/IntersectionObserver/",
+        "webkit-url": "https://bugs.webkit.org/show_bug.cgi?id=159475",
+        "keywords": ["intersection", "intersection observer"],
+        "description": "An API that can be used to understand the visibility and position of DOM elements relative to a containing element or to the top-level viewport."
     },
     {
         "name": "Preload",
@@ -300,7 +348,6 @@
         "description": "A collection of technologies to improve modularization of DOM subtrees.",
         "contact": {
             "name": "Ryosuke Niwa",
-            "twitter": "@RyosukeNiwa",
             "email": "rniwa@webkit.org"
         }
     },
@@ -516,7 +563,6 @@
         "description": "Define a custom HTML tag and associate it with an ES6 class.",
         "contact": {
             "name": "Ryosuke Niwa",
-            "twitter": "@RyosukeNiwa",
             "email": "rniwa@webkit.org"
         }
     },
@@ -579,11 +625,10 @@
         "url": "http://w3c.github.io/webcomponents/spec/imports/",
         "specification": "Web Components",
         "description": "Includes resusable HTML documents in other HTML documents.",
-        "comment": "There are concerns about the disconnect between this specification and ES6 Modules. WebKit has no intent to support the current specification.",
+        "comment": "Multile browser vendors have raised concerns about how the HTML imports currently works. For example, its dependency model is not fully compatible with ES6 Modules. We are exploring other ways to package web components by integrating into ES6 Modules with other browser vendors.",
         "contact": {
-            "name": "Jon Davis",
-            "twitter": "@jonathandavis",
-            "email": "web-evangelist@apple.com"
+            "name": "Ryosuke Niwa",
+            "email": "rniwa@webkit.org"
         }
     },
     {
@@ -698,15 +743,16 @@
     {
         "name": "Shadow DOM",
         "status": {
-            "status": "In Development"
+            "status": "Done",
+            "enabled-by-default": true
         },
         "url": "http://w3c.github.io/webcomponents/spec/shadow/",
         "webkit-url": "https://bugs.webkit.org/show_bug.cgi?id=148695",
         "specification": "Web Components",
         "description": "Functional encapsulation of HTML and CSS for Web Components.",
+        "comment": "We are fixing the remainig bugs in our implementation.",
         "contact": {
             "name": "Ryosuke Niwa",
-            "twitter": "@RyosukeNiwa",
             "email": "rniwa@webkit.org"
         }
     },
@@ -776,6 +822,18 @@
         "documentation-url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template",
         "specification": "Web Components",
         "description": "Declares HTML fragments that can be cloned and inserted into the document by a script."
+    },
+    {
+        "name": "Variation Fonts",
+        "status": {
+            "status": "In Development",
+            "enabled-by-default": false
+        },
+        "url": "https://drafts.csswg.org/css-fonts-4/",
+        "webkit-url": "https://bugs.webkit.org/show_bug.cgi?id=162815",
+        "documentation-url": "https://drafts.csswg.org/css-fonts-4/",
+        "specification": "CSS Fonts Level 4",
+        "description": "Allows selection of variation values along fonts' exposed axes."
     }
     ]
 }

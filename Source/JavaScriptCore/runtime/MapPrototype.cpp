@@ -29,13 +29,11 @@
 #include "BuiltinNames.h"
 #include "Error.h"
 #include "ExceptionHelpers.h"
-#include "GetterSetter.h"
 #include "IteratorOperations.h"
 #include "JSCInlines.h"
 #include "JSMap.h"
 #include "JSMapIterator.h"
 #include "Lookup.h"
-#include "MapDataInlines.h"
 
 #include "MapPrototype.lut.h"
 
@@ -99,12 +97,6 @@ ALWAYS_INLINE static JSMap* getMap(CallFrame* callFrame, JSValue thisValue)
         return jsCast<JSMap*>(thisValue);
     throwTypeError(callFrame, scope, ASCIILiteral("Map operation called on non-Map object"));
     return nullptr;
-}
-
-EncodedJSValue JSC_HOST_CALL privateFuncIsMap(ExecState* exec)
-{
-    JSValue value = exec->uncheckedArgument(0);
-    return JSValue::encode(jsBoolean(value.isCell() && value.asCell()->type() == JSMapType));
 }
 
 EncodedJSValue JSC_HOST_CALL mapProtoFuncClear(CallFrame* callFrame)

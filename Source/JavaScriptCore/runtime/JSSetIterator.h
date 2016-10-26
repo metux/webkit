@@ -23,14 +23,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef JSSetIterator_h
-#define JSSetIterator_h
+#pragma once
 
 #include "IterationKind.h"
 #include "JSObject.h"
 #include "JSSet.h"
-
-#include "MapData.h"
 
 namespace JSC {
 
@@ -110,6 +107,4 @@ private:
 };
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(JSSetIterator);
 
-}
-
-#endif // !defined(JSSetIterator_h)
+} // namespace JSC

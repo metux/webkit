@@ -146,6 +146,13 @@ void InProcessIDBServer::didDeleteObjectStore(const IDBResultData& resultData)
     });
 }
 
+void InProcessIDBServer::didRenameObjectStore(const IDBResultData& resultData)
+{
+    RunLoop::current().dispatch([this, protectedThis = makeRef(*this), resultData] {
+        m_connectionToServer->didRenameObjectStore(resultData);
+    });
+}
+
 void InProcessIDBServer::didClearObjectStore(const IDBResultData& resultData)
 {
     RunLoop::current().dispatch([this, protectedThis = makeRef(*this), resultData] {
@@ -164,6 +171,13 @@ void InProcessIDBServer::didDeleteIndex(const IDBResultData& resultData)
 {
     RunLoop::current().dispatch([this, protectedThis = makeRef(*this), resultData] {
         m_connectionToServer->didDeleteIndex(resultData);
+    });
+}
+
+void InProcessIDBServer::didRenameIndex(const IDBResultData& resultData)
+{
+    RunLoop::current().dispatch([this, protectedThis = makeRef(*this), resultData] {
+        m_connectionToServer->didRenameIndex(resultData);
     });
 }
 
@@ -244,6 +258,13 @@ void InProcessIDBServer::deleteObjectStore(const IDBRequestData& requestData, co
     });
 }
 
+void InProcessIDBServer::renameObjectStore(const IDBRequestData& requestData, uint64_t objectStoreIdentifier, const String& newName)
+{
+    RunLoop::current().dispatch([this, protectedThis = makeRef(*this), requestData, objectStoreIdentifier, newName] {
+        m_server->renameObjectStore(requestData, objectStoreIdentifier, newName);
+    });
+}
+
 void InProcessIDBServer::clearObjectStore(const IDBRequestData& requestData, uint64_t objectStoreIdentifier)
 {
     RunLoop::current().dispatch([this, protectedThis = makeRef(*this), requestData, objectStoreIdentifier] {
@@ -262,6 +283,13 @@ void InProcessIDBServer::deleteIndex(const IDBRequestData& requestData, uint64_t
 {
     RunLoop::current().dispatch([this, protectedThis = makeRef(*this), requestData, objectStoreIdentifier, indexName] {
         m_server->deleteIndex(requestData, objectStoreIdentifier, indexName);
+    });
+}
+
+void InProcessIDBServer::renameIndex(const IDBRequestData& requestData, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName)
+{
+    RunLoop::current().dispatch([this, protectedThis = makeRef(*this), requestData, objectStoreIdentifier, indexIdentifier, newName] {
+        m_server->renameIndex(requestData, objectStoreIdentifier, indexIdentifier, newName);
     });
 }
 

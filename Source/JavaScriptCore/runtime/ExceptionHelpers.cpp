@@ -101,7 +101,7 @@ static String defaultApproximateSourceError(const String& originalMessage, const
     return makeString(originalMessage, " (near '...", sourceText, "...')");
 }
 
-static String defaultSourceAppender(const String& originalMessage, const String& sourceText, RuntimeType, ErrorInstance::SourceTextWhereErrorOccurred occurrence)
+String defaultSourceAppender(const String& originalMessage, const String& sourceText, RuntimeType, ErrorInstance::SourceTextWhereErrorOccurred occurrence)
 {
     if (occurrence == ErrorInstance::FoundApproximateSource)
         return defaultApproximateSourceError(originalMessage, sourceText);
@@ -236,7 +236,11 @@ static String invalidParameterInstanceofhasInstanceValueNotFunctionSourceAppende
 
 JSObject* createError(ExecState* exec, JSValue value, const String& message, ErrorInstance::SourceAppender appender)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_CATCH_SCOPE(vm);
+
     String errorMessage = makeString(errorDescriptionForValue(exec, value)->value(exec), ' ', message);
+    ASSERT_UNUSED(scope, !scope.exception());
     JSObject* exception = createTypeError(exec, errorMessage, appender, runtimeTypeForValue(value));
     ASSERT(exception->isErrorInstance());
     return exception;

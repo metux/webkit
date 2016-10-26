@@ -31,7 +31,7 @@
 #include "Debugger.h"
 #include "JIT.h"
 #include "JSCInlines.h"
-#include "JSWASMModule.h"
+#include "JSWasmModule.h"
 #include "LLIntEntrypoint.h"
 #include "Parser.h"
 #include "TypeProfiler.h"
@@ -398,13 +398,12 @@ static void setupJIT(VM& vm, CodeBlock* codeBlock)
 }
 
 JSObject* ScriptExecutable::prepareForExecutionImpl(
-    ExecState* exec, JSFunction* function, JSScope* scope, CodeSpecializationKind kind, CodeBlock*& resultCodeBlock)
+    VM& vm, JSFunction* function, JSScope* scope, CodeSpecializationKind kind, CodeBlock*& resultCodeBlock)
 {
-    VM& vm = exec->vm();
     DeferGCForAWhile deferGC(vm.heap);
 
     if (vm.getAndClearFailNextNewCodeBlock())
-        return createError(exec->callerFrame(), ASCIILiteral("Forced Failure"));
+        return createError(scope->globalObject()->globalExec(), ASCIILiteral("Forced Failure"));
 
     JSObject* exception = 0;
     CodeBlock* codeBlock = newCodeBlockFor(kind, function, scope, exception);
@@ -422,7 +421,7 @@ JSObject* ScriptExecutable::prepareForExecutionImpl(
     else
         setupJIT(vm, codeBlock);
     
-    installCode(*codeBlock->vm(), codeBlock, codeBlock->codeType(), codeBlock->specializationKind());
+    installCode(vm, codeBlock, codeBlock->codeType(), codeBlock->specializationKind());
     return nullptr;
 }
 
@@ -454,6 +453,7 @@ EvalExecutable* EvalExecutable::create(ExecState* exec, const SourceCode& source
 EvalExecutable::EvalExecutable(ExecState* exec, const SourceCode& source, bool inStrictContext, DerivedContextType derivedContextType, bool isArrowFunctionContext, EvalContextType evalContextType)
     : ScriptExecutable(exec->vm().evalExecutableStructure.get(), exec->vm(), source, inStrictContext, derivedContextType, isArrowFunctionContext, evalContextType, NoIntrinsic)
 {
+    ASSERT(source.provider()->sourceType() == SourceProviderSourceType::Program);
 }
 
 void EvalExecutable::destroy(JSCell* cell)
@@ -466,6 +466,7 @@ const ClassInfo ProgramExecutable::s_info = { "ProgramExecutable", &ScriptExecut
 ProgramExecutable::ProgramExecutable(ExecState* exec, const SourceCode& source)
     : ScriptExecutable(exec->vm().programExecutableStructure.get(), exec->vm(), source, false, DerivedContextType::None, false, EvalContextType::None, NoIntrinsic)
 {
+    ASSERT(source.provider()->sourceType() == SourceProviderSourceType::Program);
     m_typeProfilingStartOffset = 0;
     m_typeProfilingEndOffset = source.length() - 1;
     if (exec->vm().typeProfiler() || exec->vm().controlFlowProfiler())
@@ -482,6 +483,7 @@ const ClassInfo ModuleProgramExecutable::s_info = { "ModuleProgramExecutable", &
 ModuleProgramExecutable::ModuleProgramExecutable(ExecState* exec, const SourceCode& source)
     : ScriptExecutable(exec->vm().moduleProgramExecutableStructure.get(), exec->vm(), source, false, DerivedContextType::None, false, EvalContextType::None, NoIntrinsic)
 {
+    ASSERT(source.provider()->sourceType() == SourceProviderSourceType::Module);
     m_typeProfilingStartOffset = 0;
     m_typeProfilingEndOffset = source.length() - 1;
     if (exec->vm().typeProfiler() || exec->vm().controlFlowProfiler())
@@ -573,7 +575,7 @@ JSObject* ProgramExecutable::checkSyntax(ExecState* exec)
     JSGlobalObject* lexicalGlobalObject = exec->lexicalGlobalObject();
     std::unique_ptr<ProgramNode> programNode = parse<ProgramNode>(
         vm, m_source, Identifier(), JSParserBuiltinMode::NotBuiltin,
-        JSParserStrictMode::NotStrict, JSParserCommentMode::Classic, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, error);
+        JSParserStrictMode::NotStrict, JSParserScriptMode::Classic, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, error);
     if (programNode)
         return 0;
     ASSERT(error.isValid());
@@ -745,12 +747,13 @@ FunctionExecutable* FunctionExecutable::fromGlobalCode(
 #if ENABLE(WEBASSEMBLY)
 const ClassInfo WebAssemblyExecutable::s_info = { "WebAssemblyExecutable", &ExecutableBase::s_info, 0, CREATE_METHOD_TABLE(WebAssemblyExecutable) };
 
-WebAssemblyExecutable::WebAssemblyExecutable(VM& vm, const SourceCode& source, JSWASMModule* module, unsigned functionIndex)
+WebAssemblyExecutable::WebAssemblyExecutable(VM& vm, const SourceCode& source, JSWasmModule* module, unsigned functionIndex)
     : ExecutableBase(vm, vm.webAssemblyExecutableStructure.get(), NUM_PARAMETERS_NOT_COMPILED, NoIntrinsic)
     , m_source(source)
     , m_module(vm, this, module)
     , m_functionIndex(functionIndex)
 {
+    ASSERT(source.provider()->sourceType() == SourceProviderSourceType::WebAssembly);
 }
 
 void WebAssemblyExecutable::destroy(JSCell* cell)

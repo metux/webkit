@@ -28,15 +28,15 @@
 
 #if ENABLE(SUBTLE_CRYPTO)
 
-#include "CryptoAlgorithmAesCbcParams.h"
-#include "CryptoAlgorithmAesKeyGenParams.h"
-#include "CryptoAlgorithmHmacKeyParams.h"
-#include "CryptoAlgorithmHmacParams.h"
+#include "CryptoAlgorithmAesCbcParamsDeprecated.h"
+#include "CryptoAlgorithmAesKeyGenParamsDeprecated.h"
+#include "CryptoAlgorithmHmacKeyParamsDeprecated.h"
+#include "CryptoAlgorithmHmacParamsDeprecated.h"
 #include "CryptoAlgorithmRegistry.h"
-#include "CryptoAlgorithmRsaKeyGenParams.h"
-#include "CryptoAlgorithmRsaKeyParamsWithHash.h"
-#include "CryptoAlgorithmRsaOaepParams.h"
-#include "CryptoAlgorithmRsaSsaParams.h"
+#include "CryptoAlgorithmRsaKeyGenParamsDeprecated.h"
+#include "CryptoAlgorithmRsaKeyParamsWithHashDeprecated.h"
+#include "CryptoAlgorithmRsaOaepParamsDeprecated.h"
+#include "CryptoAlgorithmRsaSsaParamsDeprecated.h"
 #include "ExceptionCode.h"
 #include "JSCryptoOperationData.h"
 #include "JSDOMBinding.h"
@@ -80,8 +80,7 @@ bool JSCryptoAlgorithmDictionary::getAlgorithmIdentifier(ExecState* exec, JSValu
         }
     }
 
-    if (exec->hadException())
-        return false;
+    RETURN_IF_EXCEPTION(scope, false);
 
     if (!algorithmName.containsOnlyASCII()) {
         throwSyntaxError(exec, scope);
@@ -106,13 +105,14 @@ static bool getHashAlgorithm(JSDictionary& dictionary, CryptoAlgorithmIdentifier
     // FXIME: Teach JSDictionary how to return JSValues, and use that to get hash element value.
 
     ExecState* exec = dictionary.execState();
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     JSObject* object = dictionary.initializerObject();
 
     Identifier identifier = Identifier::fromString(exec, "hash");
 
     JSValue hash = getProperty(exec, object, "hash");
-    if (exec->hadException())
-        return false;
+    RETURN_IF_EXCEPTION(scope, false);
 
     if (hash.isUndefinedOrNull()) {
         if (isRequired == HashRequirement::Required)
@@ -123,7 +123,7 @@ static bool getHashAlgorithm(JSDictionary& dictionary, CryptoAlgorithmIdentifier
     return JSCryptoAlgorithmDictionary::getAlgorithmIdentifier(exec, hash, result);
 }
 
-static RefPtr<CryptoAlgorithmParameters> createAesCbcParams(ExecState* exec, JSValue value)
+static RefPtr<CryptoAlgorithmParametersDeprecated> createAesCbcParams(ExecState* exec, JSValue value)
 {
     VM& vm = exec->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
@@ -134,16 +134,15 @@ static RefPtr<CryptoAlgorithmParameters> createAesCbcParams(ExecState* exec, JSV
     }
 
     JSValue iv = getProperty(exec, value.getObject(), "iv");
-    if (exec->hadException())
-        return nullptr;
+    RETURN_IF_EXCEPTION(scope, nullptr);
 
-    auto result = adoptRef(*new CryptoAlgorithmAesCbcParams);
+    auto result = adoptRef(*new CryptoAlgorithmAesCbcParamsDeprecated);
 
     CryptoOperationData ivData;
-    if (!cryptoOperationDataFromJSValue(exec, iv, ivData)) {
-        ASSERT(exec->hadException());
+    auto success = cryptoOperationDataFromJSValue(exec, iv, ivData);
+    ASSERT(scope.exception() || success);
+    if (!success)
         return nullptr;
-    }
 
     if (ivData.second != 16) {
         throwException(exec, scope, createError(exec, "AES-CBC initialization data must be 16 bytes"));
@@ -155,7 +154,7 @@ static RefPtr<CryptoAlgorithmParameters> createAesCbcParams(ExecState* exec, JSV
     return WTFMove(result);
 }
 
-static RefPtr<CryptoAlgorithmParameters> createAesKeyGenParams(ExecState& state, JSValue value)
+static RefPtr<CryptoAlgorithmParametersDeprecated> createAesKeyGenParams(ExecState& state, JSValue value)
 {
     VM& vm = state.vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
@@ -165,18 +164,17 @@ static RefPtr<CryptoAlgorithmParameters> createAesKeyGenParams(ExecState& state,
         return nullptr;
     }
 
-    auto result = adoptRef(*new CryptoAlgorithmAesKeyGenParams);
+    auto result = adoptRef(*new CryptoAlgorithmAesKeyGenParamsDeprecated);
 
     JSValue lengthValue = getProperty(&state, value.getObject(), "length");
-    if (state.hadException())
-        return nullptr;
+    RETURN_IF_EXCEPTION(scope, nullptr);
 
-    result->length = convert<uint16_t>(state, lengthValue, EnforceRange);
+    result->length = convert<IDLUnsignedShort>(state, lengthValue, EnforceRange);
 
     return WTFMove(result);
 }
 
-static RefPtr<CryptoAlgorithmParameters> createHmacParams(ExecState& state, JSValue value)
+static RefPtr<CryptoAlgorithmParametersDeprecated> createHmacParams(ExecState& state, JSValue value)
 {
     VM& vm = state.vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
@@ -187,17 +185,17 @@ static RefPtr<CryptoAlgorithmParameters> createHmacParams(ExecState& state, JSVa
     }
 
     JSDictionary jsDictionary(&state, value.getObject());
-    auto result = adoptRef(*new CryptoAlgorithmHmacParams);
+    auto result = adoptRef(*new CryptoAlgorithmHmacParamsDeprecated);
 
-    if (!getHashAlgorithm(jsDictionary, result->hash, HashRequirement::Required)) {
-        ASSERT(state.hadException());
+    auto success = getHashAlgorithm(jsDictionary, result->hash, HashRequirement::Required);
+    ASSERT_UNUSED(scope, scope.exception() || success);
+    if (!success)
         return nullptr;
-    }
 
     return WTFMove(result);
 }
 
-static RefPtr<CryptoAlgorithmParameters> createHmacKeyParams(ExecState& state, JSValue value)
+static RefPtr<CryptoAlgorithmParametersDeprecated> createHmacKeyParams(ExecState& state, JSValue value)
 {
     VM& vm = state.vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
@@ -208,21 +206,20 @@ static RefPtr<CryptoAlgorithmParameters> createHmacKeyParams(ExecState& state, J
     }
 
     JSDictionary jsDictionary(&state, value.getObject());
-    auto result = adoptRef(*new CryptoAlgorithmHmacKeyParams);
+    auto result = adoptRef(*new CryptoAlgorithmHmacKeyParamsDeprecated);
 
-    if (!getHashAlgorithm(jsDictionary, result->hash, HashRequirement::Required)) {
-        ASSERT(state.hadException());
+    auto success = getHashAlgorithm(jsDictionary, result->hash, HashRequirement::Required);
+    ASSERT(scope.exception() || success);
+    if (!success)
         return nullptr;
-    }
 
     result->hasLength = jsDictionary.get("length", result->length);
-    if (state.hadException())
-        return nullptr;
+    RETURN_IF_EXCEPTION(scope, nullptr);
 
     return WTFMove(result);
 }
 
-static RefPtr<CryptoAlgorithmParameters> createRsaKeyGenParams(ExecState& state, JSValue value)
+static RefPtr<CryptoAlgorithmParametersDeprecated> createRsaKeyGenParams(ExecState& state, JSValue value)
 {
     VM& vm = state.vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
@@ -233,24 +230,21 @@ static RefPtr<CryptoAlgorithmParameters> createRsaKeyGenParams(ExecState& state,
     }
 
     JSDictionary jsDictionary(&state, value.getObject());
-    auto result = adoptRef(*new CryptoAlgorithmRsaKeyGenParams);
+    auto result = adoptRef(*new CryptoAlgorithmRsaKeyGenParamsDeprecated);
 
     JSValue modulusLengthValue = getProperty(&state, value.getObject(), "modulusLength");
-    if (state.hadException())
-        return nullptr;
+    RETURN_IF_EXCEPTION(scope, nullptr);
 
     // FIXME: Why no EnforceRange? Filed as <https://www.w3.org/Bugs/Public/show_bug.cgi?id=23779>.
-    result->modulusLength = convert<uint32_t>(state, modulusLengthValue, NormalConversion);
-    if (state.hadException())
-        return nullptr;
+    result->modulusLength = convert<IDLUnsignedLong>(state, modulusLengthValue, NormalConversion);
+    RETURN_IF_EXCEPTION(scope, nullptr);
 
     JSValue publicExponentValue = getProperty(&state, value.getObject(), "publicExponent");
-    if (state.hadException())
-        return nullptr;
+    RETURN_IF_EXCEPTION(scope, nullptr);
 
     RefPtr<Uint8Array> publicExponentArray = toUint8Array(publicExponentValue);
     if (!publicExponentArray) {
-        throwTypeError(&state, scope, "Expected a Uint8Array in publicExponent");
+        throwTypeError(&state, scope, ASCIILiteral("Expected a Uint8Array in publicExponent"));
         return nullptr;
     }
     result->publicExponent.append(publicExponentArray->data(), publicExponentArray->byteLength());
@@ -260,13 +254,13 @@ static RefPtr<CryptoAlgorithmParameters> createRsaKeyGenParams(ExecState& state,
     return WTFMove(result);
 }
 
-static RefPtr<CryptoAlgorithmParameters> createRsaKeyParamsWithHash(ExecState&, JSValue)
+static RefPtr<CryptoAlgorithmParametersDeprecated> createRsaKeyParamsWithHash(ExecState&, JSValue)
 {
     // WebCrypto RSA algorithms currently do not take any parameters to importKey.
-    return adoptRef(*new CryptoAlgorithmRsaKeyParamsWithHash);
+    return adoptRef(*new CryptoAlgorithmRsaKeyParamsWithHashDeprecated);
 }
 
-static RefPtr<CryptoAlgorithmParameters> createRsaOaepParams(ExecState* exec, JSValue value)
+static RefPtr<CryptoAlgorithmParametersDeprecated> createRsaOaepParams(ExecState* exec, JSValue value)
 {
     VM& vm = exec->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
@@ -277,33 +271,32 @@ static RefPtr<CryptoAlgorithmParameters> createRsaOaepParams(ExecState* exec, JS
     }
 
     JSDictionary jsDictionary(exec, value.getObject());
-    auto result = adoptRef(*new CryptoAlgorithmRsaOaepParams);
+    auto result = adoptRef(*new CryptoAlgorithmRsaOaepParamsDeprecated);
 
-    if (!getHashAlgorithm(jsDictionary, result->hash, HashRequirement::Required)) {
-        ASSERT(exec->hadException());
+    auto success = getHashAlgorithm(jsDictionary, result->hash, HashRequirement::Required);
+    ASSERT(scope.exception() || success);
+    if (!success)
         return nullptr;
-    }
 
     JSValue labelValue = getProperty(exec, value.getObject(), "label");
-    if (exec->hadException())
-        return nullptr;
+    RETURN_IF_EXCEPTION(scope, nullptr);
 
     result->hasLabel = !labelValue.isUndefinedOrNull();
     if (!result->hasLabel)
         return WTFMove(result);
 
     CryptoOperationData labelData;
-    if (!cryptoOperationDataFromJSValue(exec, labelValue, labelData)) {
-        ASSERT(exec->hadException());
+    success = cryptoOperationDataFromJSValue(exec, labelValue, labelData);
+    ASSERT(scope.exception() || success);
+    if (!success)
         return nullptr;
-    }
 
     result->label.append(labelData.first, labelData.second);
 
     return WTFMove(result);
 }
 
-static RefPtr<CryptoAlgorithmParameters> createRsaSsaParams(ExecState& state, JSValue value)
+static RefPtr<CryptoAlgorithmParametersDeprecated> createRsaSsaParams(ExecState& state, JSValue value)
 {
     VM& vm = state.vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
@@ -314,21 +307,21 @@ static RefPtr<CryptoAlgorithmParameters> createRsaSsaParams(ExecState& state, JS
     }
 
     JSDictionary jsDictionary(&state, value.getObject());
-    auto result = adoptRef(*new CryptoAlgorithmRsaSsaParams);
+    auto result = adoptRef(*new CryptoAlgorithmRsaSsaParamsDeprecated);
 
-    if (!getHashAlgorithm(jsDictionary, result->hash, HashRequirement::Required)) {
-        ASSERT(state.hadException());
+    auto success = getHashAlgorithm(jsDictionary, result->hash, HashRequirement::Required);
+    ASSERT(scope.exception() || success);
+    if (!success)
         return nullptr;
-    }
 
     return WTFMove(result);
 }
 
-RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersForEncrypt(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
+RefPtr<CryptoAlgorithmParametersDeprecated> JSCryptoAlgorithmDictionary::createParametersForEncrypt(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
 {
     switch (algorithm) {
     case CryptoAlgorithmIdentifier::RSAES_PKCS1_v1_5:
-        return adoptRef(*new CryptoAlgorithmParameters);
+        return adoptRef(*new CryptoAlgorithmParametersDeprecated);
     case CryptoAlgorithmIdentifier::RSASSA_PKCS1_v1_5:
     case CryptoAlgorithmIdentifier::RSA_PSS:
         setDOMException(exec, NOT_SUPPORTED_ERR);
@@ -348,7 +341,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
         setDOMException(exec, NOT_SUPPORTED_ERR);
         return nullptr;
     case CryptoAlgorithmIdentifier::AES_KW:
-        return adoptRef(*new CryptoAlgorithmParameters);
+        return adoptRef(*new CryptoAlgorithmParametersDeprecated);
     case CryptoAlgorithmIdentifier::HMAC:
     case CryptoAlgorithmIdentifier::DH:
     case CryptoAlgorithmIdentifier::SHA_1:
@@ -366,11 +359,11 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     return nullptr;
 }
 
-RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersForDecrypt(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
+RefPtr<CryptoAlgorithmParametersDeprecated> JSCryptoAlgorithmDictionary::createParametersForDecrypt(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
 {
     switch (algorithm) {
     case CryptoAlgorithmIdentifier::RSAES_PKCS1_v1_5:
-        return adoptRef(*new CryptoAlgorithmParameters);
+        return adoptRef(*new CryptoAlgorithmParametersDeprecated);
     case CryptoAlgorithmIdentifier::RSASSA_PKCS1_v1_5:
     case CryptoAlgorithmIdentifier::RSA_PSS:
         setDOMException(exec, NOT_SUPPORTED_ERR);
@@ -390,7 +383,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
         setDOMException(exec, NOT_SUPPORTED_ERR);
         return nullptr;
     case CryptoAlgorithmIdentifier::AES_KW:
-        return adoptRef(*new CryptoAlgorithmParameters);
+        return adoptRef(*new CryptoAlgorithmParametersDeprecated);
     case CryptoAlgorithmIdentifier::HMAC:
     case CryptoAlgorithmIdentifier::DH:
     case CryptoAlgorithmIdentifier::SHA_1:
@@ -408,7 +401,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     return nullptr;
 }
 
-RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersForSign(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
+RefPtr<CryptoAlgorithmParametersDeprecated> JSCryptoAlgorithmDictionary::createParametersForSign(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
 {
     switch (algorithm) {
     case CryptoAlgorithmIdentifier::RSAES_PKCS1_v1_5:
@@ -446,7 +439,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     return nullptr;
 }
 
-RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersForVerify(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
+RefPtr<CryptoAlgorithmParametersDeprecated> JSCryptoAlgorithmDictionary::createParametersForVerify(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
 {
     switch (algorithm) {
     case CryptoAlgorithmIdentifier::RSAES_PKCS1_v1_5:
@@ -484,7 +477,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     return nullptr;
 }
 
-RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersForDigest(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue)
+RefPtr<CryptoAlgorithmParametersDeprecated> JSCryptoAlgorithmDictionary::createParametersForDigest(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue)
 {
     switch (algorithm) {
     case CryptoAlgorithmIdentifier::RSAES_PKCS1_v1_5:
@@ -508,7 +501,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     case CryptoAlgorithmIdentifier::SHA_256:
     case CryptoAlgorithmIdentifier::SHA_384:
     case CryptoAlgorithmIdentifier::SHA_512:
-        return adoptRef(*new CryptoAlgorithmParameters);
+        return adoptRef(*new CryptoAlgorithmParametersDeprecated);
     case CryptoAlgorithmIdentifier::CONCAT:
     case CryptoAlgorithmIdentifier::HKDF_CTR:
     case CryptoAlgorithmIdentifier::PBKDF2:
@@ -519,7 +512,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     return nullptr;
 }
 
-RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersForGenerateKey(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
+RefPtr<CryptoAlgorithmParametersDeprecated> JSCryptoAlgorithmDictionary::createParametersForGenerateKey(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
 {
     switch (algorithm) {
     case CryptoAlgorithmIdentifier::RSAES_PKCS1_v1_5:
@@ -556,7 +549,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     return nullptr;
 }
 
-RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersForDeriveKey(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue)
+RefPtr<CryptoAlgorithmParametersDeprecated> JSCryptoAlgorithmDictionary::createParametersForDeriveKey(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue)
 {
     switch (algorithm) {
     case CryptoAlgorithmIdentifier::RSAES_PKCS1_v1_5:
@@ -588,7 +581,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     return nullptr;
 }
 
-RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersForDeriveBits(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue)
+RefPtr<CryptoAlgorithmParametersDeprecated> JSCryptoAlgorithmDictionary::createParametersForDeriveBits(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue)
 {
     switch (algorithm) {
     case CryptoAlgorithmIdentifier::RSAES_PKCS1_v1_5:
@@ -620,7 +613,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     return nullptr;
 }
 
-RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersForImportKey(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
+RefPtr<CryptoAlgorithmParametersDeprecated> JSCryptoAlgorithmDictionary::createParametersForImportKey(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue value)
 {
     switch (algorithm) {
     case CryptoAlgorithmIdentifier::RSAES_PKCS1_v1_5:
@@ -636,11 +629,11 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     case CryptoAlgorithmIdentifier::AES_GCM:
     case CryptoAlgorithmIdentifier::AES_CFB:
     case CryptoAlgorithmIdentifier::AES_KW:
-        return adoptRef(*new CryptoAlgorithmParameters);
+        return adoptRef(*new CryptoAlgorithmParametersDeprecated);
     case CryptoAlgorithmIdentifier::HMAC:
         return createHmacParams(*exec, value);
     case CryptoAlgorithmIdentifier::DH:
-        return adoptRef(*new CryptoAlgorithmParameters);
+        return adoptRef(*new CryptoAlgorithmParametersDeprecated);
     case CryptoAlgorithmIdentifier::SHA_1:
     case CryptoAlgorithmIdentifier::SHA_224:
     case CryptoAlgorithmIdentifier::SHA_256:
@@ -656,7 +649,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     return nullptr;
 }
 
-RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersForExportKey(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue)
+RefPtr<CryptoAlgorithmParametersDeprecated> JSCryptoAlgorithmDictionary::createParametersForExportKey(ExecState* exec, CryptoAlgorithmIdentifier algorithm, JSValue)
 {
     switch (algorithm) {
     case CryptoAlgorithmIdentifier::RSAES_PKCS1_v1_5:
@@ -673,7 +666,7 @@ RefPtr<CryptoAlgorithmParameters> JSCryptoAlgorithmDictionary::createParametersF
     case CryptoAlgorithmIdentifier::AES_KW:
     case CryptoAlgorithmIdentifier::HMAC:
     case CryptoAlgorithmIdentifier::DH:
-        return adoptRef(*new CryptoAlgorithmParameters);
+        return adoptRef(*new CryptoAlgorithmParametersDeprecated);
     case CryptoAlgorithmIdentifier::SHA_1:
     case CryptoAlgorithmIdentifier::SHA_224:
     case CryptoAlgorithmIdentifier::SHA_256:

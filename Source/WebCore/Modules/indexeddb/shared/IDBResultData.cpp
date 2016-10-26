@@ -139,6 +139,11 @@ IDBResultData IDBResultData::deleteObjectStoreSuccess(const IDBResourceIdentifie
     return { IDBResultType::DeleteObjectStoreSuccess, requestIdentifier };
 }
 
+IDBResultData IDBResultData::renameObjectStoreSuccess(const IDBResourceIdentifier& requestIdentifier)
+{
+    return { IDBResultType::RenameObjectStoreSuccess, requestIdentifier };
+}
+
 IDBResultData IDBResultData::clearObjectStoreSuccess(const IDBResourceIdentifier& requestIdentifier)
 {
     return { IDBResultType::ClearObjectStoreSuccess, requestIdentifier };
@@ -152,6 +157,11 @@ IDBResultData IDBResultData::createIndexSuccess(const IDBResourceIdentifier& req
 IDBResultData IDBResultData::deleteIndexSuccess(const IDBResourceIdentifier& requestIdentifier)
 {
     return { IDBResultType::DeleteIndexSuccess, requestIdentifier };
+}
+
+IDBResultData IDBResultData::renameIndexSuccess(const IDBResourceIdentifier& requestIdentifier)
+{
+    return { IDBResultType::RenameIndexSuccess, requestIdentifier };
 }
 
 IDBResultData IDBResultData::putOrAddSuccess(const IDBResourceIdentifier& requestIdentifier, const IDBKeyData& resultKey)

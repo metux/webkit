@@ -101,6 +101,7 @@ void HTMLTextFormControlElement::dispatchBlurEvent(RefPtr<Element>&& newFocusedE
 {
     if (supportsPlaceholder())
         updatePlaceholderVisibility();
+    // Match the order in Document::setFocusedElement.
     handleBlurEvent();
     HTMLFormControlElementWithState::dispatchBlurEvent(WTFMove(newFocusedElement));
 }
@@ -166,7 +167,7 @@ void HTMLTextFormControlElement::updatePlaceholderVisibility()
     if (placeHolderWasVisible == m_isPlaceholderVisible)
         return;
 
-    setNeedsStyleRecalc();
+    invalidateStyleForSubtree();
 }
 
 void HTMLTextFormControlElement::setSelectionStart(int start)
@@ -760,12 +761,20 @@ String HTMLTextFormControlElement::directionForFormData() const
     return "ltr";
 }
 
-void HTMLTextFormControlElement::setMaxLengthForBindings(int maxLength, ExceptionCode& ec)
+void HTMLTextFormControlElement::setMaxLength(int maxLength, ExceptionCode& ec)
 {
-    if (maxLength < 0)
+    if (maxLength < 0 || (m_minLength >= 0 && maxLength < m_minLength))
         ec = INDEX_SIZE_ERR;
     else
         setIntegralAttribute(maxlengthAttr, maxLength);
+}
+
+void HTMLTextFormControlElement::setMinLength(int minLength, ExceptionCode& ec)
+{
+    if (minLength < 0 || (m_maxLength >= 0 && minLength > m_maxLength))
+        ec = INDEX_SIZE_ERR;
+    else
+        setIntegralAttribute(minlengthAttr, minLength);
 }
 
 void HTMLTextFormControlElement::adjustInnerTextStyle(const RenderStyle& parentStyle, RenderStyle& textBlockStyle) const

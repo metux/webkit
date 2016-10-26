@@ -23,10 +23,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef JSArrayBufferView_h
-#define JSArrayBufferView_h
+#pragma once
 
-#include "CopyBarrier.h"
+#include "AuxiliaryBarrier.h"
 #include "JSObject.h"
 
 namespace JSC {
@@ -119,6 +118,9 @@ protected:
         
         JS_EXPORT_PRIVATE ConstructionContext(VM&, Structure*, uint32_t length, uint32_t elementSize, InitializationMode = ZeroFill);
         
+        // This is only for constructing fast typed arrays. It's used by the JIT's slow path.
+        ConstructionContext(Structure*, uint32_t length, void* vector);
+        
         JS_EXPORT_PRIVATE ConstructionContext(
             VM&, Structure*, PassRefPtr<ArrayBuffer>,
             unsigned byteOffset, unsigned length);
@@ -172,6 +174,8 @@ public:
     static ptrdiff_t offsetOfLength() { return OBJECT_OFFSETOF(JSArrayBufferView, m_length); }
     static ptrdiff_t offsetOfMode() { return OBJECT_OFFSETOF(JSArrayBufferView, m_mode); }
 
+    JS_EXPORT_PRIVATE static RefPtr<ArrayBufferView> toWrapped(JSValue);
+
 private:
     static void finalize(JSCell*);
 
@@ -182,7 +186,7 @@ protected:
 
     static String toStringName(const JSObject*, ExecState*);
 
-    CopyBarrier<char> m_vector; // this is really a void*, but void would not work here.
+    AuxiliaryBarrier<void*> m_vector;
     uint32_t m_length;
     TypedArrayMode m_mode;
 };
@@ -194,6 +198,3 @@ namespace WTF {
 void printInternal(PrintStream&, JSC::TypedArrayMode);
 
 } // namespace WTF
-
-#endif // JSArrayBufferView_h
-

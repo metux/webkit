@@ -58,12 +58,10 @@ EncodedJSValue JSC_HOST_CALL constructJSDataCue(ExecState& exec)
         return throwVMError(&exec, scope, createNotEnoughArgumentsError(&exec));
 
     double startTime(exec.uncheckedArgument(0).toNumber(&exec));
-    if (UNLIKELY(exec.hadException()))
-        return JSValue::encode(jsUndefined());
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     double endTime(exec.uncheckedArgument(1).toNumber(&exec));
-    if (UNLIKELY(exec.hadException()))
-        return JSValue::encode(jsUndefined());
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     ScriptExecutionContext* context = castedThis->scriptExecutionContext();
     if (!context)
@@ -87,20 +85,19 @@ EncodedJSValue JSC_HOST_CALL constructJSDataCue(ExecState& exec)
     if (valueArgument.isCell() && valueArgument.asCell()->inherits(std::remove_pointer<JSArrayBuffer*>::type::info())) {
 
         ArrayBuffer* data = toArrayBuffer(valueArgument);
-        if (UNLIKELY(exec.hadException()))
-            return JSValue::encode(jsUndefined());
+        RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
         if (UNLIKELY(!data)) {
             setDOMException(&exec, TypeError);
             return JSValue::encode(jsUndefined());
         }
-        return JSValue::encode(CREATE_DOM_WRAPPER(castedThis->globalObject(), DataCue, DataCue::create(*context, MediaTime::createWithDouble(startTime), MediaTime::createWithDouble(endTime), *data, type)));
+        return JSValue::encode(createWrapper<DataCue>(castedThis->globalObject(), DataCue::create(*context, MediaTime::createWithDouble(startTime), MediaTime::createWithDouble(endTime), *data, type)));
     }
 
 #if !ENABLE(DATACUE_VALUE)
     return JSValue::encode(jsUndefined());
 #else
-    return JSValue::encode(CREATE_DOM_WRAPPER(castedThis->globalObject(), DataCue,DataCue::create(*context, MediaTime::createWithDouble(startTime), MediaTime::createWithDouble(endTime), valueArgument, type)));
+    return JSValue::encode(createWrapper<DataCue>(castedThis->globalObject(), DataCue::create(*context, MediaTime::createWithDouble(startTime), MediaTime::createWithDouble(endTime), valueArgument, type)));
 #endif
 }
 

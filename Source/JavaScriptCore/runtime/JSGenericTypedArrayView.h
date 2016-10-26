@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef JSGenericTypedArrayView_h
-#define JSGenericTypedArrayView_h
+#pragma once
 
 #include "JSArrayBufferView.h"
 #include "ThrowScope.h"
@@ -89,7 +88,7 @@ enum class CopyType {
     Unobservable,
 };
 
-static const char* typedArrayBufferHasBeenDetachedErrorMessage = "Underlying ArrayBuffer has been detached from the view";
+static const char* const typedArrayBufferHasBeenDetachedErrorMessage = "Underlying ArrayBuffer has been detached from the view";
 
 template<typename Adaptor>
 class JSGenericTypedArrayView : public JSArrayBufferView {
@@ -106,6 +105,7 @@ protected:
     
 public:
     static JSGenericTypedArrayView* create(ExecState*, Structure*, unsigned length);
+    static JSGenericTypedArrayView* createWithFastVector(ExecState*, Structure*, unsigned length, void* vector);
     static JSGenericTypedArrayView* createUninitialized(ExecState*, Structure*, unsigned length);
     static JSGenericTypedArrayView* create(ExecState*, Structure*, PassRefPtr<ArrayBuffer>, unsigned byteOffset, unsigned length);
     static JSGenericTypedArrayView* create(VM&, Structure*, PassRefPtr<typename Adaptor::ViewType> impl);
@@ -158,7 +158,7 @@ public:
     
     void setIndexQuicklyToDouble(unsigned i, double value)
     {
-        setIndexQuicklyToNativeValue(i, toNativeFromValue<Adaptor>(value));
+        setIndexQuicklyToNativeValue(i, toNativeFromValue<Adaptor>(jsNumber(value)));
     }
     
     void setIndexQuickly(unsigned i, JSValue value)
@@ -173,11 +173,10 @@ public:
         auto scope = DECLARE_THROW_SCOPE(vm);
 
         typename Adaptor::Type value = toNativeFromValue<Adaptor>(exec, jsValue);
-        if (exec->hadException())
-            return false;
+        RETURN_IF_EXCEPTION(scope, false);
 
         if (isNeutered()) {
-            throwTypeError(exec, scope, typedArrayBufferHasBeenDetachedErrorMessage);
+            throwTypeError(exec, scope, ASCIILiteral(typedArrayBufferHasBeenDetachedErrorMessage));
             return false;
         }
 
@@ -226,10 +225,12 @@ public:
     // then it will have thrown an exception.
     bool set(ExecState*, unsigned offset, JSObject*, unsigned objectOffset, unsigned length, CopyType type = CopyType::Unobservable);
     
-    PassRefPtr<typename Adaptor::ViewType> typedImpl()
+    RefPtr<typename Adaptor::ViewType> typedImpl()
     {
         return Adaptor::ViewType::create(buffer(), byteOffset(), length());
     }
+
+    static RefPtr<typename Adaptor::ViewType> toWrapped(JSValue);
     
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
@@ -287,7 +288,6 @@ protected:
 
     static size_t estimatedSize(JSCell*);
     static void visitChildren(JSCell*, SlotVisitor&);
-    static void copyBackingStore(JSCell*, CopyVisitor&, CopyToken);
 
     // Allocates the full-on native buffer and moves data into the C heap if
     // necessary. Note that this never allocates in the GC heap.
@@ -369,7 +369,10 @@ inline RefPtr<typename Adaptor::ViewType> toNativeTypedView(JSValue value)
     return wrapper->typedImpl();
 }
 
+template<typename Adaptor>
+RefPtr<typename Adaptor::ViewType> JSGenericTypedArrayView<Adaptor>::toWrapped(JSValue value)
+{
+    return JSC::toNativeTypedView<Adaptor>(value);
+}
+
 } // namespace JSC
-
-#endif // JSGenericTypedArrayView_h
-

@@ -52,28 +52,30 @@ namespace WebCore {
 
 void JSWorkerGlobalScope::visitAdditionalChildren(SlotVisitor& visitor)
 {
-    if (WorkerLocation* location = wrapped().optionalLocation())
+    if (auto* location = wrapped().optionalLocation())
         visitor.addOpaqueRoot(location);
-    if (WorkerNavigator* navigator = wrapped().optionalNavigator())
+    if (auto* navigator = wrapped().optionalNavigator())
         visitor.addOpaqueRoot(navigator);
-    visitor.addOpaqueRoot(wrapped().scriptExecutionContext());
+    ScriptExecutionContext& context = wrapped();
+    visitor.addOpaqueRoot(&context);
 }
 
 JSValue JSWorkerGlobalScope::importScripts(ExecState& state)
 {
+    VM& vm = state.vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     if (!state.argumentCount())
         return jsUndefined();
 
     Vector<String> urls;
+    urls.reserveInitialCapacity(state.argumentCount());
     for (unsigned i = 0; i < state.argumentCount(); ++i) {
-        urls.append(valueToUSVString(&state, state.uncheckedArgument(i)));
-        if (state.hadException())
-            return jsUndefined();
+        urls.uncheckedAppend(valueToUSVString(&state, state.uncheckedArgument(i)));
+        RETURN_IF_EXCEPTION(scope, JSValue());
     }
-    ExceptionCode ec = 0;
 
-    wrapped().importScripts(urls, ec);
-    setDOMException(&state, ec);
+    propagateException(state, scope, wrapped().importScripts(urls));
     return jsUndefined();
 }
 
@@ -86,8 +88,7 @@ JSValue JSWorkerGlobalScope::setTimeout(ExecState& state)
         return throwException(&state, scope, createNotEnoughArgumentsError(&state));
 
     std::unique_ptr<ScheduledAction> action = ScheduledAction::create(&state, globalObject()->world(), wrapped().contentSecurityPolicy());
-    if (state.hadException())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
     if (!action)
         return jsNumber(0);
     int delay = state.argument(1).toInt32(&state);
@@ -103,8 +104,7 @@ JSValue JSWorkerGlobalScope::setInterval(ExecState& state)
         return throwException(&state, scope, createNotEnoughArgumentsError(&state));
 
     std::unique_ptr<ScheduledAction> action = ScheduledAction::create(&state, globalObject()->world(), wrapped().contentSecurityPolicy());
-    if (state.hadException())
-        return jsUndefined();
+    RETURN_IF_EXCEPTION(scope, JSValue());
     if (!action)
         return jsNumber(0);
     int delay = state.argument(1).toInt32(&state);

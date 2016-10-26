@@ -500,9 +500,9 @@ end
 macro writeBarrierOnOperand(cellOperand)
     loadisFromInstruction(cellOperand, t1)
     loadConstantOrVariablePayload(t1, CellTag, t2, .writeBarrierDone)
-    skipIfIsRememberedOrInEden(t2, t1, t3, 
-        macro(cellState)
-            btbnz cellState, .writeBarrierDone
+    skipIfIsRememberedOrInEden(
+        t2, 
+        macro()
             push cfr, PC
             # We make two extra slots because cCall2 will poke.
             subp 8, sp
@@ -511,8 +511,7 @@ macro writeBarrierOnOperand(cellOperand)
             cCall2Void(_llint_write_barrier_slow)
             addp 8, sp
             pop PC, cfr
-        end
-    )
+        end)
 .writeBarrierDone:
 end
 
@@ -532,9 +531,9 @@ macro writeBarrierOnGlobal(valueOperand, loadHelper)
 
     loadHelper(t3)
 
-    skipIfIsRememberedOrInEden(t3, t1, t2,
-        macro(gcData)
-            btbnz gcData, .writeBarrierDone
+    skipIfIsRememberedOrInEden(
+        t3,
+        macro()
             push cfr, PC
             # We make two extra slots because cCall2 will poke.
             subp 8, sp
@@ -543,8 +542,7 @@ macro writeBarrierOnGlobal(valueOperand, loadHelper)
             cCall2Void(_llint_write_barrier_slow)
             addp 8, sp
             pop PC, cfr
-        end
-    )
+        end)
 .writeBarrierDone:
 end
 
@@ -948,22 +946,27 @@ _llint_op_negate:
     loadi 8[PC], t0
     loadi 4[PC], t3
     loadConstantOrVariable(t0, t1, t2)
+    loadisFromInstruction(3, t0)
     bineq t1, Int32Tag, .opNegateSrcNotInt
     btiz t2, 0x7fffffff, .opNegateSlow
     negi t2
+    ori ArithProfileInt, t0
     storei Int32Tag, TagOffset[cfr, t3, 8]
+    storeisToInstruction(t0, 3)
     storei t2, PayloadOffset[cfr, t3, 8]
-    dispatch(3)
+    dispatch(4)
 .opNegateSrcNotInt:
     bia t1, LowestTag, .opNegateSlow
     xori 0x80000000, t1
-    storei t1, TagOffset[cfr, t3, 8]
+    ori ArithProfileNumber, t0
     storei t2, PayloadOffset[cfr, t3, 8]
-    dispatch(3)
+    storeisToInstruction(t0, 3)
+    storei t1, TagOffset[cfr, t3, 8]
+    dispatch(4)
 
 .opNegateSlow:
     callOpcodeSlowPath(_slow_path_negate)
-    dispatch(3)
+    dispatch(4)
 
 
 macro binaryOpCustomStore(integerOperationAndStore, doubleOperation, slowPath)
@@ -1257,34 +1260,20 @@ _llint_op_is_number:
     dispatch(3)
 
 
-_llint_op_is_string:
+_llint_op_is_cell_with_type:
     traceExecution()
     loadi 8[PC], t1
     loadi 4[PC], t2
     loadConstantOrVariable(t1, t0, t3)
     storei BooleanTag, TagOffset[cfr, t2, 8]
-    bineq t0, CellTag, .opIsStringNotCell
-    cbeq JSCell::m_type[t3], StringType, t1
+    bineq t0, CellTag, .notCellCase
+    loadi 12[PC], t0
+    cbeq JSCell::m_type[t3], t0, t1
     storei t1, PayloadOffset[cfr, t2, 8]
-    dispatch(3)
-.opIsStringNotCell:
+    dispatch(4)
+.notCellCase:
     storep 0, PayloadOffset[cfr, t2, 8]
-    dispatch(3)
-
-
-_llint_op_is_jsarray:
-    traceExecution()
-    loadi 8[PC], t1
-    loadi 4[PC], t2
-    loadConstantOrVariable(t1, t0, t3)
-    storei BooleanTag, TagOffset[cfr, t2, 8]
-    bineq t0, CellTag, .opIsJSArrayNotCell
-    cbeq JSCell::m_type[t3], ArrayType, t1
-    storei t1, PayloadOffset[cfr, t2, 8]
-    dispatch(3)
-.opIsJSArrayNotCell:
-    storep 0, PayloadOffset[cfr, t2, 8]
-    dispatch(3)
+    dispatch(4)
 
 
 _llint_op_is_object:

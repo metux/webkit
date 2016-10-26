@@ -17,8 +17,7 @@
  *
  */
 
-#ifndef JSArrayInlines_h
-#define JSArrayInlines_h
+#pragma once
 
 #include "JSArray.h"
 #include "JSCellInlines.h"
@@ -70,28 +69,26 @@ inline bool JSArray::canFastCopy(VM& vm, JSArray* otherArray)
 
 ALWAYS_INLINE unsigned getLength(ExecState* exec, JSObject* obj)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     if (isJSArray(obj))
         return jsCast<JSArray*>(obj)->length();
 
-    VM& vm = exec->vm();
     JSValue lengthValue = obj->get(exec, vm.propertyNames->length);
-    if (UNLIKELY(vm.exception()))
-        return UINT_MAX;
+    RETURN_IF_EXCEPTION(scope, UINT_MAX);
     return lengthValue.toUInt32(exec);
 }
 
 ALWAYS_INLINE double toLength(ExecState* exec, JSObject* obj)
 {
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     if (isJSArray(obj))
         return jsCast<JSArray*>(obj)->length();
 
-    VM& vm = exec->vm();
     JSValue lengthValue = obj->get(exec, vm.propertyNames->length);
-    if (UNLIKELY(vm.exception()))
-        return PNaN;
+    RETURN_IF_EXCEPTION(scope, PNaN);
     return lengthValue.toLength(exec);
 }
 
 } // namespace JSC
-
-#endif /* JSArrayInlines_h */

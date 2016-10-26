@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef Executable_h
-#define Executable_h
+#pragma once
 
 #include "ArityCheckMode.h"
 #include "CallData.h"
@@ -47,15 +46,11 @@ class CodeBlock;
 class EvalCodeBlock;
 class FunctionCodeBlock;
 class JSScope;
-class JSWASMModule;
+class JSWasmModule;
 class LLIntOffsetsExtractor;
+class ModuleProgramCodeBlock;
 class ProgramCodeBlock;
-class ModuleProgramCodeBlock;
-class JSScope;
 class WebAssemblyCodeBlock;
-class ModuleProgramCodeBlock;
-class JSModuleRecord;
-class JSScope;
 
 enum CompilationKind { FirstCompilation, OptimizingCompilation };
 
@@ -376,13 +371,13 @@ public:
     // to point to it. This forces callers to have a CodeBlock* in a register or on the stack that will be marked
     // by conservative GC if a GC happens after we create the CodeBlock.
     template <typename ExecutableType>
-    JSObject* prepareForExecution(ExecState*, JSFunction*, JSScope*, CodeSpecializationKind, CodeBlock*& resultCodeBlock);
+    JSObject* prepareForExecution(VM&, JSFunction*, JSScope*, CodeSpecializationKind, CodeBlock*& resultCodeBlock);
 
     template <typename Functor> void forEachCodeBlock(Functor&&);
 
 private:
     friend class ExecutableBase;
-    JSObject* prepareForExecutionImpl(ExecState*, JSFunction*, JSScope*, CodeSpecializationKind, CodeBlock*&);
+    JSObject* prepareForExecutionImpl(VM&, JSFunction*, JSScope*, CodeSpecializationKind, CodeBlock*&);
 
 protected:
     ScriptExecutable(Structure*, VM&, const SourceCode&, bool isInStrictContext, DerivedContextType, bool isInArrowFunctionContext, EvalContextType, Intrinsic);
@@ -446,7 +441,7 @@ public:
         
     DECLARE_INFO;
 
-    ExecutableInfo executableInfo() const { return ExecutableInfo(usesEval(), isStrictMode(), false, false, ConstructorKind::None, JSParserCommentMode::Classic, SuperBinding::NotNeeded, SourceParseMode::ProgramMode, derivedContextType(), isArrowFunctionContext(), false, evalContextType()); }
+    ExecutableInfo executableInfo() const { return ExecutableInfo(usesEval(), isStrictMode(), false, false, ConstructorKind::None, JSParserScriptMode::Classic, SuperBinding::NotNeeded, SourceParseMode::ProgramMode, derivedContextType(), isArrowFunctionContext(), false, evalContextType()); }
 
     unsigned numVariables() { return m_unlinkedEvalCodeBlock->numVariables(); }
     unsigned numberOfFunctionDecls() { return m_unlinkedEvalCodeBlock->numberOfFunctionDecls(); }
@@ -500,7 +495,7 @@ public:
         
     DECLARE_INFO;
 
-    ExecutableInfo executableInfo() const { return ExecutableInfo(usesEval(), isStrictMode(), false, false, ConstructorKind::None, JSParserCommentMode::Classic, SuperBinding::NotNeeded, SourceParseMode::ProgramMode, derivedContextType(), isArrowFunctionContext(), false, EvalContextType::None); }
+    ExecutableInfo executableInfo() const { return ExecutableInfo(usesEval(), isStrictMode(), false, false, ConstructorKind::None, JSParserScriptMode::Classic, SuperBinding::NotNeeded, SourceParseMode::ProgramMode, derivedContextType(), isArrowFunctionContext(), false, EvalContextType::None); }
 
 private:
     friend class ExecutableBase;
@@ -541,7 +536,7 @@ public:
 
     DECLARE_INFO;
 
-    ExecutableInfo executableInfo() const { return ExecutableInfo(usesEval(), isStrictMode(), false, false, ConstructorKind::None, JSParserCommentMode::Module, SuperBinding::NotNeeded, SourceParseMode::ModuleEvaluateMode, derivedContextType(), isArrowFunctionContext(), false, EvalContextType::None); }
+    ExecutableInfo executableInfo() const { return ExecutableInfo(usesEval(), isStrictMode(), false, false, ConstructorKind::None, JSParserScriptMode::Module, SuperBinding::NotNeeded, SourceParseMode::ModuleEvaluateMode, derivedContextType(), isArrowFunctionContext(), false, EvalContextType::None); }
 
     UnlinkedModuleProgramCodeBlock* unlinkedModuleProgramCodeBlock() { return m_unlinkedModuleProgramCodeBlock.get(); }
 
@@ -654,14 +649,31 @@ public:
     bool isArrowFunction() const { return parseMode() == SourceParseMode::ArrowFunctionMode; }
     bool isGetter() const { return parseMode() == SourceParseMode::GetterMode; }
     bool isSetter() const { return parseMode() == SourceParseMode::SetterMode; }
+    bool isGenerator() const { return SourceParseModeSet(SourceParseMode::GeneratorBodyMode, SourceParseMode::GeneratorWrapperFunctionMode).contains(parseMode()); }
+    bool isMethod() const { return parseMode() == SourceParseMode::MethodMode; }
+    bool hasCallerAndArgumentsProperties() const
+    {
+        // Per https://tc39.github.io/ecma262/#sec-forbidden-extensions, only sloppy-mode non-builtin functions in old-style (pre-ES6) syntactic forms can contain
+        // "caller" and "arguments".
+        return !isStrictMode() && parseMode() == SourceParseMode::NormalFunctionMode && !isClassConstructorFunction();
+    }
+    bool hasPrototypeProperty() const
+    {
+        return SourceParseModeSet(
+            SourceParseMode::NormalFunctionMode,
+            SourceParseMode::GeneratorBodyMode,
+            SourceParseMode::GeneratorWrapperFunctionMode
+        ).contains(parseMode()) || isClass();
+    }
     DerivedContextType derivedContextType() const { return m_unlinkedExecutable->derivedContextType(); }
     bool isClassConstructorFunction() const { return m_unlinkedExecutable->isClassConstructorFunction(); }
     const Identifier& name() { return m_unlinkedExecutable->name(); }
     const Identifier& ecmaName() { return m_unlinkedExecutable->ecmaName(); }
     const Identifier& inferredName() { return m_unlinkedExecutable->inferredName(); }
-    size_t parameterCount() const { return m_unlinkedExecutable->parameterCount(); } // Excluding 'this'!
+    unsigned parameterCount() const { return m_unlinkedExecutable->parameterCount(); } // Excluding 'this'!
+    unsigned functionLength() const { return m_unlinkedExecutable->functionLength(); }
     SourceParseMode parseMode() const { return m_unlinkedExecutable->parseMode(); }
-    JSParserCommentMode commentMode() const { return m_unlinkedExecutable->commentMode(); }
+    JSParserScriptMode scriptMode() const { return m_unlinkedExecutable->scriptMode(); }
     const SourceCode& classSource() const { return m_unlinkedExecutable->classSource(); }
 
     static void visitChildren(JSCell*, SlotVisitor&);
@@ -707,7 +719,7 @@ public:
     typedef ExecutableBase Base;
     static const unsigned StructureFlags = Base::StructureFlags | StructureIsImmortal;
 
-    static WebAssemblyExecutable* create(VM& vm, const SourceCode& source, JSWASMModule* module, unsigned functionIndex)
+    static WebAssemblyExecutable* create(VM& vm, const SourceCode& source, JSWasmModule* module, unsigned functionIndex)
     {
         WebAssemblyExecutable* executable = new (NotNull, allocateCell<WebAssemblyExecutable>(vm.heap)) WebAssemblyExecutable(vm, source, module, functionIndex);
         executable->finishCreation(vm);
@@ -723,7 +735,7 @@ public:
 
     DECLARE_INFO;
 
-    void prepareForExecution(ExecState*);
+    void prepareForExecution(VM&);
 
     WebAssemblyCodeBlock* codeBlockForCall()
     {
@@ -732,12 +744,12 @@ public:
 
 private:
     friend class ExecutableBase;
-    WebAssemblyExecutable(VM&, const SourceCode&, JSWASMModule*, unsigned functionIndex);
+    WebAssemblyExecutable(VM&, const SourceCode&, JSWasmModule*, unsigned functionIndex);
 
     static void visitChildren(JSCell*, SlotVisitor&);
 
     SourceCode m_source;
-    WriteBarrier<JSWASMModule> m_module;
+    WriteBarrier<JSWasmModule> m_module;
     unsigned m_functionIndex;
 
     WriteBarrier<WebAssemblyCodeBlock> m_codeBlockForCall;
@@ -745,7 +757,7 @@ private:
 #endif
 
 template <typename ExecutableType>
-JSObject* ScriptExecutable::prepareForExecution(ExecState* exec, JSFunction* function, JSScope* scope, CodeSpecializationKind kind, CodeBlock*& resultCodeBlock)
+JSObject* ScriptExecutable::prepareForExecution(VM& vm, JSFunction* function, JSScope* scope, CodeSpecializationKind kind, CodeBlock*& resultCodeBlock)
 {
     if (hasJITCodeFor(kind)) {
         if (std::is_same<ExecutableType, EvalExecutable>::value)
@@ -760,9 +772,7 @@ JSObject* ScriptExecutable::prepareForExecution(ExecState* exec, JSFunction* fun
             RELEASE_ASSERT_NOT_REACHED();
         return nullptr;
     }
-    return prepareForExecutionImpl(exec, function, scope, kind, resultCodeBlock);
+    return prepareForExecutionImpl(vm, function, scope, kind, resultCodeBlock);
 }
 
 } // namespace JSC
-
-#endif // Executable_h

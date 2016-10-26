@@ -29,7 +29,6 @@
 #include "JIT.h"
 
 #include "BasicBlockLocation.h"
-#include "CopiedSpaceInlines.h"
 #include "Exception.h"
 #include "Heap.h"
 #include "Interpreter.h"
@@ -244,34 +243,16 @@ void JIT::emit_op_is_number(Instruction* currentInstruction)
     emitPutVirtualRegister(dst);
 }
 
-void JIT::emit_op_is_string(Instruction* currentInstruction)
+void JIT::emit_op_is_cell_with_type(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
     int value = currentInstruction[2].u.operand;
-    
-    emitGetVirtualRegister(value, regT0);
-    Jump isNotCell = emitJumpIfNotJSCell(regT0);
-    
-    compare8(Equal, Address(regT0, JSCell::typeInfoTypeOffset()), TrustedImm32(StringType), regT0);
-    emitTagBool(regT0);
-    Jump done = jump();
-    
-    isNotCell.link(this);
-    move(TrustedImm32(ValueFalse), regT0);
-    
-    done.link(this);
-    emitPutVirtualRegister(dst);
-}
-
-void JIT::emit_op_is_jsarray(Instruction* currentInstruction)
-{
-    int dst = currentInstruction[1].u.operand;
-    int value = currentInstruction[2].u.operand;
+    int type = currentInstruction[3].u.operand;
 
     emitGetVirtualRegister(value, regT0);
     Jump isNotCell = emitJumpIfNotJSCell(regT0);
 
-    compare8(Equal, Address(regT0, JSCell::typeInfoTypeOffset()), TrustedImm32(ArrayType), regT0);
+    compare8(Equal, Address(regT0, JSCell::typeInfoTypeOffset()), TrustedImm32(type), regT0);
     emitTagBool(regT0);
     Jump done = jump();
 
@@ -637,12 +618,6 @@ void JIT::emit_op_switch_string(Instruction* currentInstruction)
     jump(returnValueGPR);
 }
 
-void JIT::emit_op_throw_static_error(Instruction* currentInstruction)
-{
-    move(TrustedImm64(JSValue::encode(m_codeBlock->getConstant(currentInstruction[1].u.operand))), regT0);
-    callOperation(operationThrowStaticError, regT0, currentInstruction[2].u.operand);
-}
-
 void JIT::emit_op_debug(Instruction* currentInstruction)
 {
     load32(codeBlock()->debuggerRequestsAddress(), regT0);
@@ -955,6 +930,12 @@ void JIT::emitSlow_op_loop_hint(Instruction*, Vector<SlowCaseEntry>::iterator& i
 #else
     UNUSED_PARAM(iter);
 #endif
+}
+
+void JIT::emit_op_throw_static_error(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_throw_static_error);
+    slowPathCall.call();
 }
 
 void JIT::emit_op_watchdog(Instruction*)

@@ -45,6 +45,7 @@
 #include "HTMLNames.h"
 #include "HTMLStyleElement.h"
 #include "HTMLTemplateElement.h"
+#include "LoadableClassicScript.h"
 #include "Page.h"
 #include "ProcessingInstruction.h"
 #include "ResourceError.h"
@@ -54,6 +55,7 @@
 #include "ScriptSourceCode.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
+#include "StyleScope.h"
 #include "TextResourceDecoder.h"
 #include "TransformSource.h"
 #include "XMLNSNames.h"
@@ -664,7 +666,7 @@ XMLDocumentParser::~XMLDocumentParser()
 
     // FIXME: m_pendingScript handling should be moved into XMLDocumentParser.cpp!
     if (m_pendingScript)
-        m_pendingScript->removeClient(this);
+        m_pendingScript->removeClient(*this);
 }
 
 void XMLDocumentParser::doWrite(const String& parseString)
@@ -920,10 +922,12 @@ void XMLDocumentParser::endElementNs()
 
         if (scriptElement->readyToBeParserExecuted())
             scriptElement->executeScript(ScriptSourceCode(scriptElement->scriptContent(), document()->url(), m_scriptStartPosition));
-        else if (scriptElement->willBeParserExecuted()) {
-            m_pendingScript = scriptElement->cachedScript();
+        else if (scriptElement->willBeParserExecuted() && scriptElement->loadableScript() && is<LoadableClassicScript>(*scriptElement->loadableScript())) {
+            // FIXME: Allow "module" scripts for XML documents.
+            // https://bugs.webkit.org/show_bug.cgi?id=161651
+            m_pendingScript = &downcast<LoadableClassicScript>(*scriptElement->loadableScript()).cachedScript();
             m_scriptElement = &element;
-            m_pendingScript->addClient(this);
+            m_pendingScript->addClient(*this);
 
             // m_pendingScript will be 0 if script was already loaded and addClient() executed it.
             if (m_pendingScript)
@@ -1064,7 +1068,7 @@ void XMLDocumentParser::startDocument(const xmlChar* version, const xmlChar* enc
     if (version)
         document()->setXMLVersion(toString(version), ASSERT_NO_EXCEPTION);
     if (standalone != StandaloneUnspecified)
-        document()->setXMLStandalone(standaloneInfo == StandaloneYes, ASSERT_NO_EXCEPTION);
+        document()->setXMLStandalone(standaloneInfo == StandaloneYes);
     if (encoding)
         document()->setXMLEncoding(toString(encoding));
     document()->setHasXMLDeclaration(true);
@@ -1383,7 +1387,7 @@ void XMLDocumentParser::doEnd()
         document()->setTransformSource(std::make_unique<TransformSource>(doc));
 
         document()->setParsing(false); // Make the document think it's done, so it will apply XSL stylesheets.
-        document()->styleResolverChanged(RecalcStyleImmediately);
+        document()->styleScope().didChangeActiveStyleSheetCandidates();
 
         // styleResolverChanged() call can detach the parser and null out its document.
         // In that case, we just bail out.

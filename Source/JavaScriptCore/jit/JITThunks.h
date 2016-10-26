@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef JITThunks_h
-#define JITThunks_h
+#pragma once
 
 #if ENABLE(JIT)
 
@@ -34,10 +33,10 @@
 #include "ThunkGenerator.h"
 #include "Weak.h"
 #include "WeakHandleOwner.h"
-#include "WeakInlines.h"
 #include <tuple>
 #include <wtf/HashMap.h>
 #include <wtf/ThreadingPrimitives.h>
+#include <wtf/text/StringHash.h>
 
 namespace JSC {
 
@@ -108,6 +107,3 @@ private:
 } // namespace JSC
 
 #endif // ENABLE(JIT)
-
-#endif // JITThunks_h
-

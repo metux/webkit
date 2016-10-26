@@ -36,16 +36,15 @@
 #include "JITInlines.h"
 #include "JITOperations.h"
 #include "JSArray.h"
+#include "JSCInlines.h"
 #include "JSFunction.h"
 #include "LinkBuffer.h"
 #include "MaxFrameExtentForSlowPathCall.h"
-#include "JSCInlines.h"
 #include "PCToCodeOriginMap.h"
 #include "ProfilerDatabase.h"
 #include "ResultType.h"
 #include "SlowPathCall.h"
 #include "StackAlignment.h"
-#include "SuperSampler.h"
 #include "TypeProfilerLog.h"
 #include <wtf/CryptographicallyRandomNumber.h>
 #include <wtf/SimpleStats.h>
@@ -268,9 +267,8 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_is_undefined)
         DEFINE_OP(op_is_boolean)
         DEFINE_OP(op_is_number)
-        DEFINE_OP(op_is_string)
-        DEFINE_OP(op_is_jsarray)
         DEFINE_OP(op_is_object)
+        DEFINE_OP(op_is_cell_with_type)
         DEFINE_OP(op_jeq_null)
         DEFINE_OP(op_jfalse)
         DEFINE_OP(op_jmp)
@@ -324,6 +322,8 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_put_getter_setter_by_id)
         DEFINE_OP(op_put_getter_by_val)
         DEFINE_OP(op_put_setter_by_val)
+        DEFINE_OP(op_define_data_property)
+        DEFINE_OP(op_define_accessor_property)
 
         DEFINE_OP(op_ret)
         DEFINE_OP(op_rshift)
@@ -760,8 +760,9 @@ CompilationResult JIT::link()
     for (unsigned i = 0; i < m_callCompilationInfo.size(); ++i) {
         CallCompilationInfo& compilationInfo = m_callCompilationInfo[i];
         CallLinkInfo& info = *compilationInfo.callLinkInfo;
-        info.setCallLocations(patchBuffer.locationOfNearCall(compilationInfo.callReturnLocation),
-            patchBuffer.locationOf(compilationInfo.hotPathBegin),
+        info.setCallLocations(
+            CodeLocationLabel(patchBuffer.locationOfNearCall(compilationInfo.callReturnLocation)),
+            CodeLocationLabel(patchBuffer.locationOf(compilationInfo.hotPathBegin)),
             patchBuffer.locationOfNearCall(compilationInfo.hotPathOther));
     }
 

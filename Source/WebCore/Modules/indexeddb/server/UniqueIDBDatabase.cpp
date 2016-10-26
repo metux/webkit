@@ -660,6 +660,47 @@ void UniqueIDBDatabase::didPerformDeleteObjectStore(uint64_t callbackIdentifier,
     performErrorCallback(callbackIdentifier, error);
 }
 
+void UniqueIDBDatabase::renameObjectStore(UniqueIDBDatabaseTransaction& transaction, uint64_t objectStoreIdentifier, const String& newName, ErrorCallback callback)
+{
+    ASSERT(isMainThread());
+    LOG(IndexedDB, "(main) UniqueIDBDatabase::renameObjectStore");
+
+    uint64_t callbackID = storeCallbackOrFireError(callback);
+    if (!callbackID)
+        return;
+
+    auto* info = m_databaseInfo->infoForExistingObjectStore(objectStoreIdentifier);
+    if (!info) {
+        performErrorCallback(callbackID, { IDBDatabaseException::UnknownError, ASCIILiteral("Attempt to rename non-existant object store") });
+        return;
+    }
+
+    postDatabaseTask(createCrossThreadTask(*this, &UniqueIDBDatabase::performRenameObjectStore, callbackID, transaction.info().identifier(), objectStoreIdentifier, newName));
+}
+
+void UniqueIDBDatabase::performRenameObjectStore(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const String& newName)
+{
+    ASSERT(!isMainThread());
+    LOG(IndexedDB, "(db) UniqueIDBDatabase::performRenameObjectStore");
+
+    ASSERT(m_backingStore);
+    m_backingStore->renameObjectStore(transactionIdentifier, objectStoreIdentifier, newName);
+
+    IDBError error;
+    postDatabaseTaskReply(createCrossThreadTask(*this, &UniqueIDBDatabase::didPerformRenameObjectStore, callbackIdentifier, error, objectStoreIdentifier, newName));
+}
+
+void UniqueIDBDatabase::didPerformRenameObjectStore(uint64_t callbackIdentifier, const IDBError& error, uint64_t objectStoreIdentifier, const String& newName)
+{
+    ASSERT(isMainThread());
+    LOG(IndexedDB, "(main) UniqueIDBDatabase::didPerformRenameObjectStore");
+
+    if (error.isNull())
+        m_databaseInfo->renameObjectStore(objectStoreIdentifier, newName);
+
+    performErrorCallback(callbackIdentifier, error);
+}
+
 void UniqueIDBDatabase::clearObjectStore(UniqueIDBDatabaseTransaction& transaction, uint64_t objectStoreIdentifier, ErrorCallback callback)
 {
     ASSERT(isMainThread());
@@ -778,6 +819,60 @@ void UniqueIDBDatabase::didPerformDeleteIndex(uint64_t callbackIdentifier, const
     performErrorCallback(callbackIdentifier, error);
 }
 
+void UniqueIDBDatabase::renameIndex(UniqueIDBDatabaseTransaction& transaction, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName, ErrorCallback callback)
+{
+    ASSERT(isMainThread());
+    LOG(IndexedDB, "(main) UniqueIDBDatabase::renameIndex");
+
+    uint64_t callbackID = storeCallbackOrFireError(callback);
+    if (!callbackID)
+        return;
+
+    auto* objectStoreInfo = m_databaseInfo->infoForExistingObjectStore(objectStoreIdentifier);
+    if (!objectStoreInfo) {
+        performErrorCallback(callbackID, { IDBDatabaseException::UnknownError, ASCIILiteral("Attempt to rename index in non-existant object store") });
+        return;
+    }
+
+    auto* indexInfo = objectStoreInfo->infoForExistingIndex(indexIdentifier);
+    if (!indexInfo) {
+        performErrorCallback(callbackID, { IDBDatabaseException::UnknownError, ASCIILiteral("Attempt to rename non-existant index") });
+        return;
+    }
+
+    postDatabaseTask(createCrossThreadTask(*this, &UniqueIDBDatabase::performRenameIndex, callbackID, transaction.info().identifier(), objectStoreIdentifier, indexIdentifier, newName));
+}
+
+void UniqueIDBDatabase::performRenameIndex(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName)
+{
+    ASSERT(!isMainThread());
+    LOG(IndexedDB, "(db) UniqueIDBDatabase::performRenameIndex");
+
+    ASSERT(m_backingStore);
+    m_backingStore->renameIndex(transactionIdentifier, objectStoreIdentifier, indexIdentifier, newName);
+
+    IDBError error;
+    postDatabaseTaskReply(createCrossThreadTask(*this, &UniqueIDBDatabase::didPerformRenameIndex, callbackIdentifier, error, objectStoreIdentifier, indexIdentifier, newName));
+}
+
+void UniqueIDBDatabase::didPerformRenameIndex(uint64_t callbackIdentifier, const IDBError& error, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName)
+{
+    ASSERT(isMainThread());
+    LOG(IndexedDB, "(main) UniqueIDBDatabase::didPerformRenameIndex");
+
+    if (error.isNull()) {
+        auto* objectStoreInfo = m_databaseInfo->infoForExistingObjectStore(objectStoreIdentifier);
+        ASSERT(objectStoreInfo);
+        if (objectStoreInfo) {
+            auto* indexInfo = objectStoreInfo->infoForExistingIndex(indexIdentifier);
+            ASSERT(indexInfo);
+            indexInfo->rename(newName);
+        }
+    }
+
+    performErrorCallback(callbackIdentifier, error);
+}
+
 void UniqueIDBDatabase::putOrAdd(const IDBRequestData& requestData, const IDBKeyData& keyData, const IDBValue& value, IndexedDB::ObjectStoreOverwriteMode overwriteMode, KeyDataCallback callback)
 {
     ASSERT(isMainThread());
@@ -859,7 +954,9 @@ void UniqueIDBDatabase::performPutOrAdd(uint64_t callbackIdentifier, const IDBRe
     // using steps to assign a key to a value using a key path.
     ThreadSafeDataBuffer injectedRecordValue;
     if (usedKeyIsGenerated && !objectStoreInfo->keyPath().isNull()) {
-        JSLockHolder locker(databaseThreadVM());
+        VM& vm = databaseThreadVM();
+        JSLockHolder locker(vm);
+        auto scope = DECLARE_THROW_SCOPE(vm);
 
         auto value = deserializeIDBValueToJSValue(databaseThreadExecState(), originalRecordValue.data());
         if (value.isUndefined()) {
@@ -872,8 +969,8 @@ void UniqueIDBDatabase::performPutOrAdd(uint64_t callbackIdentifier, const IDBRe
             return;
         }
 
-        auto serializedValue = SerializedScriptValue::create(&databaseThreadExecState(), value, nullptr, nullptr);
-        if (databaseThreadExecState().hadException()) {
+        auto serializedValue = SerializedScriptValue::create(databaseThreadExecState(), value);
+        if (UNLIKELY(scope.exception())) {
             postDatabaseTaskReply(createCrossThreadTask(*this, &UniqueIDBDatabase::didPerformPutOrAdd, callbackIdentifier, IDBError(IDBDatabaseException::ConstraintError, ASCIILiteral("Unable to serialize record value after injecting record key")), usedKey));
             return;
         }

@@ -663,7 +663,7 @@ void PluginView::didInitializePlugin()
     if (m_pluginElement->displayState() < HTMLPlugInElement::Restarting) {
         if (m_plugin->pluginLayer() && frame()) {
             frame()->view()->enterCompositingMode();
-            m_pluginElement->setNeedsStyleRecalc(SyntheticStyleChange);
+            m_pluginElement->invalidateStyleAndLayerComposition();
         }
         if (frame() && !frame()->settings().maximumPlugInSnapshotAttempts()) {
             beginSnapshottingRunningPlugin();
@@ -673,7 +673,7 @@ void PluginView::didInitializePlugin()
     } else {
         if (m_plugin->pluginLayer() && frame()) {
             frame()->view()->enterCompositingMode();
-            m_pluginElement->setNeedsStyleRecalc(SyntheticStyleChange);
+            m_pluginElement->invalidateStyleAndLayerComposition();
         }
         if (m_pluginElement->displayState() == HTMLPlugInElement::RestartingWithPendingMouseClick)
             m_pluginElement->dispatchPendingMouseClick();
@@ -1531,7 +1531,7 @@ bool PluginView::isMuted() const
     if (!frame() || !frame()->page())
         return false;
 
-    return frame()->page()->isMuted();
+    return frame()->page()->isAudioMuted();
 }
 #endif
 
@@ -1570,7 +1570,7 @@ void PluginView::pluginProcessCrashed()
     if (!is<RenderEmbeddedObject>(renderer))
         return;
 
-    m_pluginElement->setNeedsStyleRecalc(SyntheticStyleChange);
+    m_pluginElement->invalidateStyleAndLayerComposition();
 
     downcast<RenderEmbeddedObject>(*renderer).setPluginUnavailabilityReason(RenderEmbeddedObject::PluginCrashed);
 
@@ -1730,7 +1730,7 @@ void PluginView::windowedPluginVisibilityDidChange(bool isVisible, uint64_t wind
 #if PLATFORM(COCOA)
 static bool isAlmostSolidColor(BitmapImage* bitmap)
 {
-    CGImageRef image = bitmap->getCGImageRef();
+    CGImageRef image = bitmap->nativeImage().get();
     ASSERT(CGImageGetBitsPerComponent(image) == 8);
 
     CGBitmapInfo imageInfo = CGImageGetBitmapInfo(image);

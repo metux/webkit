@@ -26,8 +26,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef JSSymbolTableObject_h
-#define JSSymbolTableObject_h
+#pragma once
 
 #include "JSScope.h"
 #include "PropertyDescriptor.h"
@@ -40,7 +39,7 @@ namespace JSC {
 class JSSymbolTableObject : public JSScope {
 public:
     typedef JSScope Base;
-    static const unsigned StructureFlags = Base::StructureFlags | IsEnvironmentRecord | OverridesGetPropertyNames;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetPropertyNames;
     
     SymbolTable* symbolTable() const { return m_symbolTable.get(); }
     
@@ -184,7 +183,7 @@ inline bool symbolTablePut(SymbolTableObjectType* object, ExecState* exec, Prope
         ASSERT(!fastEntry.isNull());
         if (fastEntry.isReadOnly() && !ignoreReadOnlyErrors) {
             if (shouldThrowReadOnlyError)
-                throwTypeError(exec, scope, StrictModeReadonlyPropertyWriteError);
+                throwTypeError(exec, scope, ASCIILiteral(ReadonlyPropertyWriteError));
             putResult = false;
             return true;
         }
@@ -228,6 +227,3 @@ inline bool symbolTablePutInvalidateWatchpointSet(
 }
 
 } // namespace JSC
-
-#endif // JSSymbolTableObject_h
-

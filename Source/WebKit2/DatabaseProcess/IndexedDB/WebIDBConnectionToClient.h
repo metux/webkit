@@ -64,9 +64,11 @@ public:
     void didCommitTransaction(const WebCore::IDBResourceIdentifier& transactionIdentifier, const WebCore::IDBError&) final;
     void didCreateObjectStore(const WebCore::IDBResultData&) final;
     void didDeleteObjectStore(const WebCore::IDBResultData&) final;
+    void didRenameObjectStore(const WebCore::IDBResultData&) final;
     void didClearObjectStore(const WebCore::IDBResultData&) final;
     void didCreateIndex(const WebCore::IDBResultData&) final;
     void didDeleteIndex(const WebCore::IDBResultData&) final;
+    void didRenameIndex(const WebCore::IDBResultData&) final;
     void didPutOrAdd(const WebCore::IDBResultData&) final;
     void didGetRecord(const WebCore::IDBResultData&) final;
     void didGetCount(const WebCore::IDBResultData&) final;
@@ -92,9 +94,11 @@ public:
     void didFinishHandlingVersionChangeTransaction(uint64_t databaseConnectionIdentifier, const WebCore::IDBResourceIdentifier&);
     void createObjectStore(const WebCore::IDBRequestData&, const WebCore::IDBObjectStoreInfo&);
     void deleteObjectStore(const WebCore::IDBRequestData&, const String& objectStoreName);
+    void renameObjectStore(const WebCore::IDBRequestData&, uint64_t objectStoreIdentifier, const String& newName);
     void clearObjectStore(const WebCore::IDBRequestData&, uint64_t objectStoreIdentifier);
     void createIndex(const WebCore::IDBRequestData&, const WebCore::IDBIndexInfo&);
     void deleteIndex(const WebCore::IDBRequestData&, uint64_t objectStoreIdentifier, const String& indexName);
+    void renameIndex(const WebCore::IDBRequestData&, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName);
     void putOrAdd(const WebCore::IDBRequestData&, const WebCore::IDBKeyData&, const WebCore::IDBValue&, unsigned overwriteMode);
     void getRecord(const WebCore::IDBRequestData&, const WebCore::IDBGetRecordData&);
     void getCount(const WebCore::IDBRequestData&, const WebCore::IDBKeyRangeData&);

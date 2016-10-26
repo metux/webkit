@@ -19,8 +19,7 @@
  *
  */
 
-#ifndef MarkedSpace_h
-#define MarkedSpace_h
+#pragma once
 
 #include "IterationStatus.h"
 #include "LargeAllocation.h"
@@ -65,7 +64,16 @@ public:
 
     static const size_t numSizeClasses = largeCutoff / sizeStep;
     
-    static const HeapVersion initialVersion = 42;  // This can be any value, including random garbage, so long as it's consistent for the lifetime of the process.
+    static const HeapVersion nullVersion = 0; // The version of freshly allocated blocks.
+    static const HeapVersion initialVersion = 2; // The version that the heap starts out with. Set to make sure that nextVersion(nullVersion) != initialVersion.
+    
+    static HeapVersion nextVersion(HeapVersion version)
+    {
+        version++;
+        if (version == nullVersion)
+            version = initialVersion;
+        return version;
+    }
     
     static size_t sizeClassToIndex(size_t size)
     {
@@ -103,18 +111,23 @@ public:
     MarkedAllocator* auxiliaryAllocatorFor(size_t);
 
     JS_EXPORT_PRIVATE void* allocate(Subspace&, size_t);
+    JS_EXPORT_PRIVATE void* allocate(Subspace&, GCDeferralContext*, size_t);
     JS_EXPORT_PRIVATE void* tryAllocate(Subspace&, size_t);
+    JS_EXPORT_PRIVATE void* tryAllocate(Subspace&, GCDeferralContext*, size_t);
     
     void* allocateWithDestructor(size_t);
     void* allocateWithoutDestructor(size_t);
+    void* allocateWithDestructor(GCDeferralContext*, size_t);
+    void* allocateWithoutDestructor(GCDeferralContext*, size_t);
     void* allocateAuxiliary(size_t);
     void* tryAllocateAuxiliary(size_t);
+    void* tryAllocateAuxiliary(GCDeferralContext*, size_t);
     
     Subspace& subspaceForObjectsWithDestructor() { return m_destructorSpace; }
     Subspace& subspaceForObjectsWithoutDestructor() { return m_normalSpace; }
     Subspace& subspaceForAuxiliaryData() { return m_auxiliarySpace; }
     
-    void resetAllocators();
+    void prepareForAllocation();
 
     void visitWeakSets(HeapRootVisitor&);
     void reapWeakSets();
@@ -144,21 +157,22 @@ public:
     void didConsumeFreeList(MarkedBlock::Handle*);
     void didAllocateInBlock(MarkedBlock::Handle*);
 
-    void flip();
+    void beginMarking();
+    void endMarking();
+    void snapshotUnswept();
     void clearNewlyAllocated();
     void sweep();
     void sweepLargeAllocations();
-    void zombifySweep();
+    void assertNoUnswept();
     size_t objectCount();
     size_t size();
     size_t capacity();
 
     bool isPagedOut(double deadline);
     
-    HeapVersion version() const { return m_version; }
+    HeapVersion markingVersion() const { return m_markingVersion; }
+    HeapVersion newlyAllocatedVersion() const { return m_newlyAllocatedVersion; }
 
-    const Vector<MarkedBlock::Handle*>& blocksWithNewObjects() const { return m_blocksWithNewObjects; }
-    
     const Vector<LargeAllocation*>& largeAllocations() const { return m_largeAllocations; }
     unsigned largeAllocationsNurseryOffset() const { return m_largeAllocationsNurseryOffset; }
     unsigned largeAllocationsOffsetForThisCollection() const { return m_largeAllocationsOffsetForThisCollection; }
@@ -168,7 +182,17 @@ public:
     LargeAllocation** largeAllocationsForThisCollectionBegin() const { return m_largeAllocationsForThisCollectionBegin; }
     LargeAllocation** largeAllocationsForThisCollectionEnd() const { return m_largeAllocationsForThisCollectionEnd; }
     unsigned largeAllocationsForThisCollectionSize() const { return m_largeAllocationsForThisCollectionSize; }
-
+    
+    MarkedAllocator* firstAllocator() const { return m_firstAllocator; }
+    MarkedAllocator* allocatorForEmptyAllocation() const { return m_allocatorForEmptyAllocation; }
+    
+    MarkedBlock::Handle* findEmptyBlockToSteal();
+    
+    // When this is true it means that we have flipped but the mark bits haven't converged yet.
+    bool isMarking() const { return m_isMarking; }
+    
+    void dumpBits(PrintStream& = WTF::dataFile());
+    
 private:
     friend class LLIntOffsetsExtractor;
     friend class JIT;
@@ -176,15 +200,15 @@ private:
     
     JS_EXPORT_PRIVATE static std::array<size_t, numSizeClasses> s_sizeClassForSizeStep;
     
-    JS_EXPORT_PRIVATE void* allocateLarge(Subspace&, size_t);
-    JS_EXPORT_PRIVATE void* tryAllocateLarge(Subspace&, size_t);
+    void* allocateLarge(Subspace&, GCDeferralContext*, size_t);
+    void* tryAllocateLarge(Subspace&, GCDeferralContext*, size_t);
 
     static void initializeSizeClassForStepSize();
     
     void initializeSubspace(Subspace&);
 
-    template<typename Functor> void forEachAllocator(const Functor&);
-    template<typename Functor> void forEachSubspace(const Functor&);
+    template<typename Functor> inline void forEachAllocator(const Functor&);
+    template<typename Functor> inline void forEachSubspace(const Functor&);
     
     void addActiveWeakSet(WeakSet*);
 
@@ -193,11 +217,12 @@ private:
     Subspace m_auxiliarySpace;
 
     Heap* m_heap;
-    HeapVersion m_version { initialVersion };
+    HeapVersion m_markingVersion { initialVersion };
+    HeapVersion m_newlyAllocatedVersion { initialVersion };
     size_t m_capacity;
     bool m_isIterating;
+    bool m_isMarking { false };
     MarkedBlockSet m_blocks;
-    Vector<MarkedBlock::Handle*> m_blocksWithNewObjects;
     Vector<LargeAllocation*> m_largeAllocations;
     unsigned m_largeAllocationsNurseryOffset { 0 };
     unsigned m_largeAllocationsOffsetForThisCollection { 0 };
@@ -207,39 +232,10 @@ private:
     unsigned m_largeAllocationsForThisCollectionSize { 0 };
     SentinelLinkedList<WeakSet, BasicRawSentinelNode<WeakSet>> m_activeWeakSets;
     SentinelLinkedList<WeakSet, BasicRawSentinelNode<WeakSet>> m_newActiveWeakSets;
+    
+    MarkedAllocator* m_firstAllocator { nullptr };
+    MarkedAllocator* m_allocatorForEmptyAllocation { nullptr };
 };
-
-template<typename Functor> inline void MarkedSpace::forEachLiveCell(HeapIterationScope&, const Functor& functor)
-{
-    ASSERT(isIterating());
-    BlockIterator end = m_blocks.set().end();
-    for (BlockIterator it = m_blocks.set().begin(); it != end; ++it) {
-        if ((*it)->handle().forEachLiveCell(functor) == IterationStatus::Done)
-            return;
-    }
-    for (LargeAllocation* allocation : m_largeAllocations) {
-        if (allocation->isLive()) {
-            if (functor(allocation->cell(), allocation->attributes().cellKind) == IterationStatus::Done)
-                return;
-        }
-    }
-}
-
-template<typename Functor> inline void MarkedSpace::forEachDeadCell(HeapIterationScope&, const Functor& functor)
-{
-    ASSERT(isIterating());
-    BlockIterator end = m_blocks.set().end();
-    for (BlockIterator it = m_blocks.set().begin(); it != end; ++it) {
-        if ((*it)->handle().forEachDeadCell(functor) == IterationStatus::Done)
-            return;
-    }
-    for (LargeAllocation* allocation : m_largeAllocations) {
-        if (!allocation->isLive()) {
-            if (functor(allocation->cell(), allocation->attributes().cellKind) == IterationStatus::Done)
-                return;
-        }
-    }
-}
 
 inline MarkedAllocator* MarkedSpace::allocatorFor(Subspace& space, size_t bytes)
 {
@@ -274,6 +270,16 @@ inline void* MarkedSpace::allocateWithDestructor(size_t bytes)
     return allocate(m_destructorSpace, bytes);
 }
 
+inline void* MarkedSpace::allocateWithoutDestructor(GCDeferralContext* deferralContext, size_t bytes)
+{
+    return allocate(m_normalSpace, deferralContext, bytes);
+}
+
+inline void* MarkedSpace::allocateWithDestructor(GCDeferralContext* deferralContext, size_t bytes)
+{
+    return allocate(m_destructorSpace, deferralContext, bytes);
+}
+
 inline void* MarkedSpace::allocateAuxiliary(size_t bytes)
 {
     return allocate(m_auxiliarySpace, bytes);
@@ -282,6 +288,11 @@ inline void* MarkedSpace::allocateAuxiliary(size_t bytes)
 inline void* MarkedSpace::tryAllocateAuxiliary(size_t bytes)
 {
     return tryAllocate(m_auxiliarySpace, bytes);
+}
+
+inline void* MarkedSpace::tryAllocateAuxiliary(GCDeferralContext* deferralContext, size_t bytes)
+{
+    return tryAllocate(m_auxiliarySpace, deferralContext, bytes);
 }
 
 template <typename Functor> inline void MarkedSpace::forEachBlock(const Functor& functor)
@@ -296,15 +307,10 @@ template <typename Functor> inline void MarkedSpace::forEachBlock(const Functor&
 template <typename Functor>
 void MarkedSpace::forEachAllocator(const Functor& functor)
 {
-    forEachSubspace(
-        [&] (Subspace& subspace, AllocatorAttributes) -> IterationStatus {
-            for (MarkedAllocator* allocator : subspace.bagOfAllocators) {
-                if (functor(*allocator) == IterationStatus::Done)
-                    return IterationStatus::Done;
-            }
-            
-            return IterationStatus::Continue;
-        });
+    for (MarkedAllocator* allocator = m_firstAllocator; allocator; allocator = allocator->nextAllocator()) {
+        if (functor(*allocator) == IterationStatus::Done)
+            return;
+    }
 }
 
 template<typename Functor>
@@ -338,5 +344,3 @@ ALWAYS_INLINE size_t MarkedSpace::optimalSizeFor(size_t bytes)
 }
 
 } // namespace JSC
-
-#endif // MarkedSpace_h

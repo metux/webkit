@@ -184,6 +184,13 @@ void UniqueIDBDatabaseConnection::didDeleteObjectStore(const IDBResultData& resu
     m_connectionToClient.didDeleteObjectStore(resultData);
 }
 
+void UniqueIDBDatabaseConnection::didRenameObjectStore(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "UniqueIDBDatabaseConnection::didRenameObjectStore");
+
+    m_connectionToClient.didRenameObjectStore(resultData);
+}
+
 void UniqueIDBDatabaseConnection::didClearObjectStore(const IDBResultData& resultData)
 {
     LOG(IndexedDB, "UniqueIDBDatabaseConnection::didClearObjectStore");
@@ -203,6 +210,13 @@ void UniqueIDBDatabaseConnection::didDeleteIndex(const IDBResultData& resultData
     LOG(IndexedDB, "UniqueIDBDatabaseConnection::didDeleteIndex");
 
     m_connectionToClient.didDeleteIndex(resultData);
+}
+
+void UniqueIDBDatabaseConnection::didRenameIndex(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "UniqueIDBDatabaseConnection::didRenameIndex");
+
+    m_connectionToClient.didRenameIndex(resultData);
 }
 
 } // namespace IDBServer

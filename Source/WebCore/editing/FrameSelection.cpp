@@ -1693,7 +1693,7 @@ void FrameSelection::paintCaret(GraphicsContext& context, const LayoutPoint& pai
 }
 
 #if ENABLE(TEXT_CARET)
-static inline bool disappearsIntoBackground(Color foreground, Color background)
+static inline bool disappearsIntoBackground(const Color& foreground, const Color& background)
 {
     return background.blend(foreground) == background;
 }
@@ -1983,7 +1983,7 @@ void FrameSelection::focusedOrActiveStateChanged()
     // RenderTheme::isFocused() check if the frame is active, we have to
     // update style and theme state that depended on those.
     if (Element* element = document->focusedElement()) {
-        element->setNeedsStyleRecalc();
+        element->invalidateStyleForSubtree();
         if (RenderObject* renderer = element->renderer())
             if (renderer && renderer->style().hasAppearance())
                 renderer->theme().stateChanged(*renderer, ControlStates::FocusState);
@@ -2382,6 +2382,9 @@ void FrameSelection::setShouldShowBlockCursor(bool shouldShowBlockCursor)
 
 void FrameSelection::updateAppearanceAfterLayout()
 {
+    if (auto* client = m_frame->editor().client())
+        client->updateEditorStateAfterLayoutIfEditabilityChanged();
+
     setCaretRectNeedsUpdate();
     updateAndRevealSelection(AXTextStateChangeIntent());
     updateDataDetectorsForSelection();

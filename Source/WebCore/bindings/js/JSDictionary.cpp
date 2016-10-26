@@ -30,10 +30,11 @@
 #include "DOMWindow.h"
 #include "Dictionary.h"
 #include "JSCSSFontFaceRule.h"
+#include "JSDOMConvert.h"
 #include "JSDOMError.h"
 #include "JSDOMWindow.h"
 #include "JSEventTarget.h"
-#include "JSMessagePortCustom.h"
+#include "JSMessagePort.h"
 #include "JSNode.h"
 #include "JSStorage.h"
 #include "JSTrackCustom.h"
@@ -44,8 +45,8 @@
 #include <wtf/MathExtras.h>
 #include <wtf/text/AtomicString.h>
 
-#if ENABLE(ENCRYPTED_MEDIA)
-#include "JSMediaKeyError.h"
+#if ENABLE(LEGACY_ENCRYPTED_MEDIA)
+#include "JSWebKitMediaKeyError.h"
 #endif
 
 #if ENABLE(FETCH_API)
@@ -69,6 +70,7 @@
 #endif
 
 #if ENABLE(IOS_TOUCH_EVENTS) || ENABLE(TOUCH_EVENTS)
+#include "JSTouch.h"
 #include "JSTouchList.h"
 #endif
 
@@ -78,6 +80,8 @@ namespace WebCore {
 
 JSDictionary::GetPropertyResult JSDictionary::tryGetProperty(const char* propertyName, JSValue& finalResult) const
 {
+    VM& vm = m_exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
     ASSERT(isValid());
     Identifier identifier = Identifier::fromString(m_exec, propertyName);
     bool propertyFound = m_initializerObject.get()->getPropertySlot(m_exec, identifier, [&] (bool propertyFound, PropertySlot& slot) -> bool {
@@ -86,8 +90,7 @@ JSDictionary::GetPropertyResult JSDictionary::tryGetProperty(const char* propert
         finalResult = slot.getValue(m_exec, identifier);
         return true;
     });
-    if (m_exec->hadException())
-        return ExceptionThrown;
+    RETURN_IF_EXCEPTION(scope, ExceptionThrown);
     return propertyFound ? PropertyFound : NoPropertyFound;
 }
 
@@ -151,18 +154,19 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, String& result)
 void JSDictionary::convertValue(ExecState* exec, JSValue value, Vector<String>& result)
 {
     ASSERT(exec);
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     if (value.isUndefinedOrNull())
         return;
 
     unsigned length = 0;
     JSObject* object = toJSSequence(*exec, value, length);
-    if (exec->hadException())
-        return;
+    RETURN_IF_EXCEPTION(scope, void());
 
     for (unsigned i = 0 ; i < length; ++i) {
         JSValue itemValue = object->get(exec, i);
-        if (exec->hadException())
-            return;
+        RETURN_IF_EXCEPTION(scope, void());
         result.append(itemValue.toString(exec)->value(exec));
     }
 }
@@ -174,7 +178,7 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, Deprecated::Scri
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, RefPtr<SerializedScriptValue>& result)
 {
-    result = SerializedScriptValue::create(exec, value, 0, 0);
+    result = SerializedScriptValue::create(*exec, value);
 }
 
 void JSDictionary::convertValue(ExecState* state, JSValue value, RefPtr<DOMWindow>& result)
@@ -182,7 +186,7 @@ void JSDictionary::convertValue(ExecState* state, JSValue value, RefPtr<DOMWindo
     VM& vm = state->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
 
-    auto* window = JSDOMWindow::toWrapped(*state, value);
+    auto* window = JSDOMWindow::toWrapped(value);
     if (UNLIKELY(!window) && !value.isUndefinedOrNull()) {
         throwVMTypeError(state, scope, "Dictionary member is not of type Window");
         return;
@@ -190,9 +194,9 @@ void JSDictionary::convertValue(ExecState* state, JSValue value, RefPtr<DOMWindo
     result = window;
 }
 
-void JSDictionary::convertValue(ExecState* state, JSValue value, RefPtr<EventTarget>& result)
+void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<EventTarget>& result)
 {
-    result = JSEventTarget::toWrapped(*state, value);
+    result = JSEventTarget::toWrapped(value);
 }
 
 void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<Node>& result)
@@ -205,10 +209,9 @@ void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<Storage>& resu
     result = JSStorage::toWrapped(value);
 }
 
-void JSDictionary::convertValue(ExecState* exec, JSValue value, MessagePortArray& result)
+void JSDictionary::convertValue(ExecState* exec, JSValue value, Vector<RefPtr<MessagePort>>& result)
 {
-    ArrayBufferArray arrayBuffers;
-    fillMessagePortArray(*exec, value, result, arrayBuffers);
+    result = convert<IDLSequence<IDLInterface<MessagePort>>>(*exec, value);
 }
 
 #if ENABLE(VIDEO_TRACK)
@@ -221,6 +224,9 @@ void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<TrackBase>& re
 void JSDictionary::convertValue(ExecState* exec, JSValue value, HashSet<AtomicString>& result)
 {
     ASSERT(exec);
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     result.clear();
 
     if (value.isUndefinedOrNull())
@@ -228,13 +234,11 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, HashSet<AtomicSt
 
     unsigned length = 0;
     JSObject* object = toJSSequence(*exec, value, length);
-    if (exec->hadException())
-        return;
+    RETURN_IF_EXCEPTION(scope, void());
 
     for (unsigned i = 0 ; i < length; ++i) {
         JSValue itemValue = object->get(exec, i);
-        if (exec->hadException())
-            return;
+        RETURN_IF_EXCEPTION(scope, void());
         result.add(itemValue.toString(exec)->value(exec));
     }
 }
@@ -252,10 +256,10 @@ void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Uint
     result = toUint8Array(value);
 }
 
-#if ENABLE(ENCRYPTED_MEDIA)
-void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<MediaKeyError>& result)
+#if ENABLE(LEGACY_ENCRYPTED_MEDIA)
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<WebKitMediaKeyError>& result)
 {
-    result = JSMediaKeyError::toWrapped(value);
+    result = JSWebKitMediaKeyError::toWrapped(value);
 }
 #endif
 
@@ -297,18 +301,19 @@ void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<RTCR
 void JSDictionary::convertValue(ExecState* exec, JSValue value, Vector<RefPtr<MediaStream>>& result)
 {
     ASSERT(exec);
+    VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
+
     if (value.isUndefinedOrNull())
         return;
 
     unsigned length = 0;
     JSObject* object = toJSSequence(*exec, value, length);
-    if (exec->hadException())
-        return;
+    RETURN_IF_EXCEPTION(scope, void());
 
     for (unsigned i = 0 ; i < length; ++i) {
         JSValue itemValue = object->get(exec, i);
-        if (exec->hadException())
-            return;
+        RETURN_IF_EXCEPTION(scope, void());
 
         auto stream = JSMediaStream::toWrapped(itemValue);
         if (!stream) {
@@ -347,7 +352,7 @@ void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Game
 }
 #endif
 
-#if ENABLE(IOS_TOUCH_EVENTS) || ENABLE(TOUCH_EVENTS)
+#if ENABLE(TOUCH_EVENTS)
 void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<TouchList>& result)
 {
     result = JSTouchList::toWrapped(value);

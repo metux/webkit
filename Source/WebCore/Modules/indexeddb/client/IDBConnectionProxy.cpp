@@ -59,7 +59,7 @@ void IDBConnectionProxy::deref()
     m_connectionToServer.deref();
 }
 
-RefPtr<IDBOpenDBRequest> IDBConnectionProxy::openDatabase(ScriptExecutionContext& context, const IDBDatabaseIdentifier& databaseIdentifier, uint64_t version)
+Ref<IDBOpenDBRequest> IDBConnectionProxy::openDatabase(ScriptExecutionContext& context, const IDBDatabaseIdentifier& databaseIdentifier, uint64_t version)
 {
     RefPtr<IDBOpenDBRequest> request;
     {
@@ -72,10 +72,10 @@ RefPtr<IDBOpenDBRequest> IDBConnectionProxy::openDatabase(ScriptExecutionContext
 
     callConnectionOnMainThread(&IDBConnectionToServer::openDatabase, IDBRequestData(*this, *request));
 
-    return request;
+    return request.releaseNonNull();
 }
 
-RefPtr<IDBOpenDBRequest> IDBConnectionProxy::deleteDatabase(ScriptExecutionContext& context, const IDBDatabaseIdentifier& databaseIdentifier)
+Ref<IDBOpenDBRequest> IDBConnectionProxy::deleteDatabase(ScriptExecutionContext& context, const IDBDatabaseIdentifier& databaseIdentifier)
 {
     RefPtr<IDBOpenDBRequest> request;
     {
@@ -88,7 +88,7 @@ RefPtr<IDBOpenDBRequest> IDBConnectionProxy::deleteDatabase(ScriptExecutionConte
 
     callConnectionOnMainThread(&IDBConnectionToServer::deleteDatabase, IDBRequestData(*this, *request));
 
-    return request;
+    return request.releaseNonNull();
 }
 
 void IDBConnectionProxy::didOpenDatabase(const IDBResultData& resultData)
@@ -123,6 +123,22 @@ void IDBConnectionProxy::createObjectStore(TransactionOperation& operation, cons
     saveOperation(operation);
 
     callConnectionOnMainThread(&IDBConnectionToServer::createObjectStore, requestData, info);
+}
+
+void IDBConnectionProxy::renameObjectStore(TransactionOperation& operation, uint64_t objectStoreIdentifier, const String& newName)
+{
+    const IDBRequestData requestData(operation);
+    saveOperation(operation);
+
+    callConnectionOnMainThread(&IDBConnectionToServer::renameObjectStore, requestData, objectStoreIdentifier, newName);
+}
+
+void IDBConnectionProxy::renameIndex(TransactionOperation& operation, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName)
+{
+    const IDBRequestData requestData(operation);
+    saveOperation(operation);
+
+    callConnectionOnMainThread(&IDBConnectionToServer::renameIndex, requestData, objectStoreIdentifier, indexIdentifier, newName);
 }
 
 void IDBConnectionProxy::deleteObjectStore(TransactionOperation& operation, const String& objectStoreName)

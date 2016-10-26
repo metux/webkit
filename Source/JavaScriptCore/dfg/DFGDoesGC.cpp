@@ -94,6 +94,7 @@ bool doesGC(Graph& graph, Node* node)
     case ArithFRound:
     case ArithSin:
     case ArithCos:
+    case ArithTan:
     case ArithLog:
     case ValueAdd:
     case TryGetById:
@@ -110,11 +111,14 @@ bool doesGC(Graph& graph, Node* node)
     case PutGetterSetterById:
     case PutGetterByVal:
     case PutSetterByVal:
+    case DefineDataProperty:
+    case DefineAccessorProperty:
     case DeleteById:
     case DeleteByVal:
     case CheckStructure:
     case GetExecutable:
     case GetButterfly:
+    case CheckDOM:
     case CheckArray:
     case GetScope:
     case SkipScope:
@@ -140,8 +144,11 @@ bool doesGC(Graph& graph, Node* node)
     case CompareStrictEq:
     case CompareEqPtr:
     case Call:
+    case DirectCall:
     case TailCallInlinedCaller:
+    case DirectTailCallInlinedCaller:
     case Construct:
+    case DirectConstruct:
     case CallVarargs:
     case CallEval:
     case TailCallVarargsInlinedCaller:
@@ -156,16 +163,14 @@ bool doesGC(Graph& graph, Node* node)
     case OverridesHasInstance:
     case InstanceOf:
     case InstanceOfCustom:
-    case IsJSArray:
     case IsEmpty:
     case IsUndefined:
     case IsBoolean:
     case IsNumber:
-    case IsString:
     case IsObject:
     case IsObjectOrNull:
     case IsFunction:
-    case IsRegExpObject:
+    case IsCellWithType:
     case IsTypedArrayView:
     case TypeOf:
     case LogicalNot:
@@ -174,11 +179,13 @@ bool doesGC(Graph& graph, Node* node)
     case ToString:
     case CallStringConstructor:
     case In:
+    case HasOwnProperty:
     case Jump:
     case Branch:
     case Switch:
     case Return:
     case TailCall:
+    case DirectTailCall:
     case TailCallVarargs:
     case Throw:
     case CountExecution:
@@ -196,6 +203,7 @@ bool doesGC(Graph& graph, Node* node)
     case CheckTierUpAndOSREnter:
     case LoopHint:
     case StoreBarrier:
+    case FencedStoreBarrier:
     case InvalidationPoint:
     case NotifyWrite:
     case CheckInBounds:
@@ -277,7 +285,7 @@ bool doesGC(Graph& graph, Node* node)
     case NewFunction:
     case NewGeneratorFunction:
     case NewTypedArray:
-    case ThrowReferenceError:
+    case ThrowStaticError:
     case GetPropertyEnumerator:
     case GetEnumeratorStructurePname:
     case GetEnumeratorGenericPname:
@@ -289,6 +297,8 @@ bool doesGC(Graph& graph, Node* node)
     case StringReplace:
     case StringReplaceRegExp:
     case CreateRest:
+    case ToLowerCase:
+    case CallDOM:
         return true;
         
     case MultiPutByOffset:

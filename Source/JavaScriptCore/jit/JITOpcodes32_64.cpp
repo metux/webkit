@@ -354,33 +354,16 @@ void JIT::emit_op_is_number(Instruction* currentInstruction)
     emitStoreBool(dst, regT0);
 }
 
-void JIT::emit_op_is_string(Instruction* currentInstruction)
+void JIT::emit_op_is_cell_with_type(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
     int value = currentInstruction[2].u.operand;
-    
-    emitLoad(value, regT1, regT0);
-    Jump isNotCell = branch32(NotEqual, regT1, TrustedImm32(JSValue::CellTag));
-    
-    compare8(Equal, Address(regT0, JSCell::typeInfoTypeOffset()), TrustedImm32(StringType), regT0);
-    Jump done = jump();
-    
-    isNotCell.link(this);
-    move(TrustedImm32(0), regT0);
-    
-    done.link(this);
-    emitStoreBool(dst, regT0);
-}
-
-void JIT::emit_op_is_jsarray(Instruction* currentInstruction)
-{
-    int dst = currentInstruction[1].u.operand;
-    int value = currentInstruction[2].u.operand;
+    int type = currentInstruction[3].u.operand;
 
     emitLoad(value, regT1, regT0);
     Jump isNotCell = branch32(NotEqual, regT1, TrustedImm32(JSValue::CellTag));
 
-    compare8(Equal, Address(regT0, JSCell::typeInfoTypeOffset()), TrustedImm32(ArrayType), regT0);
+    compare8(Equal, Address(regT0, JSCell::typeInfoTypeOffset()), TrustedImm32(type), regT0);
     Jump done = jump();
 
     isNotCell.link(this);
@@ -934,12 +917,6 @@ void JIT::emit_op_switch_string(Instruction* currentInstruction)
     emitLoad(scrutinee, regT1, regT0);
     callOperation(operationSwitchStringWithUnknownKeyType, regT1, regT0, tableIndex);
     jump(returnValueGPR);
-}
-
-void JIT::emit_op_throw_static_error(Instruction* currentInstruction)
-{
-    emitLoad(m_codeBlock->getConstant(currentInstruction[1].u.operand), regT1, regT0);
-    callOperation(operationThrowStaticError, regT1, regT0, currentInstruction[2].u.operand);
 }
 
 void JIT::emit_op_debug(Instruction* currentInstruction)

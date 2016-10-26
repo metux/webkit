@@ -137,6 +137,23 @@ void UniqueIDBDatabaseTransaction::deleteObjectStore(const IDBRequestData& reque
     });
 }
 
+void UniqueIDBDatabaseTransaction::renameObjectStore(const IDBRequestData& requestData, uint64_t objectStoreIdentifier, const String& newName)
+{
+    LOG(IndexedDB, "UniqueIDBDatabaseTransaction::renameObjectStore");
+
+    ASSERT(isVersionChange());
+    ASSERT(m_transactionInfo.identifier() == requestData.transactionIdentifier());
+
+    RefPtr<UniqueIDBDatabaseTransaction> protectedThis(this);
+    m_databaseConnection->database().renameObjectStore(*this, objectStoreIdentifier, newName, [this, protectedThis, requestData](const IDBError& error) {
+        LOG(IndexedDB, "UniqueIDBDatabaseTransaction::renameObjectStore (callback)");
+        if (error.isNull())
+            m_databaseConnection->didRenameObjectStore(IDBResultData::renameObjectStoreSuccess(requestData.requestIdentifier()));
+        else
+            m_databaseConnection->didRenameObjectStore(IDBResultData::error(requestData.requestIdentifier(), error));
+    });
+}
+
 void UniqueIDBDatabaseTransaction::clearObjectStore(const IDBRequestData& requestData, uint64_t objectStoreIdentifier)
 {
     LOG(IndexedDB, "UniqueIDBDatabaseTransaction::clearObjectStore");
@@ -186,6 +203,24 @@ void UniqueIDBDatabaseTransaction::deleteIndex(const IDBRequestData& requestData
             m_databaseConnection->didDeleteIndex(IDBResultData::error(requestData.requestIdentifier(), error));
     });
 }
+
+void UniqueIDBDatabaseTransaction::renameIndex(const IDBRequestData& requestData, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName)
+{
+    LOG(IndexedDB, "UniqueIDBDatabaseTransaction::renameIndex");
+
+    ASSERT(isVersionChange());
+    ASSERT(m_transactionInfo.identifier() == requestData.transactionIdentifier());
+
+    RefPtr<UniqueIDBDatabaseTransaction> protectedThis(this);
+    m_databaseConnection->database().renameIndex(*this, objectStoreIdentifier, indexIdentifier, newName, [this, protectedThis, requestData](const IDBError& error) {
+        LOG(IndexedDB, "UniqueIDBDatabaseTransaction::renameIndex (callback)");
+        if (error.isNull())
+            m_databaseConnection->didRenameIndex(IDBResultData::renameIndexSuccess(requestData.requestIdentifier()));
+        else
+            m_databaseConnection->didRenameIndex(IDBResultData::error(requestData.requestIdentifier(), error));
+    });
+}
+
 
 void UniqueIDBDatabaseTransaction::putOrAdd(const IDBRequestData& requestData, const IDBKeyData& keyData, const IDBValue& value, IndexedDB::ObjectStoreOverwriteMode overwriteMode)
 {

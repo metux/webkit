@@ -41,7 +41,7 @@ inline SVGStyleElement::SVGStyleElement(const QualifiedName& tagName, Document& 
 
 SVGStyleElement::~SVGStyleElement()
 {
-    m_styleSheetOwner.clearDocumentData(document(), *this);
+    m_styleSheetOwner.clearDocumentData(*this);
 }
 
 Ref<SVGStyleElement> SVGStyleElement::create(const QualifiedName& tagName, Document& document, bool createdByParser)
@@ -67,7 +67,7 @@ const AtomicString& SVGStyleElement::type() const
     return n.isNull() ? defaultValue.get() : n;
 }
 
-void SVGStyleElement::setType(const AtomicString& type, ExceptionCode&)
+void SVGStyleElement::setType(const AtomicString& type)
 {
     setAttribute(SVGNames::typeAttr, type);
 }
@@ -79,7 +79,7 @@ const AtomicString& SVGStyleElement::media() const
     return n.isNull() ? defaultValue.get() : n;
 }
 
-void SVGStyleElement::setMedia(const AtomicString& media, ExceptionCode&)
+void SVGStyleElement::setMedia(const AtomicString& media)
 {
     setAttributeWithoutSynchronization(SVGNames::mediaAttr, media);
 }
@@ -87,11 +87,6 @@ void SVGStyleElement::setMedia(const AtomicString& media, ExceptionCode&)
 String SVGStyleElement::title() const
 {
     return attributeWithoutSynchronization(SVGNames::titleAttr);
-}
-
-void SVGStyleElement::setTitle(const AtomicString& title, ExceptionCode&)
-{
-    setAttributeWithoutSynchronization(SVGNames::titleAttr, title);
 }
 
 void SVGStyleElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -123,7 +118,7 @@ Node::InsertionNotificationRequest SVGStyleElement::insertedInto(ContainerNode& 
 {
     SVGElement::insertedInto(rootParent);
     if (rootParent.inDocument())
-        m_styleSheetOwner.insertedIntoDocument(document(), *this);
+        m_styleSheetOwner.insertedIntoDocument(*this);
     return InsertionDone;
 }
 
@@ -131,7 +126,7 @@ void SVGStyleElement::removedFrom(ContainerNode& rootParent)
 {
     SVGElement::removedFrom(rootParent);
     if (rootParent.inDocument())
-        m_styleSheetOwner.removedFromDocument(document(), *this);
+        m_styleSheetOwner.removedFromDocument(*this);
 }
 
 void SVGStyleElement::childrenChanged(const ChildChange& change)

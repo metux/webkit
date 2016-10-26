@@ -43,7 +43,7 @@ void MapConstructor::finishCreation(VM& vm, MapPrototype* mapPrototype, GetterSe
 {
     Base::finishCreation(vm, mapPrototype->classInfo()->className);
     putDirectWithoutTransition(vm, vm.propertyNames->prototype, mapPrototype, DontEnum | DontDelete | ReadOnly);
-    putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum | DontDelete);
+    putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(0), DontEnum | ReadOnly);
     putDirectNonIndexAccessor(vm, vm.propertyNames->speciesSymbol, speciesSymbol, Accessor | ReadOnly | DontEnum);
 }
 
@@ -61,18 +61,15 @@ static EncodedJSValue JSC_HOST_CALL constructMap(ExecState* exec)
 
     JSGlobalObject* globalObject = asInternalFunction(exec->callee())->globalObject();
     Structure* mapStructure = InternalFunction::createSubclassStructure(exec, exec->newTarget(), globalObject->mapStructure());
-    if (UNLIKELY(scope.exception()))
-        return JSValue::encode(JSValue());
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
     JSMap* map = JSMap::create(exec, vm, mapStructure);
-    if (UNLIKELY(scope.exception()))
-        return JSValue::encode(JSValue());
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
     JSValue iterable = exec->argument(0);
     if (iterable.isUndefinedOrNull())
         return JSValue::encode(map);
 
     JSValue adderFunction = map->JSObject::get(exec, exec->propertyNames().set);
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
 
     CallData adderFunctionCallData;
     CallType adderFunctionCallType = getCallData(adderFunction, adderFunctionCallData);
@@ -80,18 +77,17 @@ static EncodedJSValue JSC_HOST_CALL constructMap(ExecState* exec)
         return JSValue::encode(throwTypeError(exec, scope));
 
     forEachInIterable(exec, iterable, [&](VM& vm, ExecState* exec, JSValue nextItem) {
+        auto scope = DECLARE_THROW_SCOPE(vm);
         if (!nextItem.isObject()) {
             throwTypeError(exec, scope);
             return;
         }
 
         JSValue key = nextItem.get(exec, static_cast<unsigned>(0));
-        if (vm.exception())
-            return;
+        RETURN_IF_EXCEPTION(scope, void());
 
         JSValue value = nextItem.get(exec, static_cast<unsigned>(1));
-        if (vm.exception())
-            return;
+        RETURN_IF_EXCEPTION(scope, void());
 
         MarkedArgumentBuffer arguments;
         arguments.append(key);

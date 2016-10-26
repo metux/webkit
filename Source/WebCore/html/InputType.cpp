@@ -173,8 +173,7 @@ InputType::~InputType()
 bool InputType::themeSupportsDataListUI(InputType* type)
 {
     Document& document = type->element().document();
-    RefPtr<RenderTheme> theme = document.page() ? &document.page()->theme() : RenderTheme::defaultTheme();
-    return theme->supportsDataListUI(type->formControlType());
+    return RenderTheme::themeForPage(document.page())->supportsDataListUI(type->formControlType());
 }
 
 bool InputType::isTextField() const
@@ -412,6 +411,9 @@ String InputType::validationMessage() const
     if (patternMismatch(value))
         return validationMessagePatternMismatchText();
 
+    if (element().tooShort())
+        return validationMessageTooShortText(numGraphemeClusters(value), element().minLength());
+
     if (element().tooLong())
         return validationMessageTooLongText(numGraphemeClusters(value), element().effectiveMaxLength());
 
@@ -620,11 +622,6 @@ bool InputType::shouldRespectAlignAttribute()
     return false;
 }
 
-bool InputType::canChangeFromAnotherType() const
-{
-    return true;
-}
-
 void InputType::minOrMaxAttributeChanged()
 {
 }
@@ -685,7 +682,7 @@ bool InputType::storesValueSeparateFromAttribute()
 void InputType::setValue(const String& sanitizedValue, bool valueChanged, TextFieldEventBehavior eventBehavior)
 {
     element().setValueInternal(sanitizedValue, eventBehavior);
-    element().setNeedsStyleRecalc();
+    element().invalidateStyleForSubtree();
     if (!valueChanged)
         return;
     switch (eventBehavior) {

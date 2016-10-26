@@ -57,7 +57,7 @@ class EmptyMediaEndpoint : public MediaEndpoint {
 public:
     EmptyMediaEndpoint(MediaEndpointClient&) { }
 
-    void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) override { }
+    void setConfiguration(MediaEndpointConfiguration&&) override { }
 
     void generateDtlsInfo() override { }
     MediaPayloadVector getDefaultAudioPayloads() override { return MediaPayloadVector(); }
@@ -71,6 +71,7 @@ public:
 
     Ref<RealtimeMediaSource> createMutedRemoteSource(const String&, RealtimeMediaSource::Type) override { return EmptyRealtimeMediaSource::create(); }
     void replaceSendSource(RealtimeMediaSource&, const String&) override { }
+    void replaceMutedRemoteSourceMid(const String&, const String&) override { };
 
     void stop() override { }
 };

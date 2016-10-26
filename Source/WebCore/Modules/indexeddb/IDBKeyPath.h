@@ -27,10 +27,14 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include <wtf/Variant.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
+
+using IDBKeyPathVariant = WTF::Variant<String, Vector<String>>;
+bool isIDBKeyPathValid(const IDBKeyPathVariant&);
 
 class KeyedDecoder;
 class KeyedEncoder;
@@ -44,11 +48,13 @@ enum class IDBKeyPathParseError {
 
 void IDBParseKeyPath(const String&, Vector<String>&, IDBKeyPathParseError&);
 
+// FIXME: We should be able to replace IDBKeyPath with IDBKeyPathVariant.
 class IDBKeyPath {
 public:
     IDBKeyPath() { }
     WEBCORE_EXPORT IDBKeyPath(const String&);
     WEBCORE_EXPORT IDBKeyPath(const Vector<String>& array);
+    WEBCORE_EXPORT IDBKeyPath(Optional<IDBKeyPathVariant>&&);
 
     enum class Type { Null, String, Array };
     Type type() const { return m_type; }
@@ -66,7 +72,6 @@ public:
     }
 
     bool isNull() const { return m_type == Type::Null; }
-    bool isValid() const;
     bool operator==(const IDBKeyPath& other) const;
 
     IDBKeyPath isolatedCopy() const;

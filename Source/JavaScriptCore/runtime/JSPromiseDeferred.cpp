@@ -54,8 +54,10 @@ JSValue newPromiseCapability(ExecState* exec, JSGlobalObject* globalObject, JSPr
 JSPromiseDeferred* JSPromiseDeferred::create(ExecState* exec, JSGlobalObject* globalObject)
 {
     VM& vm = exec->vm();
+    auto scope = DECLARE_THROW_SCOPE(vm);
 
     JSValue deferred = newPromiseCapability(exec, globalObject, globalObject->promiseConstructor());
+    RETURN_IF_EXCEPTION(scope, nullptr);
 
     JSValue promise = deferred.get(exec, vm.propertyNames->builtinNames().promisePrivateName());
     ASSERT(promise.inherits(JSPromise::info()));

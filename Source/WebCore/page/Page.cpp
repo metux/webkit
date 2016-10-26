@@ -67,6 +67,7 @@
 #include "PageGroup.h"
 #include "PageOverlayController.h"
 #include "PageThrottler.h"
+#include "PlatformMediaSessionManager.h"
 #include "PlugInClient.h"
 #include "PluginData.h"
 #include "PluginInfoProvider.h"
@@ -88,6 +89,7 @@
 #include "StorageNamespace.h"
 #include "StorageNamespaceProvider.h"
 #include "StyleResolver.h"
+#include "StyleScope.h"
 #include "SubframeLoader.h"
 #include "TextResourceDecoder.h"
 #include "UserContentProvider.h"
@@ -176,7 +178,7 @@ Page::Page(PageConfiguration&& pageConfiguration)
 #endif
     , m_settings(Settings::create(this))
     , m_progress(std::make_unique<ProgressTracker>(*pageConfiguration.progressTrackerClient))
-    , m_backForwardController(std::make_unique<BackForwardController>(*this, WTFMove(pageConfiguration.backForwardClient)))
+    , m_backForwardController(std::make_unique<BackForwardController>(*this, *WTFMove(pageConfiguration.backForwardClient)))
     , m_mainFrame(MainFrame::create(*this, pageConfiguration))
     , m_theme(RenderTheme::themeForPage(this))
     , m_editorClient(WTFMove(pageConfiguration.editorClient))
@@ -191,11 +193,10 @@ Page::Page(PageConfiguration&& pageConfiguration)
     , m_inLowQualityInterpolationMode(false)
     , m_areMemoryCacheClientCallsEnabled(true)
     , m_mediaVolume(1)
-    , m_muted(false)
     , m_pageScaleFactor(1)
     , m_zoomedOutPageScaleFactor(0)
     , m_topContentInset(0)
-#if ENABLE(IOS_TEXT_AUTOSIZING)
+#if ENABLE(TEXT_AUTOSIZING)
     , m_textAutosizingWidth(0)
 #endif
     , m_suppressScrollbarAnimations(false)
@@ -422,7 +423,7 @@ void Page::setViewMode(ViewMode viewMode)
         m_mainFrame->view()->forceLayout();
 
     if (m_mainFrame->document())
-        m_mainFrame->document()->styleResolverChanged(RecalcStyleImmediately);
+        m_mainFrame->document()->styleScope().didChangeStyleSheetEnvironment();
 }
 #endif // ENABLE(VIEW_MODE_CSS_MEDIA)
 
@@ -489,7 +490,7 @@ void Page::updateStyleForAllPagesAfterGlobalChangeInEnvironment()
             // the properties cache.
             if (!frame->document())
                 continue;
-            if (StyleResolver* styleResolver = frame->document()->styleResolverIfExists())
+            if (StyleResolver* styleResolver = frame->document()->styleScope().resolverIfExists())
                 styleResolver->invalidateMatchedPropertiesCache();
             frame->document()->scheduleForcedStyleRecalc();
         }
@@ -498,9 +499,10 @@ void Page::updateStyleForAllPagesAfterGlobalChangeInEnvironment()
 
 void Page::setNeedsRecalcStyleInAllFrames()
 {
+    // FIXME: Figure out what this function is actually trying to add in different call sites.
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (Document* document = frame->document())
-            document->styleResolverChanged(DeferRecalcStyle);
+            document->styleScope().didChangeStyleSheetEnvironment();
     }
 }
 
@@ -577,12 +579,6 @@ void Page::setCanStartMedia(bool canStartMedia)
             break;
         listener->mediaCanStart();
     }
-}
-
-bool Page::inPageCache() const
-{
-    auto* document = mainFrame().document();
-    return document && document->inPageCache();
 }
 
 static Frame* incrementFrame(Frame* curr, bool forward, bool wrapFlag)
@@ -882,7 +878,6 @@ void Page::setViewScaleFactor(float scale)
 
     m_viewScaleFactor = scale;
     PageCache::singleton().markPagesForDeviceOrPageScaleChanged(*this);
-    PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
 void Page::setDeviceScaleFactor(float scaleFactor)
@@ -900,7 +895,6 @@ void Page::setDeviceScaleFactor(float scaleFactor)
     mainFrame().deviceOrPageScaleFactorChanged();
     PageCache::singleton().markPagesForDeviceOrPageScaleChanged(*this);
 
-    PageCache::singleton().markPagesForFullStyleRecalc(*this);
     GraphicsContext::updateDocumentMarkerResources();
 
     mainFrame().pageOverlayController().didChangeDeviceScaleFactor();
@@ -993,7 +987,6 @@ void Page::setPagination(const Pagination& pagination)
     m_pagination = pagination;
 
     setNeedsRecalcStyleInAllFrames();
-    PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
 void Page::setPaginationLineGridEnabled(bool enabled)
@@ -1004,7 +997,6 @@ void Page::setPaginationLineGridEnabled(bool enabled)
     m_paginationLineGridEnabled = enabled;
     
     setNeedsRecalcStyleInAllFrames();
-    PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
 unsigned Page::pageCount() const
@@ -1078,7 +1070,7 @@ void Page::userStyleSheetLocationChanged()
     URL url = m_settings->userStyleSheetLocation();
     
     // Allow any local file URL scheme to be loaded.
-    if (SchemeRegistry::shouldTreatURLSchemeAsLocal(url.protocol()))
+    if (SchemeRegistry::shouldTreatURLSchemeAsLocal(url.protocol().toStringWithoutCopying()))
         m_userStyleSheetPath = url.fileSystemPath();
     else
         m_userStyleSheetPath = String();
@@ -1167,7 +1159,6 @@ void Page::invalidateInjectedStyleSheetCacheInAllFrames()
         if (!document)
             continue;
         document->extensionStyleSheets().invalidateInjectedStyleSheetCache();
-        document->styleResolverChanged(DeferRecalcStyle);
     }
 }
 
@@ -1389,12 +1380,12 @@ void Page::updateIsPlayingMedia(uint64_t sourceElementID)
     chrome().client().isPlayingMediaDidChange(state, sourceElementID);
 }
 
-void Page::setMuted(bool muted)
+void Page::setMuted(MediaProducer::MutedStateFlags muted)
 {
-    if (m_muted == muted)
+    if (m_mutedState == muted)
         return;
 
-    m_muted = muted;
+    m_mutedState = muted;
 
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (!frame->document())
@@ -1455,7 +1446,9 @@ void Page::setViewState(ViewState::Flags viewState)
 
     ViewState::Flags oldViewState = m_viewState;
 
+    bool wasVisibleAndActive = isVisibleAndActive();
     m_viewState = viewState;
+
     m_focusController->setViewState(viewState);
 
     if (changed & ViewState::IsVisible)
@@ -1470,12 +1463,14 @@ void Page::setViewState(ViewState::Flags viewState)
 
     for (auto* observer : m_viewStateChangeObservers)
         observer->viewStateDidChange(oldViewState, m_viewState);
+
+    if (wasVisibleAndActive != isVisibleAndActive())
+        PlatformMediaSessionManager::updateNowPlayingInfoIfNecessary();
 }
 
-void Page::setPageActivityState(PageActivityState::Flags activityState)
+bool Page::isVisibleAndActive() const
 {
-    chrome().client().setPageActivityState(activityState);
-    updateTimerThrottlingState();
+    return (m_viewState & ViewState::IsVisible) && (m_viewState & ViewState::WindowIsActive);
 }
 
 void Page::setIsVisible(bool isVisible)
@@ -1893,7 +1888,6 @@ void Page::setVisitedLinkStore(Ref<VisitedLinkStore>&& visitedLinkStore)
     m_visitedLinkStore->addPage(*this);
 
     invalidateStylesForAllLinks();
-    PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
 SessionID Page::sessionID() const

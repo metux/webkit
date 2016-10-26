@@ -2599,7 +2599,7 @@ void RenderLayer::updateCompositingLayersAfterScroll()
 LayoutRect RenderLayer::getRectToExpose(const LayoutRect &visibleRect, const LayoutRect &visibleRectRelativeToDocument, const LayoutRect &exposeRect, const ScrollAlignment& alignX, const ScrollAlignment& alignY)
 {
     // Determine the appropriate X behavior.
-    ScrollBehavior scrollX;
+    ScrollAlignment::Behavior scrollX;
     LayoutRect exposeRectX(exposeRect.x(), visibleRect.y(), exposeRect.width(), visibleRect.height());
     LayoutUnit intersectWidth = intersection(visibleRect, exposeRectX).width();
     if (intersectWidth == exposeRect.width() || intersectWidth >= MIN_INTERSECT_FOR_REVEAL)
@@ -2610,8 +2610,8 @@ LayoutRect RenderLayer::getRectToExpose(const LayoutRect &visibleRect, const Lay
     else if (intersectWidth == visibleRect.width()) {
         // If the rect is bigger than the visible area, don't bother trying to center. Other alignments will work.
         scrollX = ScrollAlignment::getVisibleBehavior(alignX);
-        if (scrollX == alignCenter)
-            scrollX = noScroll;
+        if (scrollX == ScrollAlignment::Behavior::AlignCenter)
+            scrollX = ScrollAlignment::Behavior::NoScroll;
     } else if (intersectWidth > 0)
         // If the rectangle is partially visible, but not above the minimum threshold, use the specified partial behavior
         scrollX = ScrollAlignment::getPartialBehavior(alignX);
@@ -2619,22 +2619,22 @@ LayoutRect RenderLayer::getRectToExpose(const LayoutRect &visibleRect, const Lay
         scrollX = ScrollAlignment::getHiddenBehavior(alignX);
     // If we're trying to align to the closest edge, and the exposeRect is further right
     // than the visibleRect, and not bigger than the visible area, then align with the right.
-    if (scrollX == alignToClosestEdge && exposeRect.maxX() > visibleRect.maxX() && exposeRect.width() < visibleRect.width())
-        scrollX = alignRight;
+    if (scrollX == ScrollAlignment::Behavior::AlignToClosestEdge && exposeRect.maxX() > visibleRect.maxX() && exposeRect.width() < visibleRect.width())
+        scrollX = ScrollAlignment::Behavior::AlignRight;
 
     // Given the X behavior, compute the X coordinate.
     LayoutUnit x;
-    if (scrollX == noScroll) 
+    if (scrollX == ScrollAlignment::Behavior::NoScroll)
         x = visibleRect.x();
-    else if (scrollX == alignRight)
+    else if (scrollX == ScrollAlignment::Behavior::AlignRight)
         x = exposeRect.maxX() - visibleRect.width();
-    else if (scrollX == alignCenter)
+    else if (scrollX == ScrollAlignment::Behavior::AlignCenter)
         x = exposeRect.x() + (exposeRect.width() - visibleRect.width()) / 2;
     else
         x = exposeRect.x();
 
     // Determine the appropriate Y behavior.
-    ScrollBehavior scrollY;
+    ScrollAlignment::Behavior scrollY;
     LayoutRect exposeRectY(visibleRect.x(), exposeRect.y(), visibleRect.width(), exposeRect.height());
     LayoutUnit intersectHeight = intersection(visibleRectRelativeToDocument, exposeRectY).height();
     if (intersectHeight == exposeRect.height())
@@ -2643,8 +2643,8 @@ LayoutRect RenderLayer::getRectToExpose(const LayoutRect &visibleRect, const Lay
     else if (intersectHeight == visibleRect.height()) {
         // If the rect is bigger than the visible area, don't bother trying to center. Other alignments will work.
         scrollY = ScrollAlignment::getVisibleBehavior(alignY);
-        if (scrollY == alignCenter)
-            scrollY = noScroll;
+        if (scrollY == ScrollAlignment::Behavior::AlignCenter)
+            scrollY = ScrollAlignment::Behavior::NoScroll;
     } else if (intersectHeight > 0)
         // If the rectangle is partially visible, use the specified partial behavior
         scrollY = ScrollAlignment::getPartialBehavior(alignY);
@@ -2652,16 +2652,16 @@ LayoutRect RenderLayer::getRectToExpose(const LayoutRect &visibleRect, const Lay
         scrollY = ScrollAlignment::getHiddenBehavior(alignY);
     // If we're trying to align to the closest edge, and the exposeRect is further down
     // than the visibleRect, and not bigger than the visible area, then align with the bottom.
-    if (scrollY == alignToClosestEdge && exposeRect.maxY() > visibleRect.maxY() && exposeRect.height() < visibleRect.height())
-        scrollY = alignBottom;
+    if (scrollY == ScrollAlignment::Behavior::AlignToClosestEdge && exposeRect.maxY() > visibleRect.maxY() && exposeRect.height() < visibleRect.height())
+        scrollY = ScrollAlignment::Behavior::AlignBottom;
 
     // Given the Y behavior, compute the Y coordinate.
     LayoutUnit y;
-    if (scrollY == noScroll) 
+    if (scrollY == ScrollAlignment::Behavior::NoScroll)
         y = visibleRect.y();
-    else if (scrollY == alignBottom)
+    else if (scrollY == ScrollAlignment::Behavior::AlignBottom)
         y = exposeRect.maxY() - visibleRect.height();
-    else if (scrollY == alignCenter)
+    else if (scrollY == ScrollAlignment::Behavior::AlignCenter)
         y = exposeRect.y() + (exposeRect.height() - visibleRect.height()) / 2;
     else
         y = exposeRect.y();
@@ -3105,7 +3105,7 @@ static inline RenderElement* rendererForScrollbar(RenderLayerModelObject& render
     return &renderer;
 }
 
-PassRefPtr<Scrollbar> RenderLayer::createScrollbar(ScrollbarOrientation orientation)
+Ref<Scrollbar> RenderLayer::createScrollbar(ScrollbarOrientation orientation)
 {
     RefPtr<Scrollbar> widget;
     RenderElement* actualRenderer = rendererForScrollbar(renderer());
@@ -3121,7 +3121,7 @@ PassRefPtr<Scrollbar> RenderLayer::createScrollbar(ScrollbarOrientation orientat
         }
     }
     renderer().view().frameView().addChild(widget.get());
-    return WTFMove(widget);
+    return widget.releaseNonNull();
 }
 
 void RenderLayer::destroyScrollbar(ScrollbarOrientation orientation)
@@ -4168,7 +4168,7 @@ bool RenderLayer::hasFilterThatIsPainting(GraphicsContext& context, PaintLayerFl
     if (!hasPaintedFilter)
         return false;
 
-    auto filterPainter = std::make_unique<FilterEffectRendererHelper>(hasPaintedFilter);
+    auto filterPainter = std::make_unique<FilterEffectRendererHelper>(hasPaintedFilter, context);
     if (!filterPainter->haveFilterEffect())
         return false;
 
@@ -4182,7 +4182,7 @@ std::unique_ptr<FilterEffectRendererHelper> RenderLayer::setupFilters(GraphicsCo
 
     FilterInfo* filterInfo = FilterInfo::getIfExists(*this);
     bool hasPaintedFilter = filterInfo && filterInfo->renderer() && paintsWithFilters();
-    auto filterPainter = std::make_unique<FilterEffectRendererHelper>(hasPaintedFilter);
+    auto filterPainter = std::make_unique<FilterEffectRendererHelper>(hasPaintedFilter, context);
 
     LayoutRect filterRepaintRect = filterInfo->dirtySourceRect();
     filterRepaintRect.move(offsetFromRoot);
@@ -4926,7 +4926,7 @@ static double computeZOffset(const HitTestingTransformState& transformState)
     return backmappedPoint.z();
 }
 
-PassRefPtr<HitTestingTransformState> RenderLayer::createLocalTransformState(RenderLayer* rootLayer, RenderLayer* containerLayer,
+Ref<HitTestingTransformState> RenderLayer::createLocalTransformState(RenderLayer* rootLayer, RenderLayer* containerLayer,
                                         const LayoutRect& hitTestRect, const HitTestLocation& hitTestLocation,
                                         const HitTestingTransformState* containerTransformState,
                                         const LayoutSize& translationOffset) const
@@ -4954,7 +4954,7 @@ PassRefPtr<HitTestingTransformState> RenderLayer::createLocalTransformState(Rend
         transformState->translate(offset.width(), offset.height(), HitTestingTransformState::AccumulateTransform);
     }
     
-    return transformState;
+    return transformState.releaseNonNull();
 }
 
 
@@ -5308,7 +5308,7 @@ RenderLayer* RenderLayer::hitTestLayerByApplyingTransform(RenderLayer* rootLayer
     const LayoutSize& translationOffset)
 {
     // Create a transform state to accumulate this transform.
-    RefPtr<HitTestingTransformState> newTransformState = createLocalTransformState(rootLayer, containerLayer, hitTestRect, hitTestLocation, transformState, translationOffset);
+    Ref<HitTestingTransformState> newTransformState = createLocalTransformState(rootLayer, containerLayer, hitTestRect, hitTestLocation, transformState, translationOffset);
 
     // If the transform can't be inverted, then don't hit test this layer at all.
     if (!newTransformState->m_accumulatedTransform.isInvertible())
@@ -5330,7 +5330,7 @@ RenderLayer* RenderLayer::hitTestLayerByApplyingTransform(RenderLayer* rootLayer
         newHitTestLocation = HitTestLocation(localPoint);
 
     // Now do a hit test with the root layer shifted to be us.
-    return hitTestLayer(this, containerLayer, request, result, localHitTestRect, newHitTestLocation, true, newTransformState.get(), zOffset);
+    return hitTestLayer(this, containerLayer, request, result, localHitTestRect, newHitTestLocation, true, newTransformState.ptr(), zOffset);
 }
 
 bool RenderLayer::hitTestContents(const HitTestRequest& request, HitTestResult& result, const LayoutRect& layerBounds, const HitTestLocation& hitTestLocation, HitTestFilter hitTestFilter) const
@@ -6985,7 +6985,7 @@ void RenderLayer::filterNeedsRepaint()
 {
     // We use the enclosing element so that we recalculate style for the ancestor of an anonymous object.
     if (Element* element = enclosingElement())
-        element->setNeedsStyleRecalc(SyntheticStyleChange);
+        element->invalidateStyleAndLayerComposition();
     renderer().repaint();
 }
 

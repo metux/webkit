@@ -96,7 +96,6 @@ const int maxSavedResults = 256;
 HTMLInputElement::HTMLInputElement(const QualifiedName& tagName, Document& document, HTMLFormElement* form, bool createdByParser)
     : HTMLTextFormControlElement(tagName, document, form)
     , m_size(defaultSize)
-    , m_maxLength(-1)
     , m_maxResults(-1)
     , m_isChecked(false)
     , m_reflectsCheckedAttribute(true)
@@ -122,7 +121,7 @@ HTMLInputElement::HTMLInputElement(const QualifiedName& tagName, Document& docum
     // its shadow subtree, just to destroy them when the |type| attribute gets set by the parser to something else than 'text'.
     , m_inputType(createdByParser ? nullptr : InputType::createText(*this))
 {
-    ASSERT(hasTagName(inputTag) || hasTagName(isindexTag));
+    ASSERT(hasTagName(inputTag));
     setHasCustomStyleResolveCallbacks();
 }
 
@@ -248,9 +247,15 @@ bool HTMLInputElement::isValidValue(const String& value) const
         && !m_inputType->stepMismatch(value)
         && !m_inputType->rangeUnderflow(value)
         && !m_inputType->rangeOverflow(value)
+        && !tooShort(value, IgnoreDirtyFlag)
         && !tooLong(value, IgnoreDirtyFlag)
         && !m_inputType->patternMismatch(value)
         && !m_inputType->valueMissing(value);
+}
+
+bool HTMLInputElement::tooShort() const
+{
+    return willValidate() && tooShort(value(), CheckDirtyFlag);
 }
 
 bool HTMLInputElement::tooLong() const
@@ -278,11 +283,33 @@ bool HTMLInputElement::patternMismatch() const
     return willValidate() && m_inputType->patternMismatch(value());
 }
 
-bool HTMLInputElement::tooLong(const String& value, NeedsToCheckDirtyFlag check) const
+bool HTMLInputElement::tooShort(StringView value, NeedsToCheckDirtyFlag check) const
 {
-    // We use isTextType() instead of supportsMaxLength() because of the
-    // 'virtual' overhead.
-    if (!isTextType())
+    if (!supportsMinLength())
+        return false;
+
+    int min = minLength();
+    if (min <= 0)
+        return false;
+
+    if (check == CheckDirtyFlag) {
+        // Return false for the default value or a value set by a script even if
+        // it is shorter than minLength.
+        if (!hasDirtyValue() || !m_wasModifiedByUser)
+            return false;
+    }
+
+    // The empty string is excluded from tooShort validation.
+    if (value.isEmpty())
+        return false;
+
+    // FIXME: The HTML specification says that the "number of characters" is measured using code-unit length.
+    return numGraphemeClusters(value) < static_cast<unsigned>(min);
+}
+
+bool HTMLInputElement::tooLong(StringView value, NeedsToCheckDirtyFlag check) const
+{
+    if (!supportsMaxLength())
         return false;
     unsigned max = effectiveMaxLength();
     if (check == CheckDirtyFlag) {
@@ -291,6 +318,7 @@ bool HTMLInputElement::tooLong(const String& value, NeedsToCheckDirtyFlag check)
         if (!hasDirtyValue() || !m_wasModifiedByUser)
             return false;
     }
+    // FIXME: The HTML specification says that the "number of characters" is measured using code-unit length.
     return numGraphemeClusters(value) > max;
 }
 
@@ -448,17 +476,9 @@ void HTMLInputElement::updateType()
 {
     ASSERT(m_inputType);
     auto newType = InputType::create(*this, attributeWithoutSynchronization(typeAttr));
-    bool hadType = m_hasType;
     m_hasType = true;
     if (m_inputType->formControlType() == newType->formControlType())
         return;
-
-    if (hadType && !newType->canChangeFromAnotherType()) {
-        // Set the attribute back to the old value.
-        // Useful in case we were called from inside parseAttribute.
-        setAttributeWithoutSynchronization(typeAttr, type());
-        return;
-    }
 
     removeFromRadioButtonGroup();
 
@@ -529,7 +549,7 @@ inline void HTMLInputElement::runPostTypeUpdateTasks()
 #endif
 
     if (renderer())
-        setNeedsStyleRecalc(ReconstructRenderTree);
+        invalidateStyleAndRenderersForSubtree();
 
     if (document().focusedElement() == this)
         updateFocusAppearance(SelectionRestorationMode::Restore, SelectionRevealMode::Reveal);
@@ -675,14 +695,14 @@ void HTMLInputElement::parseAttribute(const QualifiedName& name, const AtomicStr
         // We only need to setChanged if the form is looking at the default value right now.
         if (!hasDirtyValue()) {
             updatePlaceholderVisibility();
-            setNeedsStyleRecalc();
+            invalidateStyleForSubtree();
         }
         setFormControlValueMatchesRenderer(false);
         updateValidity();
         m_valueAttributeWasUpdatedAfterParsing = !m_parsingInProgress;
     } else if (name == checkedAttr) {
         if (m_inputType->isCheckable())
-            setNeedsStyleRecalc();
+            invalidateStyleForSubtree();
 
         // Another radio button in the same group might be checked by state
         // restore. We shouldn't call setChecked() even if this has the checked
@@ -694,6 +714,8 @@ void HTMLInputElement::parseAttribute(const QualifiedName& name, const AtomicStr
         }
     } else if (name == maxlengthAttr)
         maxLengthAttributeChanged(value);
+    else if (name == minlengthAttr)
+        minLengthAttributeChanged(value);
     else if (name == sizeAttr) {
         unsigned oldSize = m_size;
         m_size = limitToOnlyHTMLNonNegativeNumbersGreaterThanZero(value, defaultSize);
@@ -709,9 +731,9 @@ void HTMLInputElement::parseAttribute(const QualifiedName& name, const AtomicStr
         m_maxResults = !value.isNull() ? std::min(value.toInt(), maxSavedResults) : -1;
         m_inputType->maxResultsAttributeChanged();
     } else if (name == autosaveAttr) {
-        setNeedsStyleRecalc();
+        invalidateStyleForSubtree();
     } else if (name == incrementalAttr) {
-        setNeedsStyleRecalc();
+        invalidateStyleForSubtree();
     } else if (name == minAttr) {
         m_inputType->minOrMaxAttributeChanged();
         updateValidity();
@@ -873,7 +895,7 @@ void HTMLInputElement::setChecked(bool nowChecked, TextFieldEventBehavior eventB
 
     m_reflectsCheckedAttribute = false;
     m_isChecked = nowChecked;
-    setNeedsStyleRecalc();
+    invalidateStyleForSubtree();
 
     if (RadioButtonGroups* buttons = radioButtonGroups())
         buttons->updateCheckedState(this);
@@ -899,7 +921,7 @@ void HTMLInputElement::setChecked(bool nowChecked, TextFieldEventBehavior eventB
         dispatchFormControlChangeEvent();
     }
 
-    setNeedsStyleRecalc();
+    invalidateStyleForSubtree();
 }
 
 void HTMLInputElement::setIndeterminate(bool newValue)
@@ -909,7 +931,7 @@ void HTMLInputElement::setIndeterminate(bool newValue)
 
     m_isIndeterminate = newValue;
 
-    setNeedsStyleRecalc();
+    invalidateStyleForSubtree();
 
     if (renderer() && renderer()->style().hasAppearance())
         renderer()->theme().stateChanged(*renderer(), ControlStates::CheckedState);
@@ -932,7 +954,7 @@ float HTMLInputElement::decorationWidth() const
 
 void HTMLInputElement::copyNonAttributePropertiesFromElement(const Element& source)
 {
-    const HTMLInputElement& sourceElement = static_cast<const HTMLInputElement&>(source);
+    auto& sourceElement = downcast<HTMLInputElement>(source);
 
     m_valueIfDirty = sourceElement.m_valueIfDirty;
     m_wasModifiedByUser = false;
@@ -1276,7 +1298,7 @@ String HTMLInputElement::alt() const
 unsigned HTMLInputElement::effectiveMaxLength() const
 {
     // The number -1 represents no maximum at all; conveniently it becomes a super-large value when converted to unsigned.
-    return std::min<unsigned>(m_maxLength, maxEffectiveLength);
+    return std::min<unsigned>(maxLength(), maxEffectiveLength);
 }
 
 bool HTMLInputElement::multiple() const
@@ -1308,7 +1330,7 @@ void HTMLInputElement::setAutoFilled(bool autoFilled)
         return;
 
     m_isAutoFilled = autoFilled;
-    setNeedsStyleRecalc();
+    invalidateStyleForSubtree();
 }
 
 void HTMLInputElement::setShowAutoFillButton(AutoFillButtonType autoFillButtonType)
@@ -1755,12 +1777,32 @@ bool HTMLInputElement::isEmptyValue() const
 void HTMLInputElement::maxLengthAttributeChanged(const AtomicString& newValue)
 {
     unsigned oldEffectiveMaxLength = effectiveMaxLength();
-    m_maxLength = parseHTMLNonNegativeInteger(newValue).valueOr(-1);
+    if (Optional<unsigned> maxLength = parseHTMLNonNegativeInteger(newValue))
+        setMaxLength(maxLength.value());
+    else
+        setMaxLength(-1);
+
     if (oldEffectiveMaxLength != effectiveMaxLength())
         updateValueIfNeeded();
 
     // FIXME: Do we really need to do this if the effective maxLength has not changed?
-    setNeedsStyleRecalc();
+    invalidateStyleForSubtree();
+    updateValidity();
+}
+
+void HTMLInputElement::minLengthAttributeChanged(const AtomicString& newValue)
+{
+    int oldMinLength = minLength();
+    if (Optional<unsigned> minLength = parseHTMLNonNegativeInteger(newValue))
+        setMinLength(minLength.value());
+    else
+        setMinLength(-1);
+
+    if (oldMinLength != minLength())
+        updateValueIfNeeded();
+
+    // FIXME: Do we really need to do this if the effective minLength has not changed?
+    invalidateStyleForSubtree();
     updateValidity();
 }
 

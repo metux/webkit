@@ -18,6 +18,7 @@ set(JavaScriptCore_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/dfg"
     "${JAVASCRIPTCORE_DIR}/disassembler"
     "${JAVASCRIPTCORE_DIR}/disassembler/udis86"
+    "${JAVASCRIPTCORE_DIR}/domjit"
     "${JAVASCRIPTCORE_DIR}/ftl"
     "${JAVASCRIPTCORE_DIR}/heap"
     "${JAVASCRIPTCORE_DIR}/debugger"
@@ -88,13 +89,14 @@ set(JavaScriptCore_SOURCES
     b3/air/AirInsertionSet.cpp
     b3/air/AirInst.cpp
     b3/air/AirIteratedRegisterCoalescing.cpp
+    b3/air/AirKind.cpp
     b3/air/AirLogRegisterPressure.cpp
     b3/air/AirLowerAfterRegAlloc.cpp
     b3/air/AirLowerEntrySwitch.cpp
     b3/air/AirLowerMacros.cpp
     b3/air/AirOptimizeBlockOrder.cpp
+    b3/air/AirPadInterference.cpp
     b3/air/AirPhaseScope.cpp
-    b3/air/AirRegisterPriority.cpp
     b3/air/AirReportUsedRegisters.cpp
     b3/air/AirSimplifyCFG.cpp
     b3/air/AirSpecial.cpp
@@ -125,6 +127,7 @@ set(JavaScriptCore_SOURCES
     b3/B3DuplicateTails.cpp
     b3/B3Effects.cpp
     b3/B3EliminateCommonSubexpressions.cpp
+    b3/B3FenceValue.cpp
     b3/B3FixSSA.cpp
     b3/B3FoldPathConstants.cpp
     b3/B3FrequencyClass.cpp
@@ -132,6 +135,7 @@ set(JavaScriptCore_SOURCES
     b3/B3HeapRange.cpp
     b3/B3InferSwitches.cpp
     b3/B3InsertionSet.cpp
+    b3/B3Kind.cpp
     b3/B3LegalizeMemoryOffsets.cpp
     b3/B3LowerMacros.cpp
     b3/B3LowerMacrosAfterOptimizations.cpp
@@ -169,6 +173,8 @@ set(JavaScriptCore_SOURCES
     b3/B3ValueRep.cpp
     b3/B3Variable.cpp
     b3/B3VariableValue.cpp
+    b3/B3WasmAddressValue.cpp
+    b3/B3WasmBoundsCheckValue.cpp
 
     bindings/ScriptFunctionCall.cpp
     bindings/ScriptObject.cpp
@@ -199,6 +205,7 @@ set(JavaScriptCore_SOURCES
     bytecode/ComplexGetStatus.cpp
     bytecode/DataFormat.cpp
     bytecode/DFGExitProfile.cpp
+    bytecode/DOMJITAccessCasePatchpointParams.cpp
     bytecode/DeferredCompilationCallback.cpp
     bytecode/DeferredSourceDump.cpp
     bytecode/ExecutionCounter.cpp
@@ -245,6 +252,7 @@ set(JavaScriptCore_SOURCES
     debugger/Debugger.cpp
     debugger/DebuggerCallFrame.cpp
     debugger/DebuggerLocation.cpp
+    debugger/DebuggerParseData.cpp
     debugger/DebuggerScope.cpp
 
     dfg/DFGAbstractHeap.cpp
@@ -281,6 +289,7 @@ set(JavaScriptCore_SOURCES
     dfg/DFGConstantHoistingPhase.cpp
     dfg/DFGCriticalEdgeBreakingPhase.cpp
     dfg/DFGDCEPhase.cpp
+    dfg/DFGDOMJITPatchpointParams.cpp
     dfg/DFGDesiredIdentifiers.cpp
     dfg/DFGDesiredTransitions.cpp
     dfg/DFGDesiredWatchpoints.cpp
@@ -360,6 +369,7 @@ set(JavaScriptCore_SOURCES
     dfg/DFGSpeculativeJIT64.cpp
     dfg/DFGStackLayoutPhase.cpp
     dfg/DFGStaticExecutionCountEstimationPhase.cpp
+    dfg/DFGStoreBarrierClusteringPhase.cpp
     dfg/DFGStoreBarrierInsertionPhase.cpp
     dfg/DFGStrengthReductionPhase.cpp
     dfg/DFGStructureAbstractValue.cpp
@@ -403,12 +413,16 @@ set(JavaScriptCore_SOURCES
     disassembler/udis86/udis86_syn-intel.c
     disassembler/udis86/udis86_syn.c
 
+    domjit/DOMJITAbstractHeap.cpp
+    domjit/DOMJITHeapRange.cpp
+
     ftl/FTLAbstractHeap.cpp
     ftl/FTLAbstractHeapRepository.cpp
     ftl/FTLAvailableRecovery.cpp
     ftl/FTLCapabilities.cpp
     ftl/FTLCommonValues.cpp
     ftl/FTLCompile.cpp
+    ftl/FTLDOMJITPatchpointParams.cpp
     ftl/FTLExceptionTarget.cpp
     ftl/FTLExitArgument.cpp
     ftl/FTLExitArgumentForOperand.cpp
@@ -440,10 +454,8 @@ set(JavaScriptCore_SOURCES
 
     heap/AllocatorAttributes.cpp
     heap/CodeBlockSet.cpp
+    heap/CollectionScope.cpp
     heap/ConservativeRoots.cpp
-    heap/CopiedBlock.cpp
-    heap/CopiedSpace.cpp
-    heap/CopyVisitor.cpp
     heap/DeferGC.cpp
     heap/DestructionMode.cpp
     heap/EdenGCActivityCallback.cpp
@@ -456,7 +468,6 @@ set(JavaScriptCore_SOURCES
     heap/Heap.cpp
     heap/HeapCell.cpp
     heap/HeapHelperPool.cpp
-    heap/HeapOperation.cpp
     heap/HeapProfiler.cpp
     heap/HeapSnapshot.cpp
     heap/HeapSnapshotBuilder.cpp
@@ -472,6 +483,7 @@ set(JavaScriptCore_SOURCES
     heap/MarkedAllocator.cpp
     heap/MarkedBlock.cpp
     heap/MarkedSpace.cpp
+    heap/MutatorState.cpp
     heap/SlotVisitor.cpp
     heap/Weak.cpp
     heap/WeakBlock.cpp
@@ -631,6 +643,7 @@ set(JavaScriptCore_SOURCES
     runtime/BooleanObject.cpp
     runtime/BooleanPrototype.cpp
     runtime/CallData.cpp
+    runtime/CatchScope.cpp
     runtime/ClonedArguments.cpp
     runtime/CodeCache.cpp
     runtime/CodeSpecializationKind.cpp
@@ -660,8 +673,10 @@ set(JavaScriptCore_SOURCES
     runtime/ErrorInstance.cpp
     runtime/ErrorPrototype.cpp
     runtime/Exception.cpp
+    runtime/ExceptionEventLocation.cpp
     runtime/ExceptionFuzz.cpp
     runtime/ExceptionHelpers.cpp
+    runtime/ExceptionScope.cpp
     runtime/Executable.cpp
     runtime/FunctionConstructor.cpp
     runtime/FunctionExecutableDump.cpp
@@ -849,11 +864,33 @@ set(JavaScriptCore_SOURCES
     tools/JSDollarVM.cpp
     tools/JSDollarVMPrototype.cpp
 
-    wasm/JSWASMModule.cpp
-    wasm/WASMB3IRGenerator.cpp
-    wasm/WASMModuleParser.cpp
-    wasm/WASMPlan.cpp
-    wasm/WASMSections.cpp
+    wasm/JSWasmModule.cpp
+    wasm/JSWebAssembly.cpp
+    wasm/WasmB3IRGenerator.cpp
+    wasm/WasmCallingConvention.cpp
+    wasm/WasmMemory.cpp
+    wasm/WasmModuleParser.cpp
+    wasm/WasmPlan.cpp
+
+    wasm/js/JSWebAssemblyCompileError.cpp
+    wasm/js/JSWebAssemblyInstance.cpp
+    wasm/js/JSWebAssemblyMemory.cpp
+    wasm/js/JSWebAssemblyModule.cpp
+    wasm/js/JSWebAssemblyRuntimeError.cpp
+    wasm/js/JSWebAssemblyTable.cpp
+    wasm/js/WebAssemblyCompileErrorConstructor.cpp
+    wasm/js/WebAssemblyCompileErrorPrototype.cpp
+    wasm/js/WebAssemblyInstanceConstructor.cpp
+    wasm/js/WebAssemblyInstancePrototype.cpp
+    wasm/js/WebAssemblyMemoryConstructor.cpp
+    wasm/js/WebAssemblyMemoryPrototype.cpp
+    wasm/js/WebAssemblyModuleConstructor.cpp
+    wasm/js/WebAssemblyModulePrototype.cpp
+    wasm/js/WebAssemblyPrototype.cpp
+    wasm/js/WebAssemblyRuntimeErrorConstructor.cpp
+    wasm/js/WebAssemblyRuntimeErrorPrototype.cpp
+    wasm/js/WebAssemblyTableConstructor.cpp
+    wasm/js/WebAssemblyTablePrototype.cpp
 
     yarr/RegularExpression.cpp
     yarr/YarrCanonicalizeUCS2.cpp
@@ -905,6 +942,20 @@ set(JavaScriptCore_OBJECT_LUT_SOURCES
     runtime/StringPrototype.cpp
     runtime/SymbolConstructor.cpp
     runtime/SymbolPrototype.cpp
+
+    wasm/js/WebAssemblyCompileErrorConstructor.cpp
+    wasm/js/WebAssemblyCompileErrorPrototype.cpp
+    wasm/js/WebAssemblyInstanceConstructor.cpp
+    wasm/js/WebAssemblyInstancePrototype.cpp
+    wasm/js/WebAssemblyMemoryConstructor.cpp
+    wasm/js/WebAssemblyMemoryPrototype.cpp
+    wasm/js/WebAssemblyModuleConstructor.cpp
+    wasm/js/WebAssemblyModulePrototype.cpp
+    wasm/js/WebAssemblyPrototype.cpp
+    wasm/js/WebAssemblyRuntimeErrorConstructor.cpp
+    wasm/js/WebAssemblyRuntimeErrorPrototype.cpp
+    wasm/js/WebAssemblyTableConstructor.cpp
+    wasm/js/WebAssemblyTablePrototype.cpp
 )
 
 set(JavaScriptCore_LIBRARIES
@@ -1027,6 +1078,7 @@ target_link_libraries(LLIntOffsetsExtractor WTF)
 # after every asm.rb run.
 if (MSVC)
     set(LLIntOutput LowLevelInterpreterWin.asm)
+    set(OFFLINE_ASM_ARGS --assembler=MASM)
 else ()
     set(LLIntOutput LLIntAssembly.h)
 endif ()
@@ -1035,7 +1087,7 @@ add_custom_command(
     OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/${LLIntOutput}
     MAIN_DEPENDENCY ${JAVASCRIPTCORE_DIR}/offlineasm/asm.rb
     DEPENDS LLIntOffsetsExtractor ${LLINT_ASM} ${OFFLINE_ASM} ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InitBytecodes.asm
-    COMMAND ${RUBY_EXECUTABLE} ${JAVASCRIPTCORE_DIR}/offlineasm/asm.rb -I${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/ ${JAVASCRIPTCORE_DIR}/llint/LowLevelInterpreter.asm $<TARGET_FILE:LLIntOffsetsExtractor> ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/${LLIntOutput}
+    COMMAND ${RUBY_EXECUTABLE} ${JAVASCRIPTCORE_DIR}/offlineasm/asm.rb -I${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/ ${JAVASCRIPTCORE_DIR}/llint/LowLevelInterpreter.asm $<TARGET_FILE:LLIntOffsetsExtractor> ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/${LLIntOutput} ${OFFLINE_ASM_ARGS}
     COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/${LLIntOutput}
     WORKING_DIRECTORY ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}
     VERBATIM)
@@ -1089,6 +1141,7 @@ set(JavaScriptCore_FORWARDING_HEADERS_DIRECTORIES
     debugger
     dfg
     disassembler
+    domjit
     heap
     inspector
     interpreter

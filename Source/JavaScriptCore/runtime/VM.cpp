@@ -47,6 +47,7 @@
 #include "FunctionConstructor.h"
 #include "GCActivityCallback.h"
 #include "GetterSetter.h"
+#include "HasOwnPropertyCache.h"
 #include "Heap.h"
 #include "HeapIterationScope.h"
 #include "HeapProfiler.h"
@@ -63,7 +64,6 @@
 #include "JSFunction.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSInternalPromiseDeferred.h"
-#include "JSLexicalEnvironment.h"
 #include "JSLock.h"
 #include "JSMap.h"
 #include "JSPromiseDeferred.h"
@@ -73,7 +73,6 @@
 #include "LLIntData.h"
 #include "Lexer.h"
 #include "Lookup.h"
-#include "MapData.h"
 #include "NativeStdFunctionCell.h"
 #include "Nodes.h"
 #include "Parser.h"
@@ -893,5 +892,28 @@ bool VM::isSafeToRecurseSoftCLoop() const
     return interpreter->cloopStack().isSafeToRecurse();
 }
 #endif // !ENABLE(JIT)
+
+#if ENABLE(EXCEPTION_SCOPE_VERIFICATION)
+void VM::verifyExceptionCheckNeedIsSatisfied(unsigned recursionDepth, ExceptionEventLocation& location)
+{
+    if (!Options::validateExceptionChecks())
+        return;
+
+    if (UNLIKELY(m_needExceptionCheck)) {
+        auto throwDepth = m_simulatedThrowPointRecursionDepth;
+        auto& throwLocation = m_simulatedThrowPointLocation;
+
+        dataLog(
+            "ERROR: Unchecked JS exception:\n"
+            "    This scope can throw a JS exception: ", throwLocation, "\n"
+            "        (ExceptionScope::m_recursionDepth was ", throwDepth, ")\n"
+            "    But the exception was unchecked as of this scope: ", location, "\n"
+            "        (ExceptionScope::m_recursionDepth was ", recursionDepth, ")\n"
+            "\n");
+
+        RELEASE_ASSERT(!m_needExceptionCheck);
+    }
+}
+#endif
 
 } // namespace JSC

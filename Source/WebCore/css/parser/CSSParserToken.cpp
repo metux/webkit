@@ -189,7 +189,7 @@ CSSPrimitiveValue::UnitTypes cssPrimitiveValueUnitFromTrie(const CharacterType* 
         switch (toASCIILower(data[0])) {
         case '_':
             if (toASCIILower(data[1]) == '_' && toASCIILower(data[2]) == 'q' && toASCIILower(data[3]) == 'e' && toASCIILower(data[4]) == 'm')
-                return CSSPrimitiveValue::UnitTypes::CSS_EMS; // FIXME-NEWPARSER: Need quirky ems.
+                return CSSPrimitiveValue::UnitTypes::CSS_QUIRKY_EMS;
             break;
         }
         break;
@@ -296,10 +296,10 @@ double CSSParserToken::numericValue() const
     return m_numericValue;
 }
 
-CSSPropertyID CSSParserToken::parseAsUnresolvedCSSPropertyID() const
+CSSPropertyID CSSParserToken::parseAsCSSPropertyID() const
 {
     ASSERT(m_type == IdentToken);
-    return unresolvedCSSPropertyID(value());
+    return cssPropertyID(value());
 }
 
 CSSValueID CSSParserToken::id() const

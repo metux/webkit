@@ -87,6 +87,7 @@ struct CSSParserString {
 
     operator String() const { return is8Bit() ? String(m_data.characters8, m_length) : String(m_data.characters16, m_length); }
     operator AtomicString() const { return is8Bit() ? AtomicString(m_data.characters8, m_length) : AtomicString(m_data.characters16, m_length); }
+    StringView toStringView() const { return is8Bit() ? StringView(m_data.characters8, m_length) : StringView(m_data.characters16, m_length); }
 
     union {
         LChar* characters8;
@@ -193,12 +194,16 @@ enum class CSSParserSelectorCombinator {
     DescendantDoubleChild,
 #endif
     DirectAdjacent,
-    IndirectAdjacent
+    IndirectAdjacent,
+    ShadowPseudo, // Special case of shadow DOM pseudo elements / shadow pseudo element
+    ShadowDeep, // /deep/ combinator
+    ShadowSlot // slotted to <slot> e
 };
 
 class CSSParserSelector {
     WTF_MAKE_FAST_ALLOCATED;
 public:
+    // FIXME-NEWPARSER: Remove the CSSParserString-based parsing functions once the old parser is gone.
     static CSSParserSelector* parsePagePseudoSelector(const CSSParserString& pseudoTypeString);
     static CSSParserSelector* parsePseudoElementSelector(CSSParserString& pseudoTypeString);
     static CSSParserSelector* parsePseudoElementCueFunctionSelector(const CSSParserString& functionIdentifier, Vector<std::unique_ptr<CSSParserSelector>>*);
@@ -206,6 +211,10 @@ public:
     static CSSParserSelector* parsePseudoClassHostFunctionSelector(const CSSParserString& functionIdentifier, CSSParserSelector*);
     static CSSParserSelector* parsePseudoClassAndCompatibilityElementSelector(CSSParserString& pseudoTypeString);
 
+    static CSSParserSelector* parsePseudoClassSelectorFromStringView(StringView&);
+    static CSSParserSelector* parsePseudoElementSelectorFromStringView(StringView&);
+    static CSSParserSelector* parsePagePseudoSelector(const AtomicString&);
+    
     CSSParserSelector();
     explicit CSSParserSelector(const QualifiedName&);
     ~CSSParserSelector();
@@ -213,15 +222,27 @@ public:
     std::unique_ptr<CSSSelector> releaseSelector() { return WTFMove(m_selector); }
 
     void setValue(const AtomicString& value) { m_selector->setValue(value); }
+    
+    // FIXME-NEWPARSER: These two methods can go away once old parser is gone.
     void setAttribute(const QualifiedName& value, bool isCaseInsensitive) { m_selector->setAttribute(value, isCaseInsensitive); }
-    void setArgument(const AtomicString& value) { m_selector->setArgument(value); }
     void setAttributeValueMatchingIsCaseInsensitive(bool isCaseInsensitive) { m_selector->setAttributeValueMatchingIsCaseInsensitive(isCaseInsensitive); }
+    
+    void setAttribute(const QualifiedName& value, bool convertToLowercase, CSSSelector::AttributeMatchType type) { m_selector->setAttribute(value, convertToLowercase, type); }
+    
+    void setArgument(const AtomicString& value) { m_selector->setArgument(value); }
+    void setNth(int a, int b) { m_selector->setNth(a, b); }
     void setMatch(CSSSelector::Match value) { m_selector->setMatch(value); }
-    void setRelation(CSSSelector::Relation value) { m_selector->setRelation(value); }
+    void setRelation(CSSSelector::RelationType value) { m_selector->setRelation(value); }
     void setForPage() { m_selector->setForPage(); }
+
+    CSSSelector::Match match() const { return m_selector->match(); }
+    CSSSelector::PseudoElementType pseudoElementType() const { return m_selector->pseudoElementType(); }
+    const CSSSelectorList* selectorList() const { return m_selector->selectorList(); }
 
     void adoptSelectorVector(Vector<std::unique_ptr<CSSParserSelector>>& selectorVector);
     void setLangArgumentList(const Vector<CSSParserString>& stringVector);
+    void setLangArgumentList(std::unique_ptr<Vector<AtomicString>>);
+    void setSelectorList(std::unique_ptr<CSSSelectorList>);
 
     void setPseudoClassValue(const CSSParserString& pseudoClassString);
     CSSSelector::PseudoClassType pseudoClassType() const { return m_selector->pseudoClassType(); }
@@ -239,13 +260,19 @@ public:
     bool hasShadowDescendant() const;
     bool matchesPseudoElement() const;
 
+    bool isHostPseudoSelector() const;
+
+    // FIXME-NEWPARSER: Missing "shadow"
+    bool needsImplicitShadowCombinatorForMatching() const { return match() == CSSSelector::PseudoElement && (pseudoElementType() == CSSSelector::PseudoElementWebKitCustom || pseudoElementType() == CSSSelector::PseudoElementUserAgentCustom || pseudoElementType() == CSSSelector::PseudoElementWebKitCustomLegacyPrefixed || pseudoElementType() == CSSSelector::PseudoElementCue || pseudoElementType() == CSSSelector::PseudoElementSlotted); }
+
     CSSParserSelector* tagHistory() const { return m_tagHistory.get(); }
     void setTagHistory(std::unique_ptr<CSSParserSelector> selector) { m_tagHistory = WTFMove(selector); }
     void clearTagHistory() { m_tagHistory.reset(); }
-    void insertTagHistory(CSSSelector::Relation before, std::unique_ptr<CSSParserSelector>, CSSSelector::Relation after);
-    void appendTagHistory(CSSSelector::Relation, std::unique_ptr<CSSParserSelector>);
+    void insertTagHistory(CSSSelector::RelationType before, std::unique_ptr<CSSParserSelector>, CSSSelector::RelationType after);
+    void appendTagHistory(CSSSelector::RelationType, std::unique_ptr<CSSParserSelector>);
     void appendTagHistory(CSSParserSelectorCombinator, std::unique_ptr<CSSParserSelector>);
     void prependTagSelector(const QualifiedName&, bool tagIsForNamespaceRule = false);
+    std::unique_ptr<CSSParserSelector> releaseTagHistory();
 
 private:
 #if ENABLE(CSS_SELECTORS_LEVEL4)

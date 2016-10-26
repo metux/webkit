@@ -53,6 +53,7 @@
 #include "FocusEvent.h"
 #include "FrameSelection.h"
 #include "FrameView.h"
+#include "HTMLBodyElement.h"
 #include "HTMLCanvasElement.h"
 #include "HTMLCollection.h"
 #include "HTMLDocument.h"
@@ -96,6 +97,7 @@
 #include "SlotAssignment.h"
 #include "StyleProperties.h"
 #include "StyleResolver.h"
+#include "StyleScope.h"
 #include "StyleTreeResolver.h"
 #include "TextIterator.h"
 #include "VoidCallback.h"
@@ -333,12 +335,7 @@ bool Element::dispatchKeyEvent(const PlatformKeyboardEvent& platformEvent)
 
 void Element::dispatchSimulatedClick(Event* underlyingEvent, SimulatedClickMouseEventOptions eventOptions, SimulatedClickVisualOptions visualOptions)
 {
-    simulateClick(*this, underlyingEvent, eventOptions, visualOptions, SimulatedClickCreationOptions::FromUserAgent);
-}
-
-void Element::dispatchSimulatedClickForBindings(Event* underlyingEvent)
-{
-    simulateClick(*this, underlyingEvent, SendNoEvents, DoNotShowPressedLook, SimulatedClickCreationOptions::FromBindings);
+    simulateClick(*this, underlyingEvent, eventOptions, visualOptions, SimulatedClickSource::UserAgent);
 }
 
 Ref<Node> Element::cloneNodeInternal(Document& targetDocument, CloningOperation type)
@@ -570,7 +567,7 @@ void Element::setActive(bool flag, bool pause)
     const RenderStyle* renderStyle = this->renderStyle();
     bool reactsToPress = (renderStyle && renderStyle->affectedByActive()) || styleAffectedByActive();
     if (reactsToPress)
-        setNeedsStyleRecalc();
+        invalidateStyleForSubtree();
 
     if (!renderer())
         return;
@@ -615,7 +612,7 @@ void Element::setFocus(bool flag)
         return;
 
     document().userActionElements().setFocused(this, flag);
-    setNeedsStyleRecalc();
+    invalidateStyleForSubtree();
 
     for (Element* element = this; element; element = element->parentOrShadowHostElement())
         element->setHasFocusWithin(flag);
@@ -635,13 +632,13 @@ void Element::setHovered(bool flag)
         // style, it would never go back to its normal style and remain
         // stuck in its hovered style).
         if (!flag)
-            setNeedsStyleRecalc();
+            invalidateStyleForSubtree();
 
         return;
     }
 
     if (renderer()->style().affectedByHover() || childrenAffectedByHover())
-        setNeedsStyleRecalc();
+        invalidateStyleForSubtree();
 
     if (renderer()->style().hasAppearance())
         renderer()->theme().stateChanged(*renderer(), ControlStates::HoverState);
@@ -689,7 +686,50 @@ void Element::scrollIntoViewIfNotVisible(bool centerIfNotVisible)
     else
         renderer()->scrollRectToVisible(SelectionRevealMode::Reveal, bounds, ScrollAlignment::alignToEdgeIfNotVisible, ScrollAlignment::alignToEdgeIfNotVisible);
 }
-    
+
+void Element::scrollBy(const ScrollToOptions& options)
+{
+    return scrollBy(options.left.valueOr(0), options.top.valueOr(0));
+}
+
+static inline double normalizeNonFiniteValue(double f)
+{
+    return std::isfinite(f) ? f : 0;
+}
+
+void Element::scrollBy(double x, double y)
+{
+    scrollTo(scrollLeft() + normalizeNonFiniteValue(x), scrollTop() + normalizeNonFiniteValue(y));
+}
+
+void Element::scrollTo(const ScrollToOptions& options)
+{
+    // If the element is the root element and document is in quirks mode, terminate these steps.
+    // Note that WebKit always uses quirks mode document scrolling behavior. See Document::scrollingElement().
+    if (this == document().documentElement())
+        return;
+
+    document().updateLayoutIgnorePendingStylesheets();
+
+    // If the element does not have any associated CSS layout box, the element has no associated scrolling box,
+    // or the element has no overflow, terminate these steps.
+    RenderBox* renderer = renderBox();
+    if (!renderer || !renderer->hasOverflowClip())
+        return;
+
+    // Normalize non-finite values for left and top dictionary members of options, if present.
+    double x = options.left ? normalizeNonFiniteValue(options.left.value()) : adjustForAbsoluteZoom(renderer->scrollLeft(), *renderer);
+    double y = options.top ? normalizeNonFiniteValue(options.top.value()) : adjustForAbsoluteZoom(renderer->scrollTop(), *renderer);
+
+    renderer->setScrollLeft(clampToInteger(x * renderer->style().effectiveZoom()));
+    renderer->setScrollTop(clampToInteger(y * renderer->style().effectiveZoom()));
+}
+
+void Element::scrollTo(double x, double y)
+{
+    scrollTo({ x, y });
+}
+
 void Element::scrollByUnits(int units, ScrollGranularity granularity)
 {
     document().updateLayoutIgnorePendingStylesheets();
@@ -831,7 +871,7 @@ double Element::clientLeft()
 {
     document().updateLayoutIgnorePendingStylesheets();
 
-    if (RenderBox* renderer = renderBox()) {
+    if (auto* renderer = renderBox()) {
         LayoutUnit clientLeft = subpixelMetricsEnabled(renderer->document()) ? renderer->clientLeft() : LayoutUnit(roundToInt(renderer->clientLeft()));
         return convertToNonSubpixelValueIfNeeded(adjustLayoutUnitForAbsoluteZoom(clientLeft, *renderer).toDouble(), renderer->document());
     }
@@ -842,7 +882,7 @@ double Element::clientTop()
 {
     document().updateLayoutIgnorePendingStylesheets();
 
-    if (RenderBox* renderer = renderBox()) {
+    if (auto* renderer = renderBox()) {
         LayoutUnit clientTop = subpixelMetricsEnabled(renderer->document()) ? renderer->clientTop() : LayoutUnit(roundToInt(renderer->clientTop()));
         return convertToNonSubpixelValueIfNeeded(adjustLayoutUnitForAbsoluteZoom(clientTop, *renderer).toDouble(), renderer->document());
     }
@@ -855,6 +895,7 @@ double Element::clientWidth()
 
     if (!document().hasLivingRenderTree())
         return 0;
+
     RenderView& renderView = *document().renderView();
 
     // When in strict mode, clientWidth for the document element should return the width of the containing frame.
@@ -875,6 +916,7 @@ double Element::clientHeight()
     document().updateLayoutIfDimensionsOutOfDate(*this, HeightDimensionsCheck);
     if (!document().hasLivingRenderTree())
         return 0;
+
     RenderView& renderView = *document().renderView();
 
     // When in strict mode, clientHeight for the document element should return the height of the containing frame.
@@ -894,8 +936,8 @@ int Element::scrollLeft()
 {
     document().updateLayoutIgnorePendingStylesheets();
 
-    if (RenderBox* rend = renderBox())
-        return adjustForAbsoluteZoom(rend->scrollLeft(), *rend);
+    if (auto* renderer = renderBox())
+        return adjustForAbsoluteZoom(renderer->scrollLeft(), *renderer);
     return 0;
 }
 
@@ -903,8 +945,8 @@ int Element::scrollTop()
 {
     document().updateLayoutIgnorePendingStylesheets();
 
-    if (RenderBox* rend = renderBox())
-        return adjustForAbsoluteZoom(rend->scrollTop(), *rend);
+    if (RenderBox* renderer = renderBox())
+        return adjustForAbsoluteZoom(renderer->scrollTop(), *renderer);
     return 0;
 }
 
@@ -912,7 +954,7 @@ void Element::setScrollLeft(int newLeft)
 {
     document().updateLayoutIgnorePendingStylesheets();
 
-    if (RenderBox* renderer = renderBox()) {
+    if (auto* renderer = renderBox()) {
         renderer->setScrollLeft(static_cast<int>(newLeft * renderer->style().effectiveZoom()));
         if (auto* scrollableArea = renderer->layer())
             scrollableArea->setScrolledProgrammatically(true);
@@ -923,7 +965,7 @@ void Element::setScrollTop(int newTop)
 {
     document().updateLayoutIgnorePendingStylesheets();
 
-    if (RenderBox* renderer = renderBox()) {
+    if (auto* renderer = renderBox()) {
         renderer->setScrollTop(static_cast<int>(newTop * renderer->style().effectiveZoom()));
         if (auto* scrollableArea = renderer->layer())
             scrollableArea->setScrolledProgrammatically(true);
@@ -933,16 +975,16 @@ void Element::setScrollTop(int newTop)
 int Element::scrollWidth()
 {
     document().updateLayoutIfDimensionsOutOfDate(*this, WidthDimensionsCheck);
-    if (RenderBox* rend = renderBox())
-        return adjustForAbsoluteZoom(rend->scrollWidth(), *rend);
+    if (auto* renderer = renderBox())
+        return adjustForAbsoluteZoom(renderer->scrollWidth(), *renderer);
     return 0;
 }
 
 int Element::scrollHeight()
 {
     document().updateLayoutIfDimensionsOutOfDate(*this, HeightDimensionsCheck);
-    if (RenderBox* rend = renderBox())
-        return adjustForAbsoluteZoom(rend->scrollHeight(), *rend);
+    if (auto* renderer = renderBox())
+        return adjustForAbsoluteZoom(renderer->scrollHeight(), *renderer);
     return 0;
 }
 
@@ -1280,7 +1322,7 @@ void Element::attributeChanged(const QualifiedName& name, const AtomicString& ol
             elementData()->setHasNameAttribute(!newValue.isNull());
         else if (name == HTMLNames::pseudoAttr) {
             if (needsStyleInvalidation() && isInShadowTree())
-                setNeedsStyleRecalc(FullStyleChange);
+                invalidateStyleForSubtree();
         }
         else if (name == HTMLNames::slotAttr) {
             if (auto* parent = parentElement()) {
@@ -1295,7 +1337,7 @@ void Element::attributeChanged(const QualifiedName& name, const AtomicString& ol
     document().incDOMTreeVersion();
 
 #if ENABLE(CUSTOM_ELEMENTS)
-    if (UNLIKELY(isCustomElement()))
+    if (UNLIKELY(isDefinedCustomElement()))
         CustomElementReactionQueue::enqueueAttributeChangedCallbackIfNeeded(*this, name, oldValue, newValue);
 #endif
 
@@ -1388,14 +1430,34 @@ bool Element::allowsDoubleTapGesture() const
 StyleResolver& Element::styleResolver()
 {
     if (auto* shadowRoot = containingShadowRoot())
-        return shadowRoot->styleResolver();
+        return shadowRoot->styleScope().resolver();
 
-    return document().ensureStyleResolver();
+    return document().styleScope().resolver();
 }
 
 ElementStyle Element::resolveStyle(const RenderStyle* parentStyle)
 {
     return styleResolver().styleForElement(*this, parentStyle);
+}
+
+void Element::invalidateStyle()
+{
+    Node::invalidateStyle(Style::Validity::ElementInvalid);
+}
+
+void Element::invalidateStyleAndLayerComposition()
+{
+    Node::invalidateStyle(Style::Validity::ElementInvalid, Style::InvalidationMode::RecompositeLayer);
+}
+
+void Element::invalidateStyleForSubtree()
+{
+    Node::invalidateStyle(Style::Validity::SubtreeInvalid);
+}
+
+void Element::invalidateStyleAndRenderersForSubtree()
+{
+    Node::invalidateStyle(Style::Validity::SubtreeAndRenderersInvalid);
 }
 
 #if ENABLE(WEB_ANIMATIONS)
@@ -1495,7 +1557,7 @@ void Element::didMoveToNewDocument(Document* oldDocument)
     }
 
 #if ENABLE(CUSTOM_ELEMENTS)
-    if (UNLIKELY(isCustomElement()))
+    if (UNLIKELY(isDefinedCustomElement()))
         CustomElementReactionQueue::enqueueAdoptedCallbackIfNeeded(*this, *oldDocument, document());
 #endif
 }
@@ -1606,8 +1668,13 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode& insertio
     }
 
 #if ENABLE(CUSTOM_ELEMENTS)
-    if (becomeConnected && UNLIKELY(isCustomElement()))
-        CustomElementReactionQueue::enqueueConnectedCallbackIfNeeded(*this);
+    if (becomeConnected) {
+        if (UNLIKELY(isCustomElementUpgradeCandidate()))
+            CustomElementReactionQueue::enqueueElementUpgradeIfDefined(*this);
+        if (UNLIKELY(isDefinedCustomElement()))
+            CustomElementReactionQueue::enqueueConnectedCallbackIfNeeded(*this);
+    }
+
 #endif
 
     return InsertionDone;
@@ -1658,7 +1725,7 @@ void Element::removedFrom(ContainerNode& insertionPoint)
         }
 
 #if ENABLE(CUSTOM_ELEMENTS)
-        if (becomeDisconnected && UNLIKELY(isCustomElement()))
+        if (becomeDisconnected && UNLIKELY(isDefinedCustomElement()))
             CustomElementReactionQueue::enqueueDisconnectedCallbackIfNeeded(*this);
 #endif
     }
@@ -1707,7 +1774,7 @@ void Element::addShadowRoot(Ref<ShadowRoot>&& newShadowRoot)
     for (auto& target : postInsertionNotificationTargets)
         target->finishedInsertingSubtree();
 
-    setNeedsStyleRecalc(ReconstructRenderTree);
+    invalidateStyleAndRenderersForSubtree();
 
     InspectorInstrumentation::didPushShadowRoot(*this, shadowRoot);
 
@@ -1733,10 +1800,10 @@ void Element::removeShadowRoot()
     notifyChildNodeRemoved(*this, *oldRoot);
 }
 
-RefPtr<ShadowRoot> Element::createShadowRoot(ExceptionCode& ec)
+ShadowRoot* Element::createShadowRoot(ExceptionCode& ec)
 {
     if (alwaysCreateUserAgentShadowRoot())
-        ensureUserAgentShadowRoot();
+        return &ensureUserAgentShadowRoot();
 
     ec = HIERARCHY_REQUEST_ERR;
     return nullptr;
@@ -1831,19 +1898,54 @@ ShadowRoot& Element::ensureUserAgentShadowRoot()
     
 #if ENABLE(CUSTOM_ELEMENTS)
 
-void Element::setCustomElementIsResolved(JSCustomElementInterface& elementInterface)
+void Element::setIsDefinedCustomElement(JSCustomElementInterface& elementInterface)
 {
-    clearFlag(IsEditingTextOrUnresolvedCustomElementFlag);
+    clearFlag(IsEditingTextOrUndefinedCustomElementFlag);
     setFlag(IsCustomElement);
-    ensureElementRareData().setCustomElementInterface(elementInterface);
+    auto& data = ensureElementRareData();
+    if (!data.customElementReactionQueue())
+        data.setCustomElementReactionQueue(std::make_unique<CustomElementReactionQueue>(elementInterface));
 }
 
-JSCustomElementInterface* Element::customElementInterface() const
+void Element::setIsFailedCustomElement(JSCustomElementInterface&)
 {
-    ASSERT(isCustomElement());
+    ASSERT(isUndefinedCustomElement());
+    ASSERT(getFlag(IsEditingTextOrUndefinedCustomElementFlag));
+    clearFlag(IsCustomElement);
+
+    if (hasRareData()) {
+        // Clear the queue instead of deleting it since this function can be called inside CustomElementReactionQueue::invokeAll during upgrades.
+        if (auto* queue = elementRareData()->customElementReactionQueue())
+            queue->clear();
+    }
+}
+
+void Element::setIsCustomElementUpgradeCandidate()
+{
+    ASSERT(!getFlag(IsCustomElement));
+    setFlag(IsCustomElement);
+    setFlag(IsEditingTextOrUndefinedCustomElementFlag);
+}
+
+void Element::enqueueToUpgrade(JSCustomElementInterface& elementInterface)
+{
+    ASSERT(!isDefinedCustomElement() && !isFailedCustomElement());
+    setFlag(IsCustomElement);
+    setFlag(IsEditingTextOrUndefinedCustomElementFlag);
+
+    auto& data = ensureElementRareData();
+    ASSERT(!data.customElementReactionQueue());
+
+    data.setCustomElementReactionQueue(std::make_unique<CustomElementReactionQueue>(elementInterface));
+    data.customElementReactionQueue()->enqueueElementUpgrade(*this);
+}
+
+CustomElementReactionQueue* Element::reactionQueue() const
+{
+    ASSERT(isDefinedCustomElement() || isCustomElementUpgradeCandidate());
     if (!hasRareData())
         return nullptr;
-    return elementRareData()->customElementInterface();
+    return elementRareData()->customElementReactionQueue();
 }
 
 #endif
@@ -1874,7 +1976,7 @@ static void checkForEmptyStyleChange(Element& element)
     if (element.styleAffectedByEmpty()) {
         auto* style = element.renderStyle();
         if (!style || (!style->emptyState() || element.hasChildNodes()))
-            element.setNeedsStyleRecalc();
+            element.invalidateStyleForSubtree();
     }
 }
 
@@ -1885,7 +1987,7 @@ static void checkForSiblingStyleChanges(Element& parent, SiblingCheckType checkT
     // :empty selector.
     checkForEmptyStyleChange(parent);
 
-    if (parent.styleChangeType() >= FullStyleChange)
+    if (parent.styleValidity() >= Style::Validity::SubtreeInvalid)
         return;
 
     // :first-child.  In the parser callback case, we don't have to check anything, since we were right the first time.
@@ -1900,14 +2002,14 @@ static void checkForSiblingStyleChanges(Element& parent, SiblingCheckType checkT
         if (newFirstElement != elementAfterChange) {
             auto* style = elementAfterChange->renderStyle();
             if (!style || style->firstChildState())
-                elementAfterChange->setNeedsStyleRecalc();
+                elementAfterChange->invalidateStyleForSubtree();
         }
 
         // We also have to handle node removal.
         if (checkType == SiblingElementRemoved && newFirstElement == elementAfterChange && newFirstElement) {
             auto* style = newFirstElement->renderStyle();
             if (!style || !style->firstChildState())
-                newFirstElement->setNeedsStyleRecalc();
+                newFirstElement->invalidateStyleForSubtree();
         }
     }
 
@@ -1920,7 +2022,7 @@ static void checkForSiblingStyleChanges(Element& parent, SiblingCheckType checkT
         if (newLastElement != elementBeforeChange) {
             auto* style = elementBeforeChange->renderStyle();
             if (!style || style->lastChildState())
-                elementBeforeChange->setNeedsStyleRecalc();
+                elementBeforeChange->invalidateStyleForSubtree();
         }
 
         // We also have to handle node removal.  The parser callback case is similar to node removal as well in that we need to change the last child
@@ -1928,13 +2030,13 @@ static void checkForSiblingStyleChanges(Element& parent, SiblingCheckType checkT
         if ((checkType == SiblingElementRemoved || checkType == FinishedParsingChildren) && newLastElement == elementBeforeChange && newLastElement) {
             auto* style = newLastElement->renderStyle();
             if (!style || !style->lastChildState())
-                newLastElement->setNeedsStyleRecalc();
+                newLastElement->invalidateStyleForSubtree();
         }
     }
 
     if (elementAfterChange) {
         if (elementAfterChange->styleIsAffectedByPreviousSibling())
-            elementAfterChange->setNeedsStyleRecalc();
+            elementAfterChange->invalidateStyleForSubtree();
         else if (elementAfterChange->affectsNextSiblingElementStyle()) {
             Element* elementToInvalidate = elementAfterChange;
             do {
@@ -1942,7 +2044,7 @@ static void checkForSiblingStyleChanges(Element& parent, SiblingCheckType checkT
             } while (elementToInvalidate && !elementToInvalidate->styleIsAffectedByPreviousSibling());
 
             if (elementToInvalidate)
-                elementToInvalidate->setNeedsStyleRecalc();
+                elementToInvalidate->invalidateStyleForSubtree();
         }
     }
 
@@ -1953,7 +2055,7 @@ static void checkForSiblingStyleChanges(Element& parent, SiblingCheckType checkT
     // For performance reasons we just mark the parent node as changed, since we don't want to make childrenChanged O(n^2) by crawling all our kids
     // here.  recalcStyle will then force a walk of the children when it sees that this has happened.
     if (parent.childrenAffectedByBackwardPositionalRules() && elementBeforeChange)
-        parent.setNeedsStyleRecalc();
+        parent.invalidateStyleForSubtree();
 }
 
 void Element::childrenChanged(const ChildChange& change)
@@ -2620,15 +2722,15 @@ const RenderStyle& Element::resolveComputedStyle()
 
 const RenderStyle* Element::computedStyle(PseudoId pseudoElementSpecifier)
 {
+    if (!inDocument())
+        return nullptr;
+
     if (PseudoElement* pseudoElement = beforeOrAfterPseudoElement(*this, pseudoElementSpecifier))
         return pseudoElement->computedStyle();
 
     auto* style = existingComputedStyle();
-    if (!style) {
-        if (!inDocument())
-            return nullptr;
+    if (!style)
         style = &resolveComputedStyle();
-    }
 
     if (pseudoElementSpecifier) {
         if (auto* cachedPseudoStyle = style->getCachedPseudoStyle(pseudoElementSpecifier))
@@ -2642,7 +2744,7 @@ bool Element::needsStyleInvalidation() const
 {
     if (!inRenderedDocument())
         return false;
-    if (styleChangeType() >= FullStyleChange)
+    if (styleValidity() >= Style::Validity::SubtreeInvalid)
         return false;
     if (document().hasPendingForcedStyleRecalc())
         return false;
@@ -3009,7 +3111,7 @@ bool Element::containsFullScreenElement() const
 void Element::setContainsFullScreenElement(bool flag)
 {
     ensureElementRareData().setContainsFullScreenElement(flag);
-    setNeedsStyleRecalc(SyntheticStyleChange);
+    invalidateStyleAndLayerComposition();
 }
 
 static Element* parentCrossingFrameBoundaries(Element* element)
@@ -3554,7 +3656,6 @@ bool Element::ieForbidsInsertHTML() const
         || hasTagName(imageTag)
         || hasTagName(imgTag)
         || hasTagName(inputTag)
-        || hasTagName(isindexTag)
         || hasTagName(linkTag)
         || hasTagName(metaTag)
         || hasTagName(paramTag)
@@ -3610,11 +3711,11 @@ Element* Element::insertAdjacentElement(const String& where, Element& newChild, 
 }
 
 // Step 1 of https://w3c.github.io/DOM-Parsing/#dom-element-insertadjacenthtml.
-static Element* contextElementForInsertion(const String& where, Element* element, ExceptionCode& ec)
+static ContainerNode* contextNodeForInsertion(const String& where, Element* element, ExceptionCode& ec)
 {
     if (equalLettersIgnoringASCIICase(where, "beforebegin") || equalLettersIgnoringASCIICase(where, "afterend")) {
-        auto* parent = element->parentElement();
-        if (!parent) {
+        auto* parent = element->parentNode();
+        if (!parent || is<Document>(*parent)) {
             ec = NO_MODIFICATION_ALLOWED_ERR;
             return nullptr;
         }
@@ -3626,14 +3727,25 @@ static Element* contextElementForInsertion(const String& where, Element* element
     return nullptr;
 }
 
+// https://w3c.github.io/DOM-Parsing/#dom-element-insertadjacenthtml
 void Element::insertAdjacentHTML(const String& where, const String& markup, ExceptionCode& ec)
 {
-    Element* contextElement = contextElementForInsertion(where, this, ec);
-    if (!contextElement)
+    // Step 1.
+    auto* contextNode = contextNodeForInsertion(where, this, ec);
+    if (!contextNode)
         return;
+    RefPtr<Element> contextElement;
+    // Step 2.
+    if (!is<Element>(*contextNode)
+        || (contextNode->document().isHTMLDocument() && is<HTMLHtmlElement>(*contextNode))) {
+        contextElement = HTMLBodyElement::create(contextNode->document());
+    } else
+        contextElement = downcast<Element>(contextNode);
+    // Step 3.
     RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(*contextElement, markup, AllowScriptingContent, ec);
     if (!fragment)
         return;
+    // Step 4.
     insertAdjacent(where, fragment.releaseNonNull(), ec);
 }
 

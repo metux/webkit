@@ -69,9 +69,11 @@ public:
 
     void createObjectStore(const IDBRequestData&, const IDBObjectStoreInfo&);
     void deleteObjectStore(const IDBRequestData&, const String& objectStoreName);
+    void renameObjectStore(const IDBRequestData&, uint64_t objectStoreIdentifier, const String& newName);
     void clearObjectStore(const IDBRequestData&, uint64_t objectStoreIdentifier);
     void createIndex(const IDBRequestData&, const IDBIndexInfo&);
     void deleteIndex(const IDBRequestData&, uint64_t objectStoreIdentifier, const String& indexName);
+    void renameIndex(const IDBRequestData&, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName);
     void putOrAdd(const IDBRequestData&, const IDBKeyData&, const IDBValue&, IndexedDB::ObjectStoreOverwriteMode);
     void getRecord(const IDBRequestData&, const IDBGetRecordData&);
     void getCount(const IDBRequestData&, const IDBKeyRangeData&);
