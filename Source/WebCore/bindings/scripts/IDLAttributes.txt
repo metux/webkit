@@ -24,16 +24,15 @@ AtomicString
 CEReactions
 CachedAttribute
 CallbackNeedsOperatorEqual
-Callback=FunctionOnly
 CallWith=Document|ScriptExecutionContext|ScriptState|ScriptArguments|CallStack|ActiveWindow|FirstWindow|CallerDocument|CallerWindow
 CheckSecurity
 CheckSecurityForNode
 Clamp
 Conditional=*
+ConstantsScope=*
 Constructor
 ConstructorCallWith=Document|ScriptExecutionContext|ScriptState
 ConstructorMayThrowException
-ConstructorMayThrowLegacyException
 Custom
 CustomCall
 CustomConstructor
@@ -52,7 +51,7 @@ CustomPutFunction
 CustomSetPrototype
 CustomSetter
 CustomToJSObject
-DOMJIT
+DOMJIT=|ReadDOM|Getter
 DoNotCheckConstants
 DoNotCheckSecurity
 DoNotCheckSecurityOnGetter
@@ -60,6 +59,7 @@ DoNotCheckSecurityOnSetter
 DocumentEventHandler
 EnabledAtRuntime=*
 EnabledBySetting=*
+EnabledForWorld=*
 EnforceRange
 ExportMacro=WEBCORE_EXPORT|WEBCORE_TESTSUPPORT_EXPORT
 ExportToWrappedFunction
@@ -67,7 +67,7 @@ Exposed=*
 ForwardDeclareInHeader
 GenerateIsReachable=|Impl|ImplWebGLRenderingContext|ImplDocument|ImplElementRoot|ImplFrame|ImplOwnerNodeRoot|ImplScriptExecutionContext
 GetterMayThrowException
-GetterMayThrowLegacyException
+Global=*
 Immutable
 ImplementedAs=*
 ImplementationLacksVTable
@@ -92,7 +92,6 @@ JSLegacyParent=*
 LenientThis
 MasqueradesAsUndefined
 MayThrowException
-MayThrowLegacyException
 NamedConstructor=*
 NewImpurePropertyFiresWatchpoints
 NewObject
@@ -101,6 +100,7 @@ Nondeterministic
 NotEnumerable
 OverrideBuiltins
 PassContext
+PrimaryGlobal
 PrivateIdentifier
 PublicIdentifier
 PutForwards=*
@@ -111,7 +111,6 @@ ReportExternalMemoryCost
 RequiresExistingAtomicString
 SetterCallWith=ScriptExecutionContext|ScriptState|ScriptArguments|CallStack|ActiveWindow|FirstWindow
 SetterMayThrowException
-SetterMayThrowLegacyException
 SkipVTableValidation
 SuppressToJSObject
 TreatNullAs=EmptyString

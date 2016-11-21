@@ -294,6 +294,17 @@ void IDBServer::getRecord(const IDBRequestData& requestData, const IDBGetRecordD
     transaction->getRecord(requestData, getRecordData);
 }
 
+void IDBServer::getAllRecords(const IDBRequestData& requestData, const IDBGetAllRecordsData& getAllRecordsData)
+{
+    LOG(IndexedDB, "IDBServer::getAllRecords");
+
+    auto transaction = m_transactions.get(requestData.transactionIdentifier());
+    if (!transaction)
+        return;
+
+    transaction->getAllRecords(requestData, getAllRecordsData);
+}
+
 void IDBServer::getCount(const IDBRequestData& requestData, const IDBKeyRangeData& keyRangeData)
 {
     LOG(IndexedDB, "IDBServer::getCount");
@@ -327,7 +338,7 @@ void IDBServer::openCursor(const IDBRequestData& requestData, const IDBCursorInf
     transaction->openCursor(requestData, info);
 }
 
-void IDBServer::iterateCursor(const IDBRequestData& requestData, const IDBKeyData& key, unsigned long count)
+void IDBServer::iterateCursor(const IDBRequestData& requestData, const IDBIterateCursorData& data)
 {
     LOG(IndexedDB, "IDBServer::iterateCursor");
 
@@ -335,7 +346,7 @@ void IDBServer::iterateCursor(const IDBRequestData& requestData, const IDBKeyDat
     if (!transaction)
         return;
 
-    transaction->iterateCursor(requestData, key, count);
+    transaction->iterateCursor(requestData, data);
 }
 
 void IDBServer::establishTransaction(uint64_t databaseConnectionIdentifier, const IDBTransactionInfo& info)
@@ -372,6 +383,17 @@ void IDBServer::didFinishHandlingVersionChangeTransaction(uint64_t databaseConne
         return;
 
     connection->didFinishHandlingVersionChange(transactionIdentifier);
+}
+
+void IDBServer::databaseConnectionPendingClose(uint64_t databaseConnectionIdentifier)
+{
+    LOG(IndexedDB, "IDBServer::databaseConnectionPendingClose - %" PRIu64, databaseConnectionIdentifier);
+
+    auto databaseConnection = m_databaseConnections.get(databaseConnectionIdentifier);
+    if (!databaseConnection)
+        return;
+
+    databaseConnection->connectionPendingCloseFromClient();
 }
 
 void IDBServer::databaseConnectionClosed(uint64_t databaseConnectionIdentifier)
@@ -640,7 +662,7 @@ void IDBServer::performCloseAndDeleteDatabasesForOrigins(const Vector<SecurityOr
 {
     if (!m_databaseDirectoryPath.isEmpty()) {
         for (const auto& origin : origins) {
-            String originPath = pathByAppendingComponent(m_databaseDirectoryPath, origin.securityOrigin()->databaseIdentifier());
+            String originPath = pathByAppendingComponent(m_databaseDirectoryPath, origin.databaseIdentifier());
             removeAllDatabasesForOriginPath(originPath, std::chrono::system_clock::time_point::min());
         }
     }

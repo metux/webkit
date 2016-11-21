@@ -34,7 +34,6 @@
 #include "CryptoKeyDataRSAComponents.h"
 #include "CryptoKeyHMAC.h"
 #include "CryptoKeyRSA.h"
-#include "ExceptionCode.h"
 #include "File.h"
 #include "FileList.h"
 #include "IDBValue.h"
@@ -229,7 +228,7 @@ enum class CryptoAlgorithmIdentifierTag {
 };
 const uint8_t cryptoAlgorithmIdentifierTagMaximumValue = 21;
 
-static unsigned countUsages(CryptoKeyUsage usages)
+static unsigned countUsages(CryptoKeyUsageBitmap usages)
 {
     // Fast bit count algorithm for sparse bit maps.
     unsigned count = 0;
@@ -727,10 +726,10 @@ private:
         else
             return false;
 
-        RefPtr<ArrayBufferView> arrayBufferView = toArrayBufferView(obj);
+        RefPtr<ArrayBufferView> arrayBufferView = toPossiblySharedArrayBufferView(obj);
         write(static_cast<uint32_t>(arrayBufferView->byteOffset()));
         write(static_cast<uint32_t>(arrayBufferView->byteLength()));
-        RefPtr<ArrayBuffer> arrayBuffer = arrayBufferView->buffer();
+        RefPtr<ArrayBuffer> arrayBuffer = arrayBufferView->possiblySharedBuffer();
         if (!arrayBuffer) {
             code = ValidationError;
             return true;
@@ -845,7 +844,7 @@ private:
                 code = ValidationError;
                 return true;
             }
-            if (ArrayBuffer* arrayBuffer = toArrayBuffer(obj)) {
+            if (ArrayBuffer* arrayBuffer = toPossiblySharedArrayBuffer(obj)) {
                 if (arrayBuffer->isNeutered()) {
                     code = ValidationError;
                     return true;
@@ -1158,7 +1157,7 @@ private:
 
         write(key->extractable());
 
-        CryptoKeyUsage usages = key->usagesBitmap();
+        CryptoKeyUsageBitmap usages = key->usagesBitmap();
         write(countUsages(usages));
         if (usages & CryptoKeyUsageEncrypt)
             write(CryptoKeyUsageTag::Encrypt);
@@ -1371,7 +1370,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                 if (!iterator->nextKeyValue(m_exec, key, value)) {
                     mapIteratorStack.removeLast();
                     JSObject* object = inputObjectStack.last();
-                    ASSERT(jsDynamicCast<JSMap*>(object));
+                    ASSERT(jsDynamicDowncast<JSMap*>(object));
                     propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                     object->methodTable()->getOwnPropertyNames(object, m_exec, propertyStack.last(), EnumerationMode());
                     write(NonMapPropertiesTag);
@@ -1415,7 +1414,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                 if (!iterator->next(m_exec, key)) {
                     setIteratorStack.removeLast();
                     JSObject* object = inputObjectStack.last();
-                    ASSERT(jsDynamicCast<JSSet*>(object));
+                    ASSERT(jsDynamicDowncast<JSSet*>(object));
                     propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                     object->methodTable()->getOwnPropertyNames(object, m_exec, propertyStack.last(), EnumerationMode());
                     write(NonSetPropertiesTag);
@@ -1838,7 +1837,7 @@ private:
         if (length * elementSize != byteLength)
             return false;
 
-        RefPtr<ArrayBuffer> arrayBuffer = toArrayBuffer(arrayBufferObj);
+        RefPtr<ArrayBuffer> arrayBuffer = toPossiblySharedArrayBuffer(arrayBufferObj);
         switch (arrayBufferViewSubtag) {
         case DataViewTag:
             arrayBufferView = getJSValue(DataView::create(arrayBuffer, byteOffset, length).get());
@@ -2000,7 +1999,7 @@ private:
         return true;
     }
 
-    bool readHMACKey(bool extractable, CryptoKeyUsage usages, RefPtr<CryptoKey>& result)
+    bool readHMACKey(bool extractable, CryptoKeyUsageBitmap usages, RefPtr<CryptoKey>& result)
     {
         Vector<uint8_t> keyData;
         if (!read(keyData))
@@ -2012,7 +2011,7 @@ private:
         return true;
     }
 
-    bool readAESKey(bool extractable, CryptoKeyUsage usages, RefPtr<CryptoKey>& result)
+    bool readAESKey(bool extractable, CryptoKeyUsageBitmap usages, RefPtr<CryptoKey>& result)
     {
         CryptoAlgorithmIdentifier algorithm;
         if (!read(algorithm))
@@ -2026,7 +2025,7 @@ private:
         return true;
     }
 
-    bool readRSAKey(bool extractable, CryptoKeyUsage usages, RefPtr<CryptoKey>& result)
+    bool readRSAKey(bool extractable, CryptoKeyUsageBitmap usages, RefPtr<CryptoKey>& result)
     {
         CryptoAlgorithmIdentifier algorithm;
         if (!read(algorithm))
@@ -2118,7 +2117,7 @@ private:
         if (!read(usagesCount))
             return false;
 
-        CryptoKeyUsage usages = 0;
+        CryptoKeyUsageBitmap usages = 0;
         for (uint32_t i = 0; i < usagesCount; ++i) {
             CryptoKeyUsageTag usage;
             if (!read(usage))
@@ -2274,7 +2273,7 @@ private:
             uint32_t length;
             if (!read(length))
                 return JSValue();
-            if (m_end < ((uint8_t*)0) + length || m_ptr > m_end - length) {
+            if (static_cast<uint32_t>(m_end - m_ptr) < length) {
                 fail();
                 return JSValue();
             }
@@ -2282,8 +2281,17 @@ private:
                 m_ptr += length;
                 return jsNull();
             }
-            RefPtr<ImageData> result = ImageData::create(IntSize(width, height));
-            memcpy(result->data()->data(), m_ptr, length);
+            IntSize imageSize(width, height);
+            RELEASE_ASSERT(!length || (imageSize.area() * 4).unsafeGet() <= length);
+            RefPtr<ImageData> result = ImageData::create(imageSize);
+            if (!result) {
+                fail();
+                return JSValue();
+            }
+            if (length)
+                memcpy(result->data()->data(), m_ptr, length);
+            else
+                result->data()->zeroFill();
             m_ptr += length;
             return getJSValue(result.get());
         }
@@ -2359,7 +2367,14 @@ private:
                 fail();
                 return JSValue();
             }
-            JSValue result = JSArrayBuffer::create(m_exec->vm(), m_globalObject->arrayBufferStructure(), WTFMove(arrayBuffer));
+            Structure* structure = m_globalObject->arrayBufferStructure(arrayBuffer->sharingMode());
+            // A crazy RuntimeFlags mismatch could mean that we are not equipped to handle shared
+            // array buffers while the sender is. In that case, we would see a null structure here.
+            if (!structure) {
+                fail();
+                return JSValue();
+            }
+            JSValue result = JSArrayBuffer::create(m_exec->vm(), structure, WTFMove(arrayBuffer));
             m_gcBuffer.append(result);
             return result;
         }
@@ -2372,7 +2387,7 @@ private:
             }
 
             if (!m_arrayBuffers[index])
-                m_arrayBuffers[index] = ArrayBuffer::create(m_arrayBufferContents->at(index));
+                m_arrayBuffers[index] = ArrayBuffer::create(WTFMove(m_arrayBufferContents->at(index)));
 
             return getJSValue(m_arrayBuffers[index].get());
         }
@@ -2674,7 +2689,7 @@ std::unique_ptr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScrip
             continue;
         visited.add(arrayBuffers[arrayBufferIndex].get());
 
-        bool result = arrayBuffers[arrayBufferIndex]->transfer(contents->at(arrayBufferIndex));
+        bool result = arrayBuffers[arrayBufferIndex]->transferTo(contents->at(arrayBufferIndex));
         if (!result) {
             code = ValidationError;
             return nullptr;

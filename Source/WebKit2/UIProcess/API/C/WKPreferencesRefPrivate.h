@@ -50,7 +50,8 @@ enum WKEditableLinkBehavior {
 typedef enum WKEditableLinkBehavior WKEditableLinkBehavior;
 
 enum WKJavaScriptRuntimeFlags {
-    kWKJavaScriptRuntimeFlagsAllEnabled = 0
+    kWKJavaScriptRuntimeFlagsSharedArrayBufferEnabled = 1 << 0,
+    kWKJavaScriptRuntimeFlagsAllEnabled = kWKJavaScriptRuntimeFlagsSharedArrayBufferEnabled
 };
 typedef unsigned WKJavaScriptRuntimeFlagSet;
 
@@ -166,6 +167,10 @@ WK_EXPORT bool WKPreferencesGetUniversalAccessFromFileURLsAllowed(WKPreferencesR
 // Defaults to false.
 WK_EXPORT void WKPreferencesSetFileAccessFromFileURLsAllowed(WKPreferencesRef preferences, bool allowed);
 WK_EXPORT bool WKPreferencesGetFileAccessFromFileURLsAllowed(WKPreferencesRef preferences);
+
+// Defaults to true
+WK_EXPORT void WKPreferencesSetNeedsStorageAccessFromFileURLsQuirk(WKPreferencesRef preferences, bool needsQuirk);
+WK_EXPORT bool WKPreferencesGetNeedsStorageAccessFromFileURLsQuirk(WKPreferencesRef preferences);
 
 // Defaults to true.
 WK_EXPORT void WKPreferencesSetHixie76WebSocketProtocolEnabled(WKPreferencesRef preferencesRef, bool enabled);
@@ -412,7 +417,11 @@ WK_EXPORT bool WKPreferencesGetResourceUsageOverlayVisible(WKPreferencesRef);
 // Defaults to false.
 WK_EXPORT void WKPreferencesSetMockCaptureDevicesEnabled(WKPreferencesRef, bool);
 WK_EXPORT bool WKPreferencesGetMockCaptureDevicesEnabled(WKPreferencesRef);
-    
+
+// Defaults to true.
+WK_EXPORT void WKPreferencesSetMediaCaptureRequiresSecureConnection(WKPreferencesRef, bool);
+WK_EXPORT bool WKPreferencesGetMediaCaptureRequiresSecureConnection(WKPreferencesRef);
+
 // Defaults to false
 WK_EXPORT void WKPreferencesSetFetchAPIEnabled(WKPreferencesRef, bool flag);
 WK_EXPORT bool WKPreferencesGetFetchAPIEnabled(WKPreferencesRef);
@@ -428,6 +437,10 @@ WK_EXPORT bool WKPreferencesGetSelectionPaintingWithoutSelectionGapsEnabled(WKPr
 // Defaults to false.
 WK_EXPORT void WKPreferencesSetAllowsPictureInPictureMediaPlayback(WKPreferencesRef, bool flag);
 WK_EXPORT bool WKPreferencesGetAllowsPictureInPictureMediaPlayback(WKPreferencesRef);
+
+// Defaults to false
+WK_EXPORT void WKPreferencesSetES6ModulesEnabled(WKPreferencesRef, bool flag);
+WK_EXPORT bool WKPreferencesGetES6ModulesEnabled(WKPreferencesRef);
 
 #ifdef __cplusplus
 }

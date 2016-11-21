@@ -63,7 +63,7 @@
 #include "TiledBacking.h"
 #include "TransformState.h"
 #include <wtf/CurrentTime.h>
-#include <wtf/TemporaryChange.h>
+#include <wtf/SetForScope.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -274,7 +274,6 @@ static inline bool compositingLogEnabled()
 RenderLayerCompositor::RenderLayerCompositor(RenderView& renderView)
     : m_renderView(renderView)
     , m_updateCompositingLayersTimer(*this, &RenderLayerCompositor::updateCompositingLayersTimerFired)
-    , m_paintRelatedMilestonesTimer(*this, &RenderLayerCompositor::paintRelatedMilestonesTimerFired)
     , m_layerFlushTimer(*this, &RenderLayerCompositor::layerFlushTimerFired)
 {
 }
@@ -454,18 +453,17 @@ void RenderLayerCompositor::flushPendingLayerChanges(bool isFlushRoot)
     if (GraphicsLayer* rootLayer = rootGraphicsLayer()) {
 #if PLATFORM(IOS)
         FloatRect exposedRect = frameView.exposedContentRect();
-        LOG(Compositing, "RenderLayerCompositor %p flushPendingLayerChanges(%d) %.2f, %.2f, %.2fx%.2f (stable viewport %d)", this, isFlushRoot,
-            exposedRect.x(), exposedRect.y(), exposedRect.width(), exposedRect.height(), frameView.viewportIsStable());
-        rootLayer->flushCompositingState(exposedRect, frameView.viewportIsStable());
+        LOG_WITH_STREAM(Compositing, stream << "RenderLayerCompositor " << this << " flushPendingLayerChanges (root " << isFlushRoot << ") exposedRect " << exposedRect);
+        rootLayer->flushCompositingState(exposedRect);
 #else
         // Having a m_clipLayer indicates that we're doing scrolling via GraphicsLayers.
-        FloatRect visibleRect = m_clipLayer ? FloatRect({ 0, 0 }, frameView.unscaledVisibleContentSizeIncludingObscuredArea()) : frameView.visibleContentRect();
+        FloatRect visibleRect = m_clipLayer ? FloatRect({ 0, 0 }, frameView.sizeForVisibleContent()) : frameView.visibleContentRect();
 
         if (frameView.viewExposedRect())
             visibleRect.intersect(frameView.viewExposedRect().value());
 
-        LOG_WITH_STREAM(Compositing,  stream << "RenderLayerCompositor " << this << " flushPendingLayerChanges(" << isFlushRoot << ") " << visibleRect << " (stable viewport " << frameView.viewportIsStable() << ")");
-        rootLayer->flushCompositingState(visibleRect, frameView.viewportIsStable());
+        LOG_WITH_STREAM(Compositing,  stream << "RenderLayerCompositor " << this << " flushPendingLayerChanges(" << isFlushRoot << ") " << visibleRect);
+        rootLayer->flushCompositingState(visibleRect);
 #endif
     }
     
@@ -569,8 +567,8 @@ void RenderLayerCompositor::didPaintBacking(RenderLayerBacking*)
 {
     FrameView& frameView = m_renderView.frameView();
     frameView.setLastPaintTime(monotonicallyIncreasingTime());
-    if (frameView.milestonesPendingPaint() && !m_paintRelatedMilestonesTimer.isActive())
-        m_paintRelatedMilestonesTimer.startOneShot(0);
+    if (frameView.milestonesPendingPaint())
+        frameView.firePaintRelatedMilestonesIfNeeded();
 }
 
 void RenderLayerCompositor::didChangeVisibleRect()
@@ -681,7 +679,7 @@ bool RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
 
     AnimationUpdateBlock animationUpdateBlock(&m_renderView.frameView().frame().animation());
 
-    TemporaryChange<bool> postLayoutChange(m_inPostLayoutUpdate, true);
+    SetForScope<bool> postLayoutChange(m_inPostLayoutUpdate, true);
     
     bool checkForHierarchyUpdate = m_reevaluateCompositingAfterLayout;
     bool needGeometryUpdate = false;
@@ -1196,12 +1194,6 @@ void RenderLayerCompositor::computeExtent(const OverlapMap& overlapMap, const Re
         // Because fixed elements get moved around without re-computing overlap, we have to compute an overlap
         // rect that covers all the locations that the fixed element could move to.
         // FIXME: need to handle sticky too.
-        LayoutRect viewportRect;
-        if (m_renderView.frameView().useFixedLayout())
-            viewportRect = m_renderView.unscaledDocumentRect();
-        else
-            viewportRect = m_renderView.frameView().viewportConstrainedVisibleContentRect();
-
         extent.bounds = m_renderView.frameView().fixedScrollableAreaBoundsInflatedForScrolling(extent.bounds);
     }
 
@@ -1724,7 +1716,7 @@ void RenderLayerCompositor::frameViewDidChangeSize()
 {
     if (m_clipLayer) {
         const FrameView& frameView = m_renderView.frameView();
-        m_clipLayer->setSize(frameView.unscaledVisibleContentSizeIncludingObscuredArea());
+        m_clipLayer->setSize(frameView.sizeForVisibleContent());
         m_clipLayer->setPosition(positionForClipLayer());
 
         frameViewDidScroll();
@@ -2131,7 +2123,7 @@ void RenderLayerCompositor::updateRootLayerPosition()
         m_rootContentLayer->setAnchorPoint(FloatPoint3D());
     }
     if (m_clipLayer) {
-        m_clipLayer->setSize(m_renderView.frameView().unscaledVisibleContentSizeIncludingObscuredArea());
+        m_clipLayer->setSize(m_renderView.frameView().sizeForVisibleContent());
         m_clipLayer->setPosition(positionForClipLayer());
     }
 
@@ -2544,7 +2536,8 @@ bool RenderLayerCompositor::requiresCompositingForCanvas(RenderLayerModelObject&
         bool isCanvasLargeEnoughToForceCompositing = true;
 #else
         HTMLCanvasElement* canvas = downcast<HTMLCanvasElement>(renderer.element());
-        bool isCanvasLargeEnoughToForceCompositing = canvas->size().area().unsafeGet() >= canvasAreaThresholdRequiringCompositing;
+        auto canvasArea = canvas->size().area<RecordOverflow>();
+        bool isCanvasLargeEnoughToForceCompositing = !canvasArea.hasOverflowed() && canvasArea.unsafeGet() >= canvasAreaThresholdRequiringCompositing;
 #endif
         CanvasCompositingStrategy compositingStrategy = canvasCompositingStrategy(renderer);
         return compositingStrategy == CanvasAsLayerContents || (compositingStrategy == CanvasPaintedToLayer && isCanvasLargeEnoughToForceCompositing);
@@ -2781,7 +2774,8 @@ bool RenderLayerCompositor::requiresCompositingForPosition(RenderLayerModelObjec
     if (m_renderView.frameView().useFixedLayout())
         viewBounds = m_renderView.unscaledDocumentRect();
     else
-        viewBounds = m_renderView.frameView().viewportConstrainedVisibleContentRect();
+        viewBounds = m_renderView.frameView().rectForFixedPositionLayout();
+
     LayoutRect layerBounds = layer.calculateLayerBounds(&layer, LayoutSize(), RenderLayer::UseLocalClipRectIfPossible | RenderLayer::IncludeLayerFilterOutsets | RenderLayer::UseFragmentBoxesExcludingCompositing
         | RenderLayer::ExcludeHiddenDescendants | RenderLayer::DontConstrainForMask | RenderLayer::IncludeCompositedDescendants);
     // Map to m_renderView to ignore page scale.
@@ -3215,7 +3209,7 @@ bool RenderLayerCompositor::viewHasTransparentBackground(Color* backgroundColor)
     if (backgroundColor)
         *backgroundColor = documentBackgroundColor;
         
-    return documentBackgroundColor.hasAlpha();
+    return !documentBackgroundColor.isOpaque();
 }
 
 // We can't rely on getting layerStyleChanged() for a style change that affects the root background, because the style change may
@@ -3449,7 +3443,7 @@ void RenderLayerCompositor::ensureRootLayer()
             m_clipLayer->addChild(m_scrollLayer.get());
             m_scrollLayer->addChild(m_rootContentLayer.get());
 
-            m_clipLayer->setSize(m_renderView.frameView().unscaledVisibleContentSizeIncludingObscuredArea());
+            m_clipLayer->setSize(m_renderView.frameView().sizeForVisibleContent());
             m_clipLayer->setPosition(positionForClipLayer());
             m_clipLayer->setAnchorPoint(FloatPoint3D());
 
@@ -3724,7 +3718,7 @@ FixedPositionViewportConstraints RenderLayerCompositor::computeFixedViewportCons
     ASSERT(layer.isComposited());
 
     GraphicsLayer* graphicsLayer = layer.backing()->graphicsLayer();
-    LayoutRect viewportRect = m_renderView.frameView().viewportConstrainedVisibleContentRect();
+    LayoutRect viewportRect = m_renderView.frameView().rectForFixedPositionLayout();
 
     FixedPositionViewportConstraints constraints;
     constraints.setLayerPositionAtLastLayout(graphicsLayer->position());
@@ -4203,20 +4197,6 @@ void RenderLayerCompositor::layerFlushTimerFired()
     if (!m_hasPendingLayerFlush)
         return;
     scheduleLayerFlushNow();
-}
-
-void RenderLayerCompositor::paintRelatedMilestonesTimerFired()
-{
-    Frame& frame = m_renderView.frameView().frame();
-    Page* page = frame.page();
-    if (!page)
-        return;
-
-    // If the layer tree is frozen, we'll paint when it's unfrozen and schedule the timer again.
-    if (page->chrome().client().layerTreeStateIsFrozen())
-        return;
-
-    m_renderView.frameView().firePaintRelatedMilestonesIfNeeded();
 }
 
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)

@@ -445,6 +445,8 @@
 #define WTF_PLATFORM_EFL 1
 #elif defined(BUILDING_GTK__)
 #define WTF_PLATFORM_GTK 1
+#elif defined(BUILDING_JSCONLY__)
+/* JSCOnly does not provide PLATFORM() macro */
 #elif OS(MAC_OS_X)
 #define WTF_PLATFORM_MAC 1
 #elif OS(IOS)
@@ -598,10 +600,6 @@
 #define USE_CFURLCONNECTION 1
 #endif
 
-#if USE(CFURLCONNECTION) || PLATFORM(COCOA)
-#define USE_CFURLCACHE 1
-#endif
-
 #if !defined(HAVE_ACCESSIBILITY)
 #if PLATFORM(COCOA) || PLATFORM(WIN) || PLATFORM(GTK) || PLATFORM(EFL)
 #define HAVE_ACCESSIBILITY 1
@@ -746,12 +744,12 @@
 #endif
 #endif
 
-/* Concurrent JIT only works on 64-bit platforms because it requires that
+/* Concurrent JS only works on 64-bit platforms because it requires that
    values get stored to atomically. This is trivially true on 64-bit platforms,
    but not true at all on 32-bit platforms where values are composed of two
    separate sub-values. */
 #if ENABLE(DFG_JIT) && USE(JSVALUE64)
-#define ENABLE_CONCURRENT_JIT 1
+#define ENABLE_CONCURRENT_JS 1
 #endif
 
 /* This controls whether B3 is built. B3 is needed for FTL JIT and WebAssembly */
@@ -949,7 +947,6 @@
 #define USE_TEXTURE_MAPPER_GL 1
 #endif
 
-/* Compositing on the UI-process in WebKit2 */
 #if PLATFORM(COCOA)
 #define USE_PROTECTION_SPACE_AUTH_CALLBACK 1
 #endif
@@ -1140,7 +1137,7 @@
 #define HAVE_NS_ACTIVITY 1
 #endif
 
-#if (OS(DARWIN) && USE(CG)) || USE(FREETYPE) || (PLATFORM(WIN) && (USE(CG) || USE(CAIRO)))
+#if (OS(DARWIN) && USE(CG)) || (USE(FREETYPE) && !PLATFORM(GTK)) || (PLATFORM(WIN) && (USE(CG) || USE(CAIRO)))
 #undef ENABLE_OPENTYPE_MATH
 #define ENABLE_OPENTYPE_MATH 1
 #endif
@@ -1209,5 +1206,14 @@
 /* Enable strict runtime stack buffer checks. */
 #pragma strict_gs_check(on)
 #endif
+
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101201 && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#define HAVE_TOUCH_BAR 1
+#define HAVE_ADVANCED_SPELL_CHECKING 1
+
+#if defined(__LP64__)
+#define ENABLE_WEB_PLAYBACK_CONTROLS_MANAGER 1
+#endif
+#endif /* PLATFORM(MAC) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101201 && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 */
 
 #endif /* WTF_Platform_h */

@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef HTMLScriptRunner_h
-#define HTMLScriptRunner_h
+#pragma once
 
 #include "PendingScript.h"
 #include <wtf/Deque.h>
@@ -73,7 +72,6 @@ private:
     void watchForLoad(PendingScript&);
     void stopWatchingForLoad(PendingScript&);
     bool isPendingScriptReady(const PendingScript&);
-    ScriptSourceCode sourceFromPendingScript(const PendingScript&, bool& errorOccurred) const;
 
     Document* m_document;
     HTMLScriptRunnerHost& m_host;
@@ -88,6 +86,4 @@ private:
     bool m_hasScriptsWaitingForStylesheets;
 };
 
-}
-
-#endif
+} // namespace WebCore

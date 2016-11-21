@@ -1531,7 +1531,7 @@ WritingDirection EditingStyle::textDirectionForSelection(const VisibleSelection&
             return NaturalWritingDirection;
 
         // In the range case, make sure that the embedding element persists until the end of the range.
-        if (selection.isRange() && !end.deprecatedNode()->isDescendantOf(node))
+        if (selection.isRange() && !end.deprecatedNode()->isDescendantOf(*node))
             return NaturalWritingDirection;
         
         foundDirection = directionValue == CSSValueLtr ? LeftToRightWritingDirection : RightToLeftWritingDirection;
@@ -1837,7 +1837,7 @@ static bool isTransparentColorValue(CSSValue* value)
         return false;
     auto& primitiveValue = downcast<CSSPrimitiveValue>(*value);
     if (primitiveValue.isRGBColor())
-        return !primitiveValue.color().alpha();
+        return !primitiveValue.color().isVisible();
     return primitiveValue.valueID() == CSSValueTransparent;
 }
 

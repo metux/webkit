@@ -32,17 +32,15 @@
 #include "URL.h"
 #include "WorkerEventQueue.h"
 #include "WorkerScriptController.h"
+#include <inspector/ConsoleMessage.h>
 #include <memory>
-
-namespace Inspector {
-class ConsoleMessage;
-}
 
 namespace WebCore {
 
 class ContentSecurityPolicyResponseHeaders;
 class Crypto;
 class ScheduledAction;
+class WorkerInspectorController;
 class WorkerLocation;
 class WorkerNavigator;
 class WorkerThread;
@@ -66,6 +64,8 @@ public:
 
     WorkerScriptController* script() { return m_script.get(); }
     void clearScript() { m_script = nullptr; }
+
+    WorkerInspectorController& inspectorController() const { return *m_inspectorController; }
 
     WorkerThread& thread() const { return m_thread; }
 
@@ -100,7 +100,7 @@ public:
     Crypto& crypto();
 
 protected:
-    WorkerGlobalScope(const URL&, const String& userAgent, WorkerThread&, bool shouldBypassMainWorldContentSecurityPolicy, RefPtr<SecurityOrigin>&& topOrigin, IDBClient::IDBConnectionProxy*, SocketProvider*);
+    WorkerGlobalScope(const URL&, const String& identifier, const String& userAgent, WorkerThread&, bool shouldBypassMainWorldContentSecurityPolicy, RefPtr<SecurityOrigin>&& topOrigin, IDBClient::IDBConnectionProxy*, SocketProvider*);
 
     void applyContentSecurityPolicyResponseHeaders(const ContentSecurityPolicyResponseHeaders&);
 
@@ -123,6 +123,7 @@ private:
     void disableEval(const String& errorMessage) final;
     EventTarget* errorEventTarget() final;
     WorkerEventQueue& eventQueue() const final;
+    String resourceRequestIdentifier() const final { return m_identifier; }
 
 #if ENABLE(WEB_SOCKETS)
     SocketProvider* socketProvider() final;
@@ -145,13 +146,15 @@ private:
 #endif
 
     URL m_url;
+    String m_identifier;
     String m_userAgent;
 
     mutable RefPtr<WorkerLocation> m_location;
     mutable RefPtr<WorkerNavigator> m_navigator;
 
-    std::unique_ptr<WorkerScriptController> m_script;
     WorkerThread& m_thread;
+    std::unique_ptr<WorkerScriptController> m_script;
+    std::unique_ptr<WorkerInspectorController> m_inspectorController;
 
     bool m_closing { false };
     bool m_shouldBypassMainWorldContentSecurityPolicy;

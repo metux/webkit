@@ -74,12 +74,14 @@ public:
     WEBCORE_EXPORT void renameIndex(const IDBRequestData&, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName);
     WEBCORE_EXPORT void putOrAdd(const IDBRequestData&, const IDBKeyData&, const IDBValue&, IndexedDB::ObjectStoreOverwriteMode);
     WEBCORE_EXPORT void getRecord(const IDBRequestData&, const IDBGetRecordData&);
+    WEBCORE_EXPORT void getAllRecords(const IDBRequestData&, const IDBGetAllRecordsData&);
     WEBCORE_EXPORT void getCount(const IDBRequestData&, const IDBKeyRangeData&);
     WEBCORE_EXPORT void deleteRecord(const IDBRequestData&, const IDBKeyRangeData&);
     WEBCORE_EXPORT void openCursor(const IDBRequestData&, const IDBCursorInfo&);
-    WEBCORE_EXPORT void iterateCursor(const IDBRequestData&, const IDBKeyData&, unsigned long count);
+    WEBCORE_EXPORT void iterateCursor(const IDBRequestData&, const IDBIterateCursorData&);
 
     WEBCORE_EXPORT void establishTransaction(uint64_t databaseConnectionIdentifier, const IDBTransactionInfo&);
+    WEBCORE_EXPORT void databaseConnectionPendingClose(uint64_t databaseConnectionIdentifier);
     WEBCORE_EXPORT void databaseConnectionClosed(uint64_t databaseConnectionIdentifier);
     WEBCORE_EXPORT void abortOpenAndUpgradeNeeded(uint64_t databaseConnectionIdentifier, const IDBResourceIdentifier& transactionIdentifier);
     WEBCORE_EXPORT void didFireVersionChangeEvent(uint64_t databaseConnectionIdentifier, const IDBResourceIdentifier& requestIdentifier);

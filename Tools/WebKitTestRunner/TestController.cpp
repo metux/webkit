@@ -72,7 +72,7 @@
 #include <wtf/MainThread.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RunLoop.h>
-#include <wtf/TemporaryChange.h>
+#include <wtf/SetForScope.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
@@ -115,7 +115,6 @@ TestController& TestController::singleton()
 
 TestController::TestController(int argc, const char* argv[])
 {
-    WebCoreTestSupport::setURLParserEnabled(true);
     initialize(argc, argv);
     controller = this;
     run();
@@ -693,7 +692,7 @@ void TestController::resetPreferencesToConsistentValues(const TestOptions& optio
 
 bool TestController::resetStateToConsistentValues(const TestOptions& options)
 {
-    TemporaryChange<State> changeState(m_state, Resetting);
+    SetForScope<State> changeState(m_state, Resetting);
     m_beforeUnloadReturnValue = true;
 
     // This setting differs between the antique and modern Mac WebKit2 API.
@@ -771,6 +770,8 @@ bool TestController::resetStateToConsistentValues(const TestOptions& options)
 
     // Reset Custom Policy Delegate.
     setCustomPolicyDelegate(false, false);
+
+    m_shouldDownloadUndisplayableMIMETypes = false;
 
     m_workQueueManager.clearWorkQueue();
 
@@ -2062,7 +2063,10 @@ void TestController::decidePolicyForNavigationResponse(WKNavigationResponseRef n
         return;
     }
 
-    WKFramePolicyListenerIgnore(listener);
+    if (m_shouldDownloadUndisplayableMIMETypes)
+        WKFramePolicyListenerDownload(listener);
+    else
+        WKFramePolicyListenerIgnore(listener);
 }
 
 void TestController::didNavigateWithNavigationData(WKContextRef, WKPageRef, WKNavigationDataRef navigationData, WKFrameRef frame, const void* clientInfo)

@@ -24,15 +24,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ShadowRoot_h
-#define ShadowRoot_h
+#pragma once
 
-#include "ContainerNode.h"
 #include "Document.h"
 #include "DocumentFragment.h"
 #include "Element.h"
-#include "ExceptionCode.h"
-#include "TreeScope.h"
+#include "ShadowRootMode.h"
 
 namespace WebCore {
 
@@ -41,13 +38,7 @@ class SlotAssignment;
 
 class ShadowRoot final : public DocumentFragment, public TreeScope {
 public:
-    enum class Mode : uint8_t {
-        UserAgent = 0,
-        Closed,
-        Open,
-    };
-
-    static Ref<ShadowRoot> create(Document& document, Mode type)
+    static Ref<ShadowRoot> create(Document& document, ShadowRootMode type)
     {
         return adoptRef(*new ShadowRoot(document, type));
     }
@@ -70,11 +61,11 @@ public:
     void setHost(Element* host) { m_host = host; }
 
     String innerHTML() const;
-    void setInnerHTML(const String&, ExceptionCode&);
+    ExceptionOr<void> setInnerHTML(const String&);
 
     Element* activeElement() const;
 
-    Mode mode() const { return m_type; }
+    ShadowRootMode mode() const { return m_type; }
 
     void removeAllEventListeners() override;
 
@@ -87,12 +78,11 @@ public:
     void didChangeDefaultSlot();
     void hostChildElementDidChange(const Element&);
     void hostChildElementDidChangeSlotAttribute(const AtomicString& oldValue, const AtomicString& newValue);
-    void innerSlotDidChange(const AtomicString&);
 
     const Vector<Node*>* assignedNodesForSlot(const HTMLSlotElement&);
 
 protected:
-    ShadowRoot(Document&, Mode);
+    ShadowRoot(Document&, ShadowRootMode);
 
     ShadowRoot(Document&, std::unique_ptr<SlotAssignment>&&);
 
@@ -108,7 +98,7 @@ private:
     void removedFrom(ContainerNode& insertionPoint) override;
 
     bool m_resetStyleInheritance { false };
-    Mode m_type { Mode::UserAgent };
+    ShadowRootMode m_type { ShadowRootMode::UserAgent };
 
     Element* m_host { nullptr };
 
@@ -142,10 +132,10 @@ inline bool hasShadowRootParent(const Node& node)
     return node.parentNode() && node.parentNode()->isShadowRoot();
 }
 
+Vector<ShadowRoot*> assignedShadowRootsIfSlotted(const Node&);
+
 } // namespace WebCore
 
 SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ShadowRoot)
     static bool isType(const WebCore::Node& node) { return node.isShadowRoot(); }
 SPECIALIZE_TYPE_TRAITS_END()
-
-#endif

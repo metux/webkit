@@ -24,27 +24,11 @@
  */
 
 #include "config.h"
-
 #include "JSWorkerGlobalScope.h"
 
-#include "ExceptionCode.h"
-#include "JSDOMBinding.h"
-#include "JSDOMGlobalObject.h"
-#include "JSEventListener.h"
-#include "JSEventSource.h"
-#include "JSMessageChannel.h"
-#include "JSMessagePort.h"
-#include "JSWorkerLocation.h"
-#include "JSWorkerNavigator.h"
-#include "JSXMLHttpRequest.h"
+#include "JSDOMConvert.h"
 #include "ScheduledAction.h"
 #include "WorkerGlobalScope.h"
-#include "WorkerLocation.h"
-#include "WorkerNavigator.h"
-
-#if ENABLE(WEB_SOCKETS)
-#include "JSWebSocket.h"
-#endif
 
 using namespace JSC;
 
@@ -71,7 +55,7 @@ JSValue JSWorkerGlobalScope::importScripts(ExecState& state)
     Vector<String> urls;
     urls.reserveInitialCapacity(state.argumentCount());
     for (unsigned i = 0; i < state.argumentCount(); ++i) {
-        urls.uncheckedAppend(valueToUSVString(&state, state.uncheckedArgument(i)));
+        urls.uncheckedAppend(convert<IDLUSVString>(state, state.uncheckedArgument(i)));
         RETURN_IF_EXCEPTION(scope, JSValue());
     }
 

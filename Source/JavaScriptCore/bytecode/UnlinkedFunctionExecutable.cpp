@@ -30,13 +30,13 @@
 #include "ClassInfo.h"
 #include "CodeCache.h"
 #include "Debugger.h"
-#include "Executable.h"
 #include "ExecutableInfo.h"
 #include "FunctionOverrides.h"
 #include "JSCInlines.h"
 #include "Parser.h"
 #include "SourceProvider.h"
 #include "Structure.h"
+#include "UnlinkedFunctionCodeBlock.h"
 
 namespace JSC {
 
@@ -117,6 +117,11 @@ UnlinkedFunctionExecutable::UnlinkedFunctionExecutable(VM* vm, Structure* struct
     m_parentScopeTDZVariables.swap(parentScopeTDZVariables);
 }
 
+void UnlinkedFunctionExecutable::destroy(JSCell* cell)
+{
+    jsCast<UnlinkedFunctionExecutable*>(cell)->~UnlinkedFunctionExecutable();
+}
+
 void UnlinkedFunctionExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     UnlinkedFunctionExecutable* thisObject = jsCast<UnlinkedFunctionExecutable*>(cell);
@@ -174,10 +179,11 @@ UnlinkedFunctionExecutable* UnlinkedFunctionExecutable::fromGlobalCode(
 {
     ParserError error;
     VM& vm = exec.vm();
-    CodeCache* codeCache = vm.codeCache();
-    UnlinkedFunctionExecutable* executable = codeCache->getFunctionExecutableFromGlobalCode(vm, name, source, error);
-
     auto& globalObject = *exec.lexicalGlobalObject();
+    CodeCache* codeCache = vm.codeCache();
+    DebuggerMode debuggerMode = globalObject.hasInteractiveDebugger() ? DebuggerOn : DebuggerOff;
+    UnlinkedFunctionExecutable* executable = codeCache->getUnlinkedGlobalFunctionExecutable(vm, name, source, debuggerMode, error);
+
     if (globalObject.hasDebugger())
         globalObject.debugger()->sourceParsed(&exec, source.provider(), error.line(), error.message());
 

@@ -18,8 +18,7 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef StyleSheetContents_h
-#define StyleSheetContents_h
+#pragma once
 
 #include "CSSParserMode.h"
 #include "CachePolicy.h"
@@ -138,7 +137,7 @@ public:
     bool isMutable() const { return m_isMutable; }
     void setMutable() { m_isMutable = true; }
 
-    bool isInMemoryCache() const { return m_isInMemoryCache; }
+    bool isInMemoryCache() const { return m_inMemoryCacheCount; }
     void addedToMemoryCache();
     void removedFromMemoryCache();
 
@@ -162,19 +161,17 @@ private:
     PrefixNamespaceURIMap m_namespaces;
     AtomicString m_defaultNamespace;
 
-    bool m_loadCompleted : 1;
-    bool m_isUserStyleSheet : 1;
-    bool m_hasSyntacticallyValidCSSHeader : 1;
-    bool m_didLoadErrorOccur : 1;
-    bool m_usesStyleBasedEditability : 1;
-    bool m_isMutable : 1;
-    bool m_isInMemoryCache : 1;
-    
+    bool m_isUserStyleSheet;
+    bool m_loadCompleted { false };
+    bool m_hasSyntacticallyValidCSSHeader { true };
+    bool m_didLoadErrorOccur { false };
+    bool m_usesStyleBasedEditability { false };
+    bool m_isMutable { false };
+    unsigned m_inMemoryCacheCount { 0 };
+
     CSSParserContext m_parserContext;
 
     Vector<CSSStyleSheet*> m_clients;
 };
 
-} // namespace
-
-#endif
+} // namespace WebCore

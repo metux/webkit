@@ -18,8 +18,7 @@
  *
  */
 
-#ifndef HTMLPlugInImageElement_h
-#define HTMLPlugInImageElement_h
+#pragma once
 
 #include "HTMLPlugInElement.h"
 
@@ -93,7 +92,7 @@ public:
 protected:
     HTMLPlugInImageElement(const QualifiedName& tagName, Document&, bool createdByParser);
 
-    void didMoveToNewDocument(Document* oldDocument) override;
+    void didMoveToNewDocument(Document& oldDocument) override;
     bool requestObject(const String& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues) final;
 
     bool isImageType();
@@ -162,5 +161,3 @@ SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::HTMLPlugInImageElement)
     static bool isType(const WebCore::HTMLPlugInElement& element) { return element.isPlugInImageElement(); }
     static bool isType(const WebCore::Node& node) { return is<WebCore::HTMLPlugInElement>(node) && isType(downcast<WebCore::HTMLPlugInElement>(node)); }
 SPECIALIZE_TYPE_TRAITS_END()
-
-#endif // HTMLPlugInImageElement_h

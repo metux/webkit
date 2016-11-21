@@ -30,7 +30,6 @@
 #if ENABLE(VIDEO_TRACK)
 
 #include "DataCue.h"
-#include "ExceptionCodePlaceholder.h"
 #include "HTMLMediaElement.h"
 #include "InbandTextTrackPrivate.h"
 #include "Logging.h"
@@ -114,18 +113,17 @@ void InbandDataTextTrack::removeDataCue(InbandTextTrackPrivate*, const MediaTime
     if (iter == m_incompleteCueMap.end())
         return;
 
-    RefPtr<DataCue> cue = iter->value;
-    if (cue) {
+    if (RefPtr<DataCue> cue = iter->value) {
         LOG(Media, "InbandDataTextTrack::removeDataCue removing cue: start=%s, end=%s\n", toString(cue->startTime()).utf8().data(), toString(cue->endTime()).utf8().data());
-        removeCue(cue.get());
+        removeCue(*cue);
     }
 }
 
-ExceptionOr<void> InbandDataTextTrack::removeCue(TextTrackCue* cue)
+ExceptionOr<void> InbandDataTextTrack::removeCue(TextTrackCue& cue)
 {
-    ASSERT(cue->cueType() == TextTrackCue::Data);
+    ASSERT(cue.cueType() == TextTrackCue::Data);
 
-    m_incompleteCueMap.remove(const_cast<SerializedPlatformRepresentation*>(toDataCue(cue)->platformValue()));
+    m_incompleteCueMap.remove(const_cast<SerializedPlatformRepresentation*>(toDataCue(&cue)->platformValue()));
 
     return InbandTextTrack::removeCue(cue);
 }

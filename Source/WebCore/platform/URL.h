@@ -98,11 +98,12 @@ public:
 
     const String& string() const { return m_string; }
 
-    String stringCenterEllipsizedToLength(unsigned length = 1024) const;
+    WEBCORE_EXPORT String stringCenterEllipsizedToLength(unsigned length = 1024) const;
 
     WEBCORE_EXPORT StringView protocol() const;
     WEBCORE_EXPORT String host() const;
     WEBCORE_EXPORT Optional<uint16_t> port() const;
+    WEBCORE_EXPORT String hostAndPort() const;
     WEBCORE_EXPORT String user() const;
     WEBCORE_EXPORT String pass() const;
     WEBCORE_EXPORT String path() const;
@@ -314,6 +315,9 @@ WEBCORE_EXPORT bool protocolIsInHTTPFamily(const String& url);
 Optional<uint16_t> defaultPortForProtocol(StringView protocol);
 WEBCORE_EXPORT bool isDefaultPortForProtocol(uint16_t port, StringView protocol);
 WEBCORE_EXPORT bool portAllowed(const URL&); // Blacklist ports that should never be used for Web resources.
+
+WEBCORE_EXPORT void registerDefaultPortForProtocolForTesting(uint16_t port, const String& protocol);
+WEBCORE_EXPORT void clearDefaultPortForProtocolMapForTesting();
 
 bool isValidProtocol(const String&);
 

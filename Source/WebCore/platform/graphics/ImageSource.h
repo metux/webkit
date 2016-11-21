@@ -62,38 +62,42 @@ public:
     void setData(SharedBuffer* data, bool allDataReceived);
     bool dataChanged(SharedBuffer* data, bool allDataReceived);
 
-    unsigned decodedSize() const { return m_frameCache.decodedSize(); }
+    unsigned decodedSize() const { return m_frameCache->decodedSize(); }
     bool isAllDataReceived();
 
+    bool isAsyncDecodingRequired();
+    bool requestFrameAsyncDecodingAtIndex(size_t index, SubsamplingLevel subsamplingLevel) { return m_frameCache->requestFrameAsyncDecodingAtIndex(index, subsamplingLevel); }
+    void stopAsyncDecodingQueue() { m_frameCache->stopAsyncDecodingQueue(); }
+
     // Image metadata which is calculated by the decoder or can deduced by the case of the memory NativeImage.
-    bool isSizeAvailable() { return m_frameCache.isSizeAvailable(); }
-    size_t frameCount() { return m_frameCache.frameCount(); }
-    RepetitionCount repetitionCount() { return m_frameCache.repetitionCount(); }
-    String filenameExtension() { return m_frameCache.filenameExtension(); }
-    Optional<IntPoint> hotSpot() { return m_frameCache.hotSpot(); }
+    bool isSizeAvailable() { return m_frameCache->isSizeAvailable(); }
+    size_t frameCount() { return m_frameCache->frameCount(); }
+    RepetitionCount repetitionCount() { return m_frameCache->repetitionCount(); }
+    String filenameExtension() { return m_frameCache->filenameExtension(); }
+    Optional<IntPoint> hotSpot() { return m_frameCache->hotSpot(); }
 
     // Image metadata which is calculated from the first ImageFrame.
-    IntSize size() { return m_frameCache.size(); }
-    IntSize sizeRespectingOrientation() { return m_frameCache.sizeRespectingOrientation(); }
-    Color singlePixelSolidColor() { return m_frameCache.singlePixelSolidColor(); }
+    IntSize size() { return m_frameCache->size(); }
+    IntSize sizeRespectingOrientation() { return m_frameCache->sizeRespectingOrientation(); }
+    Color singlePixelSolidColor() { return m_frameCache->singlePixelSolidColor(); }
 
     // ImageFrame metadata which does not require caching the ImageFrame.
-    bool frameIsCompleteAtIndex(size_t index) { return m_frameCache.frameIsCompleteAtIndex(index); }
-    bool frameHasAlphaAtIndex(size_t index) { return m_frameCache.frameHasAlphaAtIndex(index); }
-    bool frameHasImageAtIndex(size_t index) { return m_frameCache.frameHasImageAtIndex(index); }
-    bool frameHasInvalidNativeImageAtIndex(size_t index, SubsamplingLevel subsamplingLevel) { return m_frameCache.frameHasInvalidNativeImageAtIndex(index, subsamplingLevel); }
-    SubsamplingLevel frameSubsamplingLevelAtIndex(size_t index) { return m_frameCache.frameSubsamplingLevelAtIndex(index); }
+    bool frameIsBeingDecodedAtIndex(size_t index) { return m_frameCache->frameIsBeingDecodedAtIndex(index); }
+    bool frameIsCompleteAtIndex(size_t index) { return m_frameCache->frameIsCompleteAtIndex(index); }
+    bool frameHasAlphaAtIndex(size_t index) { return m_frameCache->frameHasAlphaAtIndex(index); }
+    bool frameHasImageAtIndex(size_t index) { return m_frameCache->frameHasImageAtIndex(index); }
+    bool frameHasValidNativeImageAtIndex(size_t index, SubsamplingLevel subsamplingLevel) { return m_frameCache->frameHasValidNativeImageAtIndex(index, subsamplingLevel); }
+    SubsamplingLevel frameSubsamplingLevelAtIndex(size_t index) { return m_frameCache->frameSubsamplingLevelAtIndex(index); }
 
     // ImageFrame metadata which forces caching or re-caching the ImageFrame.
-    IntSize frameSizeAtIndex(size_t index, SubsamplingLevel subsamplingLevel = SubsamplingLevel::Default) { return m_frameCache.frameSizeAtIndex(index, subsamplingLevel); }
-    unsigned frameBytesAtIndex(size_t index, SubsamplingLevel subsamplingLevel = SubsamplingLevel::Default) { return m_frameCache.frameBytesAtIndex(index, subsamplingLevel); }
-    float frameDurationAtIndex(size_t index) { return m_frameCache.frameDurationAtIndex(index); }
-    ImageOrientation frameOrientationAtIndex(size_t index) { return m_frameCache.frameOrientationAtIndex(index); }
+    IntSize frameSizeAtIndex(size_t index, SubsamplingLevel subsamplingLevel = SubsamplingLevel::Default) { return m_frameCache->frameSizeAtIndex(index, subsamplingLevel); }
+    unsigned frameBytesAtIndex(size_t index, SubsamplingLevel subsamplingLevel = SubsamplingLevel::Default) { return m_frameCache->frameBytesAtIndex(index, subsamplingLevel); }
+    float frameDurationAtIndex(size_t index) { return m_frameCache->frameDurationAtIndex(index); }
+    ImageOrientation frameOrientationAtIndex(size_t index) { return m_frameCache->frameOrientationAtIndex(index); }
     NativeImagePtr frameImageAtIndex(size_t index, SubsamplingLevel = SubsamplingLevel::Default, const GraphicsContext* targetContext = nullptr);
 
     SubsamplingLevel maximumSubsamplingLevel();
     SubsamplingLevel subsamplingLevelForScale(float);
-    void setAllowSubsampling(bool allowSubsampling) { m_allowSubsampling = allowSubsampling; }
     NativeImagePtr createFrameImageAtIndex(size_t, SubsamplingLevel = SubsamplingLevel::Default);
 
 private:
@@ -103,17 +107,10 @@ private:
 
     void setDecoderTargetContext(const GraphicsContext*);
 
-    ImageFrameCache m_frameCache;
+    Ref<ImageFrameCache> m_frameCache;
     std::unique_ptr<ImageDecoder> m_decoder;
 
     Optional<SubsamplingLevel> m_maximumSubsamplingLevel;
-
-    // The default value of m_allowSubsampling should be the same as defaultImageSubsamplingEnabled in Settings.cpp
-#if PLATFORM(IOS)
-    bool m_allowSubsampling { true };
-#else
-    bool m_allowSubsampling { false };
-#endif
 
 #if PLATFORM(IOS)
     // FIXME: We should expose a setting to enable/disable progressive loading so that we can remove the PLATFORM(IOS)-guard.

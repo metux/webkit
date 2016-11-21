@@ -24,10 +24,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef JSCustomElementInterface_h
-#define JSCustomElementInterface_h
-
-#if ENABLE(CUSTOM_ELEMENTS)
+#pragma once
 
 #include "ActiveDOMCallback.h"
 #include "QualifiedName.h"
@@ -41,10 +38,8 @@
 #include <wtf/text/AtomicStringHash.h>
 
 namespace JSC {
-
 class JSObject;
 class PrivateName;
-
 }
 
 namespace WebCore {
@@ -64,6 +59,7 @@ public:
     }
 
     Ref<Element> constructElementWithFallback(Document&, const AtomicString&);
+    Ref<Element> constructElementWithFallback(Document&, const QualifiedName&);
 
     void upgradeElement(Element&);
 
@@ -113,7 +109,3 @@ private:
 };
 
 } // namespace WebCore
-
-#endif
-
-#endif

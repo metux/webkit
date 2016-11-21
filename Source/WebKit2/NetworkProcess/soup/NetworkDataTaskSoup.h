@@ -42,14 +42,13 @@ public:
 
     ~NetworkDataTaskSoup();
 
-    void invalidateAndCancel();
-
 private:
     NetworkDataTaskSoup(NetworkSession&, NetworkDataTaskClient&, const WebCore::ResourceRequest&, WebCore::StoredCredentials, WebCore::ContentSniffingPolicy, bool shouldClearReferrerOnHTTPSToHTTPRedirect);
 
     void suspend() override;
     void cancel() override;
     void resume() override;
+    void invalidateAndCancel() override;
     NetworkDataTask::State state() const override;
 
     void setPendingDownloadLocation(const String&, const SandboxExtension::Handle&, bool /*allowOverwrite*/) override;
@@ -63,7 +62,7 @@ private:
     void clearRequest();
     static void sendRequestCallback(SoupRequest*, GAsyncResult*, NetworkDataTaskSoup*);
     void didSendRequest(GRefPtr<GInputStream>&&);
-    void didReceiveResponse();
+    void dispatchDidReceiveResponse();
 
     static void tlsErrorsChangedCallback(SoupMessage*, GParamSpec*, NetworkDataTaskSoup*);
     void tlsErrorsChanged();

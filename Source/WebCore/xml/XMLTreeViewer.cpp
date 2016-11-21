@@ -34,7 +34,6 @@
 
 #include "Document.h"
 #include "Element.h"
-#include "ExceptionCodePlaceholder.h"
 #include "Frame.h"
 #include "ScriptController.h"
 #include "ScriptSourceCode.h"
@@ -44,7 +43,6 @@
 #include "Text.h"
 #include "XMLViewerCSS.h"
 #include "XMLViewerJS.h"
-#include <bindings/ScriptValue.h>
 
 namespace WebCore {
 
@@ -63,7 +61,7 @@ void XMLTreeViewer::transformDocumentToTreeView()
 
     String cssString = StringImpl::createWithoutCopying(XMLViewer_css, sizeof(XMLViewer_css));
     auto text = m_document.createTextNode(cssString);
-    m_document.getElementById(String(ASCIILiteral("xml-viewer-style")))->appendChild(text, IGNORE_EXCEPTION);
+    m_document.getElementById(String(ASCIILiteral("xml-viewer-style")))->appendChild(text);
     m_document.styleScope().didChangeActiveStyleSheetCandidates();
 }
 

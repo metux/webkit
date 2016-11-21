@@ -40,7 +40,9 @@
 #include "DirectArguments.h"
 #include "Error.h"
 #include "ErrorHandlingScope.h"
+#include "EvalCodeBlock.h"
 #include "ExceptionFuzz.h"
+#include "FunctionCodeBlock.h"
 #include "GetterSetter.h"
 #include "HostCallReturnValue.h"
 #include "ICStats.h"
@@ -48,13 +50,16 @@
 #include "JIT.h"
 #include "JITExceptions.h"
 #include "JITToDFGDeferredCompilationCallback.h"
+#include "JSAsyncFunction.h"
 #include "JSCInlines.h"
 #include "JSGeneratorFunction.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSLexicalEnvironment.h"
 #include "JSPropertyNameEnumerator.h"
+#include "ModuleProgramCodeBlock.h"
 #include "ObjectConstructor.h"
 #include "PolymorphicAccess.h"
+#include "ProgramCodeBlock.h"
 #include "PropertyName.h"
 #include "RegExpObject.h"
 #include "Repatch.h"
@@ -65,6 +70,7 @@
 #include "TestRunnerUtils.h"
 #include "TypeProfilerLog.h"
 #include "VMInlines.h"
+#include "WebAssemblyCodeBlock.h"
 #include <wtf/InlineASM.h>
 
 namespace JSC {
@@ -196,12 +202,15 @@ EncodedJSValue JIT_OPERATION operationTryGetByIdOptimize(ExecState* exec, Struct
 {
     VM* vm = &exec->vm();
     NativeCallFrameTracer tracer(vm, exec);
+    auto scope = DECLARE_THROW_SCOPE(*vm);
     Identifier ident = Identifier::fromUid(vm, uid);
 
     JSValue baseValue = JSValue::decode(base);
     PropertySlot slot(baseValue, PropertySlot::InternalMethodType::VMInquiry);
 
     baseValue.getPropertySlot(exec, ident, slot);
+    RETURN_IF_EXCEPTION(scope, encodedJSValue());
+
     if (stubInfo->considerCaching(baseValue.structureOrNull()) && !slot.isTaintedByOpaqueObject() && (slot.isCacheableValue() || slot.isCacheableGetter() || slot.isUnset()))
         repatchGetByID(exec, baseValue, ident, slot, *stubInfo, GetByIDKind::Pure);
 
@@ -387,7 +396,8 @@ void JIT_OPERATION operationPutByIdStrictOptimize(ExecState* exec, StructureStub
     
     VM* vm = &exec->vm();
     NativeCallFrameTracer tracer(vm, exec);
-    
+    auto scope = DECLARE_THROW_SCOPE(*vm);
+
     Identifier ident = Identifier::fromUid(vm, uid);
     AccessType accessType = static_cast<AccessType>(stubInfo->accessType);
 
@@ -398,7 +408,8 @@ void JIT_OPERATION operationPutByIdStrictOptimize(ExecState* exec, StructureStub
 
     Structure* structure = baseValue.isCell() ? baseValue.asCell()->structure(*vm) : nullptr;
     baseValue.putInline(exec, ident, value, slot);
-    
+    RETURN_IF_EXCEPTION(scope, void());
+
     if (accessType != static_cast<AccessType>(stubInfo->accessType))
         return;
     
@@ -412,7 +423,8 @@ void JIT_OPERATION operationPutByIdNonStrictOptimize(ExecState* exec, StructureS
     
     VM* vm = &exec->vm();
     NativeCallFrameTracer tracer(vm, exec);
-    
+    auto scope = DECLARE_THROW_SCOPE(*vm);
+
     Identifier ident = Identifier::fromUid(vm, uid);
     AccessType accessType = static_cast<AccessType>(stubInfo->accessType);
 
@@ -423,7 +435,8 @@ void JIT_OPERATION operationPutByIdNonStrictOptimize(ExecState* exec, StructureS
 
     Structure* structure = baseValue.isCell() ? baseValue.asCell()->structure(*vm) : nullptr;    
     baseValue.putInline(exec, ident, value, slot);
-    
+    RETURN_IF_EXCEPTION(scope, void());
+
     if (accessType != static_cast<AccessType>(stubInfo->accessType))
         return;
     
@@ -516,6 +529,7 @@ static void putByVal(CallFrame* callFrame, JSValue baseValue, JSValue subscript,
     if (byValInfo->stubInfo && (!isStringOrSymbol(subscript) || byValInfo->cachedId != property))
         byValInfo->tookSlowPath = true;
 
+    scope.release();
     PutPropertySlot slot(baseValue, callFrame->codeBlock()->isStrictMode());
     baseValue.putInline(callFrame, property, value, slot);
 }
@@ -596,7 +610,7 @@ static OptimizationResult tryPutByValOptimize(ExecState* exec, JSValue baseValue
             JITArrayMode arrayMode = jitArrayModeForStructure(structure);
             if (jitArrayModePermitsPut(arrayMode) && arrayMode != byValInfo->arrayMode) {
                 CodeBlock* codeBlock = exec->codeBlock();
-                ConcurrentJITLocker locker(codeBlock->m_lock);
+                ConcurrentJSLocker locker(codeBlock->m_lock);
                 byValInfo->arrayProfile->computeUpdatedPrediction(locker, codeBlock, structure);
 
                 JIT::compilePutByVal(&vm, exec->codeBlock(), byValInfo, returnAddress, arrayMode);
@@ -624,7 +638,7 @@ static OptimizationResult tryPutByValOptimize(ExecState* exec, JSValue baseValue
                 }
             } else {
                 CodeBlock* codeBlock = exec->codeBlock();
-                ConcurrentJITLocker locker(codeBlock->m_lock);
+                ConcurrentJSLocker locker(codeBlock->m_lock);
                 byValInfo->seen = true;
                 byValInfo->cachedId = propertyName;
                 if (subscript.isSymbol())
@@ -680,7 +694,7 @@ static OptimizationResult tryDirectPutByValOptimize(ExecState* exec, JSObject* o
             JITArrayMode arrayMode = jitArrayModeForStructure(structure);
             if (jitArrayModePermitsPut(arrayMode) && arrayMode != byValInfo->arrayMode) {
                 CodeBlock* codeBlock = exec->codeBlock();
-                ConcurrentJITLocker locker(codeBlock->m_lock);
+                ConcurrentJSLocker locker(codeBlock->m_lock);
                 byValInfo->arrayProfile->computeUpdatedPrediction(locker, codeBlock, structure);
 
                 JIT::compileDirectPutByVal(&vm, exec->codeBlock(), byValInfo, returnAddress, arrayMode);
@@ -706,7 +720,7 @@ static OptimizationResult tryDirectPutByValOptimize(ExecState* exec, JSObject* o
                 }
             } else {
                 CodeBlock* codeBlock = exec->codeBlock();
-                ConcurrentJITLocker locker(codeBlock->m_lock);
+                ConcurrentJSLocker locker(codeBlock->m_lock);
                 byValInfo->seen = true;
                 byValInfo->cachedId = propertyName;
                 if (subscript.isSymbol())
@@ -1168,6 +1182,16 @@ EncodedJSValue JIT_OPERATION operationNewGeneratorFunction(ExecState* exec, JSSc
 EncodedJSValue JIT_OPERATION operationNewGeneratorFunctionWithInvalidatedReallocationWatchpoint(ExecState* exec, JSScope* scope, JSCell* functionExecutable)
 {
     return operationNewFunctionCommon<JSGeneratorFunction>(exec, scope, functionExecutable, true);
+}
+
+EncodedJSValue JIT_OPERATION operationNewAsyncFunction(ExecState* exec, JSScope* scope, JSCell* functionExecutable)
+{
+    return operationNewFunctionCommon<JSAsyncFunction>(exec, scope, functionExecutable, false);
+}
+
+EncodedJSValue JIT_OPERATION operationNewAsyncFunctionWithInvalidatedReallocationWatchpoint(ExecState* exec, JSScope* scope, JSCell* functionExecutable)
+{
+    return operationNewFunctionCommon<JSAsyncFunction>(exec, scope, functionExecutable, true);
 }
 
 void JIT_OPERATION operationSetFunctionName(ExecState* exec, JSCell* funcCell, EncodedJSValue encodedName)
@@ -1719,7 +1743,7 @@ static OptimizationResult tryGetByValOptimize(ExecState* exec, JSValue baseValue
                 // If we reached this case, we got an interesting array mode we did not expect when we compiled.
                 // Let's update the profile to do better next time.
                 CodeBlock* codeBlock = exec->codeBlock();
-                ConcurrentJITLocker locker(codeBlock->m_lock);
+                ConcurrentJSLocker locker(codeBlock->m_lock);
                 byValInfo->arrayProfile->computeUpdatedPrediction(locker, codeBlock, structure);
 
                 JIT::compileGetByVal(&vm, exec->codeBlock(), byValInfo, returnAddress, arrayMode);
@@ -1747,7 +1771,7 @@ static OptimizationResult tryGetByValOptimize(ExecState* exec, JSValue baseValue
                 }
             } else {
                 CodeBlock* codeBlock = exec->codeBlock();
-                ConcurrentJITLocker locker(codeBlock->m_lock);
+                ConcurrentJSLocker locker(codeBlock->m_lock);
                 byValInfo->seen = true;
                 byValInfo->cachedId = propertyName;
                 if (subscript.isSymbol())
@@ -2177,8 +2201,10 @@ char* JIT_OPERATION operationReallocateButterflyToHavePropertyStorageWithInitial
     NativeCallFrameTracer tracer(&vm, exec);
 
     ASSERT(!object->structure()->outOfLineCapacity());
-    Butterfly* result = object->growOutOfLineStorage(vm, 0, initialOutOfLineCapacity);
-    object->setButterflyWithoutChangingStructure(vm, result);
+    Butterfly* result = object->allocateMoreOutOfLineStorage(vm, 0, initialOutOfLineCapacity);
+    WTF::storeStoreFence();
+    object->setButterfly(vm, result);
+    WTF::storeStoreFence();
     return reinterpret_cast<char*>(result);
 }
 
@@ -2187,8 +2213,10 @@ char* JIT_OPERATION operationReallocateButterflyToGrowPropertyStorage(ExecState*
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
-    Butterfly* result = object->growOutOfLineStorage(vm, object->structure()->outOfLineCapacity(), newSize);
-    object->setButterflyWithoutChangingStructure(vm, result);
+    Butterfly* result = object->allocateMoreOutOfLineStorage(vm, object->structure()->outOfLineCapacity(), newSize);
+    WTF::storeStoreFence();
+    object->setButterfly(vm, result);
+    WTF::storeStoreFence();
     return reinterpret_cast<char*>(result);
 }
 
@@ -2243,9 +2271,11 @@ void JIT_OPERATION operationExceptionFuzz(ExecState* exec)
 {
     VM* vm = &exec->vm();
     NativeCallFrameTracer tracer(vm, exec);
+    auto scope = DECLARE_THROW_SCOPE(*vm);
+    UNUSED_PARAM(scope);
 #if COMPILER(GCC_OR_CLANG)
     void* returnPC = __builtin_return_address(0);
-    doExceptionFuzzing(exec, "JITOperations", returnPC);
+    doExceptionFuzzing(exec, scope, "JITOperations", returnPC);
 #endif // COMPILER(GCC_OR_CLANG)
 }
 

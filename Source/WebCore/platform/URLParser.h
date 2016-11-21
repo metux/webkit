@@ -29,6 +29,8 @@
 #include "URL.h"
 #include <wtf/Forward.h>
 
+struct UIDNA;
+
 namespace WebCore {
 
 template<typename CharacterType> class CodePointIterator;
@@ -48,7 +50,12 @@ public:
     static URLEncodedForm parseURLEncodedForm(StringView);
     static String serialize(const URLEncodedForm&);
 
+    static const UIDNA& internationalDomainNameTranscoder();
+
 private:
+    static Optional<uint16_t> defaultPortForProtocol(StringView);
+    friend Optional<uint16_t> defaultPortForProtocol(StringView);
+
     URL m_url;
     Vector<LChar> m_asciiBuffer;
     bool m_urlIsSpecial { false };
@@ -99,6 +106,7 @@ private:
     template<typename CharacterType> void encodeQuery(const Vector<UChar>& source, const TextEncoding&, CodePointIterator<CharacterType>);
     void copyASCIIStringUntil(const String&, size_t length);
     StringView parsedDataView(size_t start, size_t length);
+    UChar parsedDataView(size_t position);
 
     using IPv4Address = uint32_t;
     void serializeIPv4(IPv4Address);

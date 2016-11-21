@@ -60,6 +60,7 @@
 #include "WebPageProxyMessages.h"
 #include "WebPopupMenuProxy.h"
 #include "WebProcessLifetimeTracker.h"
+#include <WebCore/ActivityState.h>
 #include <WebCore/Color.h>
 #include <WebCore/DragActions.h>
 #include <WebCore/EventTrackingRegions.h>
@@ -73,7 +74,6 @@
 #include <WebCore/TextChecking.h>
 #include <WebCore/TextGranularity.h>
 #include <WebCore/UserInterfaceLayoutDirection.h>
-#include <WebCore/ViewState.h>
 #include <WebCore/VisibleSelection.h>
 #include <memory>
 #include <wtf/HashMap.h>
@@ -129,6 +129,7 @@ class FindMatchesClient;
 class FormClient;
 class FullscreenClient;
 class HistoryClient;
+class IconLoadingClient;
 class LoaderClient;
 class Navigation;
 class NavigationClient;
@@ -153,6 +154,7 @@ class ProtectionSpace;
 class RunLoopObserver;
 class SharedBuffer;
 class TextIndicator;
+class ValidationBubble;
 enum class HasInsecureContent;
 struct DictionaryPopupInfo;
 struct ExceptionDetails;
@@ -365,6 +367,9 @@ public:
     API::UIClient& uiClient() { return *m_uiClient; }
     void setUIClient(std::unique_ptr<API::UIClient>);
 
+    API::IconLoadingClient& iconLoadingClient() { return *m_iconLoadingClient; }
+    void setIconLoadingClient(std::unique_ptr<API::IconLoadingClient>);
+
     void initializeWebPage();
 
     void close();
@@ -428,16 +433,16 @@ public:
     void setDelegatesScrolling(bool delegatesScrolling) { m_delegatesScrolling = delegatesScrolling; }
     bool delegatesScrolling() const { return m_delegatesScrolling; }
 
-    enum class ViewStateChangeDispatchMode { Deferrable, Immediate };
-    void viewStateDidChange(WebCore::ViewState::Flags mayHaveChanged, bool wantsSynchronousReply = false, ViewStateChangeDispatchMode = ViewStateChangeDispatchMode::Deferrable);
-    bool isInWindow() const { return m_viewState & WebCore::ViewState::IsInWindow; }
-    void waitForDidUpdateViewState();
-    void didUpdateViewState() { m_waitingForDidUpdateViewState = false; }
+    enum class ActivityStateChangeDispatchMode { Deferrable, Immediate };
+    void activityStateDidChange(WebCore::ActivityState::Flags mayHaveChanged, bool wantsSynchronousReply = false, ActivityStateChangeDispatchMode = ActivityStateChangeDispatchMode::Deferrable);
+    bool isInWindow() const { return m_activityState & WebCore::ActivityState::IsInWindow; }
+    void waitForDidUpdateActivityState();
+    void didUpdateActivityState() { m_waitingForDidUpdateActivityState = false; }
 
     void layerHostingModeDidChange();
 
     WebCore::IntSize viewSize() const;
-    bool isViewVisible() const { return m_viewState & WebCore::ViewState::IsVisible; }
+    bool isViewVisible() const { return m_activityState & WebCore::ActivityState::IsVisible; }
     bool isViewWindowActive() const;
 
     void addMIMETypeWithCustomContentProvider(const String& mimeType);
@@ -460,12 +465,15 @@ public:
     double displayedContentScale() const { return m_lastVisibleContentRectUpdate.scale(); }
     const WebCore::FloatRect& exposedContentRect() const { return m_lastVisibleContentRectUpdate.exposedContentRect(); }
     const WebCore::FloatRect& unobscuredContentRect() const { return m_lastVisibleContentRectUpdate.unobscuredContentRect(); }
+    // When visual viewports are enabled, this is the layout viewport rect.
+    const WebCore::FloatRect& customFixedPositionRect() const { return m_lastVisibleContentRectUpdate.customFixedPositionRect(); }
 
     void updateVisibleContentRects(const VisibleContentRectUpdateInfo&);
     void resendLastVisibleContentRects();
 
     enum class UnobscuredRectConstraint { ConstrainedToDocumentRect, Unconstrained };
-    WebCore::FloatRect computeCustomFixedPositionRect(const WebCore::FloatRect& unobscuredContentRect, double displayedContentScale, UnobscuredRectConstraint = UnobscuredRectConstraint::Unconstrained) const;
+    WebCore::FloatRect computeCustomFixedPositionRect(const WebCore::FloatRect& unobscuredContentRect, const WebCore::FloatRect& currentCustomFixedPositionRect, double displayedContentScale, UnobscuredRectConstraint = UnobscuredRectConstraint::Unconstrained, bool visualViewportEnabled = false) const;
+
     void overflowScrollViewWillStartPanGesture();
     void overflowScrollViewDidScroll();
     void overflowScrollWillStartScroll();
@@ -527,12 +535,15 @@ public:
     void getSelectionContext(std::function<void(const String&, const String&, const String&, CallbackBase::Error)>);
     void handleTwoFingerTapAtPoint(const WebCore::IntPoint&, uint64_t requestID);
     void setForceAlwaysUserScalable(bool);
+    void setIsScrollingOrZooming(bool);
 #endif
 #if ENABLE(DATA_DETECTION)
     void setDataDetectionResult(const DataDetectionResult&);
 #endif
     void didCommitLayerTree(const WebKit::RemoteLayerTreeTransaction&);
     void layerTreeCommitComplete();
+
+    bool updateLayoutViewportParameters(const WebKit::RemoteLayerTreeTransaction&);
 
 #if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
     void didRenderFrame(const WebCore::IntSize& contentsSize, const WebCore::IntRect& coveredRect);
@@ -673,6 +684,7 @@ public:
     void setIntrinsicDeviceScaleFactor(float);
     void setCustomDeviceScaleFactor(float);
     void windowScreenDidChange(WebCore::PlatformDisplayID);
+    void accessibilitySettingsDidChange();
 
     void setUseFixedLayout(bool);
     void setFixedLayoutSize(const WebCore::IntSize&);
@@ -1066,7 +1078,7 @@ public:
 
     void* immediateActionAnimationControllerForHitTestResult(RefPtr<API::HitTestResult>, uint64_t, RefPtr<API::Object>);
 
-    void installViewStateChangeCompletionHandler(void(^completionHandler)());
+    void installActivityStateChangeCompletionHandler(void(^completionHandler)());
 
     void handleAcceptedCandidate(WebCore::TextCheckingResult);
     void didHandleAcceptedCandidate();
@@ -1093,6 +1105,17 @@ public:
     void logSampledDiagnosticMessageWithResult(const String& message, const String& description, uint32_t result);
     void logSampledDiagnosticMessageWithValue(const String& message, const String& description, const String& value);
 
+    // Form validation messages.
+    void showValidationMessage(const WebCore::IntRect& anchorClientRect, const String& message);
+    void hideValidationMessage();
+#if PLATFORM(COCOA)
+    WebCore::ValidationBubble* validationBubble() const { return m_validationBubble.get(); } // For testing.
+#endif
+
+#if PLATFORM(IOS)
+    void setIsKeyboardAnimatingIn(bool isKeyboardAnimatingIn) { m_isKeyboardAnimatingIn = isKeyboardAnimatingIn; }
+#endif
+
 #if ENABLE(WIRELESS_PLAYBACK_TARGET) && !PLATFORM(IOS)
     void addPlaybackTargetPickerClient(uint64_t);
     void removePlaybackTargetPickerClient(uint64_t);
@@ -1118,6 +1141,9 @@ public:
 
     void didRestoreScrollPosition();
 
+    void getLoadDecisionForIcon(const WebCore::LinkIcon&, uint64_t callbackID);
+    void finishedLoadingIcon(uint64_t callbackIdentifier, const IPC::DataReference&);
+
     void setFocus(bool focused);
     void setWindowFrame(const WebCore::FloatRect&);
     void getWindowFrame(WebCore::FloatRect&);
@@ -1142,13 +1168,13 @@ public:
         
     WeakPtr<WebPageProxy> createWeakPtr() const { return m_weakPtrFactory.createWeakPtr(); }
 
-    void isLoadingChanged() { updateThrottleState(); }
+    void isLoadingChanged() { activityStateDidChange(WebCore::ActivityState::IsLoading); }
 
 private:
     WebPageProxy(PageClient&, WebProcessProxy&, uint64_t pageID, Ref<API::PageConfiguration>&&);
     void platformInitialize();
 
-    void updateViewState(WebCore::ViewState::Flags flagsToUpdate = WebCore::ViewState::AllFlags);
+    void updateActivityState(WebCore::ActivityState::Flags flagsToUpdate = WebCore::ActivityState::AllFlags);
     void updateThrottleState();
     void updateHiddenPageThrottlingAutoIncreases();
 
@@ -1307,7 +1333,7 @@ private:
 #endif
 
     void editorStateChanged(const EditorState&);
-    void compositionWasCanceled(const EditorState&);
+    void compositionWasCanceled();
     void setHasHadSelectionChangesFromUserInteraction(bool);
     void setNeedsHiddenContentEditableQuirk(bool);
     void setNeedsPlainTextQuirk(bool);
@@ -1533,7 +1559,7 @@ private:
 
     WebPreferencesStore preferencesStore() const;
 
-    void dispatchViewStateChange();
+    void dispatchActivityStateChange();
     void viewDidLeaveWindow();
     void viewDidEnterWindow();
 
@@ -1565,6 +1591,7 @@ private:
     std::unique_ptr<API::PolicyClient> m_policyClient;
     std::unique_ptr<API::NavigationClient> m_navigationClient;
     std::unique_ptr<API::HistoryClient> m_historyClient;
+    std::unique_ptr<API::IconLoadingClient> m_iconLoadingClient;
     std::unique_ptr<API::FormClient> m_formClient;
     std::unique_ptr<API::UIClient> m_uiClient;
     std::unique_ptr<API::FindClient> m_findClient;
@@ -1626,6 +1653,8 @@ private:
     uint64_t m_layerTreeTransactionIdAtLastTouchStart;
     uint64_t m_currentDynamicViewportSizeUpdateID { 0 };
     bool m_hasNetworkRequestsOnSuspended;
+    bool m_isKeyboardAnimatingIn { false };
+    bool m_isScrollingOrZooming { false };
 #endif
 
 #if ENABLE(VIBRATION)
@@ -1658,7 +1687,7 @@ private:
 
     UserMediaPermissionRequestManagerProxy m_userMediaPermissionRequestManager;
 
-    WebCore::ViewState::Flags m_viewState;
+    WebCore::ActivityState::Flags m_activityState;
     bool m_viewWasEverInWindow;
 #if PLATFORM(IOS)
     bool m_allowsMediaDocumentInlinePlayback { false };
@@ -1696,6 +1725,8 @@ private:
 
     bool m_useFixedLayout;
     WebCore::IntSize m_fixedLayoutSize;
+
+    WebCore::LayoutMilestones m_observedLayoutMilestones { 0 };
 
     bool m_suppressScrollbarAnimations;
 
@@ -1775,6 +1806,9 @@ private:
 #if ENABLE(INPUT_TYPE_COLOR)
     RefPtr<WebColorPicker> m_colorPicker;
 #endif
+#if PLATFORM(COCOA)
+    std::unique_ptr<WebCore::ValidationBubble> m_validationBubble;
+#endif
 
     const uint64_t m_pageID;
     const WebCore::SessionID m_sessionID;
@@ -1849,25 +1883,29 @@ private:
 
     uint64_t m_renderTreeSize;
     uint64_t m_sessionRestorationRenderTreeSize;
-    bool m_wantsSessionRestorationRenderTreeSizeThresholdEvent;
     bool m_hitRenderTreeSizeThreshold;
 
     bool m_suppressVisibilityUpdates;
     bool m_autoSizingShouldExpandToViewHeight;
     WebCore::IntSize m_minimumLayoutSize;
 
+    // Visual viewports
+    WebCore::LayoutSize m_baseLayoutViewportSize;
+    WebCore::LayoutPoint m_minStableLayoutViewportOrigin;
+    WebCore::LayoutPoint m_maxStableLayoutViewportOrigin;
+
     float m_mediaVolume;
     WebCore::MediaProducer::MutedStateFlags m_mutedState { WebCore::MediaProducer::NoneMuted };
     bool m_mayStartMediaWhenInWindow;
 
-    bool m_waitingForDidUpdateViewState;
+    bool m_waitingForDidUpdateActivityState;
 
     bool m_shouldScaleViewToFitDocument { false };
     bool m_suppressAutomaticNavigationSnapshotting { false };
 
 #if PLATFORM(COCOA)
     HashMap<String, String> m_temporaryPDFFiles;
-    std::unique_ptr<WebCore::RunLoopObserver> m_viewStateChangeDispatcher;
+    std::unique_ptr<WebCore::RunLoopObserver> m_activityStateChangeDispatcher;
 
     std::unique_ptr<RemoteLayerTreeScrollingPerformanceData> m_scrollingPerformanceData;
     bool m_scrollPerformanceDataCollectionEnabled;
@@ -1882,9 +1920,9 @@ private:
     uint64_t m_navigationID;
 
     WebPreferencesStore::ValueMap m_configurationPreferenceValues;
-    WebCore::ViewState::Flags m_potentiallyChangedViewStateFlags;
-    bool m_viewStateChangeWantsSynchronousReply;
-    Vector<uint64_t> m_nextViewStateChangeCallbacks;
+    WebCore::ActivityState::Flags m_potentiallyChangedActivityStateFlags;
+    bool m_activityStateChangeWantsSynchronousReply;
+    Vector<uint64_t> m_nextActivityStateChangeCallbacks;
 
     WebCore::MediaProducer::MediaStateFlags m_mediaState { WebCore::MediaProducer::IsNotPlaying };
 
@@ -1906,6 +1944,11 @@ private:
     bool m_hasDeferredStartAssistingNode { false };
     std::unique_ptr<NodeAssistanceArguments> m_deferredNodeAssistanceArguments;
     bool m_forceAlwaysUserScalable { false };
+#endif
+
+#if ENABLE(POINTER_LOCK)
+    bool m_isPointerLockPending { false };
+    bool m_isPointerLocked { false };
 #endif
 
 #if ENABLE(DOWNLOAD_ATTRIBUTE)

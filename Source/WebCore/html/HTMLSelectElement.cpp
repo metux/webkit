@@ -34,7 +34,6 @@
 #include "ElementTraversal.h"
 #include "EventHandler.h"
 #include "EventNames.h"
-#include "ExceptionCodePlaceholder.h"
 #include "FormController.h"
 #include "FormDataList.h"
 #include "Frame.h"
@@ -219,7 +218,7 @@ int HTMLSelectElement::activeSelectionEndListIndex() const
     return lastSelectedListIndex();
 }
 
-ExceptionOr<void> HTMLSelectElement::add(const OptionOrOptGroupElement& element, Optional<HTMLElementOrInt> before)
+ExceptionOr<void> HTMLSelectElement::add(const OptionOrOptGroupElement& element, const Optional<HTMLElementOrInt>& before)
 {
     HTMLElement* beforeElement = nullptr;
     if (before) {
@@ -233,28 +232,24 @@ ExceptionOr<void> HTMLSelectElement::add(const OptionOrOptGroupElement& element,
     );
 
 
-    ExceptionCode ec = 0;
-    insertBefore(toInsert, beforeElement, ec);
-    if (ec)
-        return Exception { ec };
-    return { };
+    return insertBefore(toInsert, beforeElement);
 }
 
-void HTMLSelectElement::removeByIndex(int optionIndex)
+void HTMLSelectElement::remove(int optionIndex)
 {
     int listIndex = optionToListIndex(optionIndex);
     if (listIndex < 0)
         return;
 
-    listItems()[listIndex]->remove(IGNORE_EXCEPTION);
+    listItems()[listIndex]->remove();
 }
 
-void HTMLSelectElement::remove(HTMLOptionElement& option)
+ExceptionOr<void> HTMLSelectElement::remove(HTMLOptionElement& option)
 {
     if (option.ownerSelectElement() != this)
-        return;
+        return { };
 
-    option.remove(IGNORE_EXCEPTION);
+    return option.remove();
 }
 
 String HTMLSelectElement::value() const
@@ -430,67 +425,64 @@ HTMLOptionElement* HTMLSelectElement::item(unsigned index)
     return options()->item(index);
 }
 
-void HTMLSelectElement::setOption(unsigned index, HTMLOptionElement& option, ExceptionCode& ec)
+ExceptionOr<void> HTMLSelectElement::setOption(unsigned index, HTMLOptionElement& option)
 {
-    ec = 0;
     if (index > maxSelectItems - 1)
         index = maxSelectItems - 1;
     int diff = index - length();
     RefPtr<HTMLOptionElement> before;
     // Out of array bounds? First insert empty dummies.
     if (diff > 0) {
-        setLength(index, ec);
+        auto result = setLength(index);
+        if (result.hasException())
+            return result;
         // Replace an existing entry?
     } else if (diff < 0) {
         before = item(index + 1);
-        removeByIndex(index);
+        remove(index);
     }
     // Finally add the new element.
-    if (!ec) {
-        auto exception = add(&option, HTMLElementOrInt(before.get()));
-        if (exception.hasException())
-            ec = exception.releaseException().code();
-        if (diff >= 0 && option.selected())
-            optionSelectionStateChanged(option, true);
-    }
+    auto result = add(&option, HTMLElementOrInt { before.get() });
+    if (result.hasException())
+        return result;
+    if (diff >= 0 && option.selected())
+        optionSelectionStateChanged(option, true);
+    return { };
 }
 
-void HTMLSelectElement::setLength(unsigned newLength, ExceptionCode& ec)
+ExceptionOr<void> HTMLSelectElement::setLength(unsigned newLength)
 {
-    ec = 0;
     if (newLength > maxSelectItems)
         newLength = maxSelectItems;
     int diff = length() - newLength;
 
     if (diff < 0) { // Add dummy elements.
         do {
-            auto option = document().createElement(optionTag, false);
-            auto exception = add(downcast<HTMLOptionElement>(option.ptr()), Nullopt);
-            if (exception.hasException()) {
-                ec = exception.releaseException().code();
-                break;
-        }
+            auto result = add(HTMLOptionElement::create(document()).ptr(), Nullopt);
+            if (result.hasException())
+                return result;
         } while (++diff);
     } else {
         auto& items = listItems();
 
         // Removing children fires mutation events, which might mutate the DOM further, so we first copy out a list
         // of elements that we intend to remove then attempt to remove them one at a time.
-        Vector<Ref<Element>> itemsToRemove;
+        Vector<Ref<HTMLOptionElement>> itemsToRemove;
         size_t optionIndex = 0;
         for (auto& item : items) {
             if (is<HTMLOptionElement>(*item) && optionIndex++ >= newLength) {
                 ASSERT(item->parentNode());
-                itemsToRemove.append(*item);
+                itemsToRemove.append(downcast<HTMLOptionElement>(*item));
             }
         }
 
-        for (auto& item : itemsToRemove) {
-            if (item->parentNode())
-                item->parentNode()->removeChild(item.get(), ec);
-        }
+        // FIXME: Clients can detect what order we remove the options in; is it good to remove them in ascending order?
+        // FIXME: This ignores exceptions. A previous version passed through the exception only for the last item removed.
+        // What exception behavior do we want?
+        for (auto& item : itemsToRemove)
+            item->remove();
     }
-    updateValidity();
+    return { };
 }
 
 bool HTMLSelectElement::isRequiredFormControl() const

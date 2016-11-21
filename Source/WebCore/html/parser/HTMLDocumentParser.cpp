@@ -27,7 +27,6 @@
 #include "config.h"
 #include "HTMLDocumentParser.h"
 
-#include "CachedScript.h"
 #include "DocumentFragment.h"
 #include "Frame.h"
 #include "HTMLDocument.h"
@@ -191,7 +190,6 @@ void HTMLDocumentParser::runScriptsForPausedTreeBuilder()
 {
     ASSERT(scriptingContentIsAllowed(parserContentPolicy()));
 
-#if ENABLE(CUSTOM_ELEMENTS)
     if (std::unique_ptr<CustomElementConstructionData> constructionData = m_treeBuilder->takeCustomElementConstructionData()) {
         ASSERT(!m_treeBuilder->hasParserBlockingScriptWork());
 
@@ -201,7 +199,6 @@ void HTMLDocumentParser::runScriptsForPausedTreeBuilder()
         m_treeBuilder->didCreateCustomOrCallbackElement(WTFMove(newElement), *constructionData);
         return;
     }
-#endif
 
     TextPosition scriptStartPosition = TextPosition::belowRangePosition();
     if (auto scriptElement = m_treeBuilder->takeScriptToProcess(scriptStartPosition)) {
@@ -319,7 +316,7 @@ void HTMLDocumentParser::constructTreeFromHTMLToken(HTMLTokenizer::TokenPtr& raw
         rawToken.clear();
     }
 
-    m_treeBuilder->constructTree(token);
+    m_treeBuilder->constructTree(WTFMove(token));
 }
 
 bool HTMLDocumentParser::hasInsertionPoint()

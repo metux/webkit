@@ -68,8 +68,10 @@ class IDBFactory;
 class Location;
 class MediaQueryList;
 class MessageEvent;
+class MessagePort;
 class Navigator;
 class Node;
+class NodeList;
 class Page;
 class PageConsoleClient;
 class Performance;
@@ -291,10 +293,10 @@ public:
     DOMApplicationCache* applicationCache() const;
     DOMApplicationCache* optionalApplicationCache() const { return m_applicationCache.get(); }
 
-#if ENABLE(CUSTOM_ELEMENTS)
     CustomElementRegistry* customElementRegistry() { return m_customElementRegistry.get(); }
     CustomElementRegistry& ensureCustomElementRegistry();
-#endif
+
+    ExceptionOr<Ref<NodeList>> collectMatchingElementsInFlatTree(Node&, const String& selectors);
 
 #if ENABLE(ORIENTATION_EVENTS)
     // This is the interface orientation in degrees. Some examples are:
@@ -410,9 +412,7 @@ private:
     mutable RefPtr<Storage> m_localStorage;
     mutable RefPtr<DOMApplicationCache> m_applicationCache;
 
-#if ENABLE(CUSTOM_ELEMENTS)
     RefPtr<CustomElementRegistry> m_customElementRegistry;
-#endif
 
 #if ENABLE(WEB_TIMING)
     mutable RefPtr<Performance> m_performance;

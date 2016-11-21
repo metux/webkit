@@ -37,17 +37,12 @@
 
 namespace WebCore {
 
-class ContainerNode;
 class Document;
 class Element;
-class HTMLSlotElement;
 class Node;
 class RenderStyle;
-class Settings;
 class ShadowRoot;
 class StyleResolver;
-class Text;
-class TreeChange;
 
 namespace Style {
 
@@ -98,6 +93,8 @@ private:
     void pushParent(Element&, const RenderStyle&, Change);
     void popParent();
     void popParentsToDepth(unsigned depth);
+
+    const RenderStyle* parentBoxStyle() const;
 
     Document& m_document;
     std::unique_ptr<RenderStyle> m_documentElementStyle;

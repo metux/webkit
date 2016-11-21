@@ -40,6 +40,7 @@
     JSCustomMarkFunction,
     JSCustomToNativeObject,
     JSLegacyParent=JSDOMWindowBase,
+    PrimaryGlobal,
 ] interface DOMWindow : EventTarget {
     [Replaceable] readonly attribute Screen screen;
     readonly attribute History history;
@@ -170,7 +171,10 @@
     attribute DOMURLConstructor webkitURL; // FIXME: Deprecate this.
     attribute MutationObserverConstructor WebKitMutationObserver; // FIXME: Remove once we prove it is not needed for compatibility with legacy content.
 
-    [Conditional=CUSTOM_ELEMENTS, EnabledAtRuntime=CustomElements, ImplementedAs=ensureCustomElementRegistry] readonly attribute CustomElementRegistry customElements;
+    [EnabledAtRuntime=CustomElements, ImplementedAs=ensureCustomElementRegistry] readonly attribute CustomElementRegistry customElements;
+
+    [MayThrowException, EnabledForWorld=shadowRootIsAlwaysOpen]
+    NodeList collectMatchingElementsInFlatTree(Node scope, DOMString selectors);
 
     // Event handlers unique to Element and DOMWindow.
     // FIXME: Should these be exposed on Document as well (and therefore moved to GlobalEventHandlers.idl)?

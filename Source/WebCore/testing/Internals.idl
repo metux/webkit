@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
- * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -70,6 +70,11 @@ enum UserInterfaceLayoutDirection {
     "RTL"
 };
 
+enum EventThrottlingBehavior {
+    "responsive",
+    "unresponsive"
+};
+
 [
     ExportMacro=WEBCORE_TESTSUPPORT_EXPORT,
     NoInterfaceObject,
@@ -100,9 +105,7 @@ enum UserInterfaceLayoutDirection {
 
     CSSStyleDeclaration computedStyleIncludingVisitedInfo(Element element);
 
-    [MayThrowException] Node ensureShadowRoot(Element host);
     Node ensureUserAgentShadowRoot(Element host);
-    [MayThrowException] Node createShadowRoot(Element host);
     Node shadowRoot(Element host);
 
     [MayThrowException] DOMString shadowRootType(Node root);
@@ -148,6 +151,9 @@ enum UserInterfaceLayoutDirection {
     void invalidateFontCache();
 
     [MayThrowException] void setScrollViewPosition(long x, long y);
+
+    [MayThrowException] ClientRect layoutViewportRect();
+    [MayThrowException] ClientRect visualViewportRect();
 
     [MayThrowException] void setViewBaseBackgroundColor(DOMString colorValue);
 
@@ -220,6 +226,7 @@ enum UserInterfaceLayoutDirection {
     [MayThrowException] boolean isPageBoxVisible(long pageNumber);
 
     unsigned long imageFrameIndex(HTMLImageElement element);
+    void setImageFrameDecodingDuration(HTMLImageElement element, unrestricted float duration);
 
     readonly attribute InternalSettings settings;
     readonly attribute unsigned long workerThreadCount;
@@ -258,10 +265,6 @@ enum UserInterfaceLayoutDirection {
     void beginSimulatedMemoryPressure();
     void endSimulatedMemoryPressure();
 
-#if defined(ENABLE_BATTERY_STATUS) && ENABLE_BATTERY_STATUS
-    [MayThrowException] void setBatteryStatus(DOMString eventType, boolean charging, unrestricted double chargingTime, unrestricted double dischargingTime, unrestricted double level);
-#endif
-
 #if defined(ENABLE_PROXIMITY_EVENTS) && ENABLE_PROXIMITY_EVENTS
     [MayThrowException] void setDeviceProximity(DOMString eventType, unrestricted double value, unrestricted double min, unrestricted double max);
 #endif
@@ -280,6 +283,8 @@ enum UserInterfaceLayoutDirection {
     [MayThrowException] DOMString pageSizeAndMarginsInPixels(long pageIndex, long width, long height, long marginTop, long marginRight, long marginBottom, long marginLeft);
 
     [MayThrowException] void setPageScaleFactor(unrestricted float scaleFactor, long x, long y);
+    [MayThrowException] float pageScaleFactor();
+
     [MayThrowException] void setPageZoomFactor(unrestricted float zoomFactor);
     [MayThrowException] void setTextZoomFactor(unrestricted float zoomFactor);
 
@@ -305,6 +310,8 @@ enum UserInterfaceLayoutDirection {
     void registerURLSchemeAsBypassingContentSecurityPolicy(DOMString scheme);
     void removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(DOMString scheme);
 
+    void registerDefaultPortForProtocol(unsigned short port, DOMString scheme);
+
     MallocStatistics mallocStatistics();
     TypeConversions typeConversions();
     MemoryInfo memoryInfo();
@@ -324,6 +331,9 @@ enum UserInterfaceLayoutDirection {
 
     boolean isRequestAnimationFrameThrottled();
     boolean areTimersThrottled();
+
+    // Override the behavior of WebPage::eventThrottlingDelay(), which only affects iOS.
+    attribute EventThrottlingBehavior? eventThrottlingBehaviorOverride;
 
     [MayThrowException] void startTrackingStyleRecalcs();
     [MayThrowException] unsigned long styleRecalcCount();
@@ -469,4 +479,6 @@ enum UserInterfaceLayoutDirection {
     void setUserInterfaceLayoutDirection(UserInterfaceLayoutDirection userInterfaceLayoutDirection);
 
     boolean userPrefersReducedMotion();
+    
+    void reportBacktrace();
 };

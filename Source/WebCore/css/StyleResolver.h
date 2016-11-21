@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include "CSSSelector.h"
 #include "CSSToLengthConversionData.h"
 #include "CSSToStyleMap.h"
 #include "DocumentRuleSets.h"
@@ -52,7 +53,6 @@ class CSSImageValue;
 class CSSPageRule;
 class CSSPrimitiveValue;
 class CSSProperty;
-class CSSSelector;
 class CSSStyleSheet;
 class CSSValue;
 class CSSVariableDependentValue;
@@ -86,7 +86,6 @@ class StyleSheetList;
 class StyledElement;
 class SVGSVGElement;
 class ViewportStyleResolver;
-class WebKitCSSFilterValue;
 struct ResourceLoaderOptions;
 
 // MatchOnlyUserAgentRules is used in media queries, where relative units
@@ -136,7 +135,7 @@ public:
     StyleResolver(Document&);
     ~StyleResolver();
 
-    ElementStyle styleForElement(const Element&, const RenderStyle* parentStyle, RuleMatchingBehavior = MatchAllRules, const RenderRegion* regionForStyling = nullptr, const SelectorFilter* = nullptr);
+    ElementStyle styleForElement(const Element&, const RenderStyle* parentStyle, const RenderStyle* parentBoxStyle = nullptr, RuleMatchingBehavior = MatchAllRules, const RenderRegion* regionForStyling = nullptr, const SelectorFilter* = nullptr);
 
     void keyframeStylesForAnimation(const Element&, const RenderStyle*, KeyframeList&);
 
@@ -207,6 +206,10 @@ public:
     void addViewportDependentMediaQueryResult(const MediaQueryExpression&, bool result);
     bool hasViewportDependentMediaQueries() const { return !m_viewportDependentMediaQueryResults.isEmpty(); }
     bool hasMediaQueriesAffectedByViewportChange() const;
+
+    void addAccessibilitySettingsDependentMediaQueryResult(const MediaQueryExpression&, bool result);
+    bool hasAccessibilitySettingsDependentMediaQueries() const { return !m_accessibilitySettingsDependentMediaQueryResults.isEmpty(); }
+    bool hasMediaQueriesAffectedByAccessibilitySettingsChange() const;
 
     void addKeyframeStyle(Ref<StyleRuleKeyframes>&&);
 
@@ -314,7 +317,7 @@ private:
     void checkForTextSizeAdjust(RenderStyle*);
 #endif
 
-    void adjustRenderStyle(RenderStyle& styleToAdjust, const RenderStyle& parentStyle, const Element*);
+    void adjustRenderStyle(RenderStyle&, const RenderStyle& parentStyle, const RenderStyle* parentBoxStyle, const Element*);
 #if ENABLE(CSS_GRID_LAYOUT)
     std::unique_ptr<GridPosition> adjustNamedGridItemPosition(const NamedGridAreaMap&, const NamedGridLinesMap&, const GridPosition&, GridPositionSide) const;
 #endif
@@ -469,7 +472,7 @@ private:
     void cacheBorderAndBackground();
 
     void applyProperty(CSSPropertyID, CSSValue*, SelectorChecker::LinkMatchMask = SelectorChecker::MatchDefault, const MatchResult* = nullptr);
-    RefPtr<CSSValue> resolvedVariableValue(CSSPropertyID, const CSSVariableDependentValue&);
+    RefPtr<CSSValue> resolvedVariableValue(CSSPropertyID, const CSSValue&);
 
     void applySVGProperty(CSSPropertyID, CSSValue*);
 
@@ -504,6 +507,7 @@ private:
     RenderStyle* m_overrideDocumentElementStyle { nullptr };
 
     Vector<MediaQueryResult> m_viewportDependentMediaQueryResults;
+    Vector<MediaQueryResult> m_accessibilitySettingsDependentMediaQueryResults;
 
 #if ENABLE(CSS_DEVICE_ADAPTATION)
     RefPtr<ViewportStyleResolver> m_viewportStyleResolver;

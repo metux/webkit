@@ -809,6 +809,7 @@
     <keyword type="signal" name="The “console-message-sent” signal" link="WebKitWebPage.html#WebKitWebPage-console-message-sent"/>
     <keyword type="signal" name="The “context-menu” signal" link="WebKitWebPage.html#WebKitWebPage-context-menu"/>
     <keyword type="signal" name="The “document-loaded” signal" link="WebKitWebPage.html#WebKitWebPage-document-loaded"/>
+    <keyword type="signal" name="The “form-controls-associated” signal" link="WebKitWebPage.html#WebKitWebPage-form-controls-associated"/>
     <keyword type="signal" name="The “send-request” signal" link="WebKitWebPage.html#WebKitWebPage-send-request"/>
     <keyword type="function" name="webkit_frame_is_main_frame ()" link="WebKitFrame.html#webkit-frame-is-main-frame" since="2.2"/>
     <keyword type="function" name="webkit_frame_get_uri ()" link="WebKitFrame.html#webkit-frame-get-uri" since="2.2"/>

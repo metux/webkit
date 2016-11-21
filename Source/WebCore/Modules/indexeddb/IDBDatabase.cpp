@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +31,7 @@
 #include "DOMStringList.h"
 #include "EventNames.h"
 #include "EventQueue.h"
+#include "ExceptionCode.h"
 #include "IDBConnectionProxy.h"
 #include "IDBConnectionToServer.h"
 #include "IDBDatabaseException.h"
@@ -55,6 +56,7 @@ IDBDatabase::IDBDatabase(ScriptExecutionContext& context, IDBClient::IDBConnecti
     , m_connectionProxy(connectionProxy)
     , m_info(resultData.databaseInfo())
     , m_databaseConnectionIdentifier(resultData.databaseConnectionIdentifier())
+    , m_eventNames(eventNames())
 {
     LOG(IndexedDB, "IDBDatabase::IDBDatabase - Creating database %s with version %" PRIu64 " connection %" PRIu64 " (%p)", m_info.name().utf8().data(), m_info.version(), m_databaseConnectionIdentifier, this);
     suspendIfNeeded();
@@ -73,7 +75,7 @@ IDBDatabase::~IDBDatabase()
 
 bool IDBDatabase::hasPendingActivity() const
 {
-    ASSERT(currentThread() == originThreadID());
+    ASSERT(currentThread() == originThreadID() || mayBeGCThread());
 
     if (m_closedInServer)
         return false;
@@ -81,7 +83,7 @@ bool IDBDatabase::hasPendingActivity() const
     if (!m_activeTransactions.isEmpty() || !m_committingTransactions.isEmpty() || !m_abortingTransactions.isEmpty())
         return true;
 
-    return hasEventListeners(eventNames().abortEvent) || hasEventListeners(eventNames().errorEvent) || hasEventListeners(eventNames().versionchangeEvent);
+    return hasEventListeners(m_eventNames.abortEvent) || hasEventListeners(m_eventNames.errorEvent) || hasEventListeners(m_eventNames.versionchangeEvent);
 }
 
 const String IDBDatabase::name() const
@@ -160,7 +162,7 @@ ExceptionOr<Ref<IDBObjectStore>> IDBDatabase::createObjectStore(const String& na
     return m_versionChangeTransaction->createObjectStore(info);
 }
 
-ExceptionOr<Ref<IDBTransaction>> IDBDatabase::transaction(StringOrVectorOfStrings&& storeNames, const String& modeString)
+ExceptionOr<Ref<IDBTransaction>> IDBDatabase::transaction(StringOrVectorOfStrings&& storeNames, IDBTransactionMode mode)
 {
     LOG(IndexedDB, "IDBDatabase::transaction");
 
@@ -178,15 +180,20 @@ ExceptionOr<Ref<IDBTransaction>> IDBDatabase::transaction(StringOrVectorOfString
     if (objectStores.isEmpty())
         return Exception { IDBDatabaseException::InvalidAccessError, ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': The storeNames parameter was empty.") };
 
-    auto mode = IDBTransaction::stringToMode(modeString);
-    if (!mode)
-        return Exception { TypeError, "Failed to execute 'transaction' on 'IDBDatabase': The mode provided ('" + modeString + "') is not one of 'readonly' or 'readwrite'." };
-
-    if (mode.value() != IndexedDB::TransactionMode::ReadOnly && mode.value() != IndexedDB::TransactionMode::ReadWrite)
+    if (mode != IDBTransactionMode::Readonly && mode != IDBTransactionMode::Readwrite)
         return Exception { TypeError };
 
     if (m_versionChangeTransaction && !m_versionChangeTransaction->isFinishedOrFinishing())
         return Exception { IDBDatabaseException::InvalidStateError, ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': A version change transaction is running.") };
+
+    // It is valid for javascript to pass in a list of object store names with the same name listed twice,
+    // so we need to put them all in a set to get a unique list.
+    HashSet<String> objectStoreSet;
+    for (auto& objectStore : objectStores)
+        objectStoreSet.add(objectStore);
+
+    objectStores.clear();
+    copyToVector(objectStoreSet, objectStores);
 
     for (auto& objectStoreName : objectStores) {
         if (m_info.hasObjectStore(objectStoreName))
@@ -194,7 +201,7 @@ ExceptionOr<Ref<IDBTransaction>> IDBDatabase::transaction(StringOrVectorOfString
         return Exception { IDBDatabaseException::NotFoundError, ASCIILiteral("Failed to execute 'transaction' on 'IDBDatabase': One of the specified object stores was not found.") };
     }
 
-    auto info = IDBTransactionInfo::clientTransaction(m_connectionProxy.get(), objectStores, mode.value());
+    auto info = IDBTransactionInfo::clientTransaction(m_connectionProxy.get(), objectStores, mode);
     auto transaction = IDBTransaction::create(*this, info);
 
     LOG(IndexedDB, "IDBDatabase::transaction - Added active transaction %s", info.identifier().loggingString().utf8().data());
@@ -231,7 +238,11 @@ void IDBDatabase::close()
 
     ASSERT(currentThread() == originThreadID());
 
-    m_closePending = true;
+    if (!m_closePending) {
+        m_closePending = true;
+        m_connectionProxy->databaseConnectionPendingClose(*this);
+    }
+
     maybeCloseInServer();
 }
 
@@ -256,11 +267,17 @@ void IDBDatabase::connectionToServerLost(const IDBError& error)
     for (auto& transaction : m_activeTransactions.values())
         transaction->connectionClosedFromServer(error);
 
-    Ref<Event> event = Event::create(eventNames().errorEvent, true, false);
-    event->setTarget(this);
+    auto errorEvent = Event::create(m_eventNames.errorEvent, true, false);
+    errorEvent->setTarget(this);
 
     if (auto* context = scriptExecutionContext())
-        context->eventQueue().enqueueEvent(WTFMove(event));
+        context->eventQueue().enqueueEvent(WTFMove(errorEvent));
+
+    auto closeEvent = Event::create(m_eventNames.closeEvent, true, false);
+    closeEvent->setTarget(this);
+
+    if (auto* context = scriptExecutionContext())
+        context->eventQueue().enqueueEvent(WTFMove(closeEvent));
 }
 
 void IDBDatabase::maybeCloseInServer()
@@ -275,7 +292,7 @@ void IDBDatabase::maybeCloseInServer()
     // 3.3.9 Database closing steps
     // Wait for all transactions created using this connection to complete.
     // Once they are complete, this connection is closed.
-    if (!m_activeTransactions.isEmpty())
+    if (!m_activeTransactions.isEmpty() || !m_committingTransactions.isEmpty())
         return;
 
     m_closedInServer = true;
@@ -326,7 +343,7 @@ Ref<IDBTransaction> IDBDatabase::startVersionChangeTransaction(const IDBTransact
 
     ASSERT(currentThread() == originThreadID());
     ASSERT(!m_versionChangeTransaction);
-    ASSERT(info.mode() == IndexedDB::TransactionMode::VersionChange);
+    ASSERT(info.mode() == IDBTransactionMode::Versionchange);
     ASSERT(!m_closePending);
     ASSERT(scriptExecutionContext());
 
@@ -450,8 +467,8 @@ void IDBDatabase::fireVersionChangeEvent(const IDBResourceIdentifier& requestIde
         connectionProxy().didFireVersionChangeEvent(m_databaseConnectionIdentifier, requestIdentifier);
         return;
     }
-
-    Ref<Event> event = IDBVersionChangeEvent::create(requestIdentifier, currentVersion, requestedVersion, eventNames().versionchangeEvent);
+    
+    Ref<Event> event = IDBVersionChangeEvent::create(requestIdentifier, currentVersion, requestedVersion, m_eventNames.versionchangeEvent);
     event->setTarget(this);
     scriptExecutionContext()->eventQueue().enqueueEvent(WTFMove(event));
 }
@@ -463,7 +480,7 @@ bool IDBDatabase::dispatchEvent(Event& event)
 
     bool result = EventTargetWithInlineData::dispatchEvent(event);
 
-    if (event.isVersionChangeEvent() && event.type() == eventNames().versionchangeEvent)
+    if (event.isVersionChangeEvent() && event.type() == m_eventNames.versionchangeEvent)
         connectionProxy().didFireVersionChangeEvent(m_databaseConnectionIdentifier, downcast<IDBVersionChangeEvent>(event).requestIdentifier());
 
     return result;

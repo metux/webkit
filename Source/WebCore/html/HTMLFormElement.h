@@ -37,12 +37,9 @@ namespace WebCore {
 
 class Event;
 class FormAssociatedElement;
-class FormData;
 class HTMLFormControlElement;
 class HTMLFormControlsCollection;
 class HTMLImageElement;
-class HTMLInputElement;
-class TextEncoding;
 
 class HTMLFormElement final : public HTMLElement {
 public:
@@ -66,12 +63,7 @@ public:
     WEBCORE_EXPORT const AtomicString& autocomplete() const;
 
 #if ENABLE(IOS_AUTOCORRECT_AND_AUTOCAPITALIZE)
-    WEBCORE_EXPORT bool autocorrect() const;
-    WEBCORE_EXPORT void setAutocorrect(bool);
-
-    WEBCORE_EXPORT WebAutocapitalizeType autocapitalizeType() const;
-    WEBCORE_EXPORT const AtomicString& autocapitalize() const;
-    WEBCORE_EXPORT void setAutocapitalize(const AtomicString&);
+    WEBCORE_EXPORT bool shouldAutocorrect() const final;
 #endif
 
     // FIXME: Should rename these two functions to say "form control" or "form-associated element" instead of "form element".
@@ -153,7 +145,7 @@ private:
 
     void resumeFromDocumentSuspension() final;
 
-    void didMoveToNewDocument(Document* oldDocument) final;
+    void didMoveToNewDocument(Document& oldDocument) final;
 
     void copyNonAttributePropertiesFromElement(const Element&) final;
 

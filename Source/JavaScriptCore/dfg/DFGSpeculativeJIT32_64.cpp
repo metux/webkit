@@ -3939,6 +3939,16 @@ void SpeculativeJIT::compile(Node* node)
         break;
     }
 
+    case NewArrayWithSpread: {
+        compileNewArrayWithSpread(node);
+        break;
+    }
+
+    case Spread: {
+        compileSpread(node);
+        break;
+    }
+
     case NewArrayWithSize: {
         JSGlobalObject* globalObject = m_jit.graph().globalObjectFor(node->origin.semantic);
         if (!globalObject->isHavingABadTime() && !hasAnyArrayStorage(node->indexingType())) {
@@ -4976,6 +4986,11 @@ void SpeculativeJIT::compile(Node* node)
         compilePutToArguments(node);
         break;
     }
+
+    case GetArgument: {
+        compileGetArgument(node);
+        break;
+    }
         
     case CreateScopedArguments: {
         compileCreateScopedArguments(node);
@@ -4999,6 +5014,7 @@ void SpeculativeJIT::compile(Node* node)
 
     case NewFunction:
     case NewGeneratorFunction:
+    case NewAsyncFunction:
         compileNewFunction(node);
         break;
 
@@ -5558,6 +5574,10 @@ void SpeculativeJIT::compile(Node* node)
         compileCallDOM(node);
         break;
 
+    case CallDOMGetter:
+        compileCallDOMGetter(node);
+        break;
+
     case CheckDOM:
         compileCheckDOM(node);
         break;
@@ -5585,6 +5605,7 @@ void SpeculativeJIT::compile(Node* node)
     case PhantomNewObject:
     case PhantomNewFunction:
     case PhantomNewGeneratorFunction:
+    case PhantomNewAsyncFunction:
     case PhantomCreateActivation:
     case PutHint:
     case CheckStructureImmediate:
@@ -5594,6 +5615,7 @@ void SpeculativeJIT::compile(Node* node)
     case GetStack:
     case GetMyArgumentByVal:
     case GetMyArgumentByValOutOfBounds:
+    case PhantomCreateRest:
         DFG_CRASH(m_jit.graph(), node, "unexpected node in DFG backend");
         break;
     }

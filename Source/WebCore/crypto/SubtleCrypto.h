@@ -28,6 +28,7 @@
 #include "ContextDestructionObserver.h"
 #include <wtf/Ref.h>
 #include <wtf/RefCounted.h>
+#include <wtf/WorkQueue.h>
 
 #if ENABLE(SUBTLE_CRYPTO)
 
@@ -35,10 +36,16 @@ namespace WebCore {
 
 class SubtleCrypto : public ContextDestructionObserver, public RefCounted<SubtleCrypto> {
 public:
+    enum class KeyFormat { Raw, Spki, Pkcs8, Jwk };
+
     static Ref<SubtleCrypto> create(ScriptExecutionContext& context) { return adoptRef(*new SubtleCrypto(context)); }
+
+    WorkQueue& workQueue() { return m_workQueue.get(); };
 
 private:
     SubtleCrypto(ScriptExecutionContext&);
+
+    Ref<WorkQueue> m_workQueue;
 };
 
 }

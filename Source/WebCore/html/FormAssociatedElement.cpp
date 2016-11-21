@@ -60,10 +60,10 @@ FormAssociatedElement::~FormAssociatedElement()
     setForm(nullptr);
 }
 
-void FormAssociatedElement::didMoveToNewDocument(Document* oldDocument)
+void FormAssociatedElement::didMoveToNewDocument(Document&)
 {
     HTMLElement& element = asHTMLElement();
-    if (oldDocument && element.hasAttributeWithoutSynchronization(formAttr))
+    if (element.hasAttributeWithoutSynchronization(formAttr))
         resetFormAttributeTargetObserver();
 }
 
@@ -237,7 +237,7 @@ bool FormAssociatedElement::typeMismatch() const
     return false;
 }
 
-bool FormAssociatedElement::valid() const
+bool FormAssociatedElement::isValid() const
 {
     bool someError = typeMismatch() || stepMismatch() || rangeUnderflow() || rangeOverflow()
         || tooShort() || tooLong() || patternMismatch() || valueMissing() || hasBadInput() || customError();

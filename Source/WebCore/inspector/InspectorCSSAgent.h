@@ -54,6 +54,7 @@ class Node;
 class NodeList;
 class StyleResolver;
 class StyleRule;
+class WebKitNamedFlow;
 
 class InspectorCSSAgent final
     : public InspectorAgentBase
@@ -93,7 +94,7 @@ public:
     void regionOversetChanged(WebKitNamedFlow*, int documentNodeId);
     void reset();
 
-    // InspectorInstrumentation callbacks.
+    // InspectorInstrumentation
     void documentDetached(Document&);
     void mediaQueryResultChanged();
     void activeStyleSheetsUpdated(Document&);
@@ -149,9 +150,9 @@ private:
     InspectorStyleSheet* createInspectorStyleSheetForDocument(Document&);
     Inspector::Protocol::CSS::StyleSheetOrigin detectOrigin(CSSStyleSheet* pageStyleSheet, Document* ownerDocument);
 
-    RefPtr<Inspector::Protocol::CSS::CSSRule> buildObjectForRule(StyleRule*, StyleResolver&, Element*);
+    RefPtr<Inspector::Protocol::CSS::CSSRule> buildObjectForRule(StyleRule*, StyleResolver&, Element&);
     RefPtr<Inspector::Protocol::CSS::CSSRule> buildObjectForRule(CSSStyleRule*);
-    RefPtr<Inspector::Protocol::Array<Inspector::Protocol::CSS::RuleMatch>> buildArrayForMatchedRuleList(const Vector<RefPtr<StyleRule>>&, StyleResolver&, Element*, PseudoId);
+    RefPtr<Inspector::Protocol::Array<Inspector::Protocol::CSS::RuleMatch>> buildArrayForMatchedRuleList(const Vector<RefPtr<StyleRule>>&, StyleResolver&, Element&, PseudoId);
     RefPtr<Inspector::Protocol::CSS::CSSStyle> buildObjectForAttributesStyle(Element*);
     RefPtr<Inspector::Protocol::Array<Inspector::Protocol::CSS::Region>> buildArrayForRegions(ErrorString&, RefPtr<NodeList>&&, int documentNodeId);
     RefPtr<Inspector::Protocol::CSS::NamedFlow> buildObjectForNamedFlow(ErrorString&, WebKitNamedFlow*, int documentNodeId);

@@ -30,10 +30,9 @@
  */
 
 #include "config.h"
+#include "InspectorIndexedDBAgent.h"
 
 #if ENABLE(INDEXED_DATABASE)
-
-#include "InspectorIndexedDBAgent.h"
 
 #include "DOMStringList.h"
 #include "DOMWindow.h"
@@ -43,7 +42,6 @@
 #include "EventListener.h"
 #include "EventNames.h"
 #include "EventTarget.h"
-#include "ExceptionCode.h"
 #include "Frame.h"
 #include "IDBBindingUtilities.h"
 #include "IDBCursor.h"
@@ -162,42 +160,27 @@ void ExecutableWithDatabase::start(IDBFactory* idbFactory, SecurityOrigin*, cons
 }
 
 
-static RefPtr<KeyPath> keyPathFromIDBKeyPath(const IDBKeyPath& idbKeyPath)
+static RefPtr<KeyPath> keyPathFromIDBKeyPath(const Optional<IDBKeyPath>& idbKeyPath)
 {
-    RefPtr<KeyPath> keyPath;
-    switch (idbKeyPath.type()) {
-    case IDBKeyPath::Type::Null:
-        keyPath = KeyPath::create()
-            .setType(KeyPath::Type::Null)
-            .release();
-        break;
+    if (!idbKeyPath)
+        return KeyPath::create().setType(KeyPath::Type::Null).release();
 
-    case IDBKeyPath::Type::String:
-        keyPath = KeyPath::create()
-            .setType(KeyPath::Type::String)
-            .release();
-        keyPath->setString(idbKeyPath.string());
-        break;
-
-    case IDBKeyPath::Type::Array: {
+    auto visitor = WTF::makeVisitor([](const String& string) {
+        RefPtr<KeyPath> keyPath = KeyPath::create().setType(KeyPath::Type::String).release();
+        keyPath->setString(string);
+        return keyPath;
+    }, [](const Vector<String>& vector) {
         auto array = Inspector::Protocol::Array<String>::create();
-        for (auto& string : idbKeyPath.array())
+        for (auto& string : vector)
             array->addItem(string);
-        keyPath = KeyPath::create()
-            .setType(KeyPath::Type::Array)
-            .release();
+        RefPtr<KeyPath> keyPath = KeyPath::create().setType(KeyPath::Type::Array).release();
         keyPath->setArray(WTFMove(array));
-        break;
-    }
-
-    default:
-        ASSERT_NOT_REACHED();
-    }
-
-    return keyPath;
+        return keyPath;
+    });
+    return WTF::visit(visitor, idbKeyPath.value());
 }
 
-static RefPtr<IDBTransaction> transactionForDatabase(IDBDatabase* idbDatabase, const String& objectStoreName, const String& mode = IDBTransaction::modeReadOnly())
+static RefPtr<IDBTransaction> transactionForDatabase(IDBDatabase* idbDatabase, const String& objectStoreName, IDBTransactionMode mode = IDBTransactionMode::Readonly)
 {
     auto result = idbDatabase->transaction(objectStoreName, mode);
     if (result.hasException())
@@ -355,9 +338,7 @@ static RefPtr<IDBKeyRange> idbKeyRangeFromKeyRange(const InspectorObject* keyRan
     return IDBKeyRange::create(WTFMove(idbLower), WTFMove(idbUpper), lowerOpen, upperOpen);
 }
 
-class DataLoader;
-
-class OpenCursorCallback : public EventListener {
+class OpenCursorCallback final : public EventListener {
 public:
     static Ref<OpenCursorCallback> create(InjectedScript injectedScript, Ref<RequestDataCallback>&& requestCallback, int skipCount, unsigned pageSize)
     {
@@ -449,7 +430,7 @@ private:
     unsigned m_pageSize;
 };
 
-class DataLoader : public ExecutableWithDatabase {
+class DataLoader final : public ExecutableWithDatabase {
 public:
     static Ref<DataLoader> create(ScriptExecutionContext* context, Ref<RequestDataCallback>&& requestCallback, const InjectedScript& injectedScript, const String& objectStoreName, const String& indexName, RefPtr<IDBKeyRange>&& idbKeyRange, int skipCount, unsigned pageSize)
     {
@@ -651,7 +632,7 @@ void InspectorIndexedDBAgent::requestData(ErrorString& errorString, const String
     dataLoader->start(idbFactory, document->securityOrigin(), databaseName);
 }
 
-class ClearObjectStoreListener : public EventListener {
+class ClearObjectStoreListener final : public EventListener {
     WTF_MAKE_NONCOPYABLE(ClearObjectStoreListener);
 public:
     static Ref<ClearObjectStoreListener> create(Ref<ClearObjectStoreCallback> requestCallback)
@@ -687,7 +668,7 @@ private:
     Ref<ClearObjectStoreCallback> m_requestCallback;
 };
 
-class ClearObjectStore : public ExecutableWithDatabase {
+class ClearObjectStore final : public ExecutableWithDatabase {
 public:
     static Ref<ClearObjectStore> create(ScriptExecutionContext* context, const String& objectStoreName, Ref<ClearObjectStoreCallback>&& requestCallback)
     {
@@ -706,7 +687,7 @@ public:
         if (!requestCallback().isActive())
             return;
 
-        auto idbTransaction = transactionForDatabase(&database, m_objectStoreName, IDBTransaction::modeReadWrite());
+        auto idbTransaction = transactionForDatabase(&database, m_objectStoreName, IDBTransactionMode::Readwrite);
         if (!idbTransaction) {
             m_requestCallback->sendFailure("Could not get transaction");
             return;

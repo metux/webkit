@@ -577,7 +577,7 @@ void RenderLayer::updateLayerPositions(RenderGeometryMap* geometryMap, UpdateLay
         
     // With all our children positioned, now update our marquee if we need to.
     if (m_marquee) {
-        // FIXME: would like to use TemporaryChange<> but it doesn't work with bitfields.
+        // FIXME: would like to use SetForScope<> but it doesn't work with bitfields.
         bool oldUpdatingMarqueePosition = m_updatingMarqueePosition;
         m_updatingMarqueePosition = true;
         m_marquee->updateMarqueePosition();
@@ -824,6 +824,8 @@ void RenderLayer::updateLayerPositionsAfterDocumentScroll()
 {
     ASSERT(this == renderer().view().layer());
 
+    LOG(Scrolling, "RenderLayer::updateLayerPositionsAfterDocumentScroll");
+
     RenderGeometryMap geometryMap(UseTransforms);
     updateLayerPositionsAfterScroll(&geometryMap);
 }
@@ -995,8 +997,8 @@ TransformationMatrix RenderLayer::currentTransform(RenderStyle::ApplyTransformOr
         return TransformationMatrix();
     
     RenderBox* box = renderBox();
-    ASSERT(box);
-    if (renderer().style().isRunningAcceleratedAnimation()) {
+
+    if (renderer().animation().isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyTransform, AnimationBase::Running | AnimationBase::Paused)) {
         TransformationMatrix currTransform;
         FloatRect pixelSnappedBorderRect = snapRectToDevicePixels(box->borderBoxRect(), box->document().deviceScaleFactor());
         std::unique_ptr<RenderStyle> style = renderer().animation().getAnimatedStyleForRenderer(renderer());
@@ -1809,6 +1811,7 @@ void RenderLayer::beginTransparencyLayers(GraphicsContext& context, const LayerP
         ancestor->beginTransparencyLayers(context, paintingInfo, dirtyRect);
     
     if (paintsWithTransparency(paintingInfo.paintBehavior)) {
+        ASSERT(isStackingContext());
         m_usedTransparency = true;
         context.save();
         LayoutRect adjustedClipRect = paintingExtent(*this, paintingInfo.rootLayer, dirtyRect, paintingInfo.paintBehavior);
@@ -3097,7 +3100,7 @@ static inline RenderElement* rendererForScrollbar(RenderLayerModelObject& render
 {
     if (Element* element = renderer.element()) {
         if (ShadowRoot* shadowRoot = element->containingShadowRoot()) {
-            if (shadowRoot->mode() == ShadowRoot::Mode::UserAgent)
+            if (shadowRoot->mode() == ShadowRootMode::UserAgent)
                 return shadowRoot->host()->renderer();
         }
     }
@@ -6924,6 +6927,9 @@ RenderStyle RenderLayer::createReflectionStyle()
 
     // Map in our mask.
     newStyle.setMaskBoxImage(renderer().style().boxReflect()->mask());
+    
+    // Style has transform and mask, so needs to be stacking context.
+    newStyle.setZIndex(0);
 
     return newStyle;
 }

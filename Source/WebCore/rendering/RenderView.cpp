@@ -51,6 +51,7 @@
 #include "Settings.h"
 #include "StyleInheritedData.h"
 #include "TransformState.h"
+#include <wtf/SetForScope.h>
 #include <wtf/StackStats.h>
 
 namespace WebCore {
@@ -183,6 +184,10 @@ bool RenderView::hitTest(const HitTestRequest& request, HitTestResult& result)
 bool RenderView::hitTest(const HitTestRequest& request, const HitTestLocation& location, HitTestResult& result)
 {
     document().updateLayout();
+    
+#if !ASSERT_DISABLED
+    SetForScope<bool> hitTestRestorer { m_inHitTesting, true };
+#endif
 
     FrameFlatteningLayoutDisallower disallower(frameView());
 
@@ -402,6 +407,9 @@ LayoutUnit RenderView::clientLogicalWidthForFixedPosition() const
         return isHorizontalWritingMode() ? frameView().customFixedPositionLayoutRect().width() : frameView().customFixedPositionLayoutRect().height();
 #endif
 
+    if (frameView().frame().settings().visualViewportEnabled())
+        return isHorizontalWritingMode() ? frameView().layoutViewportRect().width() : frameView().layoutViewportRect().height();
+
     return clientLogicalWidth();
 }
 
@@ -415,6 +423,9 @@ LayoutUnit RenderView::clientLogicalHeightForFixedPosition() const
     if (frameView().useCustomFixedPositionLayoutRect())
         return isHorizontalWritingMode() ? frameView().customFixedPositionLayoutRect().height() : frameView().customFixedPositionLayoutRect().width();
 #endif
+
+    if (frameView().frame().settings().visualViewportEnabled())
+        return isHorizontalWritingMode() ? frameView().layoutViewportRect().height() : frameView().layoutViewportRect().width();
 
     return clientLogicalHeight();
 }
@@ -580,7 +591,7 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
     else {
         const Color& documentBackgroundColor = frameView().documentBackgroundColor();
         const Color& backgroundColor = (backgroundShouldExtendBeyondPage && documentBackgroundColor.isValid()) ? documentBackgroundColor : frameView().baseBackgroundColor();
-        if (backgroundColor.alpha()) {
+        if (backgroundColor.isVisible()) {
             CompositeOperator previousOperator = paintInfo.context().compositeOperation();
             paintInfo.context().setCompositeOperation(CompositeCopy);
             paintInfo.context().fillRect(paintInfo.rect, backgroundColor);

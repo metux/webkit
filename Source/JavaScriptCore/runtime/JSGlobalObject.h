@@ -22,6 +22,7 @@
 #pragma once
 
 #include "ArrayAllocationProfile.h"
+#include "ArrayBufferSharingMode.h"
 #include "InternalFunction.h"
 #include "JSArray.h"
 #include "JSArrayBufferPrototype.h"
@@ -53,9 +54,10 @@ class JSGlobalObjectInspectorController;
 }
 
 namespace JSC {
-
 class ArrayConstructor;
 class ArrayPrototype;
+class ArrayIteratorAdaptiveWatchpoint;
+class AsyncFunctionPrototype;
 class BooleanPrototype;
 class ConsoleClient;
 class Debugger;
@@ -63,20 +65,29 @@ class ErrorConstructor;
 class ErrorPrototype;
 class EvalCodeBlock;
 class EvalExecutable;
+class FunctionConstructor;
 class FunctionPrototype;
 class GeneratorPrototype;
 class GeneratorFunctionPrototype;
 class GetterSetter;
 class GlobalCodeBlock;
+class IndirectEvalExecutable;
 class InputCursor;
+class JSArrayBuffer;
+class JSArrayBufferConstructor;
+class JSArrayBufferPrototype;
 class JSGlobalObjectDebuggable;
 class JSInternalPromise;
 class JSModuleLoader;
 class JSPromise;
 class JSPromiseConstructor;
 class JSPromisePrototype;
+class JSSharedArrayBuffer;
+class JSSharedArrayBufferConstructor;
+class JSSharedArrayBufferPrototype;
 class JSTypedArrayViewConstructor;
 class JSTypedArrayViewPrototype;
+class DirectEvalExecutable;
 class LLIntOffsetsExtractor;
 class Microtask;
 class ModuleLoaderPrototype;
@@ -103,8 +114,7 @@ struct HashTable;
     macro(Number, number, numberObject, NumberObject, Number, object) \
     macro(Error, error, error, ErrorInstance, Error, object) \
     macro(Map, map, map, JSMap, Map, object) \
-    macro(JSPromise, promise, promise, JSPromise, Promise, object) \
-    macro(JSArrayBuffer, arrayBuffer, arrayBuffer, JSArrayBuffer, ArrayBuffer, object) \
+    macro(JSPromise, promise, promise, JSPromise, Promise, object)
 
 #define FOR_EACH_BUILTIN_DERIVED_ITERATOR_TYPE(macro) \
     DEFINE_STANDARD_BUILTIN(macro, MapIterator, mapIterator) \
@@ -250,6 +260,7 @@ public:
     LazyProperty<JSGlobalObject, JSFunction> m_arrayProtoToStringFunction;
     LazyProperty<JSGlobalObject, JSFunction> m_arrayProtoValuesFunction;
     LazyProperty<JSGlobalObject, JSFunction> m_initializePromiseFunction;
+    LazyProperty<JSGlobalObject, JSFunction> m_iteratorProtocolFunction;
     WriteBarrier<JSFunction> m_newPromiseCapabilityFunction;
     WriteBarrier<JSFunction> m_functionProtoHasInstanceSymbolFunction;
     LazyProperty<JSGlobalObject, GetterSetter> m_throwTypeErrorGetterSetter;
@@ -306,17 +317,22 @@ public:
     PropertyOffset m_functionNameOffset;
     WriteBarrier<Structure> m_privateNameStructure;
     WriteBarrier<Structure> m_regExpStructure;
+    WriteBarrier<AsyncFunctionPrototype> m_asyncFunctionPrototype;
+    WriteBarrier<Structure> m_asyncFunctionStructure;
     WriteBarrier<Structure> m_generatorFunctionStructure;
     WriteBarrier<Structure> m_dollarVMStructure;
     WriteBarrier<Structure> m_iteratorResultObjectStructure;
     WriteBarrier<Structure> m_regExpMatchesArrayStructure;
-    WriteBarrier<Structure> m_regExpMatchesArraySlowPutStructure;
     WriteBarrier<Structure> m_moduleRecordStructure;
     WriteBarrier<Structure> m_moduleNamespaceObjectStructure;
     WriteBarrier<Structure> m_proxyObjectStructure;
     WriteBarrier<Structure> m_callableProxyObjectStructure;
     WriteBarrier<Structure> m_proxyRevokeStructure;
     WriteBarrier<Structure> m_moduleLoaderStructure;
+    WriteBarrier<JSArrayBufferPrototype> m_arrayBufferPrototype;
+    WriteBarrier<Structure> m_arrayBufferStructure;
+    WriteBarrier<JSArrayBufferPrototype> m_sharedArrayBufferPrototype;
+    WriteBarrier<Structure> m_sharedArrayBufferStructure;
 
 #define DEFINE_STORAGE_FOR_SIMPLE_TYPE(capitalName, lowerName, properName, instanceType, jsName, prototypeBase) \
     WriteBarrier<capitalName ## Prototype> m_ ## lowerName ## Prototype; \
@@ -381,6 +397,15 @@ public:
     std::unique_ptr<JSGlobalObjectRareData> m_rareData;
 
     WeakRandom m_weakRandom;
+
+    InlineWatchpointSet& arrayIteratorProtocolWatchpoint() { return m_arrayIteratorProtocolWatchpoint; }
+    // If this hasn't been invalidated, it means the array iterator protocol
+    // is not observable to user code yet.
+    InlineWatchpointSet m_arrayIteratorProtocolWatchpoint;
+    std::unique_ptr<ArrayIteratorAdaptiveWatchpoint> m_arrayPrototypeSymbolIteratorWatchpoint;
+    std::unique_ptr<ArrayIteratorAdaptiveWatchpoint> m_arrayIteratorPrototypeNext;
+
+    bool isArrayIteratorProtocolFastAndNonObservable();
 
     TemplateRegistry m_templateRegistry;
 
@@ -500,6 +525,7 @@ public:
     JSFunction* arrayProtoToStringFunction() const { return m_arrayProtoToStringFunction.get(this); }
     JSFunction* arrayProtoValuesFunction() const { return m_arrayProtoValuesFunction.get(this); }
     JSFunction* initializePromiseFunction() const { return m_initializePromiseFunction.get(this); }
+    JSFunction* iteratorProtocolFunction() const { return m_iteratorProtocolFunction.get(this); }
     JSFunction* newPromiseCapabilityFunction() const { return m_newPromiseCapabilityFunction.get(); }
     JSFunction* functionProtoHasInstanceSymbolFunction() const { return m_functionProtoHasInstanceSymbolFunction.get(); }
     JSObject* regExpProtoExecFunction() const { return m_regExpProtoExec.get(); }
@@ -526,6 +552,7 @@ public:
     IteratorPrototype* iteratorPrototype() const { return m_iteratorPrototype.get(); }
     GeneratorFunctionPrototype* generatorFunctionPrototype() const { return m_generatorFunctionPrototype.get(); }
     GeneratorPrototype* generatorPrototype() const { return m_generatorPrototype.get(); }
+    AsyncFunctionPrototype* asyncFunctionPrototype() const { return m_asyncFunctionPrototype.get(); }
 
     Structure* debuggerScopeStructure() const { return m_debuggerScopeStructure.get(this); }
     Structure* withScopeStructure() const { return m_withScopeStructure.get(this); }
@@ -585,6 +612,7 @@ public:
     Structure* mapStructure() const { return m_mapStructure.get(); }
     Structure* regExpStructure() const { return m_regExpStructure.get(); }
     Structure* generatorFunctionStructure() const { return m_generatorFunctionStructure.get(); }
+    Structure* asyncFunctionStructure() const { return m_asyncFunctionStructure.get(); }
     Structure* setStructure() const { return m_setStructure.get(this); }
     Structure* stringObjectStructure() const { return m_stringObjectStructure.get(); }
     Structure* symbolObjectStructure() const { return m_symbolObjectStructure.get(); }
@@ -596,6 +624,7 @@ public:
     Structure* callableProxyObjectStructure() const { return m_callableProxyObjectStructure.get(); }
     Structure* proxyRevokeStructure() const { return m_proxyRevokeStructure.get(); }
     Structure* moduleLoaderStructure() const { return m_moduleLoaderStructure.get(); }
+    Structure* restParameterStructure() const { return arrayStructureForIndexingTypeDuringAllocation(ArrayWithContiguous); }
 
     JS_EXPORT_PRIVATE void setRemoteDebuggingEnabled(bool);
     JS_EXPORT_PRIVATE bool remoteDebuggingEnabled() const;
@@ -622,7 +651,26 @@ public:
     void setName(const String&);
     const String& name() const { return m_name; }
 
-    JSArrayBufferPrototype* arrayBufferPrototype() const { return m_arrayBufferPrototype.get(); }
+    JSArrayBufferPrototype* arrayBufferPrototype(ArrayBufferSharingMode sharingMode) const
+    {
+        switch (sharingMode) {
+        case ArrayBufferSharingMode::Default:
+            return m_arrayBufferPrototype.get();
+        case ArrayBufferSharingMode::Shared:
+            return m_sharedArrayBufferPrototype.get();
+        }
+    }
+    Structure* arrayBufferStructure(ArrayBufferSharingMode sharingMode) const
+    {
+        switch (sharingMode) {
+        case ArrayBufferSharingMode::Default:
+            return m_arrayBufferStructure.get();
+        case ArrayBufferSharingMode::Shared:
+            return m_sharedArrayBufferStructure.get();
+        }
+        RELEASE_ASSERT_NOT_REACHED();
+        return nullptr;
+    }
 
 #define DEFINE_ACCESSORS_FOR_SIMPLE_TYPE(capitalName, lowerName, properName, instanceType, jsName, prototypeBase) \
     Structure* properName ## Structure() { return m_ ## properName ## Structure.get(); }
@@ -781,7 +829,8 @@ public:
     WeakRandom& weakRandom() { return m_weakRandom; }
 
     UnlinkedProgramCodeBlock* createProgramCodeBlock(CallFrame*, ProgramExecutable*, JSObject** exception);
-    UnlinkedEvalCodeBlock* createEvalCodeBlock(CallFrame*, EvalExecutable*, const VariableEnvironment*);
+    UnlinkedEvalCodeBlock* createLocalEvalCodeBlock(CallFrame*, DirectEvalExecutable*, const VariableEnvironment*);
+    UnlinkedEvalCodeBlock* createGlobalEvalCodeBlock(CallFrame*, IndirectEvalExecutable*);
     UnlinkedModuleProgramCodeBlock* createModuleProgramCodeBlock(CallFrame*, ModuleProgramExecutable*);
 
     bool needsSiteSpecificQuirks() const { return m_needsSiteSpecificQuirks; }

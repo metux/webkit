@@ -690,7 +690,7 @@ void WebFrameLoaderClient::dispatchDecidePolicyForResponse(const ResourceRespons
 
     Ref<WebFrame> protect(*m_frame);
     WebCore::Frame* coreFrame = m_frame->coreFrame();
-    if (!webPage->sendSync(Messages::WebPageProxy::DecidePolicyForResponseSync(m_frame->frameID(), SecurityOriginData::fromFrame(coreFrame), response, request, canShowMIMEType, listenerID, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())), Messages::WebPageProxy::DecidePolicyForResponseSync::Reply(receivedPolicyAction, policyAction, downloadID), std::chrono::milliseconds::max(), IPC::SendSyncOption::InformPlatformProcessWillSuspend)) {
+    if (!webPage->sendSync(Messages::WebPageProxy::DecidePolicyForResponseSync(m_frame->frameID(), SecurityOriginData::fromFrame(coreFrame), response, request, canShowMIMEType, listenerID, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())), Messages::WebPageProxy::DecidePolicyForResponseSync::Reply(receivedPolicyAction, policyAction, downloadID), Seconds::infinity(), IPC::SendSyncOption::InformPlatformProcessWillSuspend)) {
         m_frame->didReceivePolicyDecision(listenerID, PolicyIgnore, 0, { });
         return;
     }
@@ -1747,6 +1747,27 @@ void WebFrameLoaderClient::didRestoreScrollPosition()
         return;
 
     webPage->didRestoreScrollPosition();
+}
+
+bool WebFrameLoaderClient::useIconLoadingClient()
+{
+    return m_useIconLoadingClient;
+}
+
+void WebFrameLoaderClient::getLoadDecisionForIcon(const LinkIcon& icon, uint64_t callbackID)
+{
+    if (WebPage* webPage { m_frame->page() })
+        webPage->send(Messages::WebPageProxy::GetLoadDecisionForIcon(icon, callbackID));
+}
+
+void WebFrameLoaderClient::finishedLoadingIcon(uint64_t loadIdentifier, SharedBuffer* data)
+{
+    if (WebPage* webPage { m_frame->page() }) {
+        if (data)
+            webPage->send(Messages::WebPageProxy::FinishedLoadingIcon(loadIdentifier, { reinterpret_cast<const uint8_t*>(data->data()), data->size() }));
+        else
+            webPage->send(Messages::WebPageProxy::FinishedLoadingIcon(loadIdentifier, { nullptr, 0 }));
+    }
 }
 
 } // namespace WebKit

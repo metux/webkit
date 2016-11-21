@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MemoryBackingStoreTransaction_h
-#define MemoryBackingStoreTransaction_h
+#pragma once
 
 #if ENABLE(INDEXED_DATABASE)
 
@@ -52,8 +51,8 @@ public:
     MemoryBackingStoreTransaction(MemoryIDBBackingStore&, const IDBTransactionInfo&);
     ~MemoryBackingStoreTransaction();
 
-    bool isVersionChange() const { return m_info.mode() == IndexedDB::TransactionMode::VersionChange; }
-    bool isWriting() const { return m_info.mode() != IndexedDB::TransactionMode::ReadOnly; }
+    bool isVersionChange() const { return m_info.mode() == IDBTransactionMode::Versionchange; }
+    bool isWriting() const { return m_info.mode() != IDBTransactionMode::Readonly; }
     bool isAborting() const { return m_isAborting; }
 
     const IDBDatabaseInfo& originalDatabaseInfo() const;
@@ -106,4 +105,3 @@ private:
 } // namespace WebCore
 
 #endif // ENABLE(INDEXED_DATABASE)
-#endif // MemoryBackingStoreTransaction_h

@@ -70,6 +70,12 @@
     macro(Map)\
     macro(MapIterator)\
     macro(Math) \
+    macro(MediaEncryptedEvent) \
+    macro(MediaKeyMessageEvent) \
+    macro(MediaKeySession) \
+    macro(MediaKeyStatusMap) \
+    macro(MediaKeySystemAccess) \
+    macro(MediaKeys) \
     macro(ModernMediaControls) \
     macro(NaN) \
     macro(Number) \
@@ -89,6 +95,7 @@
     macro(Set)\
     macro(SetIterator)\
     macro(ShadowRoot) \
+    macro(SharedArrayBuffer) \
     macro(StaticRange) \
     macro(String) \
     macro(Symbol) \
@@ -111,7 +118,6 @@
     macro(arguments) \
     macro(as) \
     macro(assign) \
-    macro(async) \
     macro(back) \
     macro(bind) \
     macro(blur) \
@@ -259,6 +265,7 @@
     macro(value) \
     macro(valueOf) \
     macro(webkit) \
+    macro(collectMatchingElementsInFlatTree) \
     macro(webkitIDBCursor) \
     macro(webkitIDBDatabase) \
     macro(webkitIDBFactory) \
@@ -274,6 +281,7 @@
     macro(year)
 
 #define JSC_COMMON_IDENTIFIERS_EACH_KEYWORD(macro) \
+    macro(async) \
     macro(await) \
     macro(break) \
     macro(case) \

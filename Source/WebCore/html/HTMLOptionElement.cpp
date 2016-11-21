@@ -28,7 +28,6 @@
 #include "HTMLOptionElement.h"
 
 #include "Document.h"
-#include "ExceptionCode.h"
 #include "HTMLDataListElement.h"
 #include "HTMLNames.h"
 #include "HTMLOptGroupElement.h"
@@ -66,17 +65,16 @@ Ref<HTMLOptionElement> HTMLOptionElement::create(const QualifiedName& tagName, D
     return adoptRef(*new HTMLOptionElement(tagName, document));
 }
 
-RefPtr<HTMLOptionElement> HTMLOptionElement::createForJSConstructor(Document& document, const String& data, const String& value,
-        bool defaultSelected, bool selected, ExceptionCode& ec)
+ExceptionOr<Ref<HTMLOptionElement>> HTMLOptionElement::createForJSConstructor(Document& document,
+    const String& data, const String& value, bool defaultSelected, bool selected)
 {
     Ref<HTMLOptionElement> element = adoptRef(*new HTMLOptionElement(optionTag, document));
 
     auto text = Text::create(document, data.isNull() ? emptyString() : data);
 
-    ec = 0;
-    element->appendChild(text, ec);
-    if (ec)
-        return nullptr;
+    auto appendResult = element->appendChild(text);
+    if (appendResult.hasException())
+        return appendResult.releaseException();
 
     if (!value.isNull())
         element->setValue(value);
@@ -127,7 +125,7 @@ void HTMLOptionElement::setText(const String &text)
         downcast<Text>(*child).setData(text);
     else {
         removeChildren();
-        appendChild(Text::create(document(), text), ASSERT_NO_EXCEPTION);
+        appendChild(Text::create(document(), text));
     }
     
     if (selectIsMenuList && select->selectedIndex() != oldSelectedIndex)

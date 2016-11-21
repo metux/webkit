@@ -108,7 +108,7 @@ inline bool clip2D(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height,
 
 class WebGLRenderingContextBase : public CanvasRenderingContext, public ActiveDOMObject {
 public:
-    static std::unique_ptr<WebGLRenderingContextBase> create(HTMLCanvasElement*, WebGLContextAttributes*, const String&);
+    static std::unique_ptr<WebGLRenderingContextBase> create(HTMLCanvasElement&, WebGLContextAttributes*, const String&);
     virtual ~WebGLRenderingContextBase();
 
 #if PLATFORM(WIN)
@@ -150,7 +150,7 @@ public:
     void compressedTexImage2D(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, ArrayBufferView& data);
     void compressedTexSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum format, ArrayBufferView& data);
 
-    virtual void copyTexImage2D(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height, GC3Dint border) = 0;
+    void copyTexImage2D(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height, GC3Dint border);
     void copyTexSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height);
 
     RefPtr<WebGLBuffer> createBuffer();
@@ -246,8 +246,8 @@ public:
     void texParameterf(GC3Denum target, GC3Denum pname, GC3Dfloat param);
     void texParameteri(GC3Denum target, GC3Denum pname, GC3Dint param);
 
-    virtual void texSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum format, GC3Denum type, RefPtr<ArrayBufferView>&&) = 0;
-    virtual ExceptionOr<void> texSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Denum format, GC3Denum type, Optional<TexImageSource>&&) = 0;
+    void texSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum format, GC3Denum type, RefPtr<ArrayBufferView>&&);
+    ExceptionOr<void> texSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Denum format, GC3Denum type, Optional<TexImageSource>&&);
 
     void uniform1f(const WebGLUniformLocation*, GC3Dfloat x);
     void uniform1fv(const WebGLUniformLocation*, Float32Array& v);
@@ -334,8 +334,8 @@ public:
     void vertexAttribDivisor(GC3Duint index, GC3Duint divisor);
 
 protected:
-    WebGLRenderingContextBase(HTMLCanvasElement*, GraphicsContext3D::Attributes);
-    WebGLRenderingContextBase(HTMLCanvasElement*, RefPtr<GraphicsContext3D>&&, GraphicsContext3D::Attributes);
+    WebGLRenderingContextBase(HTMLCanvasElement&, GraphicsContext3D::Attributes);
+    WebGLRenderingContextBase(HTMLCanvasElement&, RefPtr<GraphicsContext3D>&&, GraphicsContext3D::Attributes);
 
     friend class WebGLDrawBuffers;
     friend class WebGLFramebuffer;
@@ -371,10 +371,6 @@ protected:
     bool isGLES2Compliant() { return m_isGLES2Compliant; }
     // Query if the GL implementation is NPOT strict.
     bool isGLES2NPOTStrict() { return m_isGLES2NPOTStrict; }
-    // Query if the GL implementation generates errors on out-of-bounds buffer accesses.
-    bool isErrorGeneratedOnOutOfBoundsAccesses() { return m_isErrorGeneratedOnOutOfBoundsAccesses; }
-    // Query if the GL implementation initializes textures/renderbuffers to 0.
-    bool isResourceSafe() { return m_isResourceSafe; }
     // Query if depth_stencil buffer is supported.
     bool isDepthStencilSupported() { return m_isDepthStencilSupported; }
 
@@ -427,6 +423,12 @@ protected:
 
     // List of bound VBO's. Used to maintain info about sizes for ARRAY_BUFFER and stored values for ELEMENT_ARRAY_BUFFER
     RefPtr<WebGLBuffer> m_boundArrayBuffer;
+    RefPtr<WebGLBuffer> m_boundCopyReadBuffer;
+    RefPtr<WebGLBuffer> m_boundCopyWriteBuffer;
+    RefPtr<WebGLBuffer> m_boundPixelPackBuffer;
+    RefPtr<WebGLBuffer> m_boundPixelUnpackBuffer;
+    RefPtr<WebGLBuffer> m_boundTransformFeedbackBuffer;
+    RefPtr<WebGLBuffer> m_boundUniformBuffer;
 
     RefPtr<WebGLVertexArrayObjectBase> m_defaultVertexArrayObject;
     RefPtr<WebGLVertexArrayObjectBase> m_boundVertexArrayObject;
@@ -530,8 +532,6 @@ protected:
 
     bool m_isGLES2Compliant;
     bool m_isGLES2NPOTStrict;
-    bool m_isErrorGeneratedOnOutOfBoundsAccesses;
-    bool m_isResourceSafe;
     bool m_isDepthStencilSupported;
     bool m_isRobustnessEXTSupported;
 
@@ -588,8 +588,8 @@ protected:
 
     void texImage2DBase(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, GC3Denum format, GC3Denum type, const void* pixels);
     void texImage2DImpl(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Denum format, GC3Denum type, Image*, GraphicsContext3D::ImageHtmlDomSource, bool flipY, bool premultiplyAlpha);
-    virtual void texSubImage2DBase(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum internalformat, GC3Denum format, GC3Denum type, const void* pixels) = 0;
-    virtual void texSubImage2DImpl(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Denum format, GC3Denum type, Image*, GraphicsContext3D::ImageHtmlDomSource, bool flipY, bool premultiplyAlpha) = 0;
+    void texSubImage2DBase(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum internalformat, GC3Denum format, GC3Denum type, const void* pixels);
+    void texSubImage2DImpl(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Denum format, GC3Denum type, Image*, GraphicsContext3D::ImageHtmlDomSource, bool flipY, bool premultiplyAlpha);
 
     bool checkTextureCompleteness(const char*, bool);
 
@@ -628,7 +628,7 @@ protected:
 
     // Helper function to check input format/type for functions {copy}Tex{Sub}Image.
     // Generates GL error and returns false if parameters are invalid.
-    virtual bool validateTexFuncFormatAndType(const char* functionName, GC3Denum internalformat, GC3Denum format, GC3Denum type, GC3Dint level) = 0;
+    bool validateTexFuncFormatAndType(const char* functionName, GC3Denum internalformat, GC3Denum format, GC3Denum type, GC3Dint level);
 
     // Helper function to check input level for functions {copy}Tex{Sub}Image.
     // Generates GL error and returns false if level is invalid.
@@ -655,12 +655,12 @@ protected:
 
     // Helper function to check input parameters for functions {copy}Tex{Sub}Image.
     // Generates GL error and returns false if parameters are invalid.
-    virtual bool validateTexFuncParameters(const char* functionName,
+    bool validateTexFuncParameters(const char* functionName,
         TexFuncValidationFunctionType,
         GC3Denum target, GC3Dint level,
         GC3Denum internalformat,
         GC3Dsizei width, GC3Dsizei height, GC3Dint border,
-        GC3Denum format, GC3Denum type) = 0;
+        GC3Denum format, GC3Denum type);
 
     enum NullDisposition {
         NullAllowed,
@@ -670,17 +670,17 @@ protected:
     // Helper function to validate that the given ArrayBufferView
     // is of the correct type and contains enough data for the texImage call.
     // Generates GL error and returns false if parameters are invalid.
-    virtual bool validateTexFuncData(const char* functionName, GC3Dint level,
+    bool validateTexFuncData(const char* functionName, GC3Dint level,
         GC3Dsizei width, GC3Dsizei height,
         GC3Denum internalformat, GC3Denum format, GC3Denum type,
         ArrayBufferView* pixels,
-        NullDisposition) = 0;
+        NullDisposition);
 
     // Helper function to validate a given texture format is settable as in
     // you can supply data to texImage2D, or call texImage2D, copyTexImage2D and
     // copyTexSubImage2D.
     // Generates GL error and returns false if the format is not settable.
-    bool validateSettableTexFormat(const char* functionName, GC3Denum format);
+    bool validateSettableTexInternalFormat(const char* functionName, GC3Denum format);
 
     // Helper function to validate compressed texture data is correct size
     // for the given format and dimensions.
@@ -798,6 +798,9 @@ protected:
 
     // Check if EXT_draw_buffers extension is supported and if it satisfies the WebGL requirements.
     bool supportsDrawBuffers();
+
+private:
+    bool validateArrayBufferType(const char* functionName, GC3Denum type, Optional<JSC::TypedArrayType>);
 };
 
 } // namespace WebCore

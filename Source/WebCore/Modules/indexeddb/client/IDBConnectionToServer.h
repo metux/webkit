@@ -44,7 +44,9 @@ class IDBResultData;
 class IDBValue;
 class SecurityOrigin;
 
+struct IDBGetAllRecordsData;
 struct IDBGetRecordData;
+struct IDBIterateCursorData;
 
 namespace IDBClient {
 
@@ -89,6 +91,9 @@ public:
     void getRecord(const IDBRequestData&, const IDBGetRecordData&);
     WEBCORE_EXPORT void didGetRecord(const IDBResultData&);
 
+    void getAllRecords(const IDBRequestData&, const IDBGetAllRecordsData&);
+    WEBCORE_EXPORT void didGetAllRecords(const IDBResultData&);
+
     void getCount(const IDBRequestData&, const IDBKeyRangeData&);
     WEBCORE_EXPORT void didGetCount(const IDBResultData&);
 
@@ -98,7 +103,7 @@ public:
     void openCursor(const IDBRequestData&, const IDBCursorInfo&);
     WEBCORE_EXPORT void didOpenCursor(const IDBResultData&);
 
-    void iterateCursor(const IDBRequestData&, const IDBKeyData&, unsigned long count);
+    void iterateCursor(const IDBRequestData&, const IDBIterateCursorData&);
     WEBCORE_EXPORT void didIterateCursor(const IDBResultData&);
 
     void commitTransaction(const IDBResourceIdentifier& transactionIdentifier);
@@ -124,6 +129,7 @@ public:
 
     void establishTransaction(uint64_t databaseConnectionIdentifier, const IDBTransactionInfo&);
 
+    void databaseConnectionPendingClose(uint64_t databaseConnectionIdentifier);
     void databaseConnectionClosed(uint64_t databaseConnectionIdentifier);
 
     // To be used when an IDBOpenDBRequest gets a new database connection, optionally with a

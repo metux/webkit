@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ResourceLoadStatistics_h
-#define ResourceLoadStatistics_h
+#pragma once
 
 #include <wtf/HashCountedSet.h>
 #include <wtf/text/StringHash.h>
@@ -44,7 +43,7 @@ struct ResourceLoadStatistics {
     ResourceLoadStatistics() = default;
 
     void encode(KeyedEncoder&) const;
-    bool decode(KeyedDecoder&);
+    bool decode(KeyedDecoder&, unsigned version);
 
     String toString() const;
 
@@ -84,8 +83,7 @@ struct ResourceLoadStatistics {
     // Prevalent resource stats
     HashCountedSet<String> redirectedToOtherPrevalentResourceOrigins;
     bool isPrevalentResource { false };
+    unsigned dataRecordsRemoved { 0 };
 };
 
 } // namespace WebCore
-
-#endif // ResourceLoadStatistics_h

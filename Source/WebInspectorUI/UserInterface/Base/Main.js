@@ -88,8 +88,13 @@ WebInspector.loaded = function()
         InspectorBackend.registerLayerTreeDispatcher(new WebInspector.LayerTreeObserver);
     if (InspectorBackend.registerRuntimeDispatcher)
         InspectorBackend.registerRuntimeDispatcher(new WebInspector.RuntimeObserver);
+    if (InspectorBackend.registerWorkerDispatcher)
+        InspectorBackend.registerWorkerDispatcher(new WebInspector.WorkerObserver);
     if (InspectorBackend.registerReplayDispatcher)
         InspectorBackend.registerReplayDispatcher(new WebInspector.ReplayObserver);
+
+    // Main backend target.
+    WebInspector.mainTarget = new WebInspector.MainTarget;
 
     // Enable agents.
     InspectorAgent.enable();
@@ -103,6 +108,7 @@ WebInspector.loaded = function()
 
     // Create the singleton managers next, before the user interface elements, so the user interface can register
     // as event listeners on these managers.
+    this.targetManager = new WebInspector.TargetManager;
     this.branchManager = new WebInspector.BranchManager;
     this.frameResourceManager = new WebInspector.FrameResourceManager;
     this.storageManager = new WebInspector.StorageManager;
@@ -121,6 +127,7 @@ WebInspector.loaded = function()
     this.layerTreeManager = new WebInspector.LayerTreeManager;
     this.dashboardManager = new WebInspector.DashboardManager;
     this.probeManager = new WebInspector.ProbeManager;
+    this.workerManager = new WebInspector.WorkerManager;
     this.replayManager = new WebInspector.ReplayManager;
 
     // Enable the Console Agent after creating the singleton managers.
@@ -160,9 +167,8 @@ WebInspector.loaded = function()
 
     // COMPATIBILITY (iOS 8): Page.enableTypeProfiler did not exist.
     this.showJavaScriptTypeInformationSetting = new WebInspector.Setting("show-javascript-type-information", false);
-    if (this.showJavaScriptTypeInformationSetting.value && window.RuntimeAgent && RuntimeAgent.enableTypeProfiler) {
+    if (this.showJavaScriptTypeInformationSetting.value && window.RuntimeAgent && RuntimeAgent.enableTypeProfiler)
         RuntimeAgent.enableTypeProfiler();
-    }
 
     this.enableControlFlowProfilerSetting = new WebInspector.Setting("enable-control-flow-profiler", false);
     if (this.enableControlFlowProfilerSetting.value && window.RuntimeAgent && RuntimeAgent.enableControlFlowProfiler)
@@ -172,6 +178,10 @@ WebInspector.loaded = function()
     this.showPaintRectsSetting = new WebInspector.Setting("show-paint-rects", false);
     if (this.showPaintRectsSetting.value && window.PageAgent && PageAgent.setShowPaintRects)
         PageAgent.setShowPaintRects(true);
+
+    this.showPrintStylesSetting = new WebInspector.Setting("show-print-styles", false);
+    if (this.showPrintStylesSetting.value && window.PageAgent)
+        PageAgent.setEmulatedMedia("print");
 
     this._zoomFactorSetting = new WebInspector.Setting("zoom-factor", 1);
     this._setZoomFactor(this._zoomFactorSetting.value);
@@ -226,13 +236,32 @@ WebInspector.contentLoaded = function()
 
     document.body.classList.add(this.debuggableType);
 
+    function setTabSize() {
+        document.body.style.tabSize = WebInspector.settings.tabSize.value;
+    }
+    WebInspector.settings.tabSize.addEventListener(WebInspector.Setting.Event.Changed, setTabSize);
+    setTabSize();
+
+    function setInvalidCharacterClassName() {
+        document.body.classList.toggle("show-invalid-characters", WebInspector.settings.showInvalidCharacters.value);
+    }
+    WebInspector.settings.showInvalidCharacters.addEventListener(WebInspector.Setting.Event.Changed, setInvalidCharacterClassName);
+    setInvalidCharacterClassName();
+
+    function setWhitespaceCharacterClassName() {
+        document.body.classList.toggle("show-whitespace-characters", WebInspector.settings.showWhitespaceCharacters.value);
+    }
+    WebInspector.settings.showWhitespaceCharacters.addEventListener(WebInspector.Setting.Event.Changed, setWhitespaceCharacterClassName);
+    setWhitespaceCharacterClassName();
+
+    this.settingsTabContentView = new WebInspector.SettingsTabContentView;
+
     // Create the user interface elements.
     this.toolbar = new WebInspector.Toolbar(document.getElementById("toolbar"), null, true);
     this.toolbar.displayMode = WebInspector.Toolbar.DisplayMode.IconOnly;
     this.toolbar.sizeMode = WebInspector.Toolbar.SizeMode.Small;
 
     this.tabBar = new WebInspector.TabBar(document.getElementById("tab-bar"));
-    this.tabBar.addEventListener(WebInspector.TabBar.Event.NewTabItemClicked, this._newTabItemClicked, this);
     this.tabBar.addEventListener(WebInspector.TabBar.Event.OpenDefaultTab, this._openDefaultTab, this);
 
     this._contentElement = document.getElementById("content");
@@ -282,9 +311,6 @@ WebInspector.contentLoaded = function()
 
     this.tabBrowser = new WebInspector.TabBrowser(document.getElementById("tab-browser"), this.tabBar, this.navigationSidebar, this.detailsSidebar);
     this.tabBrowser.addEventListener(WebInspector.TabBrowser.Event.SelectedTabContentViewDidChange, this._tabBrowserSelectedTabContentViewDidChange, this);
-
-    this.tabBar.addEventListener(WebInspector.TabBar.Event.TabBarItemAdded, this._updateNewTabButtonState, this);
-    this.tabBar.addEventListener(WebInspector.TabBar.Event.TabBarItemRemoved, this._updateNewTabButtonState, this);
 
     this._reloadPageKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl, "R", this._reloadPage.bind(this));
     this._reloadPageIgnoringCacheKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl | WebInspector.KeyboardShortcut.Modifier.Shift, "R", this._reloadPageIgnoringCache.bind(this));
@@ -400,6 +426,7 @@ WebInspector.contentLoaded = function()
         WebInspector.NewTabContentView,
         WebInspector.ResourcesTabContentView,
         WebInspector.SearchTabContentView,
+        WebInspector.SettingsTabContentView,
         WebInspector.StorageTabContentView,
         WebInspector.TimelineTabContentView,
     ];
@@ -441,7 +468,7 @@ WebInspector.contentLoaded = function()
     if (!this.tabBar.selectedTabBarItem)
         this.tabBar.selectedTabBarItem = 0;
 
-    if (!this.tabBar.hasNormalTab())
+    if (!this.tabBar.normalTabCount)
         this.showNewTabTab();
 
     // Listen to the events after restoring the saved tabs to avoid recursion.
@@ -532,17 +559,6 @@ WebInspector._rememberOpenTabs = function()
     this._openTabsSetting.value = openTabs;
 };
 
-WebInspector._updateNewTabButtonState = function(event)
-{
-    this.tabBar.newTabItem.disabled = !this.isNewTabWithTypeAllowed(WebInspector.NewTabContentView.Type);
-};
-
-WebInspector._newTabItemClicked = function(event)
-{
-    const shouldAnimate = true;
-    this.showNewTabTab(shouldAnimate);
-};
-
 WebInspector._openDefaultTab = function(event)
 {
     this.showNewTabTab();
@@ -568,7 +584,7 @@ WebInspector._tryToRestorePendingTabs = function()
 
     this._pendingOpenTabs = stillPendingOpenTabs;
 
-    this._updateNewTabButtonState();
+    this.tabBrowser.tabBar.updateNewTabTabBarItemState();
 };
 
 WebInspector.showNewTabTab = function(shouldAnimate)
@@ -1027,6 +1043,13 @@ WebInspector.UIString = function(string, vararg)
     return "LOCALIZED STRING NOT FOUND";
 };
 
+WebInspector.indentString = function()
+{
+    if (WebInspector.settings.indentWithTabs.value)
+        return "\t";
+    return " ".repeat(WebInspector.settings.indentUnit.value);
+};
+
 WebInspector.restoreFocusFromElement = function(element)
 {
     if (element && element.isSelfOrAncestor(this.currentFocusElement))
@@ -1090,6 +1113,9 @@ WebInspector.tabContentViewClassForRepresentedObject = function(representedObjec
         representedObject instanceof WebInspector.ApplicationCacheFrame || representedObject instanceof WebInspector.IndexedDatabaseObjectStore ||
         representedObject instanceof WebInspector.IndexedDatabaseObjectStoreIndex)
         return WebInspector.ResourcesTabContentView;
+
+    if (representedObject instanceof WebInspector.Collection)
+        return WebInspector.CollectionContentView;
 
     return null;
 };
@@ -2193,10 +2219,11 @@ WebInspector.linkifyElement = function(linkElement, sourceCodeLocation) {
     linkElement.addEventListener("click", showSourceCodeLocation.bind(this));
 };
 
-WebInspector.sourceCodeForURL = function(url) {
+WebInspector.sourceCodeForURL = function(url)
+{
     var sourceCode = WebInspector.frameResourceManager.resourceForURL(url);
     if (!sourceCode) {
-        sourceCode = WebInspector.debuggerManager.scriptsForURL(url)[0];
+        sourceCode = WebInspector.debuggerManager.scriptsForURL(url, WebInspector.assumingMainTarget())[0];
         if (sourceCode)
             sourceCode = sourceCode.resource || sourceCode;
     }
@@ -2502,6 +2529,20 @@ WebInspector.reportInternalError = function(errorOrString, details={})
     } else
         console.error(error);
 };
+
+Object.defineProperty(WebInspector, "targets",
+{
+    get() { return this.targetManager.targets; }
+});
+
+// Many places assume the main target because they cannot yet be
+// used by reached by Worker debugging. Eventually, once all
+// Worker domains have been implemented, all of these must be
+// handled properly.
+WebInspector.assumingMainTarget = function()
+{
+    return WebInspector.mainTarget;
+}
 
 // OpenResourceDialog delegate
 

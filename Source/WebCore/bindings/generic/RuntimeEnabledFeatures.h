@@ -204,10 +204,8 @@ public:
     void setInteractiveFormValidationEnabled(bool isEnabled) { m_isInteractiveFormValidationEnabled = isEnabled; }
     bool interactiveFormValidationEnabled() const { return m_isInteractiveFormValidationEnabled; }
 
-#if ENABLE(CUSTOM_ELEMENTS)
     void setCustomElementsEnabled(bool areEnabled) { m_areCustomElementsEnabled = areEnabled; }
     bool customElementsEnabled() const { return m_areCustomElementsEnabled; }
-#endif
 
 #if ENABLE(WEBGL2)
     void setWebGL2Enabled(bool isEnabled) { m_isWebGL2Enabled = isEnabled; }
@@ -231,6 +229,11 @@ public:
 
     void setModernMediaControlsEnabled(bool areEnabled) { m_areModernMediaControlsEnabled = areEnabled; }
     bool modernMediaControlsEnabled() const { return m_areModernMediaControlsEnabled; }
+
+#if ENABLE(ENCRYPTED_MEDIA)
+    void setEncryptedMediaAPIEnabled(bool isEnabled) { m_encryptedMediaAPIEnabled = isEnabled; }
+    bool encryptedMediaAPIEnabled() const { return m_encryptedMediaAPIEnabled; }
+#endif
 
     WEBCORE_EXPORT static RuntimeEnabledFeatures& sharedFeatures();
 
@@ -328,9 +331,7 @@ private:
 
     bool m_isInteractiveFormValidationEnabled { false };
 
-#if ENABLE(CUSTOM_ELEMENTS)
-    bool m_areCustomElementsEnabled;
-#endif
+    bool m_areCustomElementsEnabled { true };
 
 #if ENABLE(WEBGL2)
     bool m_isWebGL2Enabled;
@@ -346,6 +347,10 @@ private:
 
 #if ENABLE(CSS_GRID_LAYOUT)
     bool m_cssGridLayoutEnabled;
+#endif
+
+#if ENABLE(ENCRYPTED_MEDIA)
+    bool m_encryptedMediaAPIEnabled { false };
 #endif
 
     friend class WTF::NeverDestroyed<RuntimeEnabledFeatures>;

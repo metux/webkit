@@ -40,7 +40,6 @@
 #include "EditorInsertAction.h"
 #include "ElementTraversal.h"
 #include "Event.h"
-#include "ExceptionCodePlaceholder.h"
 #include "Frame.h"
 #include "HTMLBRElement.h"
 #include "HTMLDivElement.h"
@@ -343,12 +342,13 @@ void CompositeEditCommand::apply()
         case EditActionTypingInsertPendingComposition:
         case EditActionTypingInsertFinalComposition:
         case EditActionPaste:
-        case EditActionDrag:
+        case EditActionDeleteByDrag:
         case EditActionSetWritingDirection:
         case EditActionCut:
         case EditActionUnspecified:
         case EditActionInsert:
         case EditActionInsertReplacement:
+        case EditActionInsertFromDrop:
         case EditActionDelete:
         case EditActionDictation:
             break;
@@ -402,6 +402,17 @@ Vector<RefPtr<StaticRange>> CompositeEditCommand::targetRangesForBindings() cons
 
 RefPtr<DataTransfer> CompositeEditCommand::inputEventDataTransfer() const
 {
+    return nullptr;
+}
+
+EditCommandComposition* CompositeEditCommand::composition() const
+{
+    for (auto* command = this; command; command = command->parent()) {
+        if (auto composition = command->m_composition) {
+            ASSERT(!command->parent());
+            return composition.get();
+        }
+    }
     return nullptr;
 }
 
@@ -1149,7 +1160,7 @@ void CompositeEditCommand::removePlaceholderAt(const Position& p)
 Ref<HTMLElement> CompositeEditCommand::insertNewDefaultParagraphElementAt(const Position& position)
 {
     auto paragraphElement = createDefaultParagraphElement(document());
-    paragraphElement->appendChild(HTMLBRElement::create(document()), IGNORE_EXCEPTION);
+    paragraphElement->appendChild(HTMLBRElement::create(document()));
     insertNodeAt(paragraphElement.ptr(), position);
     return paragraphElement;
 }
@@ -1290,7 +1301,7 @@ void CompositeEditCommand::cloneParagraphUnderNewElement(const Position& start, 
             auto clonedNode = node->cloneNode(true);
             insertNodeAfter(clonedNode.ptr(), lastNode);
             lastNode = WTFMove(clonedNode);
-            if (node == end.deprecatedNode() || end.deprecatedNode()->isDescendantOf(node.get()))
+            if (node == end.deprecatedNode() || end.deprecatedNode()->isDescendantOf(*node))
                 break;
         }
     }
@@ -1743,7 +1754,7 @@ RefPtr<Node> CompositeEditCommand::splitTreeToNode(Node* start, Node* end, bool 
 
 Ref<Element> createBlockPlaceholderElement(Document& document)
 {
-    return document.createElement(brTag, false);
+    return HTMLBRElement::create(document);
 }
 
 } // namespace WebCore

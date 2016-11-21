@@ -28,8 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ScriptSourceCode_h
-#define ScriptSourceCode_h
+#pragma once
 
 #include "CachedResourceHandle.h"
 #include "CachedScript.h"
@@ -43,15 +42,15 @@ namespace WebCore {
 
 class ScriptSourceCode {
 public:
-    ScriptSourceCode(const String& source, const URL& url = URL(), const TextPosition& startPosition = TextPosition::minimumPosition())
-        : m_provider(JSC::StringSourceProvider::create(source, url.isNull() ? String() : url.string(), startPosition))
+    ScriptSourceCode(const String& source, const URL& url = URL(), const TextPosition& startPosition = TextPosition::minimumPosition(), JSC::SourceProviderSourceType sourceType = JSC::SourceProviderSourceType::Program)
+        : m_provider(JSC::StringSourceProvider::create(source, url.isNull() ? String() : url.string(), startPosition, sourceType))
         , m_code(m_provider, startPosition.m_line.oneBasedInt(), startPosition.m_column.oneBasedInt())
         , m_url(url)
     {
     }
 
-    explicit ScriptSourceCode(CachedScript* cachedScript)
-        : m_provider(CachedScriptSourceProvider::create(cachedScript))
+    explicit ScriptSourceCode(CachedScript* cachedScript, JSC::SourceProviderSourceType sourceType)
+        : m_provider(CachedScriptSourceProvider::create(cachedScript, sourceType))
         , m_code(m_provider)
         , m_cachedScript(cachedScript)
     {
@@ -71,15 +70,9 @@ public:
     
 private:
     RefPtr<JSC::SourceProvider> m_provider;
-    
     JSC::SourceCode m_code;
-
     CachedResourceHandle<CachedScript> m_cachedScript;
-
     URL m_url;
-
 };
 
 } // namespace WebCore
-
-#endif // ScriptSourceCode_h

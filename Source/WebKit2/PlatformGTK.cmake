@@ -33,8 +33,6 @@ list(APPEND WebKit2_SOURCES
 
     NetworkProcess/Downloads/gtk/DownloadSoupErrorsGtk.cpp
 
-    NetworkProcess/Downloads/soup/DownloadSoup.cpp
-
     NetworkProcess/cache/NetworkCacheCodersSoup.cpp
     NetworkProcess/cache/NetworkCacheDataSoup.cpp
     NetworkProcess/cache/NetworkCacheIOChannelSoup.cpp
@@ -887,6 +885,7 @@ list(APPEND WebKit2_SYSTEM_INCLUDE_DIRECTORIES
     ${ENCHANT_INCLUDE_DIRS}
     ${GEOCLUE_INCLUDE_DIRS}
     ${GSTREAMER_INCLUDE_DIRS}
+    ${GSTREAMER_PBUTILS_INCLUDE_DIRS}
     ${HARFBUZZ_INCLUDE_DIRS}
     ${LIBSOUP_INCLUDE_DIRS}
 )

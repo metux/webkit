@@ -692,6 +692,11 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         ts << "(position " << m_position.x() << " " << m_position.y() << ")\n";
     }
 
+    if (m_approximatePosition) {
+        writeIndent(ts, indent + 1);
+        ts << "(approximate position " << m_approximatePosition.value().x() << " " << m_approximatePosition.value().y() << ")\n";
+    }
+
     if (m_boundsOrigin != FloatPoint()) {
         writeIndent(ts, indent + 1);
         ts << "(bounds origin " << m_boundsOrigin.x() << " " << m_boundsOrigin.y() << ")\n";
@@ -904,7 +909,7 @@ TextStream& operator<<(TextStream& ts, const WebCore::GraphicsLayer::CustomAppea
 
 String GraphicsLayer::layerTreeAsText(LayerTreeAsTextBehavior behavior) const
 {
-    TextStream ts;
+    TextStream ts(TextStream::LineMode::MultipleLine, TextStream::Formatting::SVGStyleRect);
 
     dumpLayer(ts, 0, behavior);
     return ts.release();

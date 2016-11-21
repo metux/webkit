@@ -40,15 +40,16 @@ class WebGLVertexArrayObject;
 
 class WebGL2RenderingContext final : public WebGLRenderingContextBase {
 public:
-    WebGL2RenderingContext(HTMLCanvasElement*, GraphicsContext3D::Attributes);
-    WebGL2RenderingContext(HTMLCanvasElement*, RefPtr<GraphicsContext3D>&&, GraphicsContext3D::Attributes);
+    WebGL2RenderingContext(HTMLCanvasElement&, GraphicsContext3D::Attributes);
+    WebGL2RenderingContext(HTMLCanvasElement&, RefPtr<GraphicsContext3D>&&, GraphicsContext3D::Attributes);
 
     /* Buffer objects */
-    void bufferData(GC3Denum target, ArrayBufferView& data, GC3Denum usage, GC3Duint srcOffset, GC3Duint length);
-    void bufferSubData(GC3Denum target, long long offset, ArrayBufferView& data, GC3Duint srcOffset, GC3Duint length);
+    using WebGLRenderingContextBase::bufferData;
+    using WebGLRenderingContextBase::bufferSubData;
+    void bufferData(GC3Denum target, const ArrayBufferView& data, GC3Denum usage, GC3Duint srcOffset, GC3Duint length);
+    void bufferSubData(GC3Denum target, long long offset, const ArrayBufferView& data, GC3Duint srcOffset, GC3Duint length);
     void copyBufferSubData(GC3Denum readTarget, GC3Denum writeTarget, GC3Dint64 readOffset, GC3Dint64 writeOffset, GC3Dint64 size);
-    void getBufferSubData(GC3Denum target, GC3Dint64 offset, RefPtr<ArrayBufferView>&& returnedData);
-    void getBufferSubData(GC3Denum target, GC3Dint64 offset, ArrayBuffer* returnedData);
+    void getBufferSubData(GC3Denum target, long long srcByteOffset, RefPtr<ArrayBufferView>&& dstData, GC3Duint dstOffset = 0, GC3Duint length = 0);
     
     /* Framebuffer objects */
     WebGLGetInfo getFramebufferAttachmentParameter(GC3Denum target, GC3Denum attachment, GC3Denum pname) final;
@@ -63,8 +64,8 @@ public:
     void renderbufferStorageMultisample(GC3Denum target, GC3Dsizei samples, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height);
     
     /* Texture objects */
-    void texStorage2D(GC3Denum target, GC3Dsizei levels, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height);
-    void texStorage3D(GC3Denum target, GC3Dsizei levels, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dsizei depth);
+    void texStorage2D(GC3Denum target, GC3Dsizei levels, GC3Denum internalFormat, GC3Dsizei width, GC3Dsizei height);
+    void texStorage3D(GC3Denum target, GC3Dsizei levels, GC3Denum internalFormat, GC3Dsizei width, GC3Dsizei height, GC3Dsizei depth);
     void texImage3D(GC3Denum target, GC3Dint level, GC3Dint internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dsizei depth, GC3Dint border, GC3Denum format, GC3Denum type, RefPtr<ArrayBufferView>&& pixels);
 
     void texSubImage3D(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dint zoffset, GC3Dsizei width, GC3Dsizei height, GC3Dsizei depth, GC3Denum format, GC3Denum type, RefPtr<ArrayBufferView>&& pixels);
@@ -178,35 +179,20 @@ private:
 
     void renderbufferStorage(GC3Denum target, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height) final;
     void hint(GC3Denum target, GC3Denum mode) final;
-    void copyTexImage2D(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height, GC3Dint border) final;
-    void texSubImage2DBase(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum internalformat, GC3Denum format, GC3Denum type, const void* pixels) final;
-    void texSubImage2DImpl(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Denum format, GC3Denum type, Image*, GraphicsContext3D::ImageHtmlDomSource, bool flipY, bool premultiplyAlpha) final;
-    void texSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum format, GC3Denum type, RefPtr<ArrayBufferView>&&) final;
-    ExceptionOr<void> texSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Denum format, GC3Denum type, Optional<TexImageSource>&&) final;
 
     void initializeVertexArrayObjects() final;
     GC3Dint getMaxDrawBuffers() final;
     GC3Dint getMaxColorAttachments() final;
     bool validateIndexArrayConservative(GC3Denum type, unsigned& numElementsRequired) final;
     bool validateBlendEquation(const char* functionName, GC3Denum mode) final;
-    bool validateTexFuncFormatAndType(const char* functionName, GC3Denum internalformat, GC3Denum format, GC3Denum type, GC3Dint level) final;
-    bool validateTexFuncParameters(const char* functionName,
-        TexFuncValidationFunctionType,
-        GC3Denum target, GC3Dint level,
-        GC3Denum internalformat,
-        GC3Dsizei width, GC3Dsizei height, GC3Dint border,
-        GC3Denum format, GC3Denum type) final;
-    bool validateTexFuncData(const char* functionName, GC3Dint level,
-        GC3Dsizei width, GC3Dsizei height,
-        GC3Denum internalformat, GC3Denum format, GC3Denum type,
-        ArrayBufferView* pixels,
-        NullDisposition) final;
     bool validateCapability(const char* functionName, GC3Denum cap) final;
     bool validateFramebufferFuncParameters(const char* functionName, GC3Denum target, GC3Denum attachment) final;
     
     GC3Denum baseInternalFormatFromInternalFormat(GC3Denum internalformat);
     bool isIntegerFormat(GC3Denum internalformat);
     void initializeShaderExtensions();
+
+    bool validateTexStorageFuncParameters(GC3Denum target, GC3Dsizei levels, GC3Denum internalFormat, GC3Dsizei width, GC3Dsizei height, const char* functionName);
 };
 
 } // namespace WebCore

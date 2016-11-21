@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2007, 2008, 2011, 2012, 2013, 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2007-2008, 2011-2013, 2015-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Research In Motion Limited. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -666,11 +666,13 @@ void URL::init(const URL& base, const String& relative, const TextEncoding& enco
 
                 // all done with the path work, now copy any remainder
                 // of the relative reference; this will also add a null terminator
-                strncpy(bufferPos, relStringPos, bufferSize - (bufferPos - bufferStart));
+                const size_t currentOffset = bufferPos - bufferStart;
+                auto remainingBufferSize = bufferSize - currentOffset;
+                ASSERT(currentOffset + strlen(relStringPos) + 1 <= bufferSize);
+                strncpy(bufferPos, relStringPos, remainingBufferSize);
+                bufferPos[remainingBufferSize - 1] = '\0';
 
                 parse(parseBuffer.data(), &relative);
-
-                ASSERT(strlen(parseBuffer.data()) + 1 <= parseBuffer.size());
                 break;
             }
         }
@@ -726,6 +728,13 @@ Optional<uint16_t> URL::port() const
     if (!ok || number > std::numeric_limits<uint16_t>::max())
         return Nullopt;
     return number;
+}
+
+String URL::hostAndPort() const
+{
+    if (auto port = this->port())
+        return host() + ':' + String::number(port.value());
+    return host();
 }
 
 String URL::user() const
@@ -799,6 +808,37 @@ static void assertProtocolIsGood(StringView protocol)
 }
 
 #endif
+
+using DefaultPortForProtocolMapForTesting = HashMap<String, uint16_t>;
+static DefaultPortForProtocolMapForTesting& defaultPortForProtocolMapForTesting()
+{
+    static NeverDestroyed<DefaultPortForProtocolMapForTesting> defaultPortForProtocolMap;
+    return defaultPortForProtocolMap;
+}
+
+void registerDefaultPortForProtocolForTesting(uint16_t port, const String& protocol)
+{
+    defaultPortForProtocolMapForTesting().add(protocol, port);
+}
+
+void clearDefaultPortForProtocolMapForTesting()
+{
+    defaultPortForProtocolMapForTesting().clear();
+}
+
+Optional<uint16_t> defaultPortForProtocol(StringView protocol)
+{
+    const auto& defaultPortForProtocolMap = defaultPortForProtocolMapForTesting();
+    auto iterator = defaultPortForProtocolMap.find(protocol.toStringWithoutCopying());
+    if (iterator != defaultPortForProtocolMap.end())
+        return iterator->value;
+    return URLParser::defaultPortForProtocol(protocol);
+}
+
+bool isDefaultPortForProtocol(uint16_t port, StringView protocol)
+{
+    return defaultPortForProtocol(protocol) == port;
+}
 
 bool URL::protocolIs(const char* protocol) const
 {
@@ -1642,8 +1682,22 @@ void URL::parse(const char* url, const String* originalString)
     }
 
     // assemble it all, remembering the real ranges
+    Checked<unsigned, RecordOverflow> bufferLength = fragmentEnd;
+    bufferLength *= 3;
 
-    Vector<char, 4096> buffer(fragmentEnd * 3 + 1);
+    // The magic number 10 comes from the worst-case addition of characters for password start,
+    // user info, and colon for port number, colon after scheme, plus inserting missing slashes
+    // after protocol, slash for empty path, and possible end-of-query '#' character. This
+    // yields a max of nine additional characters, plus a null.
+    bufferLength += 10;
+
+    if (bufferLength.hasOverflowed()) {
+        m_string = originalString ? *originalString : url;
+        invalidate();
+        return;
+    }
+
+    Vector<char, 4096> buffer(bufferLength.unsafeGet());
 
     char* p = buffer.data();
     const char* strPtr = url;

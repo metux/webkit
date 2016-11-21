@@ -511,6 +511,13 @@ AccessibilityObject* AccessibilityObject::firstAccessibleObjectFromNode(const No
     return accessibleObject;
 }
 
+bool AccessibilityObject::isDescendantOfRole(AccessibilityRole role) const
+{
+    return AccessibilityObject::matchedParent(*this, false, [&role] (const AccessibilityObject& object) {
+        return object.roleValue() == role;
+    }) != nullptr;
+}
+
 static void appendAccessibilityObject(AccessibilityObject* object, AccessibilityObject::AccessibilityChildrenVector& results)
 {
     // Find the next descendant of this attachment object so search can continue through frames.
@@ -695,7 +702,7 @@ RefPtr<Range> AccessibilityObject::rangeOfStringClosestToRangeInDirection(Range*
                 Node* closestContainerNode = closestStringPosition.containerNode();
                 Node* searchContainerNode = searchStringPosition.containerNode();
                 
-                short result = Range::compareBoundaryPoints(closestContainerNode, closestPositionOffset, searchContainerNode, searchPositionOffset, ASSERT_NO_EXCEPTION);
+                short result = Range::compareBoundaryPoints(closestContainerNode, closestPositionOffset, searchContainerNode, searchPositionOffset).releaseReturnValue();
                 if ((!isBackwardSearch && result > 0) || (isBackwardSearch && result < 0))
                     closestStringRange = searchStringRange;
             }
@@ -911,11 +918,12 @@ bool AccessibilityObject::press()
     
     // Prefer the actionElement instead of this node, if the actionElement is inside this node.
     Element* pressElement = this->element();
-    if (!pressElement || actionElem->isDescendantOf(pressElement))
+    if (!pressElement || actionElem->isDescendantOf(*pressElement))
         pressElement = actionElem;
     
+    ASSERT(pressElement);
     // Prefer the hit test element, if it is inside the target element.
-    if (hitTestElement && hitTestElement->isDescendantOf(pressElement))
+    if (hitTestElement && hitTestElement->isDescendantOf(*pressElement))
         pressElement = hitTestElement;
     
     UserGestureIndicator gestureIndicator(ProcessingUserGesture, document);
@@ -2197,7 +2205,9 @@ String AccessibilityObject::computedRoleString() const
     AccessibilityRole role = roleValue();
     if (role == HorizontalRuleRole)
         role = SplitterRole;
-    
+    if (role == PopUpButtonRole || role == ToggleButtonRole)
+        role = ButtonRole;
+
     return reverseAriaRoleMap().get(role);
 }
 

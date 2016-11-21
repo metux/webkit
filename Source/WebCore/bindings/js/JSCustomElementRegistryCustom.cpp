@@ -38,8 +38,6 @@ using namespace JSC;
 
 namespace WebCore {
 
-#if ENABLE(CUSTOM_ELEMENTS)
-
 static JSObject* getCustomElementCallback(ExecState& state, JSObject& prototype, const Identifier& id)
 {
     VM& vm = state.vm();
@@ -103,7 +101,7 @@ JSValue JSCustomElementRegistry::define(ExecState& state)
         throwNotSupportedError(state, scope, ASCIILiteral("Cannot define a custom element while defining another custom element"));
         return jsUndefined();
     }
-    TemporaryChange<bool> change(registry.elementDefinitionIsRunning(), true);
+    SetForScope<bool> change(registry.elementDefinitionIsRunning(), true);
 
     if (registry.findInterface(localName)) {
         throwNotSupportedError(state, scope, ASCIILiteral("Cannot define multiple custom elements with the same tag name"));
@@ -201,7 +199,5 @@ JSValue JSCustomElementRegistry::whenDefined(ExecState& state)
 
     return promise;
 }
-
-#endif
 
 }

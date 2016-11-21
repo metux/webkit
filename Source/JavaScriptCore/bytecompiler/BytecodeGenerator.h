@@ -39,7 +39,6 @@
 #include "Nodes.h"
 #include "ParserError.h"
 #include "RegisterID.h"
-#include "SetForScope.h"
 #include "StaticPropertyAnalyzer.h"
 #include "SymbolTable.h"
 #include "TemplateRegistryKey.h"
@@ -48,6 +47,7 @@
 #include <wtf/HashTraits.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/SegmentedVector.h>
+#include <wtf/SetForScope.h>
 #include <wtf/Vector.h>
 
 namespace JSC {
@@ -315,6 +315,8 @@ namespace JSC {
 
         RegisterID* generatorRegister() { return m_generatorRegister; }
 
+        RegisterID* promiseCapabilityRegister() { return m_promiseCapabilityRegister; }
+
         // Returns the next available temporary register. Registers returned by
         // newTemporary require a modified form of reference counting: any
         // register with a refcount of 0 is considered "available", meaning that
@@ -527,6 +529,7 @@ namespace JSC {
         void liftTDZCheckIfPossible(const Variable&);
         RegisterID* emitNewObject(RegisterID* dst);
         RegisterID* emitNewArray(RegisterID* dst, ElementNode*, unsigned length); // stops at first elision
+        RegisterID* emitNewArrayWithSpread(RegisterID* dst, ElementNode*);
         RegisterID* emitNewArrayWithSize(RegisterID* dst, RegisterID* length);
 
         RegisterID* emitNewFunction(RegisterID* dst, FunctionMetadataNode*);
@@ -576,7 +579,12 @@ namespace JSC {
         void emitPutGetterSetter(RegisterID* base, const Identifier& property, unsigned attributes, RegisterID* getter, RegisterID* setter);
         void emitPutGetterByVal(RegisterID* base, RegisterID* property, unsigned propertyDescriptorOptions, RegisterID* getter);
         void emitPutSetterByVal(RegisterID* base, RegisterID* property, unsigned propertyDescriptorOptions, RegisterID* setter);
-        
+
+        RegisterID* emitGetArgument(RegisterID* dst, int32_t index);
+
+        // Initialize object with generator fields (@generatorThis, @generatorNext, @generatorState, @generatorFrame)
+        void emitPutGeneratorFields(RegisterID* nextFunction);
+
         ExpectedFunction expectedFunctionForIdentifier(const Identifier&);
         RegisterID* emitCall(RegisterID* dst, RegisterID* func, ExpectedFunction, CallArguments&, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd, DebuggableCall);
         RegisterID* emitCallInTailPosition(RegisterID* dst, RegisterID* func, ExpectedFunction, CallArguments&, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd, DebuggableCall);
@@ -842,7 +850,7 @@ namespace JSC {
         {
             DerivedContextType newDerivedContextType = DerivedContextType::None;
 
-            if (metadata->parseMode() == SourceParseMode::ArrowFunctionMode) {
+            if (SourceParseModeSet(SourceParseMode::ArrowFunctionMode, SourceParseMode::AsyncArrowFunctionMode).contains(metadata->parseMode())) {
                 if (constructorKind() == ConstructorKind::Extends || isDerivedConstructorContext())
                     newDerivedContextType = DerivedContextType::DerivedConstructorContext;
                 else if (m_codeBlock->isClassContext() || isDerivedClassContext())
@@ -925,6 +933,7 @@ namespace JSC {
         RegisterID* m_isDerivedConstuctor { nullptr };
         RegisterID* m_linkTimeConstantRegisters[LinkTimeConstantCount];
         RegisterID* m_arrowFunctionContextLexicalEnvironmentRegister { nullptr };
+        RegisterID* m_promiseCapabilityRegister { nullptr };
 
         SegmentedVector<RegisterID*, 16> m_localRegistersForCalleeSaveRegisters;
         SegmentedVector<RegisterID, 32> m_constantPoolRegisters;

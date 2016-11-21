@@ -25,12 +25,10 @@
 
 #pragma once
 
-#if ENABLE(CUSTOM_ELEMENTS)
-
 #include "JSDOMPromise.h"
 #include "QualifiedName.h"
 #include <wtf/HashMap.h>
-#include <wtf/TemporaryChange.h>
+#include <wtf/SetForScope.h>
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/AtomicStringHash.h>
 
@@ -78,9 +76,7 @@ private:
 
     bool m_elementDefinitionIsRunning { false };
 
-    friend class ElementDefinitionIsRunningTemporaryChange;
+    friend class ElementDefinitionIsRunningSetForScope;
 };
 
 }
-
-#endif

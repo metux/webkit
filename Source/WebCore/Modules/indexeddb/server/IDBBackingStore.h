@@ -23,8 +23,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef IDBBackingStore_h
-#define IDBBackingStore_h
+#pragma once
 
 #if ENABLE(INDEXED_DATABASE)
 
@@ -34,6 +33,7 @@
 namespace WebCore {
 
 class IDBCursorInfo;
+class IDBGetAllResult;
 class IDBGetResult;
 class IDBIndexInfo;
 class IDBKeyData;
@@ -43,6 +43,8 @@ class IDBTransactionInfo;
 class IDBValue;
 class ThreadSafeDataBuffer;
 
+struct IDBGetAllRecordsData;
+struct IDBIterateCursorData;
 struct IDBKeyRangeData;
 
 namespace IndexedDB {
@@ -79,13 +81,14 @@ public:
     virtual IDBError deleteRange(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyRangeData&) = 0;
     virtual IDBError addRecord(const IDBResourceIdentifier& transactionIdentifier, const IDBObjectStoreInfo&, const IDBKeyData&, const IDBValue&) = 0;
     virtual IDBError getRecord(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyRangeData&, IDBGetResult& outValue) = 0;
+    virtual IDBError getAllRecords(const IDBResourceIdentifier& transactionIdentifier, const IDBGetAllRecordsData&, IDBGetAllResult& outValue) = 0;
     virtual IDBError getIndexRecord(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, IndexedDB::IndexRecordType, const IDBKeyRangeData&, IDBGetResult& outValue) = 0;
     virtual IDBError getCount(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const IDBKeyRangeData&, uint64_t& outCount) = 0;
     virtual IDBError generateKeyNumber(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, uint64_t& keyNumber) = 0;
     virtual IDBError revertGeneratedKeyNumber(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, uint64_t keyNumber) = 0;
     virtual IDBError maybeUpdateKeyGeneratorNumber(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, double newKeyNumber) = 0;
     virtual IDBError openCursor(const IDBResourceIdentifier& transactionIdentifier, const IDBCursorInfo&, IDBGetResult& outResult) = 0;
-    virtual IDBError iterateCursor(const IDBResourceIdentifier& transactionIdentifier, const IDBResourceIdentifier& cursorIdentifier, const IDBKeyData&, uint32_t count, IDBGetResult& outResult) = 0;
+    virtual IDBError iterateCursor(const IDBResourceIdentifier& transactionIdentifier, const IDBResourceIdentifier& cursorIdentifier, const IDBIterateCursorData&, IDBGetResult& outResult) = 0;
 
     virtual IDBObjectStoreInfo* infoForObjectStore(uint64_t objectStoreIdentifier) = 0;
     virtual void deleteBackingStore() = 0;
@@ -98,4 +101,3 @@ public:
 } // namespace WebCore
 
 #endif // ENABLE(INDEXED_DATABASE)
-#endif // IDBBackingStore_h

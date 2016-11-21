@@ -29,6 +29,7 @@
 #if ENABLE(JIT)
 
 #include "DOMJITAbstractHeapRepository.h"
+#include "DOMJITCheckDOM.h"
 #include "DOMJITHelpers.h"
 #include "JSDOMWrapper.h"
 #include "Node.h"
@@ -43,19 +44,9 @@ namespace WebCore {
 enum class IsContainerGuardRequirement { Required, NotRequired };
 
 template<typename WrappedNode>
-EncodedJSValue JIT_OPERATION toWrapperSlow(JSC::ExecState* exec, JSC::JSGlobalObject* globalObject, void* result)
+static Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> createCallDOMGetterForOffsetAccess(ptrdiff_t offset, IsContainerGuardRequirement isContainerGuardRequirement)
 {
-    ASSERT(exec);
-    ASSERT(result);
-    ASSERT(globalObject);
-    JSC::NativeCallFrameTracer tracer(&exec->vm(), exec);
-    return JSValue::encode(toJS(exec, static_cast<JSDOMGlobalObject*>(globalObject), *static_cast<WrappedNode*>(result)));
-}
-
-template<typename WrappedNode>
-static Ref<JSC::DOMJIT::CallDOMPatchpoint> createCallDOMForOffsetAccess(ptrdiff_t offset, IsContainerGuardRequirement isContainerGuardRequirement)
-{
-    Ref<JSC::DOMJIT::CallDOMPatchpoint> patchpoint = JSC::DOMJIT::CallDOMPatchpoint::create();
+    Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> patchpoint = JSC::DOMJIT::CallDOMGetterPatchpoint::create();
     patchpoint->numGPScratchRegisters = 1;
     patchpoint->setGenerator([=](CCallHelpers& jit, JSC::DOMJIT::PatchpointParams& params) {
         JSValueRegs result = params[0].jsValueRegs();
@@ -74,7 +65,7 @@ static Ref<JSC::DOMJIT::CallDOMPatchpoint> createCallDOMForOffsetAccess(ptrdiff_
         jit.loadPtr(CCallHelpers::Address(scratch, offset), scratch);
         nullCases.append(jit.branchTestPtr(CCallHelpers::Zero, scratch));
 
-        DOMJIT::toWrapper<WrappedNode>(jit, params, scratch, globalObject, result, toWrapperSlow<WrappedNode>, globalObjectValue);
+        DOMJIT::toWrapper<WrappedNode>(jit, params, scratch, globalObject, result, DOMJIT::toWrapperSlow<WrappedNode>, globalObjectValue);
         CCallHelpers::Jump done = jit.jump();
 
         nullCases.link(&jit);
@@ -85,96 +76,74 @@ static Ref<JSC::DOMJIT::CallDOMPatchpoint> createCallDOMForOffsetAccess(ptrdiff_
     return patchpoint;
 }
 
-static Ref<JSC::DOMJIT::Patchpoint> checkNode()
-{
-    Ref<JSC::DOMJIT::Patchpoint> patchpoint = JSC::DOMJIT::Patchpoint::create();
-    patchpoint->setGenerator([=](CCallHelpers& jit, JSC::DOMJIT::PatchpointParams& params) {
-        CCallHelpers::JumpList failureCases;
-        failureCases.append(DOMJIT::branchIfNotNode(jit, params[0].gpr()));
-        return failureCases;
-    });
-    return patchpoint;
-}
-
-// Node#firstChild.
 Ref<JSC::DOMJIT::Patchpoint> NodeFirstChildDOMJIT::checkDOM()
 {
-    return checkNode();
+    return DOMJIT::checkDOM<Node>();
 }
 
-Ref<JSC::DOMJIT::CallDOMPatchpoint> NodeFirstChildDOMJIT::callDOM()
+Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> NodeFirstChildDOMJIT::callDOMGetter()
 {
-    const auto& heap = DOMJIT::AbstractHeapRepository::shared();
-    auto patchpoint = createCallDOMForOffsetAccess<Node>(CAST_OFFSET(Node*, ContainerNode*) + ContainerNode::firstChildMemoryOffset(), IsContainerGuardRequirement::Required);
-    patchpoint->effect = JSC::DOMJIT::Effect::forDef(heap.Node_firstChild);
+    auto patchpoint = createCallDOMGetterForOffsetAccess<Node>(CAST_OFFSET(Node*, ContainerNode*) + ContainerNode::firstChildMemoryOffset(), IsContainerGuardRequirement::Required);
+    patchpoint->effect = JSC::DOMJIT::Effect::forDef(DOMJIT::AbstractHeapRepository::Node_firstChild);
     return patchpoint;
 }
 
-// Node#lastChild.
 Ref<JSC::DOMJIT::Patchpoint> NodeLastChildDOMJIT::checkDOM()
 {
-    return checkNode();
+    return DOMJIT::checkDOM<Node>();
 }
 
-Ref<JSC::DOMJIT::CallDOMPatchpoint> NodeLastChildDOMJIT::callDOM()
+Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> NodeLastChildDOMJIT::callDOMGetter()
 {
-    const auto& heap = DOMJIT::AbstractHeapRepository::shared();
-    auto patchpoint = createCallDOMForOffsetAccess<Node>(CAST_OFFSET(Node*, ContainerNode*) + ContainerNode::lastChildMemoryOffset(), IsContainerGuardRequirement::Required);
-    patchpoint->effect = JSC::DOMJIT::Effect::forDef(heap.Node_lastChild);
+    auto patchpoint = createCallDOMGetterForOffsetAccess<Node>(CAST_OFFSET(Node*, ContainerNode*) + ContainerNode::lastChildMemoryOffset(), IsContainerGuardRequirement::Required);
+    patchpoint->effect = JSC::DOMJIT::Effect::forDef(DOMJIT::AbstractHeapRepository::Node_lastChild);
     return patchpoint;
 }
 
-// Node#nextSibling.
 Ref<JSC::DOMJIT::Patchpoint> NodeNextSiblingDOMJIT::checkDOM()
 {
-    return checkNode();
+    return DOMJIT::checkDOM<Node>();
 }
 
-Ref<JSC::DOMJIT::CallDOMPatchpoint> NodeNextSiblingDOMJIT::callDOM()
+Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> NodeNextSiblingDOMJIT::callDOMGetter()
 {
-    const auto& heap = DOMJIT::AbstractHeapRepository::shared();
-    auto patchpoint = createCallDOMForOffsetAccess<Node>(Node::nextSiblingMemoryOffset(), IsContainerGuardRequirement::NotRequired);
-    patchpoint->effect = JSC::DOMJIT::Effect::forDef(heap.Node_nextSibling);
+    auto patchpoint = createCallDOMGetterForOffsetAccess<Node>(Node::nextSiblingMemoryOffset(), IsContainerGuardRequirement::NotRequired);
+    patchpoint->effect = JSC::DOMJIT::Effect::forDef(DOMJIT::AbstractHeapRepository::Node_nextSibling);
     return patchpoint;
 }
 
-// Node#previousSibling.
 Ref<JSC::DOMJIT::Patchpoint> NodePreviousSiblingDOMJIT::checkDOM()
 {
-    return checkNode();
+    return DOMJIT::checkDOM<Node>();
 }
 
-Ref<JSC::DOMJIT::CallDOMPatchpoint> NodePreviousSiblingDOMJIT::callDOM()
+Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> NodePreviousSiblingDOMJIT::callDOMGetter()
 {
-    const auto& heap = DOMJIT::AbstractHeapRepository::shared();
-    auto patchpoint = createCallDOMForOffsetAccess<Node>(Node::previousSiblingMemoryOffset(), IsContainerGuardRequirement::NotRequired);
-    patchpoint->effect = JSC::DOMJIT::Effect::forDef(heap.Node_previousSibling);
+    auto patchpoint = createCallDOMGetterForOffsetAccess<Node>(Node::previousSiblingMemoryOffset(), IsContainerGuardRequirement::NotRequired);
+    patchpoint->effect = JSC::DOMJIT::Effect::forDef(DOMJIT::AbstractHeapRepository::Node_previousSibling);
     return patchpoint;
 }
 
-// Node#parentNode.
 Ref<JSC::DOMJIT::Patchpoint> NodeParentNodeDOMJIT::checkDOM()
 {
-    return checkNode();
+    return DOMJIT::checkDOM<Node>();
 }
 
-Ref<JSC::DOMJIT::CallDOMPatchpoint> NodeParentNodeDOMJIT::callDOM()
+Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> NodeParentNodeDOMJIT::callDOMGetter()
 {
-    const auto& heap = DOMJIT::AbstractHeapRepository::shared();
-    auto patchpoint = createCallDOMForOffsetAccess<ContainerNode>(Node::parentNodeMemoryOffset(), IsContainerGuardRequirement::NotRequired);
-    patchpoint->effect = JSC::DOMJIT::Effect::forDef(heap.Node_parentNode);
+    auto patchpoint = createCallDOMGetterForOffsetAccess<ContainerNode>(Node::parentNodeMemoryOffset(), IsContainerGuardRequirement::NotRequired);
+    patchpoint->effect = JSC::DOMJIT::Effect::forDef(DOMJIT::AbstractHeapRepository::Node_parentNode);
     return patchpoint;
 }
 
-// Node#nodeType.
 Ref<JSC::DOMJIT::Patchpoint> NodeNodeTypeDOMJIT::checkDOM()
 {
-    return checkNode();
+    return DOMJIT::checkDOM<Node>();
 }
 
-Ref<JSC::DOMJIT::CallDOMPatchpoint> NodeNodeTypeDOMJIT::callDOM()
+Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> NodeNodeTypeDOMJIT::callDOMGetter()
 {
-    Ref<JSC::DOMJIT::CallDOMPatchpoint> patchpoint = JSC::DOMJIT::CallDOMPatchpoint::create();
+    Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> patchpoint = JSC::DOMJIT::CallDOMGetterPatchpoint::create();
     patchpoint->effect = JSC::DOMJIT::Effect::forPure();
     patchpoint->requireGlobalObject = false;
     patchpoint->setGenerator([=](CCallHelpers& jit, JSC::DOMJIT::PatchpointParams& params) {
@@ -185,6 +154,43 @@ Ref<JSC::DOMJIT::CallDOMPatchpoint> NodeNodeTypeDOMJIT::callDOM()
         jit.boxInt32(result.payloadGPR(), result);
         return CCallHelpers::JumpList();
     });
+    return patchpoint;
+}
+
+Ref<JSC::DOMJIT::Patchpoint> NodeOwnerDocumentDOMJIT::checkDOM()
+{
+    return DOMJIT::checkDOM<Node>();
+}
+
+Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> NodeOwnerDocumentDOMJIT::callDOMGetter()
+{
+    Ref<JSC::DOMJIT::CallDOMGetterPatchpoint> patchpoint = JSC::DOMJIT::CallDOMGetterPatchpoint::create();
+    patchpoint->numGPScratchRegisters = 2;
+    patchpoint->setGenerator([=](CCallHelpers& jit, JSC::DOMJIT::PatchpointParams& params) {
+        JSValueRegs result = params[0].jsValueRegs();
+        GPRReg node = params[1].gpr();
+        GPRReg globalObject = params[2].gpr();
+        JSValue globalObjectValue = params[2].value();
+        GPRReg wrapped = params.gpScratch(0);
+        GPRReg document = params.gpScratch(1);
+
+        jit.loadPtr(CCallHelpers::Address(node, JSNode::offsetOfWrapped()), wrapped);
+        DOMJIT::loadDocument(jit, wrapped, document);
+        RELEASE_ASSERT(!CAST_OFFSET(EventTarget*, Node*));
+        RELEASE_ASSERT(!CAST_OFFSET(Node*, Document*));
+
+        CCallHelpers::JumpList nullCases;
+        // If the |this| is the document itself, ownerDocument will return null.
+        nullCases.append(jit.branchPtr(CCallHelpers::Equal, wrapped, document));
+        DOMJIT::toWrapper<Document>(jit, params, document, globalObject, result, DOMJIT::toWrapperSlow<Document>, globalObjectValue);
+        auto done = jit.jump();
+
+        nullCases.link(&jit);
+        jit.moveValue(jsNull(), result);
+        done.link(&jit);
+        return CCallHelpers::JumpList();
+    });
+    patchpoint->effect = JSC::DOMJIT::Effect::forDef(DOMJIT::AbstractHeapRepository::Node_ownerDocument);
     return patchpoint;
 }
 

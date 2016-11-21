@@ -290,7 +290,9 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     m_gcController = GCController::create();
     m_eventSendingController = EventSendingController::create();
     m_textInputController = TextInputController::create();
+#if HAVE(ACCESSIBILITY)
     m_accessibilityController = AccessibilityController::create();
+#endif
 
     WKBundleSetAllowUniversalAccessFromFileURLs(m_bundle, m_pageGroup, true);
     WKBundleSetJavaScriptCanAccessClipboard(m_bundle, m_pageGroup, true);
@@ -303,6 +305,7 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     WKBundleSetAllowFileAccessFromFileURLs(m_bundle, m_pageGroup, true);
     WKBundleSetPluginsEnabled(m_bundle, m_pageGroup, true);
     WKBundleSetPopupBlockingEnabled(m_bundle, m_pageGroup, false);
+    WKBundleSetAllowStorageAccessFromFileURLS(m_bundle, m_pageGroup, false);
 
 #if PLATFORM(IOS)
     WKBundlePageSetUseTestingViewportConfiguration(page()->page(), !booleanForKey(settings, "UseFlexibleViewport"));
@@ -324,6 +327,10 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     m_testRunner->setFetchAPIEnabled(true);
 
     m_testRunner->setDownloadAttributeEnabled(true);
+
+    m_testRunner->setES6ModulesEnabled(true);
+
+    m_testRunner->setEncryptedMediaAPIEnabled(true);
 
     m_testRunner->setCloseRemainingWindowsWhenComplete(false);
     m_testRunner->setAcceptsEditing(true);
