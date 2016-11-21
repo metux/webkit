@@ -1,4 +1,4 @@
-webkit2gtk (2.15.2-1) UNRELEASED; urgency=medium
+webkit2gtk (2.15.2-1) experimental; urgency=medium
 
   * New upstream development release.
   * Verify GPG signature of the upstream tarball:
@@ -13,7 +13,7 @@ webkit2gtk (2.15.2-1) UNRELEASED; urgency=medium
   * debian/rules:
     + Use the NEWS file as the upstream changelog.
 
- -- Alberto Garcia <berto@igalia.com>  Mon, 21 Nov 2016 15:24:13 +0200
+ -- Alberto Garcia <berto@igalia.com>  Mon, 21 Nov 2016 20:34:28 +0200
 
 webkit2gtk (2.15.1-1) experimental; urgency=medium
 
