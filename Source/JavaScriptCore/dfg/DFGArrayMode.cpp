@@ -35,7 +35,7 @@
 
 namespace JSC { namespace DFG {
 
-ArrayMode ArrayMode::fromObserved(const ConcurrentJITLocker& locker, ArrayProfile* profile, Array::Action action, bool makeSafe)
+ArrayMode ArrayMode::fromObserved(const ConcurrentJSLocker& locker, ArrayProfile* profile, Array::Action action, bool makeSafe)
 {
     Array::Class nonArray;
     if (profile->usesOriginalArrayStructures(locker))
@@ -733,7 +733,7 @@ bool ArrayMode::permitsBoundsCheckLowering() const
 
 void ArrayMode::dump(PrintStream& out) const
 {
-    out.print(type(), arrayClass(), speculation(), conversion());
+    out.print(type(), "+", arrayClass(), "+", speculation(), "+", conversion());
 }
 
 } } // namespace JSC::DFG

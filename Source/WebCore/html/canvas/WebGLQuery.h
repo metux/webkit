@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef WebGLQuery_h
-#define WebGLQuery_h
+#pragma once
 
 #include "WebGLSharedObject.h"
 
@@ -34,10 +33,10 @@ class WebGLQuery final : public WebGLSharedObject {
 public:
     virtual ~WebGLQuery();
 
-    static Ref<WebGLQuery> create(WebGLRenderingContextBase*);
+    static Ref<WebGLQuery> create(WebGLRenderingContextBase&);
 
 protected:
-    WebGLQuery(WebGLRenderingContextBase*);
+    WebGLQuery(WebGLRenderingContextBase&);
 
     void deleteObjectImpl(GraphicsContext3D*, Platform3DObject) override;
 
@@ -46,5 +45,3 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // WebGLQuery_h

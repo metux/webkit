@@ -19,8 +19,7 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef CSSSelector_h
-#define CSSSelector_h
+#pragma once
 
 #include "QualifiedName.h"
 #include "RenderStyleConstants.h"
@@ -83,14 +82,14 @@ namespace WebCore {
 
         enum RelationType {
             Subselector,
-            Descendant,
+            DescendantSpace,
             Child,
             DirectAdjacent,
             IndirectAdjacent,
-            ShadowDescendant, // FIXME-NEWPARSER: Remove this in favor of the new shadow values below.
-            ShadowPseudo, // Special case of shadow DOM pseudo elements / shadow pseudo element
-            ShadowDeep, // /deep/ combinator
-            ShadowSlot // slotted to <slot> e
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+            DescendantDoubleChild,
+#endif
+            ShadowDescendant
         };
 
         enum PseudoClassType {
@@ -164,9 +163,7 @@ namespace WebCore {
             PseudoClassRole,
 #endif
             PseudoClassHost,
-#if ENABLE(CUSTOM_ELEMENTS)
             PseudoClassDefined,
-#endif
         };
 
         enum PseudoElementType {
@@ -259,6 +256,14 @@ namespace WebCore {
         int nthA() const;
         int nthB() const;
 
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+        bool hasDescendantRelation() const { return relation() == DescendantSpace || relation() == DescendantDoubleChild; }
+#else
+        bool hasDescendantRelation() const { return relation() == DescendantSpace; }
+#endif
+
+        bool hasDescendantOrChildRelation() const { return relation() == Child || hasDescendantRelation(); }
+
         PseudoClassType pseudoClassType() const
         {
             ASSERT(match() == PseudoClass);
@@ -306,14 +311,6 @@ namespace WebCore {
             ASSERT(m_relation == relation);
         }
 
-#if ENABLE(CSS_SELECTORS_LEVEL4)
-        void setDescendantUseDoubleChildSyntax()
-        {
-            ASSERT(relation() == Descendant);
-            m_descendantDoubleChildSyntax = true;
-        }
-#endif
-
         Match match() const { return static_cast<Match>(m_match); }
         void setMatch(Match match)
         {
@@ -330,7 +327,7 @@ namespace WebCore {
         void setForPage() { m_isForPage = true; }
 
     private:
-        unsigned m_relation              : 3; // enum RelationType.
+        unsigned m_relation              : 4; // enum RelationType.
         mutable unsigned m_match         : 4; // enum Match.
         mutable unsigned m_pseudoType    : 8; // PseudoType.
         mutable unsigned m_parsedNth     : 1; // Used for :nth-*.
@@ -340,9 +337,6 @@ namespace WebCore {
         unsigned m_hasNameWithCase       : 1;
         unsigned m_isForPage             : 1;
         unsigned m_tagIsForNamespaceRule : 1;
-#if ENABLE(CSS_SELECTORS_LEVEL4)
-        unsigned m_descendantDoubleChildSyntax : 1;
-#endif
         unsigned m_caseInsensitiveAttributeValueMatching : 1;
 #if !ASSERT_WITH_SECURITY_IMPLICATION_DISABLED
         unsigned m_destructorHasBeenCalled : 1;
@@ -483,7 +477,7 @@ inline void CSSSelector::setValue(const AtomicString& value)
 }
 
 inline CSSSelector::CSSSelector()
-    : m_relation(Descendant)
+    : m_relation(DescendantSpace)
     , m_match(Unknown)
     , m_pseudoType(0)
     , m_parsedNth(false)
@@ -493,9 +487,6 @@ inline CSSSelector::CSSSelector()
     , m_hasNameWithCase(false)
     , m_isForPage(false)
     , m_tagIsForNamespaceRule(false)
-#if ENABLE(CSS_SELECTORS_LEVEL4)
-    , m_descendantDoubleChildSyntax(false)
-#endif
     , m_caseInsensitiveAttributeValueMatching(false)
 #if !ASSERT_WITH_SECURITY_IMPLICATION_DISABLED
     , m_destructorHasBeenCalled(false)
@@ -514,9 +505,6 @@ inline CSSSelector::CSSSelector(const CSSSelector& o)
     , m_hasNameWithCase(o.m_hasNameWithCase)
     , m_isForPage(o.m_isForPage)
     , m_tagIsForNamespaceRule(o.m_tagIsForNamespaceRule)
-#if ENABLE(CSS_SELECTORS_LEVEL4)
-    , m_descendantDoubleChildSyntax(o.m_descendantDoubleChildSyntax)
-#endif
     , m_caseInsensitiveAttributeValueMatching(o.m_caseInsensitiveAttributeValueMatching)
 #if !ASSERT_WITH_SECURITY_IMPLICATION_DISABLED
     , m_destructorHasBeenCalled(false)
@@ -596,5 +584,3 @@ inline bool CSSSelector::attributeValueMatchingIsCaseInsensitive() const
 }
 
 } // namespace WebCore
-
-#endif // CSSSelector_h

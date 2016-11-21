@@ -34,19 +34,19 @@
  *  - "1" enables the feature by default. The feature can still be disabled for a specific port or environment.
  *
  * The feature defaults in this file are only taken into account if the (port specific) build system
- * has not enabled or disabled a particular feature. 
+ * has not enabled or disabled a particular feature.
  *
  * Use this file to define ENABLE() macros only. Do not use this file to define USE() or macros !
  *
  * Only define a macro if it was not defined before - always check for !defined first.
- * 
+ *
  * Keep the file sorted by the name of the defines. As an exception you can change the order
  * to allow interdependencies between the default values.
- * 
+ *
  * Below are a few potential commands to take advantage of this file running from the Source/WTF directory
  *
  * Get the list of feature defines: grep -o "ENABLE_\(\w\+\)" wtf/FeatureDefines.h | sort | uniq
- * Get the list of features enabled by default for a PLATFORM(XXX): gcc -E -dM -I. -DWTF_PLATFORM_XXX "wtf/Platform.h" | grep "ENABLE_\w\+ 1" | cut -d' ' -f2 | sort 
+ * Get the list of features enabled by default for a PLATFORM(XXX): gcc -E -dM -I. -DWTF_PLATFORM_XXX "wtf/Platform.h" | grep "ENABLE_\w\+ 1" | cut -d' ' -f2 | sort
  */
 
 /* FIXME: Move out the PLATFORM specific rules into platform specific files. */
@@ -345,10 +345,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_APNG 1
 #endif
 
-#if !defined(ENABLE_BATTERY_STATUS)
-#define ENABLE_BATTERY_STATUS 0
-#endif
-
 #if !defined(ENABLE_CANVAS_PATH)
 #define ENABLE_CANVAS_PATH 1
 #endif
@@ -359,14 +355,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_CHANNEL_MESSAGING)
 #define ENABLE_CHANNEL_MESSAGING 1
-#endif
-
-#if !defined(ENABLE_ES6_MODULES)
-#define ENABLE_ES6_MODULES 0
-#endif
-
-#if !defined(ENABLE_ES2017_ASYNCFUNCTION_SYNTAX)
-#define ENABLE_ES2017_ASYNCFUNCTION_SYNTAX 0
 #endif
 
 #if !defined(ENABLE_CONTENT_EXTENSIONS)
@@ -642,7 +630,7 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #endif
 
 #if !defined(ENABLE_POINTER_LOCK)
-#define ENABLE_POINTER_LOCK 0
+#define ENABLE_POINTER_LOCK 1
 #endif
 
 #if !defined(ENABLE_PROXIMITY_EVENTS)
@@ -686,6 +674,13 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_READABLE_STREAM_API 0
 #else
 #define ENABLE_READABLE_STREAM_API 1
+#endif
+#if !defined(ENABLE_READABLE_BYTE_STREAM_API)
+#if PLATFORM(WIN)
+#define ENABLE_READABLE_BYTE_STREAM_API 0
+#else
+#define ENABLE_READABLE_BYTE_STREAM_API 1
+#endif
 #endif
 #endif
 

@@ -131,11 +131,8 @@ public:
 
     WEBCORE_EXPORT bool renderedCharactersExceed(unsigned threshold);
 
-    WEBCORE_EXPORT void setViewportIsStable(bool stable) { m_viewportIsStable = stable; }
-    bool viewportIsStable() const { return m_viewportIsStable; }
-
 #if PLATFORM(IOS)
-    bool useCustomFixedPositionLayoutRect() const { return m_useCustomFixedPositionLayoutRect; }
+    bool useCustomFixedPositionLayoutRect() const;
     IntRect customFixedPositionLayoutRect() const { return m_customFixedPositionLayoutRect; }
     WEBCORE_EXPORT void setCustomFixedPositionLayoutRect(const IntRect&);
     bool updateFixedPositionLayoutRect();
@@ -143,7 +140,7 @@ public:
     IntSize customSizeForResizeEvent() const { return m_customSizeForResizeEvent; }
     WEBCORE_EXPORT void setCustomSizeForResizeEvent(IntSize);
 
-    WEBCORE_EXPORT void setScrollVelocity(double horizontalVelocity, double verticalVelocity, double scaleChangeRate, double timestamp);
+    WEBCORE_EXPORT void setScrollVelocity(double horizontalVelocity, double verticalVelocity, double scaleChangeRate, MonotonicTime timestamp);
 #else
     bool useCustomFixedPositionLayoutRect() const { return false; }
 #endif
@@ -245,12 +242,41 @@ public:
     WEBCORE_EXPORT ScrollPosition minimumScrollPosition() const override;
     WEBCORE_EXPORT ScrollPosition maximumScrollPosition() const override;
 
-    void viewportContentsChanged();
-    WEBCORE_EXPORT void resumeVisibleImageAnimationsIncludingSubframes();
+    // The scrollOrigin, scrollPosition, minimumScrollPosition and maximumScrollPosition are all affected by frame scale,
+    // but layoutViewport computations require unscaled scroll positions.
+    ScrollPosition unscaledMinimumScrollPosition() const;
+    ScrollPosition unscaledMaximumScrollPosition() const;
+
+    IntPoint unscaledScrollOrigin() const;
+
+    WEBCORE_EXPORT LayoutPoint minStableLayoutViewportOrigin() const;
+    WEBCORE_EXPORT LayoutPoint maxStableLayoutViewportOrigin() const;
+
+    enum class TriggerLayoutOrNot {
+        No,
+        Yes
+    };
+    // This origin can be overridden by setLayoutViewportOverrideRect.
+    void setBaseLayoutViewportOrigin(LayoutPoint, TriggerLayoutOrNot = TriggerLayoutOrNot::Yes);
+    // This size can be overridden by setLayoutViewportOverrideRect.
+    WEBCORE_EXPORT LayoutSize baseLayoutViewportSize() const;
+    
+    // If set, overrides the default "m_layoutViewportOrigin, size of initial containing block" rect.
+    // Used with delegated scrolling (i.e. iOS).
+    WEBCORE_EXPORT void setLayoutViewportOverrideRect(Optional<LayoutRect>);
+
+    // These are in document coordinates, unaffected by zooming.
+    WEBCORE_EXPORT LayoutRect layoutViewportRect() const;
+    WEBCORE_EXPORT LayoutRect visualViewportRect() const;
 
     // This is different than visibleContentRect() in that it ignores negative (or overly positive)
     // offsets from rubber-banding, and it takes zooming into account. 
     LayoutRect viewportConstrainedVisibleContentRect() const;
+    
+    LayoutRect rectForFixedPositionLayout() const;
+
+    void viewportContentsChanged();
+    WEBCORE_EXPORT void resumeVisibleImageAnimationsIncludingSubframes();
 
     String mediaType() const;
     WEBCORE_EXPORT void setMediaType(const String&);
@@ -276,13 +302,12 @@ public:
 
     // Functions for querying the current scrolled position, negating the effects of overhang
     // and adjusting for page scale.
-    LayoutPoint scrollPositionForFixedPosition() const
-    {
-        return scrollPositionForFixedPosition(visibleContentRect(), totalContentsSize(), scrollPosition(), scrollOrigin(), frameScaleFactor(), fixedElementsLayoutRelativeToFrame(), scrollBehaviorForFixedElements(), headerHeight(), footerHeight());
-    }
+    LayoutPoint scrollPositionForFixedPosition() const;
     
     // Static function can be called from another thread.
     static LayoutPoint scrollPositionForFixedPosition(const LayoutRect& visibleContentRect, const LayoutSize& totalContentsSize, const LayoutPoint& scrollPosition, const LayoutPoint& scrollOrigin, float frameScaleFactor, bool fixedElementsLayoutRelativeToFrame, ScrollBehaviorForFixedElements, int headerHeight, int footerHeight);
+
+    WEBCORE_EXPORT static LayoutPoint computeLayoutViewportOrigin(const LayoutRect& visualViewport, const LayoutPoint& stableLayoutViewportOriginMin, const LayoutPoint& stableLayoutViewportOriginMax, const LayoutRect& layoutViewport);
 
     // These layers are positioned differently when there is a topContentInset, a header, or a footer. These value need to be computed
     // on both the main thread and the scrolling thread.
@@ -491,7 +516,10 @@ public:
     WEBCORE_EXPORT GraphicsLayer* setWantsLayerForBottomOverHangArea(bool) const;
 #endif
 
+    // This function "smears" the "position:fixed" uninflatedBounds for scrolling, returning a rect that is the union of
+    // all possible locations of the given rect under page scrolling.
     LayoutRect fixedScrollableAreaBoundsInflatedForScrolling(const LayoutRect& uninflatedBounds) const;
+
     LayoutPoint scrollPositionRespectingCustomFixedPosition() const;
 
     int headerHeight() const override { return m_headerHeight; }
@@ -660,6 +688,7 @@ private:
     void handleDeferredScrollbarsUpdateAfterDirectionChange();
 
     void updateScrollableAreaSet();
+    void updateLayoutViewport();
 
     void notifyPageThatContentAreaWillPaint() const override;
 
@@ -758,6 +787,9 @@ private:
     bool m_shouldUpdateWhileOffscreen;
 
     Optional<FloatRect> m_viewExposedRect;
+    
+    LayoutPoint m_layoutViewportOrigin;
+    Optional<LayoutRect> m_layoutViewportOverrideRect;
 
     unsigned m_deferSetNeedsLayoutCount;
     bool m_setNeedsLayoutWasDeferred;
@@ -771,8 +803,6 @@ private:
     unsigned m_visuallyNonEmptyPixelCount;
     bool m_isVisuallyNonEmpty;
     bool m_firstVisuallyNonEmptyLayoutCallbackPending;
-
-    bool m_viewportIsStable { true };
 
     bool m_needsDeferredScrollbarsUpdate { false };
 

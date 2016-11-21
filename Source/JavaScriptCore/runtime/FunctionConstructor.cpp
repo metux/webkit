@@ -23,6 +23,7 @@
 
 #include "ExceptionHelpers.h"
 #include "FunctionPrototype.h"
+#include "JSAsyncFunction.h"
 #include "JSFunction.h"
 #include "JSGeneratorFunction.h"
 #include "JSGlobalObject.h"
@@ -93,27 +94,48 @@ JSObject* constructFunctionSkippingEvalEnabledCheck(
     VM& vm = exec->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
 
+    const char* prefix = nullptr;
+    Structure* structure = nullptr;
+    switch (functionConstructionMode) {
+    case FunctionConstructionMode::Function:
+        structure = globalObject->functionStructure();
+        prefix = "{function ";
+        break;
+    case FunctionConstructionMode::Generator:
+        structure = globalObject->generatorFunctionStructure();
+        prefix = "{function *";
+        break;
+    case FunctionConstructionMode::Async:
+        structure = globalObject->asyncFunctionStructure();
+        prefix = "{async function ";
+        break;
+    }
+
     // How we stringify functions is sometimes important for web compatibility.
     // See https://bugs.webkit.org/show_bug.cgi?id=24350.
     String program;
     if (args.isEmpty())
-        program = makeString("{function ", functionConstructionMode == FunctionConstructionMode::Generator ? "*" : "", functionName.string(), "() {\n\n}}");
+        program = makeString(prefix, functionName.string(), "() {\n\n}}");
     else if (args.size() == 1)
-        program = makeString("{function ", functionConstructionMode == FunctionConstructionMode::Generator ? "*" : "", functionName.string(), "() {\n", args.at(0).toString(exec)->value(exec), "\n}}");
+        program = makeString(prefix, functionName.string(), "() {\n", args.at(0).toString(exec)->value(exec), "\n}}");
     else {
         StringBuilder builder;
-        builder.appendLiteral("{function ");
-        if (functionConstructionMode == FunctionConstructionMode::Generator)
-            builder.append('*');
+        builder.append(prefix);
         builder.append(functionName.string());
         builder.append('(');
-        builder.append(args.at(0).toString(exec)->view(exec).get());
+        auto viewWithString = args.at(0).toString(exec)->viewWithUnderlyingString(*exec);
+        RETURN_IF_EXCEPTION(scope, nullptr);
+        builder.append(viewWithString.view);
         for (size_t i = 1; i < args.size() - 1; i++) {
             builder.appendLiteral(", ");
-            builder.append(args.at(i).toString(exec)->view(exec).get());
+            auto viewWithString = args.at(i).toString(exec)->viewWithUnderlyingString(*exec);
+            RETURN_IF_EXCEPTION(scope, nullptr);
+            builder.append(viewWithString.view);
         }
         builder.appendLiteral(") {\n");
-        builder.append(args.at(args.size() - 1).toString(exec)->view(exec).get());
+        viewWithString = args.at(args.size() - 1).toString(exec)->viewWithUnderlyingString(*exec);
+        RETURN_IF_EXCEPTION(scope, nullptr);
+        builder.append(viewWithString.view);
         builder.appendLiteral("\n}}");
         program = builder.toString();
     }
@@ -126,12 +148,20 @@ JSObject* constructFunctionSkippingEvalEnabledCheck(
         return throwException(exec, scope, exception);
     }
 
-    Structure* subclassStructure = InternalFunction::createSubclassStructure(exec, newTarget, functionConstructionMode == FunctionConstructionMode::Generator ? globalObject->generatorFunctionStructure() : globalObject->functionStructure());
+    Structure* subclassStructure = InternalFunction::createSubclassStructure(exec, newTarget, structure);
     RETURN_IF_EXCEPTION(scope, nullptr);
 
-    if (functionConstructionMode == FunctionConstructionMode::Generator)
+    switch (functionConstructionMode) {
+    case FunctionConstructionMode::Function:
+        return JSFunction::create(vm, function, globalObject->globalScope(), subclassStructure);
+    case FunctionConstructionMode::Generator:
         return JSGeneratorFunction::create(vm, function, globalObject->globalScope(), subclassStructure);
-    return JSFunction::create(vm, function, globalObject->globalScope(), subclassStructure);
+    case FunctionConstructionMode::Async:
+        return JSAsyncFunction::create(vm, function, globalObject->globalScope(), subclassStructure);
+    }
+
+    ASSERT_NOT_REACHED();
+    return nullptr;
 }
 
 // ECMA 15.3.2 The Function Constructor

@@ -31,49 +31,82 @@
 #include "B3Compilation.h"
 #include "WasmB3IRGenerator.h"
 #include "WasmCallingConvention.h"
+#include "WasmMemory.h"
 #include "WasmModuleParser.h"
+#include "WasmValidate.h"
 #include <wtf/DataLog.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace JSC { namespace Wasm {
 
 static const bool verbose = false;
     
-Plan::Plan(VM& vm, Vector<uint8_t> source)
+Plan::Plan(VM* vm, Vector<uint8_t> source)
     : Plan(vm, source.data(), source.size())
 {
 }
 
-Plan::Plan(VM& vm, const uint8_t* source, size_t sourceLength)
+Plan::Plan(VM* vm, const uint8_t* source, size_t sourceLength)
+    : m_vm(vm)
+    , m_source(source)
+    , m_sourceLength(sourceLength)
+{
+}
+
+void Plan::run()
 {
     if (verbose)
         dataLogLn("Starting plan.");
-    ModuleParser moduleParser(source, sourceLength);
-    if (!moduleParser.parse()) {
-        dataLogLn("Parsing module failed: ", moduleParser.errorMessage());
-        m_errorMessage = moduleParser.errorMessage();
-        return;
+    {
+        ModuleParser moduleParser(m_source, m_sourceLength);
+        if (!moduleParser.parse()) {
+            if (verbose)
+                dataLogLn("Parsing module failed: ", moduleParser.errorMessage());
+            m_errorMessage = moduleParser.errorMessage();
+            return;
+        }
+        m_moduleInformation = WTFMove(moduleParser.moduleInformation());
     }
-
     if (verbose)
         dataLogLn("Parsed module.");
 
-    for (const FunctionInformation& info : moduleParser.functionInformation()) {
+    if (!m_compiledFunctions.tryReserveCapacity(m_moduleInformation->functions.size())) {
+        StringBuilder builder;
+        builder.appendLiteral("Failed allocating enough space for ");
+        builder.appendNumber(m_moduleInformation->functions.size());
+        builder.appendLiteral(" compiled functions");
+        m_errorMessage = builder.toString();
+        return;
+    }
+
+    for (const FunctionInformation& info : m_moduleInformation->functions) {
         if (verbose)
-            dataLogLn("Processing funcion starting at: ", info.start, " and ending at: ", info.end);
-        const uint8_t* functionStart = source + info.start;
+            dataLogLn("Processing function starting at: ", info.start, " and ending at: ", info.end);
+        const uint8_t* functionStart = m_source + info.start;
         size_t functionLength = info.end - info.start;
-        ASSERT(functionLength <= sourceLength);
-        m_result.append(parseAndCompile(vm, functionStart, functionLength, moduleParser.memory().get(), info.signature, moduleParser.functionInformation()));
+        ASSERT(functionLength <= m_sourceLength);
+
+        String error = validateFunction(functionStart, functionLength, info.signature, m_moduleInformation->functions);
+        if (!error.isNull()) {
+            if (verbose) {
+                for (unsigned i = 0; i < functionLength; ++i)
+                    dataLog(RawPointer(reinterpret_cast<void*>(functionStart[i])), ", ");
+                dataLogLn();
+            }
+            m_errorMessage = error;
+            return;
+        }
+
+        m_compiledFunctions.uncheckedAppend(parseAndCompile(*m_vm, functionStart, functionLength, m_moduleInformation->memory.get(), info.signature, m_moduleInformation->functions));
     }
 
     // Patch the call sites for each function.
-    for (std::unique_ptr<FunctionCompilation>& functionPtr : m_result) {
+    for (std::unique_ptr<FunctionCompilation>& functionPtr : m_compiledFunctions) {
         FunctionCompilation* function = functionPtr.get();
         for (auto& call : function->unlinkedCalls)
-            MacroAssembler::repatchCall(call.callLocation, CodeLocationLabel(m_result[call.functionIndex]->code->code()));
+            MacroAssembler::repatchCall(call.callLocation, CodeLocationLabel(m_compiledFunctions[call.functionIndex]->code->code()));
     }
 
-    m_memory = WTFMove(moduleParser.memory());
     m_failed = false;
 }
 

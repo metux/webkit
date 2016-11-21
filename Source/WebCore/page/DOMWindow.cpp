@@ -35,6 +35,7 @@
 #include "CSSRuleList.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
+#include "ComposedTreeIterator.h"
 #include "ContentExtensionActions.h"
 #include "ContentExtensionRule.h"
 #include "Crypto.h"
@@ -57,7 +58,6 @@
 #include "EventListener.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
-#include "ExceptionCodePlaceholder.h"
 #include "FloatRect.h"
 #include "FocusController.h"
 #include "FrameLoadRequest.h"
@@ -88,9 +88,12 @@
 #include "Screen.h"
 #include "ScriptController.h"
 #include "SecurityOrigin.h"
+#include "SecurityOriginData.h"
 #include "SecurityPolicy.h"
+#include "SelectorQuery.h"
 #include "SerializedScriptValue.h"
 #include "Settings.h"
+#include "StaticNodeList.h"
 #include "Storage.h"
 #include "StorageArea.h"
 #include "StorageNamespace.h"
@@ -491,7 +494,8 @@ void DOMWindow::frameDestroyed()
 
 void DOMWindow::willDetachPage()
 {
-    InspectorInstrumentation::frameWindowDiscarded(m_frame, this);
+    if (m_frame)
+        InspectorInstrumentation::frameWindowDiscarded(*m_frame, this);
 }
 
 void DOMWindow::willDestroyCachedFrame()
@@ -624,8 +628,6 @@ bool DOMWindow::isCurrentlyDisplayedInFrame() const
     return m_frame && m_frame->document()->domWindow() == this;
 }
 
-#if ENABLE(CUSTOM_ELEMENTS)
-
 CustomElementRegistry& DOMWindow::ensureCustomElementRegistry()
 {
     if (!m_customElementRegistry)
@@ -633,7 +635,32 @@ CustomElementRegistry& DOMWindow::ensureCustomElementRegistry()
     return *m_customElementRegistry;
 }
 
-#endif
+ExceptionOr<Ref<NodeList>> DOMWindow::collectMatchingElementsInFlatTree(Node& scope, const String& selectors)
+{
+    if (!m_frame)
+        return Exception { NOT_SUPPORTED_ERR };
+
+    Document* document = m_frame->document();
+    if (!document)
+        return Exception { NOT_SUPPORTED_ERR };
+
+    auto queryOrException = document->selectorQueryForString(selectors);
+    if (queryOrException.hasException())
+        return queryOrException.releaseException();
+
+    if (!is<ContainerNode>(scope))
+        return Ref<NodeList> { StaticElementList::create() };
+
+    SelectorQuery& query = queryOrException.releaseReturnValue();
+
+    Vector<Ref<Element>> result;
+    for (auto& node : composedTreeDescendants(downcast<ContainerNode>(scope))) {
+        if (is<Element>(node) && query.matches(downcast<Element>(node)))
+            result.append(downcast<Element>(node));
+    }
+
+    return Ref<NodeList> { StaticElementList::create(WTFMove(result)) };
+}
 
 #if ENABLE(ORIENTATION_EVENTS)
 
@@ -843,7 +870,7 @@ ExceptionOr<Storage*> DOMWindow::sessionStorage() const
     if (!page)
         return nullptr;
 
-    auto storageArea = page->sessionStorage()->storageArea(document->securityOrigin());
+    auto storageArea = page->sessionStorage()->storageArea(SecurityOriginData::fromSecurityOrigin(*document->securityOrigin()));
     if (!storageArea->canAccessStorage(m_frame))
         return Exception { SECURITY_ERR };
 
@@ -1620,7 +1647,7 @@ ExceptionOr<int> DOMWindow::setTimeout(std::unique_ptr<ScheduledAction> action, 
 {
     auto* context = scriptExecutionContext();
     if (!context)
-        return ExceptionCode { INVALID_ACCESS_ERR };
+        return Exception { INVALID_ACCESS_ERR };
     return DOMTimer::install(*context, WTFMove(action), std::chrono::milliseconds(timeout), true);
 }
 
@@ -1652,7 +1679,7 @@ ExceptionOr<int> DOMWindow::setInterval(std::unique_ptr<ScheduledAction> action,
 {
     auto* context = scriptExecutionContext();
     if (!context)
-        return ExceptionCode { INVALID_ACCESS_ERR };
+        return Exception { INVALID_ACCESS_ERR };
     return DOMTimer::install(*context, WTFMove(action), std::chrono::milliseconds(timeout), false);
 }
 

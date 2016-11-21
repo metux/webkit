@@ -40,9 +40,11 @@
 
 namespace WebKit {
 
-class NetworkLoad final : private WebCore::ResourceHandleClient
+class NetworkLoad final :
 #if USE(NETWORK_SESSION)
-    , private NetworkDataTaskClient
+    private NetworkDataTaskClient
+#else
+    private WebCore::ResourceHandleClient
 #endif
 {
     WTF_MAKE_FAST_ALLOCATED;
@@ -64,12 +66,13 @@ public:
     void continueDidReceiveResponse();
 
 #if USE(NETWORK_SESSION)
-    void convertTaskToDownload(DownloadID, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
+    void convertTaskToDownload(PendingDownload&, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
     void setPendingDownloadID(DownloadID);
     void setSuggestedFilename(const String&);
     void setPendingDownload(PendingDownload&);
     DownloadID pendingDownloadID() { return m_task->pendingDownloadID(); }
-#endif
+#else
+    WebCore::ResourceHandle* handle() const { return m_handle.get(); }
 
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
     void canAuthenticateAgainstProtectionSpaceAsync(WebCore::ResourceHandle*, const WebCore::ProtectionSpace&) override;
@@ -85,17 +88,17 @@ public:
     void willCacheResponseAsync(WebCore::ResourceHandle*, NSCachedURLResponse *) override;
 #endif
 #endif
+#endif // USE(NETWORK_SESSION)
 
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
     void continueCanAuthenticateAgainstProtectionSpace(bool);
 #endif
 
-    WebCore::ResourceHandle* handle() const { return m_handle.get(); }
-
 private:
     NetworkLoadClient::ShouldContinueDidReceiveResponse sharedDidReceiveResponse(WebCore::ResourceResponse&&);
     void sharedWillSendRedirectedRequest(WebCore::ResourceRequest&&, WebCore::ResourceResponse&&);
 
+#if !USE(NETWORK_SESSION)
     // ResourceHandleClient
     void willSendRequestAsync(WebCore::ResourceHandle*, WebCore::ResourceRequest&&, WebCore::ResourceResponse&& redirectResponse) final;
     void didSendData(WebCore::ResourceHandle*, unsigned long long bytesSent, unsigned long long totalBytesToBeSent) final;
@@ -110,16 +113,14 @@ private:
     void didReceiveAuthenticationChallenge(WebCore::ResourceHandle*, const WebCore::AuthenticationChallenge&) final;
     void receivedCancellation(WebCore::ResourceHandle*, const WebCore::AuthenticationChallenge&) final;
     bool usesAsyncCallbacks() final { return true; }
-    bool loadingSynchronousXHR() final { return m_client.isSynchronous(); }
-
-#if USE(NETWORK_SESSION)
+    bool loadingSynchronousXHR() final { return m_client.get().isSynchronous(); }
+#else
     // NetworkDataTaskClient
     void willPerformHTTPRedirection(WebCore::ResourceResponse&&, WebCore::ResourceRequest&&, RedirectCompletionHandler&&) final;
     void didReceiveChallenge(const WebCore::AuthenticationChallenge&, ChallengeCompletionHandler&&) final;
     void didReceiveResponseNetworkSession(WebCore::ResourceResponse&&, ResponseCompletionHandler&&) final;
     void didReceiveData(Ref<WebCore::SharedBuffer>&&) final;
     void didCompleteWithError(const WebCore::ResourceError&) final;
-    void didBecomeDownload() final;
     void didSendData(uint64_t totalBytesSent, uint64_t totalBytesExpectedToSend) final;
     void wasBlocked() final;
     void cannotShowURL() final;
@@ -130,7 +131,7 @@ private:
     void completeAuthenticationChallenge(ChallengeCompletionHandler&&);
 #endif
 
-    NetworkLoadClient& m_client;
+    std::reference_wrapper<NetworkLoadClient> m_client;
     const NetworkLoadParameters m_parameters;
 #if USE(NETWORK_SESSION)
     RefPtr<NetworkDataTask> m_task;
@@ -146,8 +147,8 @@ private:
 #else
     bool m_waitingForContinueCanAuthenticateAgainstProtectionSpace { false };
     RefPtr<RemoteNetworkingContext> m_networkingContext;
-#endif
     RefPtr<WebCore::ResourceHandle> m_handle;
+#endif
 
     WebCore::ResourceRequest m_currentRequest; // Updated on redirects.
 };

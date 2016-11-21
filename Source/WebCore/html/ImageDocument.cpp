@@ -31,7 +31,6 @@
 #include "DocumentLoader.h"
 #include "EventListener.h"
 #include "EventNames.h"
-#include "ExceptionCodePlaceholder.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameView.h"
@@ -102,7 +101,7 @@ private:
     }
 
     virtual ~ImageDocumentElement();
-    void didMoveToNewDocument(Document* oldDocument) override;
+    void didMoveToNewDocument(Document& oldDocument) override;
 
     ImageDocument* m_imageDocument;
 };
@@ -210,16 +209,16 @@ Ref<DocumentParser> ImageDocument::createParser()
 
 void ImageDocument::createDocumentStructure()
 {
-    auto rootElement = Document::createElement(htmlTag, false);
+    auto rootElement = HTMLHtmlElement::create(*this);
     appendChild(rootElement);
-    downcast<HTMLHtmlElement>(rootElement.get()).insertedByParser();
+    rootElement->insertedByParser();
 
     frame()->injectUserScripts(InjectAtDocumentStart);
 
-    auto body = Document::createElement(bodyTag, false);
+    auto body = HTMLBodyElement::create(*this);
     body->setAttribute(styleAttr, "margin: 0px");
     if (MIMETypeRegistry::isPDFMIMEType(document().loader()->responseMIMEType()))
-        downcast<HTMLBodyElement>(body.get()).setInlineStyleProperty(CSSPropertyBackgroundColor, "white", CSSPrimitiveValue::CSS_IDENT);
+        body->setInlineStyleProperty(CSSPropertyBackgroundColor, "white", CSSPrimitiveValue::CSS_IDENT);
     rootElement->appendChild(body);
     
     auto imageElement = ImageDocumentElement::create(*this);
@@ -422,7 +421,7 @@ ImageDocumentElement::~ImageDocumentElement()
         m_imageDocument->disconnectImageElement();
 }
 
-void ImageDocumentElement::didMoveToNewDocument(Document* oldDocument)
+void ImageDocumentElement::didMoveToNewDocument(Document& oldDocument)
 {
     if (m_imageDocument) {
         m_imageDocument->disconnectImageElement();

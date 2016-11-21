@@ -136,9 +136,7 @@
 #include "JSCSSValue.cpp"
 #include "JSCSSValueList.cpp"
 #include "JSClipboardEvent.cpp"
-#if ENABLE(CUSTOM_ELEMENTS)
 #include "JSCustomElementRegistry.cpp"
-#endif
 #include "JSCustomEvent.cpp"
 #include "JSDatabase.cpp"
 #include "JSDatabaseCallback.cpp"
@@ -308,6 +306,7 @@
 #include "JSIDBOpenDBRequest.cpp"
 #include "JSIDBRequest.cpp"
 #include "JSIDBTransaction.cpp"
+#include "JSIDBTransactionMode.cpp"
 #include "JSIDBVersionChangeEvent.cpp"
 #endif
 #include "JSImageData.cpp"
@@ -327,6 +326,15 @@
 #include "JSMediaElementAudioSourceNode.cpp"
 #endif
 #include "JSMediaError.cpp"
+#if ENABLE(ENCRYPTED_MEDIA)
+#include "JSMediaKeyMessageEvent.cpp"
+#include "JSMediaKeySession.cpp"
+#include "JSMediaKeyStatusMap.cpp"
+#include "JSMediaKeySystemAccess.cpp"
+#include "JSMediaKeySystemConfiguration.cpp"
+#include "JSMediaKeySystemMediaCapability.cpp"
+#include "JSMediaKeys.cpp"
+#endif
 #include "JSMediaList.cpp"
 #include "JSMediaQueryList.cpp"
 #include "JSMediaQueryListListener.cpp"
@@ -352,7 +360,6 @@
 #include "JSMutationRecord.cpp"
 #include "JSNamedNodeMap.cpp"
 #include "JSNavigator.cpp"
-#include "JSNavigatorBattery.cpp"
 #include "JSNavigatorContentUtils.cpp"
 #include "JSNavigatorGeolocation.cpp"
 #include "JSNavigatorMediaDevices.cpp"
@@ -390,11 +397,10 @@
 #include "JSProgressEvent.cpp"
 #include "JSRadioNodeList.cpp"
 #include "JSRange.cpp"
-#if ENABLE(READABLE_STREAM_API)
+#include "JSReadableByteStreamController.cpp"
 #include "JSReadableStream.cpp"
 #include "JSReadableStreamDefaultController.cpp"
 #include "JSReadableStreamDefaultReader.cpp"
-#endif
 #include "JSRect.cpp"
 #include "JSRequestAnimationFrameCallback.cpp"
 #include "JSRGBColor.cpp"
@@ -580,6 +586,7 @@
 #include "JSSVGZoomAndPan.cpp"
 #include "JSSVGZoomEvent.cpp"
 #include "JSShadowRoot.cpp"
+#include "JSShadowRootMode.cpp"
 #include "JSStorage.cpp"
 #if ENABLE(QUOTA)
 #include "JSStorageErrorCallback.cpp"
@@ -637,7 +644,6 @@
 #include "JSVoidCallback.cpp"
 #include "JSWaveShaperNode.cpp"
 #include "JSWebKitAnimationEvent.cpp"
-#include "JSWebKitCSSFilterValue.cpp"
 #include "JSWebKitCSSTransformValue.cpp"
 #include "JSWebKitCSSMatrix.cpp"
 #include "JSWebKitCSSRegionRule.cpp"

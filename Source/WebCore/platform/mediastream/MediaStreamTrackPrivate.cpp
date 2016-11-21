@@ -37,30 +37,19 @@
 
 namespace WebCore {
 
-RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(RefPtr<RealtimeMediaSource>&& source)
+Ref<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(Ref<RealtimeMediaSource>&& source)
 {
-    return adoptRef(new MediaStreamTrackPrivate(WTFMove(source), createCanonicalUUIDString()));
+    return adoptRef(*new MediaStreamTrackPrivate(WTFMove(source), createCanonicalUUIDString()));
 }
 
-RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(RefPtr<RealtimeMediaSource>&& source, const String& id)
+Ref<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(Ref<RealtimeMediaSource>&& source, String&& id)
 {
-    return adoptRef(new MediaStreamTrackPrivate(WTFMove(source), id));
+    return adoptRef(*new MediaStreamTrackPrivate(WTFMove(source), WTFMove(id)));
 }
 
-MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& other)
-    : RefCounted()
-    , m_source(&other.source())
-    , m_id(createCanonicalUUIDString())
-    , m_isEnabled(other.enabled())
-    , m_isEnded(other.ended())
-{
-    m_source->addObserver(this);
-}
-
-MediaStreamTrackPrivate::MediaStreamTrackPrivate(RefPtr<RealtimeMediaSource>&& source, const String& id)
-    : RefCounted()
-    , m_source(source)
-    , m_id(id)
+MediaStreamTrackPrivate::MediaStreamTrackPrivate(Ref<RealtimeMediaSource>&& source, String&& id)
+    : m_source(WTFMove(source))
+    , m_id(WTFMove(id))
     , m_isEnabled(true)
     , m_isEnded(false)
 {
@@ -112,6 +101,9 @@ void MediaStreamTrackPrivate::setEnabled(bool enabled)
     // Always update the enabled state regardless of the track being ended.
     m_isEnabled = enabled;
 
+    if (m_preview)
+        m_preview->setEnabled(enabled);
+
     for (auto& observer : m_observers)
         observer->trackEnabledChanged(*this);
 }
@@ -126,15 +118,21 @@ void MediaStreamTrackPrivate::endTrack()
     // trackEnded method once.
     m_isEnded = true;
 
+    m_preview = nullptr;
     m_source->requestStop(this);
 
     for (auto& observer : m_observers)
         observer->trackEnded(*this);
 }
 
-RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
+Ref<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
 {
-    return adoptRef(new MediaStreamTrackPrivate(*this));
+    auto clonedMediaStreamTrackPrivate = create(m_source.copyRef());
+    clonedMediaStreamTrackPrivate->m_isEnabled = this->m_isEnabled;
+    clonedMediaStreamTrackPrivate->m_isEnded = this->m_isEnded;
+    clonedMediaStreamTrackPrivate->m_constraints = this->m_constraints;
+
+    return clonedMediaStreamTrackPrivate;
 }
 
 RealtimeMediaSource::Type MediaStreamTrackPrivate::type() const
@@ -170,6 +168,15 @@ void MediaStreamTrackPrivate::paintCurrentFrameInContext(GraphicsContext& contex
         IntRect paintRect(IntPoint(0, 0), IntSize(rect.width(), rect.height()));
         context.fillRect(paintRect, Color::black);
     }
+}
+
+RealtimeMediaSourcePreview* MediaStreamTrackPrivate::preview()
+{
+    if (m_preview)
+        return m_preview.get();
+
+    m_preview = m_source->preview();
+    return m_preview.get();
 }
 
 void MediaStreamTrackPrivate::applyConstraints(const MediaConstraints& constraints, RealtimeMediaSource::SuccessHandler successHandler, RealtimeMediaSource::FailureHandler failureHandler)

@@ -25,8 +25,6 @@
 
 #pragma once
 
-#if ENABLE(DFG_JIT)
-
 #include "DFGPlan.h"
 #include "DFGThreadData.h"
 #include <wtf/AutomaticThread.h>
@@ -41,6 +39,8 @@ namespace JSC {
 class SlotVisitor;
 
 namespace DFG {
+
+#if ENABLE(DFG_JIT)
 
 class Worklist : public RefCounted<Worklist> {
 public:
@@ -57,6 +57,7 @@ public:
     // worklist->completeAllReadyPlansForVM(vm);
     void completeAllPlansForVM(VM&);
 
+    void markCodeBlocks(VM&, SlotVisitor&);
     void rememberCodeBlocks(VM&);
 
     void waitUntilAllPlansForVMAreReady(VM&);
@@ -121,18 +122,30 @@ private:
 };
 
 // For DFGMode compilations.
-Worklist* ensureGlobalDFGWorklist();
+Worklist& ensureGlobalDFGWorklist();
 Worklist* existingGlobalDFGWorklistOrNull();
 
 // For FTLMode and FTLForOSREntryMode compilations.
-Worklist* ensureGlobalFTLWorklist();
+Worklist& ensureGlobalFTLWorklist();
 Worklist* existingGlobalFTLWorklistOrNull();
 
-Worklist* ensureGlobalWorklistFor(CompilationMode);
+Worklist& ensureGlobalWorklistFor(CompilationMode);
 
 // Simplify doing things for all worklists.
 inline unsigned numberOfWorklists() { return 2; }
-inline Worklist* worklistForIndexOrNull(unsigned index)
+inline Worklist& ensureWorklistForIndex(unsigned index)
+{
+    switch (index) {
+    case 0:
+        return ensureGlobalDFGWorklist();
+    case 1:
+        return ensureGlobalFTLWorklist();
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+        return ensureGlobalDFGWorklist();
+    }
+}
+inline Worklist* existingWorklistForIndexOrNull(unsigned index)
 {
     switch (index) {
     case 0:
@@ -144,10 +157,18 @@ inline Worklist* worklistForIndexOrNull(unsigned index)
         return 0;
     }
 }
+inline Worklist& existingWorklistForIndex(unsigned index)
+{
+    Worklist* result = existingWorklistForIndexOrNull(index);
+    RELEASE_ASSERT(result);
+    return *result;
+}
+
+#endif // ENABLE(DFG_JIT)
 
 void completeAllPlansForVM(VM&);
+void markCodeBlocks(VM&, SlotVisitor&);
 void rememberCodeBlocks(VM&);
 
 } } // namespace JSC::DFG
 
-#endif // ENABLE(DFG_JIT)

@@ -56,7 +56,6 @@
 #include "InspectorDOMAgent.h"
 #include "InspectorNetworkAgent.h"
 #include "InspectorOverlay.h"
-#include "InspectorTimelineAgent.h"
 #include "InstrumentingAgents.h"
 #include "MIMETypeRegistry.h"
 #include "MainFrame.h"
@@ -70,7 +69,6 @@
 #include "TextEncoding.h"
 #include "TextResourceDecoder.h"
 #include "UserGestureIndicator.h"
-#include <bindings/ScriptValue.h>
 #include <inspector/ContentSearchUtilities.h>
 #include <inspector/IdentifiersFactory.h>
 #include <inspector/InspectorValues.h>
@@ -273,7 +271,7 @@ CachedResource* InspectorPageAgent::cachedResource(Frame* frame, const URL& url)
     if (url.isNull())
         return nullptr;
 
-    CachedResource* cachedResource = frame->document()->cachedResourceLoader().cachedResource(url);
+    CachedResource* cachedResource = frame->document()->cachedResourceLoader().cachedResource(MemoryCache::removeFragmentIdentifierIfNeeded(url));
     if (!cachedResource) {
         ResourceRequest request(url);
 #if ENABLE(CACHE_PARTITIONING)
@@ -360,9 +358,6 @@ void InspectorPageAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReas
 {
     ErrorString unused;
     disable(unused);
-#if ENABLE(TOUCH_EVENTS)
-    updateTouchEventEmulationInPage(false);
-#endif
 }
 
 double InspectorPageAgent::timestamp()
@@ -528,7 +523,7 @@ void InspectorPageAgent::getCookies(ErrorString&, RefPtr<Inspector::Protocol::Ar
                 // FIXME: We need duplication checking for the String representation of cookies.
                 // Exceptions are thrown by cookie() in sandboxed frames. That won't happen here
                 // because "document" is the document of the main frame of the page.
-                stringCookiesList.append(document->cookie(ASSERT_NO_EXCEPTION));
+                stringCookiesList.append(document->cookie().releaseReturnValue());
             } else {
                 for (auto& cookie : docCookiesList) {
                     if (!rawCookiesList.contains(cookie))
@@ -672,7 +667,7 @@ void InspectorPageAgent::setDocumentContent(ErrorString& errorString, const Stri
         errorString = ASCIILiteral("No Document instance to set HTML for");
         return;
     }
-    DOMPatchSupport::patchDocument(document, html);
+    DOMPatchSupport::patchDocument(*document, html);
 }
 
 void InspectorPageAgent::setShowPaintRects(ErrorString&, bool show)
@@ -739,13 +734,13 @@ void InspectorPageAgent::loadEventFired()
     m_frontendDispatcher->loadEventFired(timestamp());
 }
 
-void InspectorPageAgent::frameNavigated(DocumentLoader* loader)
+void InspectorPageAgent::frameNavigated(Frame& frame)
 {
-    if (loader->frame()->isMainFrame()) {
+    if (frame.isMainFrame()) {
         m_scriptToEvaluateOnLoadOnce = m_pendingScriptToEvaluateOnLoadOnce;
         m_pendingScriptToEvaluateOnLoadOnce = String();
     }
-    m_frontendDispatcher->frameNavigated(buildObjectForFrame(loader->frame()));
+    m_frontendDispatcher->frameNavigated(buildObjectForFrame(&frame));
 }
 
 void InspectorPageAgent::frameDetached(Frame& frame)
@@ -861,13 +856,13 @@ void InspectorPageAgent::didRunJavaScriptDialog()
     m_frontendDispatcher->javascriptDialogClosed();
 }
 
-void InspectorPageAgent::didPaint(RenderObject* renderer, const LayoutRect& rect)
+void InspectorPageAgent::didPaint(RenderObject& renderer, const LayoutRect& rect)
 {
     if (!m_enabled || !m_showPaintRects)
         return;
 
-    LayoutRect absoluteRect = LayoutRect(renderer->localToAbsoluteQuad(FloatRect(rect)).boundingBox());
-    FrameView* view = renderer->document().view();
+    LayoutRect absoluteRect = LayoutRect(renderer.localToAbsoluteQuad(FloatRect(rect)).boundingBox());
+    FrameView* view = renderer.document().view();
 
     LayoutRect rootRect = absoluteRect;
     if (!view->frame().isMainFrame()) {
@@ -962,6 +957,9 @@ Ref<Inspector::Protocol::Page::FrameResourceTree> InspectorPageAgent::buildObjec
         String sourceMappingURL = InspectorPageAgent::sourceMapURLForResource(cachedResource);
         if (!sourceMappingURL.isEmpty())
             resourceObject->setSourceMapURL(sourceMappingURL);
+        String targetId = cachedResource->resourceRequest().initiatorIdentifier();
+        if (!targetId.isEmpty())
+            resourceObject->setTargetId(targetId);
         subresources->addItem(WTFMove(resourceObject));
     }
 
@@ -974,24 +972,6 @@ Ref<Inspector::Protocol::Page::FrameResourceTree> InspectorPageAgent::buildObjec
         childrenArray->addItem(buildObjectForFrameTree(child));
     }
     return result;
-}
-
-#if ENABLE(TOUCH_EVENTS)
-void InspectorPageAgent::updateTouchEventEmulationInPage(bool enabled)
-{
-    mainFrame().settings().setTouchEventEmulationEnabled(enabled);
-}
-#endif
-
-void InspectorPageAgent::setTouchEmulationEnabled(ErrorString& error, bool enabled)
-{
-#if ENABLE(TOUCH_EVENTS)
-    UNUSED_PARAM(error);
-    updateTouchEventEmulationInPage(enabled);
-#else
-    error = ASCIILiteral("Touch events emulation not supported");
-    UNUSED_PARAM(enabled);
-#endif
 }
 
 void InspectorPageAgent::setEmulatedMedia(ErrorString&, const String& media)

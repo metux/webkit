@@ -19,8 +19,7 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef ChromeClient_h
-#define ChromeClient_h
+#pragma once
 
 #include "AXObjectCache.h"
 #include "Cursor.h"
@@ -33,7 +32,6 @@
 #include "HostWindow.h"
 #include "LayerFlushThrottleState.h"
 #include "MediaProducer.h"
-#include "PageThrottler.h"
 #include "PopupMenu.h"
 #include "PopupMenuClient.h"
 #include "RenderEmbeddedObject.h"
@@ -43,13 +41,8 @@
 #include "WebCoreKeyboardUIMode.h"
 #include <runtime/ConsoleTypes.h>
 #include <wtf/Forward.h>
+#include <wtf/Seconds.h>
 #include <wtf/Vector.h>
-
-#if ENABLE(MEDIA_SESSION)
-namespace WebCore {
-class MediaSessionMetadata;
-}
-#endif
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
 #include "MediaPlaybackTargetContext.h"
@@ -88,6 +81,7 @@ class HTMLMediaElement;
 class HTMLVideoElement;
 class HitTestResult;
 class IntRect;
+class MediaSessionMetadata;
 class NavigationAction;
 class Node;
 class Page;
@@ -239,7 +233,7 @@ public:
     virtual void didPreventDefaultForEvent() = 0;
 #endif
 
-    virtual std::chrono::milliseconds eventThrottlingDelay() { return 0ms; };
+    virtual Seconds eventThrottlingDelay() { return Seconds(0); };
 
 #if PLATFORM(IOS)
     virtual void didReceiveMobileDocType(bool) = 0;
@@ -470,5 +464,4 @@ protected:
     virtual ~ChromeClient() { }
 };
 
-}
-#endif // ChromeClient_h
+} // namespace WebCore

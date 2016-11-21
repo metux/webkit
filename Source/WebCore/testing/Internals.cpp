@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
- * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -143,10 +143,6 @@
 #include "ColorChooser.h"
 #endif
 
-#if ENABLE(BATTERY_STATUS)
-#include "BatteryController.h"
-#endif
-
 #if ENABLE(PROXIMITY_EVENTS)
 #include "DeviceProximityController.h"
 #endif
@@ -250,7 +246,7 @@ private:
     void setAttachedWindowHeight(unsigned) final { }
     void setAttachedWindowWidth(unsigned) final { }
 
-    bool sendMessageToFrontend(const String& message) final;
+    void sendMessageToFrontend(const String& message) final;
     ConnectionType connectionType() const final { return ConnectionType::Local; }
 
     Page* frontendPage() const
@@ -293,11 +289,11 @@ void InspectorStubFrontend::closeWindow()
     m_frontendWindow = nullptr;
 }
 
-bool InspectorStubFrontend::sendMessageToFrontend(const String& message)
+void InspectorStubFrontend::sendMessageToFrontend(const String& message)
 {
     ASSERT_ARG(message, !message.isEmpty());
 
-    return InspectorClient::doDispatchMessageOnFrontendPage(frontendPage(), message);
+    InspectorClient::doDispatchMessageOnFrontendPage(frontendPage(), message);
 }
 
 static bool markerTypeFrom(const String& markerType, DocumentMarker::MarkerType& result)
@@ -379,6 +375,7 @@ void Internals::resetToConsistentState(Page& page)
 #endif
     }
 
+    WebCore::clearDefaultPortForProtocolMapForTesting();
     WebCore::overrideUserPreferredLanguages(Vector<String>());
     WebCore::Settings::setUsesOverlayScrollbars(false);
     WebCore::Settings::setUsesMockScrollAnimator(false);
@@ -426,6 +423,7 @@ Internals::Internals(Document& document)
 
 #if ENABLE(MEDIA_STREAM)
     setMockMediaCaptureDevicesEnabled(true);
+    WebCore::Settings::setMediaCaptureRequiresSecureConnection(false);
 #endif
 
 #if ENABLE(WEB_RTC)
@@ -651,6 +649,19 @@ unsigned Internals::imageFrameIndex(HTMLImageElement& element)
     return is<BitmapImage>(image) ? downcast<BitmapImage>(*image).currentFrame() : 0;
 }
 
+void Internals::setImageFrameDecodingDuration(HTMLImageElement& element, float duration)
+{
+    auto* cachedImage = element.cachedImage();
+    if (!cachedImage)
+        return;
+    
+    auto* image = cachedImage->image();
+    if (!is<BitmapImage>(image))
+        return;
+    
+    downcast<BitmapImage>(*image).setFrameDecodingDurationForTesting(duration);
+}
+
 void Internals::clearPageCache()
 {
     PageCache::singleton().pruneToSizeNow(0, PruningReason::None);
@@ -780,30 +791,9 @@ RefPtr<CSSComputedStyleDeclaration> Internals::computedStyleIncludingVisitedInfo
     return CSSComputedStyleDeclaration::create(element, allowVisitedStyle);
 }
 
-ExceptionOr<Node*> Internals::ensureShadowRoot(Element& host)
-{
-    if (ShadowRoot* shadowRoot = host.shadowRoot())
-        return shadowRoot;
-
-    ExceptionCode ec = 0;
-    auto result = host.createShadowRoot(ec);
-    if (ec)
-        return Exception { ec };
-    return result;
-}
-
 Node* Internals::ensureUserAgentShadowRoot(Element& host)
 {
     return &host.ensureUserAgentShadowRoot();
-}
-
-ExceptionOr<Node*> Internals::createShadowRoot(Element& host)
-{
-    ExceptionCode ec = 0;
-    auto result = host.createShadowRoot(ec);
-    if (ec)
-        return Exception { ec };
-    return result;
 }
 
 Node* Internals::shadowRoot(Element& host)
@@ -817,11 +807,11 @@ ExceptionOr<String> Internals::shadowRootType(const Node& root) const
         return Exception { INVALID_ACCESS_ERR };
 
     switch (downcast<ShadowRoot>(root).mode()) {
-    case ShadowRoot::Mode::UserAgent:
+    case ShadowRootMode::UserAgent:
         return String("UserAgentShadowRoot");
-    case ShadowRoot::Mode::Closed:
+    case ShadowRootMode::Closed:
         return String("ClosedShadowRoot");
-    case ShadowRoot::Mode::Open:
+    case ShadowRootMode::Open:
         return String("OpenShadowRoot");
     default:
         ASSERT_NOT_REACHED();
@@ -862,6 +852,47 @@ bool Internals::isRequestAnimationFrameThrottled() const
 bool Internals::areTimersThrottled() const
 {
     return contextDocument()->isTimerThrottlingEnabled();
+}
+
+void Internals::setEventThrottlingBehaviorOverride(Optional<EventThrottlingBehavior> value)
+{
+    Document* document = contextDocument();
+    if (!document || !document->page())
+        return;
+
+    if (!value) {
+        document->page()->setEventThrottlingBehaviorOverride(Nullopt);
+        return;
+    }
+
+    switch (value.value()) {
+    case Internals::EventThrottlingBehavior::Responsive:
+        document->page()->setEventThrottlingBehaviorOverride(WebCore::EventThrottlingBehavior::Responsive);
+        break;
+    case Internals::EventThrottlingBehavior::Unresponsive:
+        document->page()->setEventThrottlingBehaviorOverride(WebCore::EventThrottlingBehavior::Unresponsive);
+        break;
+    }
+}
+
+Optional<Internals::EventThrottlingBehavior> Internals::eventThrottlingBehaviorOverride() const
+{
+    Document* document = contextDocument();
+    if (!document || !document->page())
+        return Nullopt;
+
+    auto behavior = document->page()->eventThrottlingBehaviorOverride();
+    if (!behavior)
+        return Nullopt;
+    
+    switch (behavior.value()) {
+    case WebCore::EventThrottlingBehavior::Responsive:
+        return Internals::EventThrottlingBehavior::Responsive;
+    case WebCore::EventThrottlingBehavior::Unresponsive:
+        return Internals::EventThrottlingBehavior::Unresponsive;
+    }
+
+    return Nullopt;
 }
 
 String Internals::visiblePlaceholder(Element& element)
@@ -1100,6 +1131,30 @@ ExceptionOr<void> Internals::setScrollViewPosition(int x, int y)
     frameView.setConstrainsScrollingToContentEdge(constrainsScrollingToContentEdgeOldValue);
 
     return { };
+}
+
+ExceptionOr<Ref<ClientRect>> Internals::layoutViewportRect()
+{
+    Document* document = contextDocument();
+    if (!document || !document->frame())
+        return Exception { INVALID_ACCESS_ERR };
+
+    document->updateLayoutIgnorePendingStylesheets();
+
+    auto& frameView = *document->view();
+    return ClientRect::create(frameView.layoutViewportRect());
+}
+
+ExceptionOr<Ref<ClientRect>> Internals::visualViewportRect()
+{
+    Document* document = contextDocument();
+    if (!document || !document->frame())
+        return Exception { INVALID_ACCESS_ERR };
+
+    document->updateLayoutIgnorePendingStylesheets();
+
+    auto& frameView = *document->view();
+    return ClientRect::create(frameView.visualViewportRect());
 }
 
 ExceptionOr<void> Internals::setViewBaseBackgroundColor(const String& colorValue)
@@ -1502,24 +1557,6 @@ String Internals::parserMetaData(JSC::JSValue code)
     result.appendLiteral(" }");
 
     return result.toString();
-}
-
-ExceptionOr<void> Internals::setBatteryStatus(const String& eventType, bool charging, double chargingTime, double dischargingTime, double level)
-{
-    Document* document = contextDocument();
-    if (!document || !document->page())
-        return Exception { INVALID_ACCESS_ERR };
-
-#if ENABLE(BATTERY_STATUS)
-    BatteryController::from(document->page())->didChangeBatteryStatus(eventType, BatteryStatus::create(charging, chargingTime, dischargingTime, level));
-#else
-    UNUSED_PARAM(eventType);
-    UNUSED_PARAM(charging);
-    UNUSED_PARAM(chargingTime);
-    UNUSED_PARAM(dischargingTime);
-    UNUSED_PARAM(level);
-#endif
-    return { };
 }
 
 ExceptionOr<void> Internals::setDeviceProximity(const String&, double value, double min, double max)
@@ -2038,6 +2075,15 @@ ExceptionOr<String> Internals::pageSizeAndMarginsInPixels(int pageNumber, int wi
     return PrintContext::pageSizeAndMarginsInPixels(frame(), pageNumber, width, height, marginTop, marginRight, marginBottom, marginLeft);
 }
 
+ExceptionOr<float> Internals::pageScaleFactor() const
+{
+    Document* document = contextDocument();
+    if (!document || !document->page())
+        return Exception { INVALID_ACCESS_ERR };
+
+    return document->page()->pageScaleFactor();
+}
+
 ExceptionOr<void> Internals::setPageScaleFactor(float scaleFactor, int x, int y)
 {
     Document* document = contextDocument();
@@ -2177,6 +2223,11 @@ void Internals::registerURLSchemeAsBypassingContentSecurityPolicy(const String& 
 void Internals::removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(const String& scheme)
 {
     SchemeRegistry::removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(scheme);
+}
+
+void Internals::registerDefaultPortForProtocol(unsigned short port, const String& protocol)
+{
+    registerDefaultPortForProtocolForTesting(port, protocol);
 }
 
 Ref<MallocStatistics> Internals::mallocStatistics() const
@@ -2517,7 +2568,7 @@ ExceptionOr<String> Internals::captionsStyleSheetOverride()
 #if ENABLE(VIDEO_TRACK)
     return document->page()->group().captionPreferences().captionsStyleSheetOverride();
 #else
-    return emptyString();
+    return String { emptyString() };
 #endif
 }
 
@@ -2703,6 +2754,8 @@ ExceptionOr<void> Internals::setMediaSessionRestrictions(const String& mediaType
         mediaType = PlatformMediaSession::Video;
     else if (equalLettersIgnoringASCIICase(mediaTypeString, "audio"))
         mediaType = PlatformMediaSession::Audio;
+    else if (equalLettersIgnoringASCIICase(mediaTypeString, "videoaudio"))
+        mediaType = PlatformMediaSession::VideoAudio;
     else if (equalLettersIgnoringASCIICase(mediaTypeString, "webaudio"))
         mediaType = PlatformMediaSession::WebAudio;
     else
@@ -2998,10 +3051,10 @@ String Internals::pageMediaState()
         string.append("HasPlaybackTargetAvailabilityListener,");
     if (state & MediaProducer::HasAudioOrVideo)
         string.append("HasAudioOrVideo,");
-    if (state & MediaProducer::HasActiveMediaCaptureDevice)
-        string.append("HasActiveMediaCaptureDevice,");
-    if (state & MediaProducer::HasMediaCaptureDevice)
-        string.append("HasMediaCaptureDevice,");
+    if (state & MediaProducer::HasActiveAudioCaptureDevice)
+        string.append("HasActiveAudioCaptureDevice,");
+    if (state & MediaProducer::HasActiveVideoCaptureDevice)
+        string.append("HasActiveVideoCaptureDevice,");
 
     if (string.isEmpty())
         string.append("IsNotPlaying");
@@ -3299,5 +3352,10 @@ bool Internals::userPrefersReducedMotion() const
 }
 
 #endif
+
+void Internals::reportBacktrace()
+{
+    WTFReportBacktrace();
+}
 
 } // namespace WebCore

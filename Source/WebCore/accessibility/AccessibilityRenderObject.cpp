@@ -54,7 +54,6 @@
 #include "HTMLMapElement.h"
 #include "HTMLMeterElement.h"
 #include "HTMLNames.h"
-#include "HTMLOptGroupElement.h"
 #include "HTMLOptionElement.h"
 #include "HTMLOptionsCollection.h"
 #include "HTMLSelectElement.h"
@@ -777,6 +776,11 @@ String AccessibilityRenderObject::stringValue() const
     if (isTextControl())
         return text();
     
+#if PLATFORM(IOS)
+    if (isInputTypePopupButton())
+        return textUnderElement();
+#endif
+    
     if (is<RenderFileUploadControl>(*m_renderer))
         return downcast<RenderFileUploadControl>(*m_renderer).fileTextValue();
     
@@ -1454,15 +1458,22 @@ PlainTextRange AccessibilityRenderObject::documentBasedSelectedTextRange() const
     Node* node = m_renderer->node();
     if (!node)
         return PlainTextRange();
-    
+
     VisibleSelection visibleSelection = selection();
     RefPtr<Range> currentSelectionRange = visibleSelection.toNormalizedRange();
-    if (!currentSelectionRange || !currentSelectionRange->intersectsNode(*node, IGNORE_EXCEPTION))
+    if (!currentSelectionRange)
         return PlainTextRange();
-    
+    // FIXME: The reason this does the correct thing when the selection is in the
+    // shadow tree of an input element is that we get an exception below, and we
+    // choose to interpret all exceptions as "does not intersect". Seems likely
+    // that does not handle all cases correctly.
+    auto intersectsResult = currentSelectionRange->intersectsNode(*node);
+    if (!intersectsResult.hasException() && !intersectsResult.releaseReturnValue())
+        return PlainTextRange();
+
     int start = indexForVisiblePosition(visibleSelection.start());
     int end = indexForVisiblePosition(visibleSelection.end());
-    
+
     return PlainTextRange(start, end - start);
 }
 
@@ -1609,6 +1620,10 @@ bool AccessibilityRenderObject::isSelected() const
     
     if (isTabItem() && isTabItemSelected())
         return true;
+
+    // Menu items are considered selectable by assistive technologies
+    if (isMenuItem())
+        return isFocused() || parentObjectUnignored()->activeDescendant() == this;
 
     return false;
 }
@@ -3259,9 +3274,29 @@ bool AccessibilityRenderObject::ariaLiveRegionAtomic() const
     }
 }
 
-bool AccessibilityRenderObject::ariaLiveRegionBusy() const
+bool AccessibilityRenderObject::isBusy() const
 {
     return elementAttributeValue(aria_busyAttr);    
+}
+
+bool AccessibilityRenderObject::canHaveSelectedChildren() const
+{
+    switch (roleValue()) {
+    // These roles are containers whose children support aria-selected:
+    case GridRole:
+    case ListBoxRole:
+    case TabListRole:
+    case TreeRole:
+    case TreeGridRole:
+    // These roles are containers whose children are treated as selected by assistive
+    // technologies. We can get the "selected" item via aria-activedescendant or the
+    // focused element.
+    case MenuRole:
+    case MenuBarRole:
+        return true;
+    default:
+        return false;
+    }
 }
     
 void AccessibilityRenderObject::ariaSelectedRows(AccessibilityChildrenVector& result)
@@ -3316,12 +3351,36 @@ void AccessibilityRenderObject::selectedChildren(AccessibilityChildrenVector& re
 {
     ASSERT(result.isEmpty());
 
-    // only listboxes should be asked for their selected children. 
-    AccessibilityRole role = roleValue();
-    if (role == ListBoxRole) // native list boxes would be AccessibilityListBoxes, so only check for aria list boxes
+    if (!canHaveSelectedChildren())
+        return;
+
+    switch (roleValue()) {
+    case ListBoxRole:
+        // native list boxes would be AccessibilityListBoxes, so only check for aria list boxes
         ariaListboxSelectedChildren(result);
-    else if (role == TreeRole || role == TreeGridRole || role == TableRole || role == GridRole)
+        return;
+    case GridRole:
+    case TreeRole:
         ariaSelectedRows(result);
+        return;
+    case TabListRole:
+        if (AccessibilityObject* selectedTab = selectedTabItem())
+            result.append(selectedTab);
+        return;
+    case MenuRole:
+    case MenuBarRole:
+        if (AccessibilityObject* descendant = activeDescendant()) {
+            result.append(descendant);
+            return;
+        }
+        if (AccessibilityObject* focusedElement = focusedUIElement()) {
+            result.append(focusedElement);
+            return;
+        }
+        return;
+    default:
+        ASSERT_NOT_REACHED();
+    }
 }
 
 void AccessibilityRenderObject::ariaListboxVisibleChildren(AccessibilityChildrenVector& result)      

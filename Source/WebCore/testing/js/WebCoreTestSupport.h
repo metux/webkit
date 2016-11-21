@@ -24,8 +24,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebCoreTestSupport_h
-#define WebCoreTestSupport_h
+#pragma once
 
 typedef const struct OpaqueJSContext* JSContextRef;
 typedef struct OpaqueJSString* JSStringRef;
@@ -56,7 +55,6 @@ void clearWheelEventTestTrigger(WebCore::Frame&) TEST_SUPPORT_EXPORT;
 void setLogChannelToAccumulate(const WTF::String& name) TEST_SUPPORT_EXPORT;
 void initializeLogChannelsIfNecessary() TEST_SUPPORT_EXPORT;
 void setAllowsAnySSLCertificate(bool) TEST_SUPPORT_EXPORT;
-void setURLParserEnabled(bool) TEST_SUPPORT_EXPORT;
 
 void installMockGamepadProvider() TEST_SUPPORT_EXPORT;
 void connectMockGamepad(unsigned index) TEST_SUPPORT_EXPORT;
@@ -66,5 +64,3 @@ void setMockGamepadAxisValue(unsigned index, unsigned axisIndex, double value) T
 void setMockGamepadButtonValue(unsigned index, unsigned buttonIndex, double value) TEST_SUPPORT_EXPORT;
 
 } // namespace WebCoreTestSupport
-
-#endif

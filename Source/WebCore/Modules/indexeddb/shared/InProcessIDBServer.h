@@ -71,11 +71,13 @@ public:
     void renameIndex(const IDBRequestData&, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, const String& newName) final;
     void putOrAdd(const IDBRequestData&, const IDBKeyData&, const IDBValue&, const IndexedDB::ObjectStoreOverwriteMode) final;
     void getRecord(const IDBRequestData&, const IDBGetRecordData&) final;
+    void getAllRecords(const IDBRequestData&, const IDBGetAllRecordsData&) final;
     void getCount(const IDBRequestData&, const IDBKeyRangeData&) final;
     void deleteRecord(const IDBRequestData&, const IDBKeyRangeData&) final;
     void openCursor(const IDBRequestData&, const IDBCursorInfo&) final;
-    void iterateCursor(const IDBRequestData&, const IDBKeyData&, unsigned long count) final;
+    void iterateCursor(const IDBRequestData&, const IDBIterateCursorData&) final;
     void establishTransaction(uint64_t databaseConnectionIdentifier, const IDBTransactionInfo&) final;
+    void databaseConnectionPendingClose(uint64_t databaseConnectionIdentifier) final;
     void databaseConnectionClosed(uint64_t databaseConnectionIdentifier) final;
     void abortOpenAndUpgradeNeeded(uint64_t databaseConnectionIdentifier, const IDBResourceIdentifier& transactionIdentifier) final;
     void didFireVersionChangeEvent(uint64_t databaseConnectionIdentifier, const IDBResourceIdentifier& requestIdentifier) final;
@@ -98,6 +100,7 @@ public:
     void didRenameIndex(const IDBResultData&) final;
     void didPutOrAdd(const IDBResultData&) final;
     void didGetRecord(const IDBResultData&) final;
+    void didGetAllRecords(const IDBResultData&) final;
     void didGetCount(const IDBResultData&) final;
     void didDeleteRecord(const IDBResultData&) final;
     void didOpenCursor(const IDBResultData&) final;

@@ -92,14 +92,14 @@ public:
 
     WEBCORE_EXPORT const String& httpVersion() const;
     WEBCORE_EXPORT void setHTTPVersion(const String&);
-    bool isHttpVersion0_9() const;
+    WEBCORE_EXPORT bool isHttpVersion0_9() const;
 
     WEBCORE_EXPORT const HTTPHeaderMap& httpHeaderFields() const;
 
     String httpHeaderField(const String& name) const;
     WEBCORE_EXPORT String httpHeaderField(HTTPHeaderName) const;
     WEBCORE_EXPORT void setHTTPHeaderField(const String& name, const String& value);
-    void setHTTPHeaderField(HTTPHeaderName, const String& value);
+    WEBCORE_EXPORT void setHTTPHeaderField(HTTPHeaderName, const String& value);
 
     void addHTTPHeaderField(HTTPHeaderName, const String& value);
     void addHTTPHeaderField(const String& name, const String& value);

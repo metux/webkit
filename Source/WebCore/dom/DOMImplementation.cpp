@@ -29,7 +29,6 @@
 #include "ContentType.h"
 #include "DocumentType.h"
 #include "Element.h"
-#include "ExceptionCode.h"
 #include "FTPDirectoryDocument.h"
 #include "Frame.h"
 #include "FrameLoader.h"
@@ -92,13 +91,9 @@ DOMImplementation::DOMImplementation(Document& document)
 
 ExceptionOr<Ref<DocumentType>> DOMImplementation::createDocumentType(const String& qualifiedName, const String& publicId, const String& systemId)
 {
-    ExceptionCode ec = 0;
-    String prefix;
-    String localName;
-    Document::parseQualifiedName(qualifiedName, prefix, localName, ec);
-    if (ec)
-        return Exception { ec };
-
+    auto parseResult = Document::parseQualifiedName(qualifiedName);
+    if (parseResult.hasException())
+        return parseResult.releaseException();
     return DocumentType::create(m_document, qualifiedName, publicId, systemId);
 }
 
@@ -119,10 +114,11 @@ ExceptionOr<Ref<XMLDocument>> DOMImplementation::createDocument(const String& na
 
     RefPtr<Element> documentElement;
     if (!qualifiedName.isEmpty()) {
-        ExceptionCode ec = 0;
-        documentElement = document->createElementNS(namespaceURI, qualifiedName, ec);
-        if (ec)
-            return Exception { ec };
+        ASSERT(!document->domWindow()); // If domWindow is not null, createElementNS could find CustomElementRegistry and arbitrary scripts.
+        auto result = document->createElementNS(namespaceURI, qualifiedName);
+        if (result.hasException())
+            return result.releaseException();
+        documentElement = result.releaseReturnValue();
     }
 
     if (documentType)
@@ -138,7 +134,7 @@ Ref<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, const S
     // FIXME: Title should be set.
     // FIXME: Media could have wrong syntax, in which case we should generate an exception.
     auto sheet = CSSStyleSheet::create(StyleSheetContents::create());
-    sheet->setMediaQueries(MediaQuerySet::createAllowingDescriptionSyntax(media));
+    sheet->setMediaQueries(MediaQuerySet::create(media));
     return sheet;
 }
 

@@ -1050,6 +1050,45 @@ private:
             fixEdge<KnownStringUse>(node->child1());
             break;
         }
+
+        case NewArrayWithSpread: {
+            watchHavingABadTime(node);
+            
+            BitVector* bitVector = node->bitVector();
+            for (unsigned i = node->numChildren(); i--;) {
+                if (bitVector->get(i))
+                    fixEdge<KnownCellUse>(m_graph.m_varArgChildren[node->firstChild() + i]);
+                else
+                    fixEdge<UntypedUse>(m_graph.m_varArgChildren[node->firstChild() + i]);
+            }
+
+            break;
+        }
+
+        case Spread: {
+            // Note: We care about performing the protocol on our child's global object, not necessarily ours.
+            
+            watchHavingABadTime(node->child1().node());
+
+            JSGlobalObject* globalObject = m_graph.globalObjectFor(node->child1()->origin.semantic);
+            // When we go down the fast path, we don't consult the prototype chain, so we must prove
+            // that it doesn't contain any indexed properties, and that any holes will result in
+            // jsUndefined().
+            InlineWatchpointSet& objectPrototypeTransition = globalObject->objectPrototype()->structure()->transitionWatchpointSet();
+            InlineWatchpointSet& arrayPrototypeTransition = globalObject->arrayPrototype()->structure()->transitionWatchpointSet();
+            if (node->child1()->shouldSpeculateArray() 
+                && arrayPrototypeTransition.isStillValid() 
+                && objectPrototypeTransition.isStillValid() 
+                && globalObject->arrayPrototypeChainIsSane()
+                && m_graph.isWatchingArrayIteratorProtocolWatchpoint(node->child1().node())
+                && m_graph.isWatchingHavingABadTimeWatchpoint(node->child1().node())) {
+                m_graph.watchpoints().addLazily(objectPrototypeTransition);
+                m_graph.watchpoints().addLazily(arrayPrototypeTransition);
+                fixEdge<ArrayUse>(node->child1());
+            } else
+                fixEdge<CellUse>(node->child1());
+            break;
+        }
             
         case NewArray: {
             watchHavingABadTime(node);
@@ -1396,8 +1435,10 @@ private:
         case PhantomNewObject:
         case PhantomNewFunction:
         case PhantomNewGeneratorFunction:
+        case PhantomNewAsyncFunction:
         case PhantomCreateActivation:
         case PhantomDirectArguments:
+        case PhantomCreateRest:
         case PhantomClonedArguments:
         case GetMyArgumentByVal:
         case GetMyArgumentByValOutOfBounds:
@@ -1536,7 +1577,7 @@ private:
             } else if (typeSet->doesTypeConformTo(TypeObject)) {
                 StructureSet set;
                 {
-                    ConcurrentJITLocker locker(typeSet->m_lock);
+                    ConcurrentJSLocker locker(typeSet->m_lock);
                     set = typeSet->structureSet(locker);
                 }
                 if (!set.isEmpty()) {
@@ -1548,10 +1589,16 @@ private:
             break;
         }
 
+        case CreateClonedArguments: {
+            watchHavingABadTime(node);
+            break;
+        }
+
         case CreateScopedArguments:
         case CreateActivation:
         case NewFunction:
-        case NewGeneratorFunction: {
+        case NewGeneratorFunction:
+        case NewAsyncFunction: {
             fixEdge<CellUse>(node->child1());
             break;
         }
@@ -1706,15 +1753,26 @@ private:
             break;
         }
 
-        case CheckDOM:
-            fixEdge<CellUse>(node->child1());
+        case CheckDOM: {
+            fixupCheckDOM(node);
             break;
+        }
 
-        case CallDOM: {
-            DOMJIT::CallDOMPatchpoint* patchpoint = node->callDOMData()->patchpoint;
+        case CallDOMGetter: {
+            DOMJIT::CallDOMGetterPatchpoint* patchpoint = node->callDOMGetterData()->patchpoint;
             fixEdge<CellUse>(node->child1()); // DOM.
             if (patchpoint->requireGlobalObject)
                 fixEdge<KnownCellUse>(node->child2()); // GlobalObject.
+            break;
+        }
+
+        case CallDOM: {
+            fixupCallDOM(node);
+            break;
+        }
+
+        case Call: {
+            attemptToMakeCallDOM(node);
             break;
         }
 
@@ -1728,13 +1786,13 @@ private:
         case GetCallee:
         case GetArgumentCountIncludingThis:
         case GetRestLength:
+        case GetArgument:
         case Flush:
         case PhantomLocal:
         case GetLocalUnlinked:
         case GetGlobalVar:
         case GetGlobalLexicalVariable:
         case NotifyWrite:
-        case Call:
         case DirectCall:
         case CheckTypeInfoFlags:
         case TailCallInlinedCaller:
@@ -1764,7 +1822,6 @@ private:
         case IsObjectOrNull:
         case IsFunction:
         case CreateDirectArguments:
-        case CreateClonedArguments:
         case Jump:
         case Return:
         case TailCall:
@@ -1808,8 +1865,10 @@ private:
         // optimizing, the code just gets thrown out. Doing this at FixupPhase is just early enough, since
         // prior to this point nobody should have been doing optimizations based on the indexing type of
         // the allocation.
-        if (!globalObject->isHavingABadTime())
+        if (!globalObject->isHavingABadTime()) {
             m_graph.watchpoints().addLazily(globalObject->havingABadTimeWatchpoint());
+            m_graph.freeze(globalObject);
+        }
     }
     
     template<UseKind useKind>
@@ -2600,7 +2659,7 @@ private:
             profiledBlock->getArrayProfile(node->origin.semantic.bytecodeIndex);
         ArrayMode arrayMode = ArrayMode(Array::SelectUsingPredictions);
         if (arrayProfile) {
-            ConcurrentJITLocker locker(profiledBlock->m_lock);
+            ConcurrentJSLocker locker(profiledBlock->m_lock);
             arrayProfile->computeUpdatedPrediction(locker, profiledBlock);
             arrayMode = ArrayMode::fromObserved(locker, arrayProfile, Array::Read, false);
             if (arrayMode.type() == Array::Unprofiled) {
@@ -2657,6 +2716,93 @@ private:
             OpInfo(arrayMode.asWord()), Edge(child, KnownCellUse), Edge(storage));
     }
     
+    bool attemptToMakeCallDOM(Node* node)
+    {
+        if (m_graph.hasExitSite(node->origin.semantic, BadType))
+            return false;
+
+        const DOMJIT::Signature* signature = node->signature();
+        if (!signature)
+            return false;
+
+        {
+            unsigned index = 0;
+            bool shouldConvertToCallDOM = true;
+            m_graph.doToChildren(node, [&](Edge& edge) {
+                // Callee. Ignore this. DFGByteCodeParser already emit appropriate checks.
+                if (!index)
+                    return;
+
+                if (index == 1) {
+                    // DOM node case.
+                    if (edge->shouldSpeculateNotCell())
+                        shouldConvertToCallDOM = false;
+                } else {
+                    switch (signature->arguments[index - 2]) {
+                    case SpecString:
+                        if (edge->shouldSpeculateNotString())
+                            shouldConvertToCallDOM = false;
+                        break;
+                    case SpecInt32Only:
+                        if (edge->shouldSpeculateNotInt32())
+                            shouldConvertToCallDOM = false;
+                        break;
+                    case SpecBoolean:
+                        if (edge->shouldSpeculateNotBoolean())
+                            shouldConvertToCallDOM = false;
+                        break;
+                    default:
+                        RELEASE_ASSERT_NOT_REACHED();
+                        break;
+                    }
+                }
+                ++index;
+            });
+            if (!shouldConvertToCallDOM)
+                return false;
+        }
+
+        Node* thisNode = m_graph.varArgChild(node, 1).node();
+        Ref<DOMJIT::Patchpoint> checkDOMPatchpoint = signature->checkDOM();
+        m_graph.m_domJITPatchpoints.append(checkDOMPatchpoint.ptr());
+        Node* checkDOM = m_insertionSet.insertNode(m_indexInBlock, SpecNone, CheckDOM, node->origin, OpInfo(checkDOMPatchpoint.ptr()), OpInfo(signature->classInfo), Edge(thisNode));
+        node->convertToCallDOM(m_graph);
+        fixupCheckDOM(checkDOM);
+        fixupCallDOM(node);
+        return true;
+    }
+
+    void fixupCheckDOM(Node* node)
+    {
+        fixEdge<CellUse>(node->child1());
+    }
+
+    void fixupCallDOM(Node* node)
+    {
+        const DOMJIT::Signature* signature = node->signature();
+        auto fixup = [&](Edge& edge, unsigned argumentIndex) {
+            if (!edge)
+                return;
+            switch (signature->arguments[argumentIndex]) {
+            case SpecString:
+                fixEdge<StringUse>(edge);
+                break;
+            case SpecInt32Only:
+                fixEdge<Int32Use>(edge);
+                break;
+            case SpecBoolean:
+                fixEdge<BooleanUse>(edge);
+                break;
+            default:
+                RELEASE_ASSERT_NOT_REACHED();
+                break;
+            }
+        };
+        fixEdge<CellUse>(node->child1()); // DOM.
+        fixup(node->child2(), 0);
+        fixup(node->child3(), 1);
+    }
+
     void fixupChecksInBlock(BasicBlock* block)
     {
         if (!block)

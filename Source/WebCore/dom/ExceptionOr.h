@@ -46,6 +46,19 @@ private:
     Variant<Exception, ReturnType> m_value;
 };
 
+template<typename ReturnReferenceType> class ExceptionOr<ReturnReferenceType&> {
+public:
+    ExceptionOr(Exception&&);
+    ExceptionOr(ReturnReferenceType&);
+
+    bool hasException() const;
+    Exception&& releaseException();
+    ReturnReferenceType& releaseReturnValue();
+
+private:
+    ExceptionOr<ReturnReferenceType*> m_value;
+};
+
 template<> class ExceptionOr<void> {
 public:
     ExceptionOr(Exception&&);
@@ -57,6 +70,8 @@ public:
 private:
     Optional<Exception> m_exception;
 };
+
+ExceptionOr<void> isolatedCopy(ExceptionOr<void>&&);
 
 template<typename ReturnType> inline ExceptionOr<ReturnType>::ExceptionOr(Exception&& exception)
     : m_value(WTFMove(exception))
@@ -88,6 +103,31 @@ template<typename ReturnType> inline ReturnType&& ExceptionOr<ReturnType>::relea
     return WTF::get<ReturnType>(WTFMove(m_value));
 }
 
+template<typename ReturnReferenceType> inline ExceptionOr<ReturnReferenceType&>::ExceptionOr(Exception&& exception)
+    : m_value(WTFMove(exception))
+{
+}
+
+template<typename ReturnReferenceType> inline ExceptionOr<ReturnReferenceType&>::ExceptionOr(ReturnReferenceType& returnValue)
+    : m_value(&returnValue)
+{
+}
+
+template<typename ReturnReferenceType> inline bool ExceptionOr<ReturnReferenceType&>::hasException() const
+{
+    return m_value.hasException();
+}
+
+template<typename ReturnReferenceType> inline Exception&& ExceptionOr<ReturnReferenceType&>::releaseException()
+{
+    return m_value.releaseException();
+}
+
+template<typename ReturnReferenceType> inline ReturnReferenceType& ExceptionOr<ReturnReferenceType&>::releaseReturnValue()
+{
+    return *m_value.releaseReturnValue();
+}
+
 inline ExceptionOr<void>::ExceptionOr(Exception&& exception)
     : m_exception(WTFMove(exception))
 {
@@ -101,6 +141,13 @@ inline bool ExceptionOr<void>::hasException() const
 inline Exception&& ExceptionOr<void>::releaseException()
 {
     return WTFMove(m_exception.value());
+}
+
+inline ExceptionOr<void> isolatedCopy(ExceptionOr<void>&& value)
+{
+    if (value.hasException())
+        return isolatedCopy(value.releaseException());
+    return { };
 }
 
 }

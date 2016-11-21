@@ -26,16 +26,17 @@
 #include "config.h"
 #include "DFGWorklist.h"
 
-#if ENABLE(DFG_JIT)
-
 #include "CodeBlock.h"
 #include "DFGLongLivedState.h"
 #include "DFGSafepoint.h"
 #include "DeferGC.h"
 #include "JSCInlines.h"
+#include "ReleaseHeapAccessScope.h"
 #include <mutex>
 
 namespace JSC { namespace DFG {
+
+#if ENABLE(DFG_JIT)
 
 class Worklist::ThreadBody : public AutomaticThread {
 public:
@@ -104,9 +105,17 @@ protected:
             dataLog(m_worklist, ": Compiling ", m_plan->key(), " asynchronously\n");
         
         // There's no way for the GC to be safepointing since we own rightToRun.
-        RELEASE_ASSERT(m_plan->vm->heap.mutatorState() != MutatorState::HelpingGC);
+        if (m_plan->vm->heap.collectorBelievesThatTheWorldIsStopped()) {
+            dataLog("Heap is stoped but here we are! (1)\n");
+            RELEASE_ASSERT_NOT_REACHED();
+        }
         m_plan->compileInThread(*m_longLivedState, &m_data);
-        RELEASE_ASSERT(m_plan->stage == Plan::Cancelled || m_plan->vm->heap.mutatorState() != MutatorState::HelpingGC);
+        if (m_plan->stage != Plan::Cancelled) {
+            if (m_plan->vm->heap.collectorBelievesThatTheWorldIsStopped()) {
+                dataLog("Heap is stopped but here we are! (2)\n");
+                RELEASE_ASSERT_NOT_REACHED();
+            }
+        }
         
         {
             LockHolder locker(*m_worklist.m_lock);
@@ -124,7 +133,7 @@ protected:
             
             m_worklist.m_planCompiled.notifyAll();
         }
-        RELEASE_ASSERT(m_plan->vm->heap.mutatorState() != MutatorState::HelpingGC);
+        RELEASE_ASSERT(!m_plan->vm->heap.collectorBelievesThatTheWorldIsStopped());
         
         return WorkResult::Continue;
     }
@@ -238,6 +247,13 @@ Worklist::State Worklist::compilationState(CompilationKey key)
 void Worklist::waitUntilAllPlansForVMAreReady(VM& vm)
 {
     DeferGC deferGC(vm.heap);
+    
+    // While we are waiting for the compiler to finish, the collector might have already suspended
+    // the compiler and then it will be waiting for us to stop. That's a deadlock. We avoid that
+    // deadlock by relinquishing our heap access, so that the collector pretends that we are stopped
+    // even if we aren't.
+    ReleaseHeapAccessScope releaseHeapAccessScope(vm.heap);
+    
     // Wait for all of the plans for the given VM to complete. The idea here
     // is that we want all of the caller VM's plans to be done. We don't care
     // about any other VM's plans, and we won't attempt to wait on those.
@@ -333,6 +349,17 @@ void Worklist::completeAllPlansForVM(VM& vm)
     completeAllReadyPlansForVM(vm);
 }
 
+void Worklist::markCodeBlocks(VM& vm, SlotVisitor& slotVisitor)
+{
+    LockHolder locker(*m_lock);
+    for (PlanMap::iterator iter = m_plans.begin(); iter != m_plans.end(); ++iter) {
+        Plan* plan = iter->value.get();
+        if (plan->vm != &vm)
+            continue;
+        plan->markCodeBlocks(slotVisitor);
+    }
+}
+
 void Worklist::rememberCodeBlocks(VM& vm)
 {
     LockHolder locker(*m_lock);
@@ -340,7 +367,7 @@ void Worklist::rememberCodeBlocks(VM& vm)
         Plan* plan = iter->value.get();
         if (plan->vm != &vm)
             continue;
-        plan->rememberCodeBlocks();
+        plan->rememberCodeBlocks(vm);
     }
 }
 
@@ -483,13 +510,13 @@ void Worklist::dump(const LockHolder&, PrintStream& out) const
 
 static Worklist* theGlobalDFGWorklist;
 
-Worklist* ensureGlobalDFGWorklist()
+Worklist& ensureGlobalDFGWorklist()
 {
     static std::once_flag initializeGlobalWorklistOnceFlag;
     std::call_once(initializeGlobalWorklistOnceFlag, [] {
         theGlobalDFGWorklist = &Worklist::create("DFG Worklist", Options::numberOfDFGCompilerThreads(), Options::priorityDeltaOfDFGCompilerThreads()).leakRef();
     });
-    return theGlobalDFGWorklist;
+    return *theGlobalDFGWorklist;
 }
 
 Worklist* existingGlobalDFGWorklistOrNull()
@@ -499,13 +526,13 @@ Worklist* existingGlobalDFGWorklistOrNull()
 
 static Worklist* theGlobalFTLWorklist;
 
-Worklist* ensureGlobalFTLWorklist()
+Worklist& ensureGlobalFTLWorklist()
 {
     static std::once_flag initializeGlobalWorklistOnceFlag;
     std::call_once(initializeGlobalWorklistOnceFlag, [] {
         theGlobalFTLWorklist = &Worklist::create("FTL Worklist", Options::numberOfFTLCompilerThreads(), Options::priorityDeltaOfFTLCompilerThreads()).leakRef();
     });
-    return theGlobalFTLWorklist;
+    return *theGlobalFTLWorklist;
 }
 
 Worklist* existingGlobalFTLWorklistOrNull()
@@ -513,12 +540,12 @@ Worklist* existingGlobalFTLWorklistOrNull()
     return theGlobalFTLWorklist;
 }
 
-Worklist* ensureGlobalWorklistFor(CompilationMode mode)
+Worklist& ensureGlobalWorklistFor(CompilationMode mode)
 {
     switch (mode) {
     case InvalidCompilationMode:
         RELEASE_ASSERT_NOT_REACHED();
-        return 0;
+        return ensureGlobalDFGWorklist();
     case DFGMode:
         return ensureGlobalDFGWorklist();
     case FTLMode:
@@ -526,26 +553,49 @@ Worklist* ensureGlobalWorklistFor(CompilationMode mode)
         return ensureGlobalFTLWorklist();
     }
     RELEASE_ASSERT_NOT_REACHED();
-    return 0;
+    return ensureGlobalDFGWorklist();
 }
 
 void completeAllPlansForVM(VM& vm)
 {
     for (unsigned i = DFG::numberOfWorklists(); i--;) {
-        if (DFG::Worklist* worklist = DFG::worklistForIndexOrNull(i))
+        if (DFG::Worklist* worklist = DFG::existingWorklistForIndexOrNull(i))
             worklist->completeAllPlansForVM(vm);
+    }
+}
+
+void markCodeBlocks(VM& vm, SlotVisitor& slotVisitor)
+{
+    for (unsigned i = DFG::numberOfWorklists(); i--;) {
+        if (DFG::Worklist* worklist = DFG::existingWorklistForIndexOrNull(i))
+            worklist->markCodeBlocks(vm, slotVisitor);
     }
 }
 
 void rememberCodeBlocks(VM& vm)
 {
     for (unsigned i = DFG::numberOfWorklists(); i--;) {
-        if (DFG::Worklist* worklist = DFG::worklistForIndexOrNull(i))
+        if (DFG::Worklist* worklist = DFG::existingWorklistForIndexOrNull(i))
             worklist->rememberCodeBlocks(vm);
     }
 }
 
-} } // namespace JSC::DFG
+#else // ENABLE(DFG_JIT)
+
+void completeAllPlansForVM(VM&)
+{
+}
+
+void markCodeBlocks(VM&, SlotVisitor&)
+{
+}
+
+void rememberCodeBlocks(VM&)
+{
+}
 
 #endif // ENABLE(DFG_JIT)
+
+} } // namespace JSC::DFG
+
 

@@ -28,6 +28,7 @@
 #include "CodeBlock.h"
 #include "CodeSpecializationKind.h"
 #include "ExceptionHelpers.h"
+#include "FunctionCodeBlock.h"
 #include "SlowPathReturnType.h"
 #include "StackAlignment.h"
 #include "Symbol.h"
@@ -82,11 +83,14 @@ inline bool opIn(ExecState* exec, JSValue propName, JSValue baseVal)
     JSObject* baseObj = asObject(baseVal);
 
     uint32_t i;
-    if (propName.getUInt32(i))
+    if (propName.getUInt32(i)) {
+        scope.release();
         return baseObj->hasProperty(exec, i);
+    }
 
     auto property = propName.toPropertyKey(exec);
     RETURN_IF_EXCEPTION(scope, false);
+    scope.release();
     return baseObj->hasProperty(exec, property);
 }
 
@@ -105,7 +109,7 @@ inline void tryCachePutToScopeGlobal(
             ResolveType newResolveType = resolveType == UnresolvedProperty ? GlobalProperty : GlobalPropertyWithVarInjectionChecks;
             resolveType = newResolveType;
             getPutInfo = GetPutInfo(getPutInfo.resolveMode(), newResolveType, getPutInfo.initializationMode());
-            ConcurrentJITLocker locker(codeBlock->m_lock);
+            ConcurrentJSLocker locker(codeBlock->m_lock);
             pc[4].u.operand = getPutInfo.operand();
         } else if (scope->isGlobalLexicalEnvironment()) {
             JSGlobalLexicalEnvironment* globalLexicalEnvironment = jsCast<JSGlobalLexicalEnvironment*>(scope);
@@ -113,7 +117,7 @@ inline void tryCachePutToScopeGlobal(
             pc[4].u.operand = GetPutInfo(getPutInfo.resolveMode(), newResolveType, getPutInfo.initializationMode()).operand();
             SymbolTableEntry entry = globalLexicalEnvironment->symbolTable()->get(ident.impl());
             ASSERT(!entry.isNull());
-            ConcurrentJITLocker locker(codeBlock->m_lock);
+            ConcurrentJSLocker locker(codeBlock->m_lock);
             pc[5].u.watchpointSet = entry.watchpointSet();
             pc[6].u.pointer = static_cast<void*>(globalLexicalEnvironment->variableAt(entry.scopeOffset()).slot());
         }
@@ -133,7 +137,7 @@ inline void tryCachePutToScopeGlobal(
         
         scope->structure()->didCachePropertyReplacement(exec->vm(), slot.cachedOffset());
 
-        ConcurrentJITLocker locker(codeBlock->m_lock);
+        ConcurrentJSLocker locker(codeBlock->m_lock);
         pc[5].u.structure.set(exec->vm(), codeBlock, scope->structure());
         pc[6].u.operand = slot.cachedOffset();
     }
@@ -149,14 +153,14 @@ inline void tryCacheGetFromScopeGlobal(
         if (scope->isGlobalObject()) {
             ResolveType newResolveType = resolveType == UnresolvedProperty ? GlobalProperty : GlobalPropertyWithVarInjectionChecks;
             resolveType = newResolveType; // Allow below caching mechanism to kick in.
-            ConcurrentJITLocker locker(exec->codeBlock()->m_lock);
+            ConcurrentJSLocker locker(exec->codeBlock()->m_lock);
             pc[4].u.operand = GetPutInfo(getPutInfo.resolveMode(), newResolveType, getPutInfo.initializationMode()).operand();
         } else if (scope->isGlobalLexicalEnvironment()) {
             JSGlobalLexicalEnvironment* globalLexicalEnvironment = jsCast<JSGlobalLexicalEnvironment*>(scope);
             ResolveType newResolveType = resolveType == UnresolvedProperty ? GlobalLexicalVar : GlobalLexicalVarWithVarInjectionChecks;
             SymbolTableEntry entry = globalLexicalEnvironment->symbolTable()->get(ident.impl());
             ASSERT(!entry.isNull());
-            ConcurrentJITLocker locker(exec->codeBlock()->m_lock);
+            ConcurrentJSLocker locker(exec->codeBlock()->m_lock);
             pc[4].u.operand = GetPutInfo(getPutInfo.resolveMode(), newResolveType, getPutInfo.initializationMode()).operand();
             pc[5].u.watchpointSet = entry.watchpointSet();
             pc[6].u.pointer = static_cast<void*>(globalLexicalEnvironment->variableAt(entry.scopeOffset()).slot());
@@ -169,7 +173,7 @@ inline void tryCacheGetFromScopeGlobal(
             CodeBlock* codeBlock = exec->codeBlock();
             Structure* structure = scope->structure(vm);
             {
-                ConcurrentJITLocker locker(codeBlock->m_lock);
+                ConcurrentJSLocker locker(codeBlock->m_lock);
                 pc[5].u.structure.set(exec->vm(), codeBlock, structure);
                 pc[6].u.operand = slot.cachedOffset();
             }
@@ -259,5 +263,7 @@ SLOW_PATH_HIDDEN_DECL(slow_path_put_by_val_with_this);
 SLOW_PATH_HIDDEN_DECL(slow_path_define_data_property);
 SLOW_PATH_HIDDEN_DECL(slow_path_define_accessor_property);
 SLOW_PATH_HIDDEN_DECL(slow_path_throw_static_error);
+SLOW_PATH_HIDDEN_DECL(slow_path_new_array_with_spread);
+SLOW_PATH_HIDDEN_DECL(slow_path_spread);
 
 } // namespace JSC

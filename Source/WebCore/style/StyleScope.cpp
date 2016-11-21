@@ -79,7 +79,7 @@ bool Scope::shouldUseSharedUserAgentShadowTreeStyleResolver() const
 {
     if (!m_shadowRoot)
         return false;
-    if (m_shadowRoot->mode() != ShadowRoot::Mode::UserAgent)
+    if (m_shadowRoot->mode() != ShadowRootMode::UserAgent)
         return false;
     // If we have stylesheets in the user agent shadow tree use per-scope resolver.
     if (!m_styleSheetCandidateNodes.isEmpty())
@@ -407,10 +407,19 @@ void Scope::updateActiveStyleSheets(UpdateType updateType)
             m_usesStyleBasedEditability = true;
     }
 
+    // FIXME: Move this code somewhere else.
     if (requiresFullStyleRecalc) {
         if (m_shadowRoot) {
             for (auto& shadowChild : childrenOfType<Element>(*m_shadowRoot))
                 shadowChild.invalidateStyleForSubtree();
+            if (m_shadowRoot->host()) {
+                if (!resolver().ruleSets().authorStyle().hostPseudoClassRules().isEmpty())
+                    m_shadowRoot->host()->invalidateStyle();
+                if (!resolver().ruleSets().authorStyle().slottedPseudoElementRules().isEmpty()) {
+                    for (auto& shadowChild : childrenOfType<Element>(*m_shadowRoot->host()))
+                        shadowChild.invalidateStyle();
+                }
+            }
         } else
             m_document.scheduleForcedStyleRecalc();
     }
@@ -520,7 +529,7 @@ void Scope::didChangeStyleSheetEnvironment()
     if (!m_shadowRoot) {
         for (auto* descendantShadowRoot : m_document.inDocumentShadowRoots()) {
             // Stylesheets is author shadow roots are are potentially affected.
-            if (descendantShadowRoot->mode() != ShadowRoot::Mode::UserAgent)
+            if (descendantShadowRoot->mode() != ShadowRootMode::UserAgent)
                 descendantShadowRoot->styleScope().scheduleUpdate(UpdateType::ContentsOrInterpretation);
         }
     }

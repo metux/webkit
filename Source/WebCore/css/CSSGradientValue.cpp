@@ -35,6 +35,7 @@
 #include "GradientImage.h"
 #include "Image.h"
 #include "NodeRenderStyle.h"
+#include "Pair.h"
 #include "RenderElement.h"
 #include "RenderView.h"
 #include "StyleResolver.h"
@@ -142,6 +143,7 @@ static inline int interpolate(int min, int max, float position)
 
 static inline Color interpolate(const Color& color1, const Color& color2, float position)
 {
+    // FIXME: ExtendedColor - Doesn't work with extended colors, and really should be a helper in Color.h, not here.
     int red = interpolate(color1.red(), color2.red(), position);
     int green = interpolate(color1.green(), color2.green(), position);
     int blue = interpolate(color1.blue(), color2.blue(), position);
@@ -494,21 +496,37 @@ void CSSGradientValue::addStops(Gradient& gradient, const CSSToLengthConversionD
     gradient.setStopsSorted(true);
 }
 
-static float positionFromValue(CSSPrimitiveValue& value, const CSSToLengthConversionData& conversionData, const FloatSize& size, bool isHorizontal)
+static float positionFromValue(const CSSPrimitiveValue* value, const CSSToLengthConversionData& conversionData, const FloatSize& size, bool isHorizontal)
 {
-    if (value.isNumber())
-        return value.floatValue() * conversionData.zoom();
-
+    int origin = 0;
+    int sign = 1;
     int edgeDistance = isHorizontal ? size.width() : size.height();
-    if (value.isPercentage())
-        return value.floatValue() / 100.f * edgeDistance;
-
-    if (value.isCalculatedPercentageWithLength()) {
-        Ref<CalculationValue> calculationValue { value.cssCalcValue()->createCalculationValue(conversionData) };
-        return calculationValue->evaluate(edgeDistance);
+    
+    // In this case the center of the gradient is given relative to an edge in the
+    // form of: [ top | bottom | right | left ] [ <percentage> | <length> ].
+    if (value->isPair()) {
+        CSSValueID originID = value->pairValue()->first()->valueID();
+        value = value->pairValue()->second();
+        
+        if (originID == CSSValueRight || originID == CSSValueBottom) {
+            // For right/bottom, the offset is relative to the far edge.
+            origin = edgeDistance;
+            sign = -1;
+        }
     }
+    
+    if (value->isNumber())
+        return origin + sign * value->floatValue() * conversionData.zoom();
+    
+    if (value->isPercentage())
+        return origin + sign * value->floatValue() / 100.f * edgeDistance;
 
-    switch (value.valueID()) {
+    if (value->isCalculatedPercentageWithLength()) {
+        Ref<CalculationValue> calculationValue { value->cssCalcValue()->createCalculationValue(conversionData) };
+        return origin + sign * calculationValue->evaluate(edgeDistance);
+    }
+    
+    switch (value->valueID()) {
     case CSSValueTop:
         ASSERT(!isHorizontal);
         return 0;
@@ -521,11 +539,13 @@ static float positionFromValue(CSSPrimitiveValue& value, const CSSToLengthConver
     case CSSValueRight:
         ASSERT(isHorizontal);
         return size.width();
+    case CSSValueCenter:
+        return origin + sign * .5f * edgeDistance;
     default:
         break;
     }
 
-    return value.computeLength<float>(conversionData);
+    return origin + sign * value->computeLength<float>(conversionData);
 }
 
 FloatPoint CSSGradientValue::computeEndPoint(CSSPrimitiveValue* horizontal, CSSPrimitiveValue* vertical, const CSSToLengthConversionData& conversionData, const FloatSize& size)
@@ -533,10 +553,10 @@ FloatPoint CSSGradientValue::computeEndPoint(CSSPrimitiveValue* horizontal, CSSP
     FloatPoint result;
 
     if (horizontal)
-        result.setX(positionFromValue(*horizontal, conversionData, size, true));
+        result.setX(positionFromValue(horizontal, conversionData, size, true));
 
     if (vertical)
-        result.setY(positionFromValue(*vertical, conversionData, size, false));
+        result.setY(positionFromValue(vertical, conversionData, size, false));
 
     return result;
 }
@@ -562,7 +582,7 @@ bool CSSGradientValue::isCacheable() const
 bool CSSGradientValue::knownToBeOpaque(const RenderElement*) const
 {
     for (size_t i = 0; i < m_stops.size(); ++i) {
-        if (m_stops[i].m_resolvedColor.hasAlpha())
+        if (!m_stops[i].m_resolvedColor.isOpaque())
             return false;
     }
     return true;

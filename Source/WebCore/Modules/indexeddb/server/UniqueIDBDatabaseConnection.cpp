@@ -83,11 +83,17 @@ void UniqueIDBDatabaseConnection::abortTransactionWithoutCallback(UniqueIDBDatab
     });
 }
 
+void UniqueIDBDatabaseConnection::connectionPendingCloseFromClient()
+{
+    LOG(IndexedDB, "UniqueIDBDatabaseConnection::connectionPendingCloseFromClient - %s - %" PRIu64, m_openRequestIdentifier.loggingString().utf8().data(), m_identifier);
+
+    m_closePending = true;
+}
+
 void UniqueIDBDatabaseConnection::connectionClosedFromClient()
 {
     LOG(IndexedDB, "UniqueIDBDatabaseConnection::connectionClosedFromClient - %s - %" PRIu64, m_openRequestIdentifier.loggingString().utf8().data(), m_identifier);
 
-    m_closePending = true;
     m_database.connectionClosedFromClient(*this);
 }
 
@@ -135,7 +141,7 @@ void UniqueIDBDatabaseConnection::establishTransaction(const IDBTransactionInfo&
 {
     LOG(IndexedDB, "UniqueIDBDatabaseConnection::establishTransaction - %s - %" PRIu64, m_openRequestIdentifier.loggingString().utf8().data(), m_identifier);
 
-    ASSERT(info.mode() != IndexedDB::TransactionMode::VersionChange);
+    ASSERT(info.mode() != IDBTransactionMode::Versionchange);
 
     // No transactions should ever come from the client after the client has already told us
     // the connection is closing.
@@ -217,6 +223,11 @@ void UniqueIDBDatabaseConnection::didRenameIndex(const IDBResultData& resultData
     LOG(IndexedDB, "UniqueIDBDatabaseConnection::didRenameIndex");
 
     m_connectionToClient.didRenameIndex(resultData);
+}
+
+bool UniqueIDBDatabaseConnection::connectionIsClosing() const
+{
+    return m_closePending;
 }
 
 } // namespace IDBServer

@@ -41,9 +41,11 @@
 #include "GetterSetter.h"
 #include "HostCallReturnValue.h"
 #include "Interpreter.h"
+#include "IteratorOperations.h"
 #include "JIT.h"
 #include "JSCInlines.h"
 #include "JSCJSValue.h"
+#include "JSFixedArray.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSLexicalEnvironment.h"
 #include "JSPropertyNameEnumerator.h"
@@ -94,14 +96,13 @@ namespace JSC {
 #define END_IMPL() RETURN_TWO(pc, exec)
 
 #define THROW(exceptionToThrow) do {                        \
-        auto scope = DECLARE_THROW_SCOPE(vm);               \
-        throwException(exec, scope, exceptionToThrow);      \
+        throwException(exec, throwScope, exceptionToThrow); \
         RETURN_TO_THROW(exec, pc);                          \
         END_IMPL();                                         \
     } while (false)
 
 #define CHECK_EXCEPTION() do {                    \
-        doExceptionFuzzingIfEnabled(exec, "CommonSlowPaths", pc);   \
+        doExceptionFuzzingIfEnabled(exec, throwScope, "CommonSlowPaths", pc);   \
         if (UNLIKELY(throwScope.exception())) {   \
             RETURN_TO_THROW(exec, pc);            \
             END_IMPL();                           \
@@ -180,6 +181,7 @@ SLOW_PATH_DECL(slow_path_call_arityCheck)
         exec = exec->callerFrame();
         vm.topCallFrame = exec;
         ErrorHandlingScope errorScope(vm);
+        throwScope.release();
         CommonSlowPaths::interpreterThrowInCaller(exec, createStackOverflowError(exec));
         RETURN_TWO(bitwise_cast<void*>(static_cast<uintptr_t>(1)), exec);
     }
@@ -442,9 +444,11 @@ SLOW_PATH_DECL(slow_path_add)
     ArithProfile& arithProfile = *exec->codeBlock()->arithProfileForPC(pc);
     arithProfile.observeLHSAndRHS(v1, v2);
 
-    if (v1.isString() && !v2.isObject())
-        result = jsString(exec, asString(v1), v2.toString(exec));
-    else if (v1.isNumber() && v2.isNumber())
+    if (v1.isString() && !v2.isObject()) {
+        JSString* v2String = v2.toString(exec);
+        if (LIKELY(!throwScope.exception()))
+            result = jsString(exec, asString(v1), v2String);
+    } else if (v1.isNumber() && v2.isNumber())
         result = jsNumber(v1.asNumber() + v2.asNumber());
     else
         result = jsAddSlowCase(exec, v1, v2);
@@ -823,8 +827,10 @@ SLOW_PATH_DECL(slow_path_resolve_scope)
     if (resolveType == UnresolvedProperty || resolveType == UnresolvedPropertyWithVarInjectionChecks) {
         if (resolvedScope->isGlobalObject()) {
             JSGlobalObject* globalObject = jsCast<JSGlobalObject*>(resolvedScope);
-            if (globalObject->hasProperty(exec, ident)) {
-                ConcurrentJITLocker locker(exec->codeBlock()->m_lock);
+            bool hasProperty = globalObject->hasProperty(exec, ident);
+            CHECK_EXCEPTION();
+            if (hasProperty) {
+                ConcurrentJSLocker locker(exec->codeBlock()->m_lock);
                 if (resolveType == UnresolvedProperty)
                     pc[4].u.operand = GlobalProperty;
                 else
@@ -834,7 +840,7 @@ SLOW_PATH_DECL(slow_path_resolve_scope)
             }
         } else if (resolvedScope->isGlobalLexicalEnvironment()) {
             JSGlobalLexicalEnvironment* globalLexicalEnvironment = jsCast<JSGlobalLexicalEnvironment*>(resolvedScope);
-            ConcurrentJITLocker locker(exec->codeBlock()->m_lock);
+            ConcurrentJSLocker locker(exec->codeBlock()->m_lock);
             if (resolveType == UnresolvedProperty)
                 pc[4].u.operand = GlobalLexicalVar;
             else
@@ -851,7 +857,7 @@ SLOW_PATH_DECL(slow_path_create_rest)
     BEGIN();
     unsigned arraySize = OP_C(2).jsValue().asUInt32();
     JSGlobalObject* globalObject = exec->lexicalGlobalObject();
-    Structure* structure = globalObject->arrayStructureForIndexingTypeDuringAllocation(ArrayWithContiguous);
+    Structure* structure = globalObject->restParameterStructure();
     unsigned numParamsToSkip = pc[3].u.unsignedValue;
     JSValue* argumentsToCopyRegion = exec->addressOfArgumentsStart() + numParamsToSkip;
     RETURN(constructArray(exec, structure, argumentsToCopyRegion, arraySize));
@@ -974,6 +980,85 @@ SLOW_PATH_DECL(slow_path_throw_static_error)
     String errorMessage = asString(errorMessageValue)->value(exec);
     ErrorType errorType = static_cast<ErrorType>(pc[2].u.unsignedValue);
     THROW(createError(exec, errorType, errorMessage));
+}
+
+SLOW_PATH_DECL(slow_path_new_array_with_spread)
+{
+    BEGIN();
+    int numItems = pc[3].u.operand;
+    ASSERT(numItems >= 0);
+    const BitVector& bitVector = exec->codeBlock()->unlinkedCodeBlock()->bitVector(pc[4].u.unsignedValue);
+
+    JSValue* values = bitwise_cast<JSValue*>(&OP(2));
+
+    unsigned arraySize = 0;
+    for (int i = 0; i < numItems; i++) {
+        if (bitVector.get(i)) {
+            JSValue value = values[-i];
+            JSFixedArray* array = jsCast<JSFixedArray*>(value);
+            arraySize += array->size();
+        } else
+            arraySize += 1;
+    }
+
+    JSGlobalObject* globalObject = exec->lexicalGlobalObject();
+    Structure* structure = globalObject->arrayStructureForIndexingTypeDuringAllocation(ArrayWithContiguous);
+
+    JSArray* result = JSArray::tryCreateUninitialized(vm, structure, arraySize);
+    CHECK_EXCEPTION();
+
+    unsigned index = 0;
+    for (int i = 0; i < numItems; i++) {
+        JSValue value = values[-i];
+        if (bitVector.get(i)) {
+            // We are spreading.
+            JSFixedArray* array = jsCast<JSFixedArray*>(value);
+            for (unsigned i = 0; i < array->size(); i++) {
+                RELEASE_ASSERT(array->get(i));
+                result->initializeIndex(vm, index, array->get(i));
+                ++index;
+            }
+        } else {
+            // We are not spreading.
+            result->initializeIndex(vm, index, value);
+            ++index;
+        }
+    }
+
+    RETURN(result);
+}
+
+SLOW_PATH_DECL(slow_path_spread)
+{
+    BEGIN();
+
+    JSValue iterable = OP_C(2).jsValue();
+
+    JSGlobalObject* globalObject = exec->lexicalGlobalObject();
+
+    if (iterable.isCell() && isJSArray(iterable.asCell()) && globalObject->isArrayIteratorProtocolFastAndNonObservable()) {
+        // JSFixedArray::createFromArray does not consult the prototype chain,
+        // so we must be sure that not consulting the prototype chain would
+        // produce the same value during iteration.
+        JSArray* array = jsCast<JSArray*>(iterable);
+        RETURN(JSFixedArray::createFromArray(exec, vm, array));
+    }
+
+    JSArray* array;
+    {
+        JSFunction* iterationFunction = globalObject->iteratorProtocolFunction();
+        CallData callData;
+        CallType callType = JSC::getCallData(iterationFunction, callData);
+        ASSERT(callType != CallType::None);
+
+        MarkedArgumentBuffer arguments;
+        arguments.append(iterable);
+        JSValue arrayResult = call(exec, iterationFunction, callType, callData, jsNull(), arguments);
+        CHECK_EXCEPTION();
+        array = jsCast<JSArray*>(arrayResult);
+    }
+
+    RETURN(JSFixedArray::createFromArray(exec, vm, array));
 }
 
 } // namespace JSC

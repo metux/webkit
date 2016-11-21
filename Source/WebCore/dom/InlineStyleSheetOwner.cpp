@@ -48,10 +48,10 @@ static CSSParserContext parserContextForElement(const Element& element)
 {
     auto* shadowRoot = element.containingShadowRoot();
     // User agent shadow trees can't contain document-relative URLs. Use blank URL as base allowing cross-document sharing.
-    auto& baseURL = shadowRoot && shadowRoot->mode() == ShadowRoot::Mode::UserAgent ? blankURL() : element.document().baseURL();
+    auto& baseURL = shadowRoot && shadowRoot->mode() == ShadowRootMode::UserAgent ? blankURL() : element.document().baseURL();
 
     CSSParserContext result = CSSParserContext { element.document(), baseURL, element.document().encoding() };
-    if (shadowRoot && shadowRoot->mode() == ShadowRoot::Mode::UserAgent)
+    if (shadowRoot && shadowRoot->mode() == ShadowRootMode::UserAgent)
         result.mode = UASheetMode;
     return result;
 }
@@ -170,11 +170,7 @@ void InlineStyleSheetOwner::createSheet(Element& element, const String& text)
     if (!contentSecurityPolicy.allowInlineStyle(document.url(), m_startTextPosition.m_line, text, hasKnownNonce))
         return;
 
-    RefPtr<MediaQuerySet> mediaQueries;
-    if (element.isHTMLElement())
-        mediaQueries = MediaQuerySet::createAllowingDescriptionSyntax(m_media);
-    else
-        mediaQueries = MediaQuerySet::create(m_media);
+    RefPtr<MediaQuerySet> mediaQueries = MediaQuerySet::create(m_media);
 
     MediaQueryEvaluator screenEval(ASCIILiteral("screen"), true);
     MediaQueryEvaluator printEval(ASCIILiteral("print"), true);
@@ -213,12 +209,15 @@ void InlineStyleSheetOwner::createSheet(Element& element, const String& text)
     contents->checkLoaded();
 
     if (cacheKey && contents->isCacheable()) {
+        m_sheet->contents().addedToMemoryCache();
         inlineStyleSheetCache().add(*cacheKey, &m_sheet->contents());
 
         // Prevent pathological growth.
         const size_t maximumInlineStyleSheetCacheSize = 50;
-        if (inlineStyleSheetCache().size() > maximumInlineStyleSheetCacheSize)
+        if (inlineStyleSheetCache().size() > maximumInlineStyleSheetCacheSize) {
+            inlineStyleSheetCache().begin()->value->removedFromMemoryCache();
             inlineStyleSheetCache().remove(inlineStyleSheetCache().begin());
+        }
     }
 }
 

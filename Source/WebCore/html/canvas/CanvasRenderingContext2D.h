@@ -55,8 +55,6 @@ class HTMLVideoElement;
 class ImageData;
 class TextMetrics;
 
-typedef int ExceptionCode;
-
 class CanvasRenderingContext2D final : public CanvasRenderingContext, public CanvasPath {
 public:
     CanvasRenderingContext2D(HTMLCanvasElement&, bool usesCSSCompatibilityParseMode, bool usesDashboardCompatibilityMode);
@@ -197,8 +195,8 @@ public:
     void webkitPutImageDataHD(ImageData&, float dx, float dy);
     void webkitPutImageDataHD(ImageData&, float dx, float dy, float dirtyX, float dirtyY, float dirtyWidth, float dirtyHeight);
 
-    void drawFocusIfNeeded(Element*);
-    void drawFocusIfNeeded(DOMPath&, Element*);
+    void drawFocusIfNeeded(Element&);
+    void drawFocusIfNeeded(DOMPath&, Element&);
 
     float webkitBackingStorePixelRatio() const { return 1; }
 
@@ -353,7 +351,7 @@ private:
     bool isPointInPathInternal(const Path&, float x, float y, WindingRule);
     bool isPointInStrokeInternal(const Path&, float x, float y);
 
-    void drawFocusIfNeededInternal(const Path&, Element*);
+    void drawFocusIfNeededInternal(const Path&, Element&);
 
     void clearCanvas();
     Path transformAreaToDevice(const Path&) const;

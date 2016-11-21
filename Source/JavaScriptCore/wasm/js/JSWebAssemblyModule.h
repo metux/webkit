@@ -29,6 +29,7 @@
 
 #include "JSDestructibleObject.h"
 #include "JSObject.h"
+#include "WasmFormat.h"
 
 namespace JSC {
 
@@ -36,16 +37,24 @@ class JSWebAssemblyModule : public JSDestructibleObject {
 public:
     typedef JSDestructibleObject Base;
 
-    static JSWebAssemblyModule* create(VM&, Structure*);
+    static JSWebAssemblyModule* create(VM&, Structure*, std::unique_ptr<Wasm::ModuleInformation>&, Wasm::CompiledFunctions&);
     static Structure* createStructure(VM&, JSGlobalObject*, JSValue);
 
     DECLARE_INFO;
 
+    const Wasm::ModuleInformation* moduleInformation() const
+    {
+        return m_moduleInformation.get();
+    }
+
 protected:
-    JSWebAssemblyModule(VM&, Structure*);
+    JSWebAssemblyModule(VM&, Structure*, std::unique_ptr<Wasm::ModuleInformation>&, Wasm::CompiledFunctions&);
     void finishCreation(VM&);
     static void destroy(JSCell*);
     static void visitChildren(JSCell*, SlotVisitor&);
+private:
+    std::unique_ptr<Wasm::ModuleInformation> m_moduleInformation;
+    Wasm::CompiledFunctions m_compiledFunctions;
 };
 
 } // namespace JSC

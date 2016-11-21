@@ -38,6 +38,7 @@
 #include "CSSValueKeywords.h"
 #include "DocumentFragment.h"
 #include "Event.h"
+#include "ExceptionCode.h"
 #include "HTMLDivElement.h"
 #include "HTMLSpanElement.h"
 #include "Logging.h"
@@ -270,7 +271,7 @@ VTTCue::~VTTCue()
 {
     // FIXME: We should set m_cue in VTTCueBox to nullptr instead.
     if (m_displayTree && m_displayTree->document().refCount())
-        m_displayTree->remove(ASSERT_NO_EXCEPTION);
+        m_displayTree->remove();
 }
 
 void VTTCue::initialize(ScriptExecutionContext& context)
@@ -499,7 +500,7 @@ void VTTCue::copyWebVTTNodeToDOMTree(ContainerNode* webVTTNode, ContainerNode* p
             clonedNode = downcast<WebVTTElement>(*node).createEquivalentHTMLElement(ownerDocument());
         else
             clonedNode = node->cloneNode(false);
-        parent->appendChild(*clonedNode, ASSERT_NO_EXCEPTION);
+        parent->appendChild(*clonedNode);
         if (is<ContainerNode>(*node))
             copyWebVTTNodeToDOMTree(downcast<ContainerNode>(node), downcast<ContainerNode>(clonedNode.get()));
     }
@@ -814,8 +815,8 @@ VTTCueBox& VTTCue::getDisplayTree(const IntSize& videoSize, int fontSize)
     m_cueHighlightBox->setPseudo(cueShadowPseudoId());
 
     m_cueBackdropBox->setPseudo(cueBackdropShadowPseudoId());
-    m_cueBackdropBox->appendChild(*m_cueHighlightBox, ASSERT_NO_EXCEPTION);
-    displayTree->appendChild(*m_cueBackdropBox, ASSERT_NO_EXCEPTION);
+    m_cueBackdropBox->appendChild(*m_cueHighlightBox);
+    displayTree->appendChild(*m_cueBackdropBox);
 
     // FIXME(BUG 79916): Runs of children of WebVTT Ruby Objects that are not
     // WebVTT Ruby Text Objects must be wrapped in anonymous boxes whose
@@ -843,7 +844,7 @@ void VTTCue::removeDisplayTree()
 
     if (!hasDisplayTree())
         return;
-    displayTreeInternal().remove(ASSERT_NO_EXCEPTION);
+    displayTreeInternal().remove();
 }
 
 std::pair<double, double> VTTCue::getPositionCoordinates() const

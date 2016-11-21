@@ -50,8 +50,6 @@ static StyleEventSender& styleLoadEventSender()
 inline HTMLStyleElement::HTMLStyleElement(const QualifiedName& tagName, Document& document, bool createdByParser)
     : HTMLElement(tagName, document)
     , m_styleSheetOwner(document, createdByParser)
-    , m_firedLoad(false)
-    , m_loadedSheet(false)
 {
     ASSERT(hasTagName(styleTag));
 }
@@ -68,6 +66,11 @@ Ref<HTMLStyleElement> HTMLStyleElement::create(const QualifiedName& tagName, Doc
     return adoptRef(*new HTMLStyleElement(tagName, document, createdByParser));
 }
 
+Ref<HTMLStyleElement> HTMLStyleElement::create(Document& document)
+{
+    return adoptRef(*new HTMLStyleElement(styleTag, document, false));
+}
+
 void HTMLStyleElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == titleAttr && sheet())
@@ -75,7 +78,7 @@ void HTMLStyleElement::parseAttribute(const QualifiedName& name, const AtomicStr
     else if (name == mediaAttr) {
         m_styleSheetOwner.setMedia(value);
         if (sheet()) {
-            sheet()->setMediaQueries(MediaQuerySet::createAllowingDescriptionSyntax(value));
+            sheet()->setMediaQueries(MediaQuerySet::create(value));
             if (auto* scope = m_styleSheetOwner.styleScope())
                 scope->didChangeStyleSheetContents();
         } else
@@ -94,18 +97,17 @@ void HTMLStyleElement::finishParsingChildren()
 
 Node::InsertionNotificationRequest HTMLStyleElement::insertedInto(ContainerNode& insertionPoint)
 {
-    HTMLElement::insertedInto(insertionPoint);
-    if (insertionPoint.inDocument())
+    bool wasInDocument = inDocument();
+    auto result = HTMLElement::insertedInto(insertionPoint);
+    if (insertionPoint.inDocument() && !wasInDocument)
         m_styleSheetOwner.insertedIntoDocument(*this);
-
-    return InsertionDone;
+    return result;
 }
 
 void HTMLStyleElement::removedFrom(ContainerNode& insertionPoint)
 {
     HTMLElement::removedFrom(insertionPoint);
-
-    if (insertionPoint.inDocument())
+    if (insertionPoint.inDocument() && !inDocument())
         m_styleSheetOwner.removedFromDocument(*this);
 }
 

@@ -43,11 +43,10 @@
 #include "Page.h"
 #include "ResourceLoadObserver.h"
 #include "RuntimeEnabledFeatures.h"
-#include "Settings.h"
 #include <wtf/Ref.h>
 #include <wtf/RefCountedLeakCounter.h>
+#include <wtf/SetForScope.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/TemporaryChange.h>
 #include <wtf/text/CString.h>
 
 #if PLATFORM(IOS)
@@ -190,6 +189,9 @@ void SubresourceLoader::willSendRequestInternal(ResourceRequest& newRequest, con
             m_resource->responseReceived(opaqueRedirectedResponse);
             didFinishLoading(currentTime());
             return;
+        } else if (m_redirectCount++ >= options().maxRedirectCount) {
+            cancel(ResourceError(String(), 0, request().url(), ASCIILiteral("Too many redirections"), ResourceError::Type::General));
+            return;
         }
 
         // CachedResources are keyed off their original request URL.
@@ -259,14 +261,6 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
 
     if (shouldIncludeCertificateInfo())
         response.includeCertificateInfo();
-
-    if (response.isHttpVersion0_9()) {
-        if (m_frame) {
-            String message = "Sandboxing '" + response.url().string() + "' because it is using HTTP/0.9.";
-            m_frame->document()->addConsoleMessage(MessageSource::Security, MessageLevel::Error, message, identifier());
-            frameLoader()->forceSandboxFlags(SandboxScripts | SandboxPlugins);
-        }
-    }
 
     if (m_resource->resourceToRevalidate()) {
         if (response.httpStatusCode() == 304) {

@@ -29,7 +29,7 @@
 #pragma once
 
 #include "CallData.h"
-#include "ConcurrentJITLock.h"
+#include "ConcurrentJSLock.h"
 #include "ControlFlowProfiler.h"
 #include "DateInstanceCache.h"
 #include "ExceptionEventLocation.h"
@@ -49,7 +49,6 @@
 #include "SourceCode.h"
 #include "Strong.h"
 #include "ThunkGenerators.h"
-#include "TypedArrayController.h"
 #include "VMEntryRecord.h"
 #include "Watchpoint.h"
 #include <wtf/Bag.h>
@@ -114,6 +113,7 @@ class Structure;
 class RegExp;
 #endif
 class Symbol;
+class TypedArrayController;
 class UnlinkedCodeBlock;
 class UnlinkedEvalCodeBlock;
 class UnlinkedFunctionExecutable;
@@ -140,6 +140,9 @@ struct ArityCheckData;
 }
 namespace Profiler {
 class Database;
+}
+namespace DOMJIT {
+class Signature;
 }
 
 struct HashTable;
@@ -311,6 +314,7 @@ public:
     Strong<Structure> regExpStructure;
     Strong<Structure> symbolStructure;
     Strong<Structure> symbolTableStructure;
+    Strong<Structure> fixedArrayStructure;
     Strong<Structure> structureChainStructure;
     Strong<Structure> sparseArrayValueMapStructure;
     Strong<Structure> templateRegistryKeyStructure;
@@ -429,7 +433,7 @@ public:
     std::unique_ptr<FTL::Thunks> ftlThunks;
 #endif
     NativeExecutable* getHostFunction(NativeFunction, NativeFunction constructor, const String& name);
-    NativeExecutable* getHostFunction(NativeFunction, Intrinsic intrinsic, NativeFunction constructor, const String& name);
+    NativeExecutable* getHostFunction(NativeFunction, Intrinsic, NativeFunction constructor, const DOMJIT::Signature*, const String& name);
 
     static ptrdiff_t exceptionOffset()
     {
@@ -553,7 +557,7 @@ public:
     RefPtr<TypedArrayController> m_typedArrayController;
     RegExpCache* m_regExpCache;
     BumpPointerAllocator m_regExpAllocator;
-    ConcurrentJITLock m_regExpAllocatorLock;
+    ConcurrentJSLock m_regExpAllocatorLock;
 
     std::unique_ptr<HasOwnPropertyCache> m_hasOwnPropertyCache;
     ALWAYS_INLINE HasOwnPropertyCache* hasOwnPropertyCache() { return m_hasOwnPropertyCache.get(); }

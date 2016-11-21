@@ -54,6 +54,8 @@ static EncodedJSValue JSC_HOST_CALL constructJSWebAssemblyModule(ExecState* stat
     auto& vm = state->vm();
     auto scope = DECLARE_THROW_SCOPE(vm);
     JSValue val = state->argument(0);
+
+    // If the given bytes argument is not a BufferSource, a TypeError exception is thrown.
     JSArrayBuffer* arrayBuffer = val.getObject() ? jsDynamicCast<JSArrayBuffer*>(val.getObject()) : nullptr;
     JSArrayBufferView* arrayBufferView = val.getObject() ? jsDynamicCast<JSArrayBufferView*>(val.getObject()) : nullptr;
     if (!(arrayBuffer || arrayBufferView))
@@ -66,15 +68,17 @@ static EncodedJSValue JSC_HOST_CALL constructJSWebAssemblyModule(ExecState* stat
     size_t byteSize = arrayBufferView ? arrayBufferView->length() : arrayBuffer->impl()->byteLength();
     const auto* base = arrayBufferView ? static_cast<uint8_t*>(arrayBufferView->vector()) : static_cast<uint8_t*>(arrayBuffer->impl()->data());
 
-    Wasm::Plan plan(vm, base + byteOffset, byteSize);
+    Wasm::Plan plan(&vm, base + byteOffset, byteSize);
+    // On failure, a new WebAssembly.CompileError is thrown.
+    plan.run();
     if (plan.failed())
         return JSValue::encode(throwException(state, scope, createWebAssemblyCompileError(state, plan.errorMessage())));
 
-    // FIXME take content from Plan.
-
+    // On success, a new WebAssembly.Module object is returned with [[Module]] set to the validated Ast.module.
     auto* structure = InternalFunction::createSubclassStructure(state, state->newTarget(), asInternalFunction(state->callee())->globalObject()->WebAssemblyModuleStructure());
     RETURN_IF_EXCEPTION(scope, encodedJSValue());
-    return JSValue::encode(JSWebAssemblyModule::create(vm, structure));
+
+    return JSValue::encode(JSWebAssemblyModule::create(vm, structure, plan.getModuleInformation(), plan.getCompiledFunctions()));
 }
 
 static EncodedJSValue JSC_HOST_CALL callJSWebAssemblyModule(ExecState* state)

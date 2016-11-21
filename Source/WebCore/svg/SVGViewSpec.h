@@ -22,13 +22,13 @@
 #include "SVGAnimatedPreserveAspectRatio.h"
 #include "SVGAnimatedRect.h"
 #include "SVGFitToViewBox.h"
-#include "SVGTransformList.h"
+#include "SVGTransformListValues.h"
 #include "SVGZoomAndPan.h"
 
 namespace WebCore {
 
 class SVGElement;
-class SVGTransformListPropertyTearOff;
+class SVGTransformList;
 
 class SVGViewSpec final : public RefCounted<SVGViewSpec>, public SVGZoomAndPan, public SVGFitToViewBox {
 public:
@@ -54,8 +54,8 @@ public:
     void resetContextElement() { m_contextElement = nullptr; }
 
     // Custom non-animated 'transform' property.
-    RefPtr<SVGTransformListPropertyTearOff> transform();
-    SVGTransformList transformBaseValue() const { return m_transform; }
+    RefPtr<SVGTransformList> transform();
+    SVGTransformListValues transformBaseValue() const { return m_transform; }
 
     // Custom animated 'viewBox' property.
     RefPtr<SVGAnimatedRect> viewBoxAnimated();
@@ -64,8 +64,8 @@ public:
 
     // Custom animated 'preserveAspectRatio' property.
     RefPtr<SVGAnimatedPreserveAspectRatio> preserveAspectRatioAnimated();
-    SVGPreserveAspectRatio& preserveAspectRatio() { return m_preserveAspectRatio; }
-    void setPreserveAspectRatioBaseValue(const SVGPreserveAspectRatio& preserveAspectRatio) { m_preserveAspectRatio = preserveAspectRatio; }
+    SVGPreserveAspectRatioValue& preserveAspectRatio() { return m_preserveAspectRatio; }
+    void setPreserveAspectRatioBaseValue(const SVGPreserveAspectRatioValue& preserveAspectRatio) { m_preserveAspectRatio = preserveAspectRatio; }
 
 private:
     explicit SVGViewSpec(SVGElement&);
@@ -84,9 +84,9 @@ private:
 
     SVGElement* m_contextElement;
     SVGZoomAndPanType m_zoomAndPan { SVGZoomAndPanMagnify };
-    SVGTransformList m_transform;
+    SVGTransformListValues m_transform;
     FloatRect m_viewBox;
-    SVGPreserveAspectRatio m_preserveAspectRatio;
+    SVGPreserveAspectRatioValue m_preserveAspectRatio;
     String m_viewTargetString;
 };
 

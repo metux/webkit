@@ -34,9 +34,7 @@
 #include "CSSPrimitiveValue.h"
 #include "CSSReflectionDirection.h"
 #include "CSSToLengthConversionData.h"
-#include "ColorSpace.h"
 #include "CSSValueKeywords.h"
-#include "FontDescription.h"
 #include "GraphicsTypes.h"
 #include "Length.h"
 #include "LineClampValue.h"
@@ -5490,6 +5488,10 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ApplePayButtonType e)
     case ApplePayButtonType::SetUp:
         m_value.valueID = CSSValueSetUp;
         break;
+    case ApplePayButtonType::Donate:
+        m_value.valueID = CSSValueDonate;
+        break;
+
     default:
         ASSERT_NOT_REACHED();
         break;
@@ -5506,6 +5508,8 @@ template<> inline CSSPrimitiveValue::operator ApplePayButtonType() const
         return ApplePayButtonType::Buy;
     case CSSValueSetUp:
         return ApplePayButtonType::SetUp;
+    case CSSValueDonate:
+        return ApplePayButtonType::Donate;
     default:
         break;
     }

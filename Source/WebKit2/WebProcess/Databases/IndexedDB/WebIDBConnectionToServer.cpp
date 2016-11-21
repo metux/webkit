@@ -32,6 +32,7 @@
 #include "DatabaseToWebProcessConnectionMessages.h"
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "NetworkProcessConnection.h"
+#include "WebCoreArgumentCoders.h"
 #include "WebIDBConnectionToClientMessages.h"
 #include "WebIDBResult.h"
 #include "WebProcess.h"
@@ -41,6 +42,7 @@
 #include <WebCore/IDBDatabaseException.h>
 #include <WebCore/IDBError.h>
 #include <WebCore/IDBIndexInfo.h>
+#include <WebCore/IDBIterateCursorData.h>
 #include <WebCore/IDBKeyRangeData.h>
 #include <WebCore/IDBObjectStoreInfo.h>
 #include <WebCore/IDBOpenDBRequest.h>
@@ -153,6 +155,11 @@ void WebIDBConnectionToServer::getRecord(const IDBRequestData& requestData, cons
     send(Messages::WebIDBConnectionToClient::GetRecord(requestData, getRecordData));
 }
 
+void WebIDBConnectionToServer::getAllRecords(const IDBRequestData& requestData, const IDBGetAllRecordsData& getAllRecordsData)
+{
+    send(Messages::WebIDBConnectionToClient::GetAllRecords(requestData, getAllRecordsData));
+}
+
 void WebIDBConnectionToServer::getCount(const IDBRequestData& requestData, const IDBKeyRangeData& range)
 {
     send(Messages::WebIDBConnectionToClient::GetCount(requestData, range));
@@ -168,14 +175,19 @@ void WebIDBConnectionToServer::openCursor(const IDBRequestData& requestData, con
     send(Messages::WebIDBConnectionToClient::OpenCursor(requestData, info));
 }
 
-void WebIDBConnectionToServer::iterateCursor(const IDBRequestData& requestData, const IDBKeyData& key, unsigned long count)
+void WebIDBConnectionToServer::iterateCursor(const IDBRequestData& requestData, const IDBIterateCursorData& data)
 {
-    send(Messages::WebIDBConnectionToClient::IterateCursor(requestData, key, count));
+    send(Messages::WebIDBConnectionToClient::IterateCursor(requestData, data));
 }
 
 void WebIDBConnectionToServer::establishTransaction(uint64_t databaseConnectionIdentifier, const IDBTransactionInfo& info)
 {
     send(Messages::WebIDBConnectionToClient::EstablishTransaction(databaseConnectionIdentifier, info));
+}
+
+void WebIDBConnectionToServer::databaseConnectionPendingClose(uint64_t databaseConnectionIdentifier)
+{
+    send(Messages::WebIDBConnectionToClient::DatabaseConnectionPendingClose(databaseConnectionIdentifier));
 }
 
 void WebIDBConnectionToServer::databaseConnectionClosed(uint64_t databaseConnectionIdentifier)
@@ -271,12 +283,12 @@ void WebIDBConnectionToServer::didPutOrAdd(const IDBResultData& result)
 static void preregisterSandboxExtensionsIfNecessary(const WebIDBResult& result)
 {
     auto resultType = result.resultData().type();
-    if (resultType != IDBResultType::GetRecordSuccess && resultType != IDBResultType::OpenCursorSuccess && resultType != IDBResultType::IterateCursorSuccess) {
+    if (resultType != IDBResultType::GetRecordSuccess && resultType != IDBResultType::OpenCursorSuccess && resultType != IDBResultType::IterateCursorSuccess && resultType != IDBResultType::GetAllRecordsSuccess) {
         ASSERT(resultType == IDBResultType::Error);
         return;
     }
 
-    const auto& filePaths = result.resultData().getResult().value().blobFilePaths();
+    const auto filePaths = resultType == IDBResultType::GetAllRecordsSuccess ? result.resultData().getAllResult().allBlobFilePaths() : result.resultData().getResult().value().blobFilePaths();
 
 #if ENABLE(SANDBOX_EXTENSIONS)
     ASSERT(filePaths.size() == result.handles().size());
@@ -290,6 +302,13 @@ void WebIDBConnectionToServer::didGetRecord(const WebIDBResult& result)
 {
     preregisterSandboxExtensionsIfNecessary(result);
     m_connectionToServer->didGetRecord(result.resultData());
+}
+
+void WebIDBConnectionToServer::didGetAllRecords(const WebIDBResult& result)
+{
+    if (result.resultData().getAllResult().type() == IndexedDB::GetAllType::Values)
+        preregisterSandboxExtensionsIfNecessary(result);
+    m_connectionToServer->didGetAllRecords(result.resultData());
 }
 
 void WebIDBConnectionToServer::didGetCount(const IDBResultData& result)

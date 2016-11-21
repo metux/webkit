@@ -34,7 +34,6 @@
 #include "MarkedSpaceInlines.h"
 #include "Parser.h"
 #include "Protect.h"
-#include "VMEntryScope.h"
 
 namespace {
 
@@ -99,7 +98,7 @@ private:
     Debugger& m_debugger;
 };
 
-// This is very similar to TemporaryChange<bool>, but that cannot be used
+// This is very similar to SetForScope<bool>, but that cannot be used
 // as the m_isPaused field uses only one bit.
 class TemporaryPausedState {
 public:

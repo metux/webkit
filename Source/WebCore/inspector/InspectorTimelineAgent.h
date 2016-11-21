@@ -111,7 +111,7 @@ public:
     void startFromConsole(JSC::ExecState*, const String& title);
     void stopFromConsole(JSC::ExecState*, const String& title);
 
-    // InspectorInstrumentation callbacks.
+    // InspectorInstrumentation
     void didInstallTimer(int timerId, std::chrono::milliseconds timeout, bool singleShot, Frame*);
     void didRemoveTimer(int timerId, Frame*);
     void willFireTimer(int timerId, Frame*);
@@ -124,11 +124,11 @@ public:
     void didEvaluateScript(Frame&);
     void didInvalidateLayout(Frame&);
     void willLayout(Frame&);
-    void didLayout(RenderObject*);
+    void didLayout(RenderObject&);
     void willComposite(Frame&);
     void didComposite();
     void willPaint(Frame&);
-    void didPaint(RenderObject*, const LayoutRect&);
+    void didPaint(RenderObject&, const LayoutRect&);
     void willRecalculateStyle(Frame*);
     void didRecalculateStyle();
     void didScheduleStyleRecalculation(Frame*);

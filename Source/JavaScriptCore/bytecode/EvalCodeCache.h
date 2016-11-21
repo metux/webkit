@@ -28,12 +28,7 @@
 
 #pragma once
 
-#include "Executable.h"
-#include "JSGlobalObject.h"
-#include "JSScope.h"
-#include "Options.h"
-#include "SourceCode.h"
-#include "SourceCodeKey.h"
+#include "DirectEvalExecutable.h"
 #include <wtf/HashMap.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/StringHash.h>
@@ -44,12 +39,11 @@ namespace JSC {
 
     class EvalCodeCache {
     public:
-        // Specialized cache key (compared with SourceCodeKey) for eval code cache.
         class CacheKey {
         public:
-            CacheKey(const String& source, DerivedContextType derivedContextType, EvalContextType evalContextType, bool isArrowFunctionContext)
+            CacheKey(const String& source, CallSiteIndex callSiteIndex)
                 : m_source(source.impl())
-                , m_flags(SourceCodeType::EvalType, JSParserBuiltinMode::NotBuiltin, JSParserStrictMode::NotStrict, JSParserScriptMode::Classic, derivedContextType, evalContextType, isArrowFunctionContext)
+                , m_callSiteIndex(callSiteIndex)
             {
             }
 
@@ -60,13 +54,13 @@ namespace JSC {
 
             CacheKey() = default;
 
-            unsigned hash() const { return m_source->hash(); }
+            unsigned hash() const { return m_source->hash() ^ m_callSiteIndex.bits(); }
 
             bool isEmptyValue() const { return !m_source; }
 
             bool operator==(const CacheKey& other) const
             {
-                return m_source == other.m_source && m_flags == other.m_flags;
+                return m_callSiteIndex == other.m_callSiteIndex && WTF::equal(m_source.get(), other.m_source.get());
             }
 
             bool isHashTableDeletedValue() const { return m_source.isHashTableDeletedValue(); }
@@ -78,7 +72,7 @@ namespace JSC {
                 }
                 static bool equal(const CacheKey& lhs, const CacheKey& rhs)
                 {
-                    return StringHash::equal(lhs.m_source, rhs.m_source) && lhs.m_flags == rhs.m_flags;
+                    return lhs == rhs;
                 }
                 static const bool safeToCompareToEmptyOrDeleted = false;
             };
@@ -87,32 +81,18 @@ namespace JSC {
 
         private:
             RefPtr<StringImpl> m_source;
-            SourceCodeFlags m_flags;
+            CallSiteIndex m_callSiteIndex;
         };
 
-        EvalExecutable* tryGet(bool inStrictContext, const String& evalSource, DerivedContextType derivedContextType, EvalContextType evalContextType, bool isArrowFunctionContext, JSScope* scope)
+        DirectEvalExecutable* tryGet(const String& evalSource, CallSiteIndex callSiteIndex)
         {
-            if (isCacheable(inStrictContext, evalSource, scope)) {
-                ASSERT(!inStrictContext);
-                return m_cacheMap.fastGet(CacheKey(evalSource, derivedContextType, evalContextType, isArrowFunctionContext)).get();
-            }
-            return nullptr;
+            return m_cacheMap.fastGet(CacheKey(evalSource, callSiteIndex)).get();
         }
         
-        EvalExecutable* getSlow(ExecState* exec, JSCell* owner, bool inStrictContext, DerivedContextType derivedContextType, EvalContextType evalContextType, bool isArrowFunctionContext, const String& evalSource, JSScope* scope)
+        void set(ExecState* exec, JSCell* owner, const String& evalSource, CallSiteIndex callSiteIndex, DirectEvalExecutable* evalExecutable)
         {
-            VariableEnvironment variablesUnderTDZ;
-            JSScope::collectVariablesUnderTDZ(scope, variablesUnderTDZ);
-            EvalExecutable* evalExecutable = EvalExecutable::create(exec, makeSource(evalSource), inStrictContext, derivedContextType, isArrowFunctionContext, evalContextType, &variablesUnderTDZ);
-            if (!evalExecutable)
-                return nullptr;
-
-            if (isCacheable(inStrictContext, evalSource, scope) && m_cacheMap.size() < maxCacheEntries) {
-                ASSERT(!inStrictContext);
-                m_cacheMap.set(CacheKey(evalSource, derivedContextType, evalContextType, isArrowFunctionContext), WriteBarrier<EvalExecutable>(exec->vm(), owner, evalExecutable));
-            }
-            
-            return evalExecutable;
+            if (m_cacheMap.size() < maxCacheEntries)
+                m_cacheMap.set(CacheKey(evalSource, callSiteIndex), WriteBarrier<DirectEvalExecutable>(exec->vm(), owner, evalExecutable));
         }
 
         bool isEmpty() const { return m_cacheMap.isEmpty(); }
@@ -125,22 +105,9 @@ namespace JSC {
         }
 
     private:
-        ALWAYS_INLINE bool isCacheableScope(JSScope* scope)
-        {
-            return scope->isGlobalLexicalEnvironment() || scope->isFunctionNameScopeObject() || scope->isVarScope();
-        }
-
-        ALWAYS_INLINE bool isCacheable(bool inStrictContext, const String& evalSource, JSScope* scope)
-        {
-            // If eval() is called and it has access to a lexical scope, we can't soundly cache it.
-            // If the eval() only has access to the "var" scope, then we can cache it.
-            return !inStrictContext 
-                && static_cast<size_t>(evalSource.length()) < Options::maximumEvalCacheableSourceLength()
-                && isCacheableScope(scope);
-        }
         static const int maxCacheEntries = 64;
 
-        typedef HashMap<CacheKey, WriteBarrier<EvalExecutable>, CacheKey::Hash, CacheKey::HashTraits> EvalCacheMap;
+        typedef HashMap<CacheKey, WriteBarrier<DirectEvalExecutable>, CacheKey::Hash, CacheKey::HashTraits> EvalCacheMap;
         EvalCacheMap m_cacheMap;
     };
 

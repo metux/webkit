@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef WebGLTransformFeedback_h
-#define WebGLTransformFeedback_h
+#pragma once
 
 #include "WebGLSharedObject.h"
 
@@ -34,10 +33,10 @@ class WebGLTransformFeedback final : public WebGLSharedObject {
 public:
     virtual ~WebGLTransformFeedback();
 
-    static Ref<WebGLTransformFeedback> create(WebGLRenderingContextBase*);
+    static Ref<WebGLTransformFeedback> create(WebGLRenderingContextBase&);
 
 protected:
-    WebGLTransformFeedback(WebGLRenderingContextBase*);
+    WebGLTransformFeedback(WebGLRenderingContextBase&);
 
     void deleteObjectImpl(GraphicsContext3D*, Platform3DObject) override;
 
@@ -46,5 +45,3 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // WebGLTransformFeedback_h

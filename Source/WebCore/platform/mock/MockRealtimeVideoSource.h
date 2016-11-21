@@ -46,14 +46,13 @@ class GraphicsContext;
 class MockRealtimeVideoSource : public MockRealtimeMediaSource {
 public:
 
-    static Ref<MockRealtimeVideoSource> create();
-    static Ref<MockRealtimeVideoSource> createMuted(const String& name);
+    static RefPtr<MockRealtimeVideoSource> create(const String&, const MediaConstraints*);
+    static RefPtr<MockRealtimeVideoSource> createMuted(const String& name);
 
     virtual ~MockRealtimeVideoSource() { }
 
 protected:
-    MockRealtimeVideoSource(const String& name = ASCIILiteral("Mock video device"));
-    virtual void updatePlatformLayer() const { }
+    MockRealtimeVideoSource(const String&);
     virtual void updateSampleBuffer() { }
 
     ImageBuffer* imageBuffer() const;
@@ -77,7 +76,6 @@ private:
     bool applyFacingMode(RealtimeMediaSourceSettings::VideoFacingMode) override { return true; }
     bool applyAspectRatio(double) override { return true; }
 
-    PlatformLayer* platformLayer() const override { return nullptr; }
     RefPtr<Image> currentFrameImage() override;
     void paintCurrentFrameInContext(GraphicsContext&, const FloatRect&) override;
 

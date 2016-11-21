@@ -28,7 +28,6 @@
 
 #if ENABLE(VIDEO_TRACK)
 
-#include "ExceptionCode.h"
 #include "TextTrackCue.h"
 #include "TrackBase.h"
 #include "VTTCue.h"
@@ -100,8 +99,8 @@ public:
     void clearClient() override { m_client = nullptr; }
     TextTrackClient* client() { return m_client; }
 
-    ExceptionOr<void> addCue(RefPtr<TextTrackCue>&&);
-    virtual ExceptionOr<void> removeCue(TextTrackCue*);
+    ExceptionOr<void> addCue(Ref<TextTrackCue>&&);
+    virtual ExceptionOr<void> removeCue(TextTrackCue&);
 
     bool hasCue(TextTrackCue*, TextTrackCue::CueMatchRules = TextTrackCue::MatchAllFields);
 

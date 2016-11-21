@@ -59,6 +59,7 @@
 #include <WebCore/Page.h>
 #include <WebCore/PageOverlay.h>
 #include <WebCore/PageOverlayController.h>
+#include <WebCore/SecurityOriginData.h>
 #include <WebCore/URL.h>
 #include <WebCore/WheelEventTestTrigger.h>
 #include <wtf/StdLibExtras.h>
@@ -686,7 +687,24 @@ WKArrayRef WKBundlePageCopyOriginsWithApplicationCache(WKBundlePageRef page)
     originIdentifiers.reserveInitialCapacity(origins.size());
 
     for (const auto& origin : origins)
-        originIdentifiers.uncheckedAppend(API::String::create(origin->databaseIdentifier()));
+        originIdentifiers.uncheckedAppend(API::String::create(WebCore::SecurityOriginData::fromSecurityOrigin(*origin).databaseIdentifier()));
 
     return toAPI(&API::Array::create(WTFMove(originIdentifiers)).leakRef());
+}
+
+void WKBundlePageSetEventThrottlingBehaviorOverride(WKBundlePageRef page, EventThrottlingBehavior* behavior)
+{
+    Optional<WebCore::EventThrottlingBehavior> behaviorValue;
+    if (behavior) {
+        switch (*behavior) {
+        case EventThrottlingBehaviorResponsive:
+            behaviorValue = WebCore::EventThrottlingBehavior::Responsive;
+            break;
+        case EventThrottlingBehaviorUnresponsive:
+            behaviorValue = WebCore::EventThrottlingBehavior::Unresponsive;
+            break;
+        }
+    }
+
+    toImpl(page)->corePage()->setEventThrottlingBehaviorOverride(behaviorValue);
 }

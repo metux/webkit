@@ -20,8 +20,7 @@
  *
  */
 
-#ifndef HTMLObjectElement_h
-#define HTMLObjectElement_h
+#pragma once
 
 #include "FormAssociatedElement.h"
 #include "HTMLPlugInImageElement.h"
@@ -68,7 +67,7 @@ private:
     void finishedInsertingSubtree() final;
     void removedFrom(ContainerNode&) final;
 
-    void didMoveToNewDocument(Document* oldDocument) final;
+    void didMoveToNewDocument(Document& oldDocument) final;
 
     void childrenChanged(const ChildChange&) final;
 
@@ -109,6 +108,4 @@ private:
     bool m_useFallbackContent : 1;
 };
 
-}
-
-#endif
+} // namespace WebCore

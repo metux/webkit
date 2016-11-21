@@ -244,8 +244,10 @@ bool doesGC(Graph& graph, Node* node)
     case PhantomNewObject:
     case PhantomNewFunction:
     case PhantomNewGeneratorFunction:
+    case PhantomNewAsyncFunction:
     case PhantomCreateActivation:
     case PhantomDirectArguments:
+    case PhantomCreateRest:
     case PhantomClonedArguments:
     case GetMyArgumentByVal:
     case GetMyArgumentByValOutOfBounds:
@@ -257,6 +259,7 @@ bool doesGC(Graph& graph, Node* node)
     case GetStack:
     case GetFromArguments:
     case PutToArguments:
+    case GetArgument:
     case LogShadowChickenPrologue:
     case LogShadowChickenTail:
     case GetDynamicVar:
@@ -277,6 +280,8 @@ bool doesGC(Graph& graph, Node* node)
     case ArrayifyToStructure:
     case NewObject:
     case NewArray:
+    case NewArrayWithSpread:
+    case Spread:
     case NewArrayWithSize:
     case NewArrayBuffer:
     case NewRegexp:
@@ -284,6 +289,7 @@ bool doesGC(Graph& graph, Node* node)
     case MakeRope:
     case NewFunction:
     case NewGeneratorFunction:
+    case NewAsyncFunction:
     case NewTypedArray:
     case ThrowStaticError:
     case GetPropertyEnumerator:
@@ -298,6 +304,7 @@ bool doesGC(Graph& graph, Node* node)
     case StringReplaceRegExp:
     case CreateRest:
     case ToLowerCase:
+    case CallDOMGetter:
     case CallDOM:
         return true;
         

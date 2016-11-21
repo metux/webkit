@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MediaProducer_h
-#define MediaProducer_h
+#pragma once
 
 namespace WebCore {
 
@@ -43,8 +42,8 @@ public:
         IsPreviousTrackControlEnabled = 1 << 8,
         HasPlaybackTargetAvailabilityListener = 1 << 9,
         HasAudioOrVideo = 1 << 10,
-        HasActiveMediaCaptureDevice = 1 << 11,
-        HasMediaCaptureDevice = 1 << 12,
+        HasActiveAudioCaptureDevice = 1 << 11,
+        HasActiveVideoCaptureDevice = 1 << 12,
     };
     typedef unsigned MediaStateFlags;
 
@@ -63,6 +62,4 @@ protected:
     virtual ~MediaProducer() { }
 };
 
-}
-
-#endif
+} // namespace WebCore

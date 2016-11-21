@@ -32,29 +32,33 @@
 #include "Crypto.h"
 #include "ExceptionCode.h"
 #include "IDBConnectionProxy.h"
-#include "InspectorConsoleInstrumentation.h"
+#include "InspectorInstrumentation.h"
 #include "ScheduledAction.h"
 #include "ScriptSourceCode.h"
 #include "SecurityOrigin.h"
 #include "SecurityOriginPolicy.h"
 #include "SocketProvider.h"
+#include "WorkerInspectorController.h"
 #include "WorkerLoaderProxy.h"
 #include "WorkerLocation.h"
 #include "WorkerNavigator.h"
 #include "WorkerReportingProxy.h"
 #include "WorkerScriptLoader.h"
 #include "WorkerThread.h"
-#include <inspector/ConsoleMessage.h>
+#include <inspector/ScriptArguments.h>
+#include <inspector/ScriptCallStack.h>
 
 using namespace Inspector;
 
 namespace WebCore {
 
-WorkerGlobalScope::WorkerGlobalScope(const URL& url, const String& userAgent, WorkerThread& thread, bool shouldBypassMainWorldContentSecurityPolicy, RefPtr<SecurityOrigin>&& topOrigin, IDBClient::IDBConnectionProxy* connectionProxy, SocketProvider* socketProvider)
+WorkerGlobalScope::WorkerGlobalScope(const URL& url, const String& identifier, const String& userAgent, WorkerThread& thread, bool shouldBypassMainWorldContentSecurityPolicy, RefPtr<SecurityOrigin>&& topOrigin, IDBClient::IDBConnectionProxy* connectionProxy, SocketProvider* socketProvider)
     : m_url(url)
+    , m_identifier(identifier)
     , m_userAgent(userAgent)
-    , m_script(std::make_unique<WorkerScriptController>(this))
     , m_thread(thread)
+    , m_script(std::make_unique<WorkerScriptController>(this))
+    , m_inspectorController(std::make_unique<WorkerInspectorController>(*this))
     , m_shouldBypassMainWorldContentSecurityPolicy(shouldBypassMainWorldContentSecurityPolicy)
     , m_eventQueue(*this)
     , m_topOrigin(topOrigin)
@@ -75,6 +79,8 @@ WorkerGlobalScope::WorkerGlobalScope(const URL& url, const String& userAgent, Wo
     auto origin = SecurityOrigin::create(url);
     if (m_topOrigin->hasUniversalAccess())
         origin->grantUniversalAccess();
+    if (m_topOrigin->needsStorageAccessFromFileURLsQuirk())
+        origin->grantStorageAccessFromFileURLsQuirk();
 
     setSecurityOriginPolicy(SecurityOriginPolicy::create(WTFMove(origin)));
     setContentSecurityPolicy(std::make_unique<ContentSecurityPolicy>(*this));
@@ -219,13 +225,13 @@ ExceptionOr<void> WorkerGlobalScope::importScripts(const Vector<String>& urls)
             return Exception { NETWORK_ERR };
 
         auto scriptLoader = WorkerScriptLoader::create();
-        scriptLoader->loadSynchronously(this, url, FetchOptions::Mode::NoCors, shouldBypassMainWorldContentSecurityPolicy ? ContentSecurityPolicyEnforcement::DoNotEnforce : ContentSecurityPolicyEnforcement::EnforceScriptSrcDirective);
+        scriptLoader->loadSynchronously(this, url, FetchOptions::Mode::NoCors, shouldBypassMainWorldContentSecurityPolicy ? ContentSecurityPolicyEnforcement::DoNotEnforce : ContentSecurityPolicyEnforcement::EnforceScriptSrcDirective, resourceRequestIdentifier());
 
         // If the fetching attempt failed, throw a NETWORK_ERR exception and abort all these steps.
         if (scriptLoader->failed())
             return Exception { NETWORK_ERR };
 
-        InspectorInstrumentation::scriptImported(this, scriptLoader->identifier(), scriptLoader->script());
+        InspectorInstrumentation::scriptImported(*this, scriptLoader->identifier(), scriptLoader->script());
 
         NakedPtr<JSC::Exception> exception;
         m_script->evaluate(ScriptSourceCode(scriptLoader->script(), scriptLoader->responseURL()), exception);
@@ -255,8 +261,7 @@ void WorkerGlobalScope::addConsoleMessage(std::unique_ptr<Inspector::ConsoleMess
         return;
     }
 
-    thread().workerReportingProxy().postConsoleMessageToWorkerObject(message->source(), message->level(), message->message(), message->line(), message->column(), message->url());
-    InspectorInstrumentation::addMessageToConsole(this, WTFMove(message));
+    InspectorInstrumentation::addMessageToConsole(*this, WTFMove(message));
 }
 
 void WorkerGlobalScope::addConsoleMessage(MessageSource source, MessageLevel level, const String& message, unsigned long requestIdentifier)
@@ -271,14 +276,12 @@ void WorkerGlobalScope::addMessage(MessageSource source, MessageLevel level, con
         return;
     }
 
-    thread().workerReportingProxy().postConsoleMessageToWorkerObject(source, level, messageText, lineNumber, columnNumber, sourceURL);
-
     std::unique_ptr<Inspector::ConsoleMessage> message;
     if (callStack)
         message = std::make_unique<Inspector::ConsoleMessage>(source, MessageType::Log, level, messageText, WTFMove(callStack), requestIdentifier);
     else
         message = std::make_unique<Inspector::ConsoleMessage>(source, MessageType::Log, level, messageText, sourceURL, lineNumber, columnNumber, state, requestIdentifier);
-    InspectorInstrumentation::addMessageToConsole(this, WTFMove(message));
+    InspectorInstrumentation::addMessageToConsole(*this, WTFMove(message));
 }
 
 bool WorkerGlobalScope::isContextThread() const

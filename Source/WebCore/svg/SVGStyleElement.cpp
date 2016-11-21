@@ -25,7 +25,6 @@
 
 #include "CSSStyleSheet.h"
 #include "Document.h"
-#include "ExceptionCode.h"
 #include "SVGNames.h"
 #include <wtf/StdLibExtras.h>
 
@@ -116,16 +115,17 @@ void SVGStyleElement::finishParsingChildren()
 
 Node::InsertionNotificationRequest SVGStyleElement::insertedInto(ContainerNode& rootParent)
 {
-    SVGElement::insertedInto(rootParent);
-    if (rootParent.inDocument())
+    bool wasInDocument = inDocument();
+    auto result = SVGElement::insertedInto(rootParent);
+    if (rootParent.inDocument() && !wasInDocument)
         m_styleSheetOwner.insertedIntoDocument(*this);
-    return InsertionDone;
+    return result;
 }
 
 void SVGStyleElement::removedFrom(ContainerNode& rootParent)
 {
     SVGElement::removedFrom(rootParent);
-    if (rootParent.inDocument())
+    if (rootParent.inDocument() && !inDocument())
         m_styleSheetOwner.removedFromDocument(*this);
 }
 

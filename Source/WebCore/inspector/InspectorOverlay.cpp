@@ -55,7 +55,6 @@
 #include "ScriptSourceCode.h"
 #include "Settings.h"
 #include "StyledElement.h"
-#include <bindings/ScriptValue.h>
 #include <inspector/InspectorProtocolObjects.h>
 #include <inspector/InspectorValues.h>
 
@@ -323,8 +322,8 @@ void InspectorOverlay::update()
         return;
 
     FrameView* overlayView = overlayPage()->mainFrame().view();
-    IntSize viewportSize = view->unscaledVisibleContentSizeIncludingObscuredArea();
-    IntSize frameViewFullSize = view->unscaledVisibleContentSizeIncludingObscuredArea(ScrollableArea::IncludeScrollbars);
+    IntSize viewportSize = view->sizeForVisibleContent();
+    IntSize frameViewFullSize = view->sizeForVisibleContent(ScrollableArea::IncludeScrollbars);
     overlayView->resize(frameViewFullSize);
 
     // Clear canvas and paint things.

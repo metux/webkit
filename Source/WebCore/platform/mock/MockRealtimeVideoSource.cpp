@@ -48,14 +48,18 @@
 namespace WebCore {
 
 #if !PLATFORM(MAC) && !PLATFORM(IOS)
-Ref<MockRealtimeVideoSource> MockRealtimeVideoSource::create()
+RefPtr<MockRealtimeVideoSource> MockRealtimeVideoSource::create(const String& name, const MediaConstraints* constraints)
 {
-    return adoptRef(*new MockRealtimeVideoSource(MockRealtimeMediaSource::mockVideoSourceName()));
+    auto source = adoptRef(new MockRealtimeVideoSource(name));
+    if (constraints && source->applyConstraints(*constraints))
+        source = nullptr;
+
+    return source;
 }
 
-Ref<MockRealtimeVideoSource> MockRealtimeVideoSource::createMuted(const String& name)
+RefPtr<MockRealtimeVideoSource> MockRealtimeVideoSource::createMuted(const String& name)
 {
-    auto source = adoptRef(*new MockRealtimeVideoSource(name));
+    auto source = adoptRef(new MockRealtimeVideoSource(name));
     source->m_muted = true;
     return source;
 }
@@ -134,7 +138,6 @@ bool MockRealtimeVideoSource::applyFrameRate(double rate)
     if (m_timer.isActive())
         m_timer.startRepeating(std::chrono::milliseconds(lround(1000 / rate)));
 
-    updatePlatformLayer();
     updateSampleBuffer();
     return true;
 }
@@ -164,7 +167,6 @@ bool MockRealtimeVideoSource::applySize(const IntSize& size)
     m_statsFont.update(nullptr);
 
     m_imageBuffer = nullptr;
-    updatePlatformLayer();
 
     return true;
 }
@@ -335,7 +337,6 @@ void MockRealtimeVideoSource::generateFrame()
     drawAnimation(context);
     drawBoxes(context);
 
-    updatePlatformLayer();
     updateSampleBuffer();
 }
 
