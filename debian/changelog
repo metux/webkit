@@ -7,6 +7,9 @@ webkit2gtk (2.15.2-1) UNRELEASED; urgency=medium
     + debian/watch:
       - Add pgpsigurlmangle option.
   * Refresh all patches.
+  * debian/control:
+    + Add build dependencies on libgeoclue-2-dev and libgcrypt20-dev, and
+      remove libgnutls28-dev.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 21 Nov 2016 15:24:13 +0200
 
