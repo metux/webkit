@@ -6,6 +6,7 @@ webkit2gtk (2.15.2-1) UNRELEASED; urgency=medium
       - Add key file.
     + debian/watch:
       - Add pgpsigurlmangle option.
+  * Refresh all patches.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 21 Nov 2016 15:24:13 +0200
 
