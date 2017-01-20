@@ -18,7 +18,7 @@ Index: webkitgtk/Source/JavaScriptCore/CMakeLists.txt
 ===================================================================
 --- webkitgtk.orig/Source/JavaScriptCore/CMakeLists.txt
 +++ webkitgtk/Source/JavaScriptCore/CMakeLists.txt
-@@ -1439,6 +1439,7 @@ endif ()
+@@ -1465,6 +1465,7 @@ endif ()
  
  if (WTF_CPU_ARM)
  elseif (WTF_CPU_ARM64)
@@ -30,7 +30,7 @@ Index: webkitgtk/Source/WTF/wtf/Platform.h
 ===================================================================
 --- webkitgtk.orig/Source/WTF/wtf/Platform.h
 +++ webkitgtk/Source/WTF/wtf/Platform.h
-@@ -348,7 +348,7 @@
+@@ -354,7 +354,7 @@
  
  #endif /* ARM */
  
