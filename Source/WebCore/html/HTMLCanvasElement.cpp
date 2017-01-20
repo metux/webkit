@@ -31,8 +31,6 @@
 #include "CanvasGradient.h"
 #include "CanvasPattern.h"
 #include "CanvasRenderingContext2D.h"
-#include "Chrome.h"
-#include "ChromeClient.h"
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
@@ -43,7 +41,6 @@
 #include "HTMLParserIdioms.h"
 #include "ImageData.h"
 #include "MIMETypeRegistry.h"
-#include "Page.h"
 #include "RenderHTMLCanvas.h"
 #include "ScriptController.h"
 #include "Settings.h"
@@ -170,6 +167,72 @@ void HTMLCanvasElement::setWidth(unsigned value)
     setAttributeWithoutSynchronization(widthAttr, AtomicString::number(limitToOnlyHTMLNonNegative(value, defaultWidth)));
 }
 
+static inline size_t maxActivePixelMemory()
+{
+    static size_t maxPixelMemory;
+    static std::once_flag onceFlag;
+    std::call_once(onceFlag, [] {
+        maxPixelMemory = std::max(ramSize() / 4, 2151 * MB);
+    });
+    return maxPixelMemory;
+}
+
+CanvasRenderingContext* HTMLCanvasElement::getContext(const String& type)
+{
+    if (HTMLCanvasElement::is2dType(type))
+        return getContext2d(type);
+
+#if ENABLE(WEBGL)
+    if (HTMLCanvasElement::is3dType(type))
+        return getContextWebGL(type);
+#endif
+
+    return nullptr;
+}
+
+bool HTMLCanvasElement::is2dType(const String& type)
+{
+    return type == "2d";
+}
+
+CanvasRenderingContext* HTMLCanvasElement::getContext2d(const String& type)
+{
+    ASSERT_UNUSED(HTMLCanvasElement::is2dType(type), type);
+
+    if (m_context && !m_context->is2d())
+        return nullptr;
+    if (!m_context) {
+        bool usesDashboardCompatibilityMode = false;
+#if ENABLE(DASHBOARD_SUPPORT)
+        if (Settings* settings = document().settings())
+            usesDashboardCompatibilityMode = settings->usesDashboardBackwardCompatibilityMode();
+#endif
+
+        // Make sure we don't use more pixel memory than the system can support.
+        size_t requestedPixelMemory = 4 * width() * height();
+        if (activePixelMemory + requestedPixelMemory > maxActivePixelMemory()) {
+            StringBuilder stringBuilder;
+            stringBuilder.appendLiteral("Total canvas memory use exceeds the maximum limit (");
+            stringBuilder.appendNumber(maxActivePixelMemory() / 1024 / 1024);
+            stringBuilder.appendLiteral(" MB).");
+            document().addConsoleMessage(MessageSource::JS, MessageLevel::Warning, stringBuilder.toString());
+            return nullptr;
+        }
+
+        m_context = std::make_unique<CanvasRenderingContext2D>(*this, document().inQuirksMode(), usesDashboardCompatibilityMode);
+
+        downcast<CanvasRenderingContext2D>(*m_context).setUsesDisplayListDrawing(m_usesDisplayListDrawing);
+        downcast<CanvasRenderingContext2D>(*m_context).setTracksDisplayListReplay(m_tracksDisplayListReplay);
+
+#if USE(IOSURFACE_CANVAS_BACKING_STORE) || ENABLE(ACCELERATED_2D_CANVAS)
+        // Need to make sure a RenderLayer and compositing layer get created for the Canvas
+        invalidateStyleAndLayerComposition();
+#endif
+    }
+
+    return m_context.get();
+}
+
 #if ENABLE(WEBGL)
 static bool requiresAcceleratedCompositingForWebGL()
 {
@@ -193,81 +256,7 @@ static bool shouldEnableWebGL(Settings* settings)
 
     return settings->acceleratedCompositingEnabled();
 }
-#endif
 
-static inline size_t maxActivePixelMemory()
-{
-    static size_t maxPixelMemory;
-    static std::once_flag onceFlag;
-    std::call_once(onceFlag, [] {
-        maxPixelMemory = std::max(ramSize() / 4, 2151 * MB);
-    });
-    return maxPixelMemory;
-}
-
-CanvasRenderingContext* HTMLCanvasElement::getContext(const String& type, CanvasContextAttributes* attrs)
-{
-    if (is2dType(type)) {
-        if (m_context && !m_context->is2d())
-            return nullptr;
-        if (!m_context) {
-            bool usesDashboardCompatibilityMode = false;
-#if ENABLE(DASHBOARD_SUPPORT)
-            if (Settings* settings = document().settings())
-                usesDashboardCompatibilityMode = settings->usesDashboardBackwardCompatibilityMode();
-#endif
-
-            // Make sure we don't use more pixel memory than the system can support.
-            size_t requestedPixelMemory = 4 * width() * height();
-            if (activePixelMemory + requestedPixelMemory > maxActivePixelMemory()) {
-                StringBuilder stringBuilder;
-                stringBuilder.appendLiteral("Total canvas memory use exceeds the maximum limit (");
-                stringBuilder.appendNumber(maxActivePixelMemory() / 1024 / 1024);
-                stringBuilder.appendLiteral(" MB).");
-                document().addConsoleMessage(MessageSource::JS, MessageLevel::Warning, stringBuilder.toString());
-                return nullptr;
-            }
-
-            m_context = std::make_unique<CanvasRenderingContext2D>(*this, document().inQuirksMode(), usesDashboardCompatibilityMode);
-
-            downcast<CanvasRenderingContext2D>(*m_context).setUsesDisplayListDrawing(m_usesDisplayListDrawing);
-            downcast<CanvasRenderingContext2D>(*m_context).setTracksDisplayListReplay(m_tracksDisplayListReplay);
-
-#if USE(IOSURFACE_CANVAS_BACKING_STORE) || ENABLE(ACCELERATED_2D_CANVAS)
-            // Need to make sure a RenderLayer and compositing layer get created for the Canvas
-            invalidateStyleAndLayerComposition();
-#endif
-        }
-        return m_context.get();
-    }
-#if ENABLE(WEBGL)
-    if (shouldEnableWebGL(document().settings())) {
-
-        if (is3dType(type)) {
-            if (m_context && !m_context->is3d())
-                return nullptr;
-            if (!m_context) {
-                m_context = WebGLRenderingContextBase::create(*this, static_cast<WebGLContextAttributes*>(attrs), type);
-                if (m_context) {
-                    // Need to make sure a RenderLayer and compositing layer get created for the Canvas
-                    invalidateStyleAndLayerComposition();
-                }
-            }
-            return m_context.get();
-        }
-    }
-#else
-    UNUSED_PARAM(attrs);
-#endif
-    return nullptr;
-}
-
-bool HTMLCanvasElement::is2dType(const String& type)
-{
-    return type == "2d";
-}
-
-#if ENABLE(WEBGL)
 bool HTMLCanvasElement::is3dType(const String& type)
 {
     // Retain support for the legacy "webkit-3d" name.
@@ -276,6 +265,27 @@ bool HTMLCanvasElement::is3dType(const String& type)
         || type == "webgl2"
 #endif
         || type == "webkit-3d";
+}
+
+CanvasRenderingContext* HTMLCanvasElement::getContextWebGL(const String& type, WebGLContextAttributes&& attrs)
+{
+    ASSERT(HTMLCanvasElement::is3dType(type));
+
+    if (!shouldEnableWebGL(document().settings()))
+        return nullptr;
+
+    if (m_context && !m_context->is3d())
+        return nullptr;
+
+    if (!m_context) {
+        m_context = WebGLRenderingContextBase::create(*this, attrs, type);
+        if (m_context) {
+            // Need to make sure a RenderLayer and compositing layer get created for the Canvas
+            invalidateStyleAndLayerComposition();
+        }
+    }
+
+    return m_context.get();
 }
 #endif
 
@@ -458,7 +468,7 @@ String HTMLCanvasElement::toEncodingMimeType(const String& mimeType)
     return mimeType.convertToASCIILowercase();
 }
 
-ExceptionOr<String> HTMLCanvasElement::toDataURL(const String& mimeType, Optional<double> quality)
+ExceptionOr<String> HTMLCanvasElement::toDataURL(const String& mimeType, std::optional<double> quality)
 {
     if (!m_originClean)
         return Exception { SECURITY_ERR };
@@ -525,7 +535,7 @@ FloatSize HTMLCanvasElement::convertDeviceToLogical(const FloatSize& deviceSize)
 
 SecurityOrigin* HTMLCanvasElement::securityOrigin() const
 {
-    return document().securityOrigin();
+    return &document().securityOrigin();
 }
 
 bool HTMLCanvasElement::shouldAccelerate(const IntSize& size) const

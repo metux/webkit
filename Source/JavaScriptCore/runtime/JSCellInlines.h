@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,7 +41,7 @@
 namespace JSC {
 
 inline JSCell::JSCell(CreatingEarlyCellTag)
-    : m_cellState(CellState::NewWhite)
+    : m_cellState(CellState::DefinitelyWhite)
 {
     ASSERT(!isCompilationThread());
 }
@@ -51,7 +51,7 @@ inline JSCell::JSCell(VM&, Structure* structure)
     , m_indexingTypeAndMisc(structure->indexingTypeIncludingHistory())
     , m_type(structure->typeInfo().type())
     , m_flags(structure->typeInfo().inlineTypeFlags())
-    , m_cellState(CellState::NewWhite)
+    , m_cellState(CellState::DefinitelyWhite)
 {
     ASSERT(!isCompilationThread());
 }
@@ -105,20 +105,23 @@ inline IndexingType JSCell::indexingType() const
     return indexingTypeAndMisc() & AllArrayTypes;
 }
 
-inline Structure* JSCell::structure() const
+ALWAYS_INLINE Structure* JSCell::structure() const
 {
-    return Heap::heap(this)->structureIDTable().get(m_structureID);
+    return structure(*vm());
 }
 
-inline Structure* JSCell::structure(VM& vm) const
+ALWAYS_INLINE Structure* JSCell::structure(VM& vm) const
 {
-    return vm.heap.structureIDTable().get(m_structureID);
+    return vm.getStructure(m_structureID);
 }
 
 inline void JSCell::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
-    Structure* structure = cell->structure(visitor.vm());
-    visitor.appendUnbarrieredPointer(&structure);
+    visitor.appendUnbarriered(cell->structure(visitor.vm()));
+}
+
+inline void JSCell::visitOutputConstraints(JSCell*, SlotVisitor&)
+{
 }
 
 ALWAYS_INLINE VM& ExecState::vm() const
@@ -127,7 +130,15 @@ ALWAYS_INLINE VM& ExecState::vm() const
     ASSERT(callee()->vm());
     ASSERT(!callee()->isLargeAllocation());
     // This is an important optimization since we access this so often.
-    return *calleeAsValue().asCell()->markedBlock().vm();
+    return *callee()->markedBlock().vm();
+}
+
+template<typename CellType>
+Subspace* JSCell::subspaceFor(VM& vm)
+{
+    if (CellType::needsDestruction)
+        return &vm.destructibleCellSpace;
+    return &vm.cellSpace;
 }
 
 template<typename T>
@@ -135,7 +146,7 @@ void* allocateCell(Heap& heap, size_t size)
 {
     ASSERT(!DisallowGC::isGCDisallowedOnCurrentThread());
     ASSERT(size >= sizeof(T));
-    JSCell* result = static_cast<JSCell*>(heap.allocateObjectOfType<T>(size));
+    JSCell* result = static_cast<JSCell*>(subspaceFor<T>(*heap.vm())->allocate(size));
 #if ENABLE(GC_VALIDATION)
     ASSERT(!heap.vm()->isInitializingObject());
     heap.vm()->setInitializingObjectClass(T::info());
@@ -154,7 +165,7 @@ template<typename T>
 void* allocateCell(Heap& heap, GCDeferralContext* deferralContext, size_t size)
 {
     ASSERT(size >= sizeof(T));
-    JSCell* result = static_cast<JSCell*>(heap.allocateObjectOfType<T>(deferralContext, size));
+    JSCell* result = static_cast<JSCell*>(subspaceFor<T>(*heap.vm())->allocate(deferralContext, size));
 #if ENABLE(GC_VALIDATION)
     ASSERT(!heap.vm()->isInitializingObject());
     heap.vm()->setInitializingObjectClass(T::info());
@@ -268,17 +279,13 @@ inline bool JSCell::canUseFastGetOwnProperty(const Structure& structure)
 
 ALWAYS_INLINE const ClassInfo* JSCell::classInfo() const
 {
-    if (isLargeAllocation()) {
-        LargeAllocation& allocation = largeAllocation();
-        if (allocation.attributes().destruction == NeedsDestruction
-            && !(inlineTypeFlags() & StructureIsImmortal))
-            return static_cast<const JSDestructibleObject*>(this)->classInfo();
-        return structure(*allocation.vm())->classInfo();
-    }
-    MarkedBlock& block = markedBlock();
-    if (block.needsDestruction() && !(inlineTypeFlags() & StructureIsImmortal))
-        return static_cast<const JSDestructibleObject*>(this)->classInfo();
-    return structure(*block.vm())->classInfo();
+    VM* vm;
+    if (isLargeAllocation())
+        vm = largeAllocation().vm();
+    else
+        vm = markedBlock().vm();
+    ASSERT(vm->heap.mutatorState() == MutatorState::Running || vm->apiLock().ownerThread() != std::this_thread::get_id());
+    return structure(*vm)->classInfo();
 }
 
 inline bool JSCell::toBoolean(ExecState* exec) const
@@ -308,20 +315,39 @@ inline void JSCell::callDestructor(VM& vm)
         MethodTable::DestroyFunctionPtr destroy = classInfo->methodTable.destroy;
         destroy(this);
     } else
-        jsCast<JSDestructibleObject*>(this)->classInfo()->methodTable.destroy(this);
+        static_cast<JSDestructibleObject*>(this)->classInfo()->methodTable.destroy(this);
     zap();
 }
 
-inline void JSCell::lockInternalLock()
+inline void JSCell::lock()
 {
     Atomic<IndexingType>* lock = bitwise_cast<Atomic<IndexingType>*>(&m_indexingTypeAndMisc);
     IndexingTypeLockAlgorithm::lock(*lock);
 }
 
-inline void JSCell::unlockInternalLock()
+inline bool JSCell::tryLock()
+{
+    Atomic<IndexingType>* lock = bitwise_cast<Atomic<IndexingType>*>(&m_indexingTypeAndMisc);
+    return IndexingTypeLockAlgorithm::tryLock(*lock);
+}
+
+inline void JSCell::unlock()
 {
     Atomic<IndexingType>* lock = bitwise_cast<Atomic<IndexingType>*>(&m_indexingTypeAndMisc);
     IndexingTypeLockAlgorithm::unlock(*lock);
+}
+
+inline bool JSCell::isLocked() const
+{
+    Atomic<IndexingType>* lock = bitwise_cast<Atomic<IndexingType>*>(&m_indexingTypeAndMisc);
+    return IndexingTypeLockAlgorithm::isLocked(*lock);
+}
+
+inline JSObject* JSCell::toObject(ExecState* exec, JSGlobalObject* globalObject) const
+{
+    if (isObject())
+        return jsCast<JSObject*>(const_cast<JSCell*>(this));
+    return toObjectSlow(exec, globalObject);
 }
 
 } // namespace JSC

@@ -32,7 +32,6 @@
 #include "AudioSourceProvider.h"
 #include "GraphicsContext.h"
 #include "IntRect.h"
-#include "MediaSourceSettings.h"
 #include "UUID.h"
 
 namespace WebCore {
@@ -101,9 +100,6 @@ void MediaStreamTrackPrivate::setEnabled(bool enabled)
     // Always update the enabled state regardless of the track being ended.
     m_isEnabled = enabled;
 
-    if (m_preview)
-        m_preview->setEnabled(enabled);
-
     for (auto& observer : m_observers)
         observer->trackEnabledChanged(*this);
 }
@@ -118,7 +114,6 @@ void MediaStreamTrackPrivate::endTrack()
     // trackEnded method once.
     m_isEnded = true;
 
-    m_preview = nullptr;
     m_source->requestStop(this);
 
     for (auto& observer : m_observers)
@@ -130,7 +125,6 @@ Ref<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
     auto clonedMediaStreamTrackPrivate = create(m_source.copyRef());
     clonedMediaStreamTrackPrivate->m_isEnabled = this->m_isEnabled;
     clonedMediaStreamTrackPrivate->m_isEnded = this->m_isEnded;
-    clonedMediaStreamTrackPrivate->m_constraints = this->m_constraints;
 
     return clonedMediaStreamTrackPrivate;
 }
@@ -138,11 +132,6 @@ Ref<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
 RealtimeMediaSource::Type MediaStreamTrackPrivate::type() const
 {
     return m_source->type();
-}
-
-RefPtr<MediaConstraints> MediaStreamTrackPrivate::constraints() const
-{
-    return m_constraints;
 }
 
 const RealtimeMediaSourceSettings& MediaStreamTrackPrivate::settings() const
@@ -168,15 +157,6 @@ void MediaStreamTrackPrivate::paintCurrentFrameInContext(GraphicsContext& contex
         IntRect paintRect(IntPoint(0, 0), IntSize(rect.width(), rect.height()));
         context.fillRect(paintRect, Color::black);
     }
-}
-
-RealtimeMediaSourcePreview* MediaStreamTrackPrivate::preview()
-{
-    if (m_preview)
-        return m_preview.get();
-
-    m_preview = m_source->preview();
-    return m_preview.get();
 }
 
 void MediaStreamTrackPrivate::applyConstraints(const MediaConstraints& constraints, RealtimeMediaSource::SuccessHandler successHandler, RealtimeMediaSource::FailureHandler failureHandler)

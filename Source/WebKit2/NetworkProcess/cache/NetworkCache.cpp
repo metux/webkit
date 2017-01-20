@@ -145,7 +145,7 @@ static bool cachePolicyAllowsExpired(WebCore::ResourceRequestCachePolicy policy)
     return false;
 }
 
-static bool responseHasExpired(const WebCore::ResourceResponse& response, std::chrono::system_clock::time_point timestamp, Optional<std::chrono::microseconds> maxStale)
+static bool responseHasExpired(const WebCore::ResourceResponse& response, std::chrono::system_clock::time_point timestamp, std::optional<std::chrono::microseconds> maxStale)
 {
     if (response.cacheControlContainsNoCache())
         return true;
@@ -309,7 +309,7 @@ static StoreDecision makeStoreDecision(const WebCore::ResourceRequest& originalR
     return StoreDecision::Yes;
 }
 
-void Cache::retrieve(const WebCore::ResourceRequest& request, const GlobalFrameID& frameID, std::function<void (std::unique_ptr<Entry>)>&& completionHandler)
+void Cache::retrieve(const WebCore::ResourceRequest& request, const GlobalFrameID& frameID, Function<void (std::unique_ptr<Entry>)>&& completionHandler)
 {
     ASSERT(isEnabled());
     ASSERT(request.url().protocolIsInHTTPFamily());
@@ -337,19 +337,21 @@ void Cache::retrieve(const WebCore::ResourceRequest& request, const GlobalFrameI
     }
 
 #if ENABLE(NETWORK_CACHE_SPECULATIVE_REVALIDATION)
-    if (canUseSpeculativeRevalidation && m_speculativeLoadManager->retrieve(frameID, storageKey, request, [request, completionHandler](std::unique_ptr<Entry> entry) {
-        if (entry && WebCore::verifyVaryingRequestHeaders(entry->varyingRequestHeaders(), request))
-            completionHandler(WTFMove(entry));
-        else
-            completionHandler(nullptr);
-    }))
+    if (canUseSpeculativeRevalidation && m_speculativeLoadManager->canRetrieve(storageKey, request, frameID)) {
+        m_speculativeLoadManager->retrieve(storageKey, [request, completionHandler = WTFMove(completionHandler)](std::unique_ptr<Entry> entry) {
+            if (entry && WebCore::verifyVaryingRequestHeaders(entry->varyingRequestHeaders(), request))
+                completionHandler(WTFMove(entry));
+            else
+                completionHandler(nullptr);
+        });
         return;
+    }
 #endif
 
     auto startTime = std::chrono::system_clock::now();
     auto priority = static_cast<unsigned>(request.priority());
 
-    m_storage->retrieve(storageKey, priority, [this, request, completionHandler = WTFMove(completionHandler), startTime, storageKey, frameID](std::unique_ptr<Storage::Record> record) {
+    m_storage->retrieve(storageKey, priority, [this, request, completionHandler = WTFMove(completionHandler), startTime, storageKey, frameID](auto record) {
         if (!record) {
             LOG(NetworkCache, "(NetworkProcess) not found in storage");
 
@@ -586,7 +588,7 @@ void Cache::deleteDumpFile()
     });
 }
 
-void Cache::clear(std::chrono::system_clock::time_point modifiedSince, std::function<void ()>&& completionHandler)
+void Cache::clear(std::chrono::system_clock::time_point modifiedSince, Function<void ()>&& completionHandler)
 {
     LOG(NetworkCache, "(NetworkProcess) clearing cache");
 
@@ -611,6 +613,30 @@ void Cache::clear()
 String Cache::recordsPath() const
 {
     return m_storage ? m_storage->recordsPath() : String();
+}
+
+void Cache::retrieveData(const DataKey& dataKey, Function<void (const uint8_t* data, size_t size)> completionHandler)
+{
+    ASSERT(isEnabled());
+
+    Key key { dataKey, m_storage->salt() };
+    m_storage->retrieve(key, 4, [completionHandler = WTFMove(completionHandler)] (auto record) {
+        if (!record || !record->body.size()) {
+            completionHandler(nullptr, 0);
+            return true;
+        }
+        completionHandler(record->body.data(), record->body.size());
+        return true;
+    });
+}
+
+void Cache::storeData(const DataKey& dataKey, const uint8_t* data, size_t size)
+{
+    if (!m_storage)
+        return;
+    Key key { dataKey, m_storage->salt() };
+    Storage::Record record { key, std::chrono::system_clock::now(), { }, Data { data, size }, { } };
+    m_storage->store(record, { });
 }
 
 }

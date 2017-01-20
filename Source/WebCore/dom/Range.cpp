@@ -40,7 +40,6 @@
 #include "HTMLNames.h"
 #include "NodeTraversal.h"
 #include "NodeWithIndex.h"
-#include "Page.h"
 #include "ProcessingInstruction.h"
 #include "RenderBoxModelObject.h"
 #include "RenderText.h"
@@ -89,8 +88,7 @@ Ref<Range> Range::create(Document& ownerDocument)
     return adoptRef(*new Range(ownerDocument));
 }
 
-// FIXME: startContainer and endContainer should probably be Ref<Node>&&.
-inline Range::Range(Document& ownerDocument, PassRefPtr<Node> startContainer, int startOffset, PassRefPtr<Node> endContainer, int endOffset)
+inline Range::Range(Document& ownerDocument, Node* startContainer, int startOffset, Node* endContainer, int endOffset)
     : m_ownerDocument(ownerDocument)
     , m_start(&ownerDocument)
     , m_end(&ownerDocument)
@@ -109,9 +107,9 @@ inline Range::Range(Document& ownerDocument, PassRefPtr<Node> startContainer, in
         setEnd(*endContainer, endOffset);
 }
 
-Ref<Range> Range::create(Document& ownerDocument, PassRefPtr<Node> startContainer, int startOffset, PassRefPtr<Node> endContainer, int endOffset)
+Ref<Range> Range::create(Document& ownerDocument, RefPtr<Node>&& startContainer, int startOffset, RefPtr<Node>&& endContainer, int endOffset)
 {
-    return adoptRef(*new Range(ownerDocument, startContainer, startOffset, endContainer, endOffset));
+    return adoptRef(*new Range(ownerDocument, startContainer.get(), startOffset, endContainer.get(), endOffset));
 }
 
 Ref<Range> Range::create(Document& ownerDocument, const Position& start, const Position& end)
@@ -1109,11 +1107,8 @@ ExceptionOr<void> Range::surroundContents(Node& newParent)
         return fragment.releaseException();
 
     // Step 4: If newParent has children, replace all with null within newParent.
-    while (auto* child = newParent.firstChild()) {
-        auto result = downcast<ContainerNode>(newParent).removeChild(*child);
-        if (result.hasException())
-            return result.releaseException();
-    }
+    if (newParent.hasChildNodes())
+        downcast<ContainerNode>(newParent).replaceAllChildren(nullptr);
 
     // Step 5: Insert newParent into context object.
     auto insertResult = insertNode(newParent);

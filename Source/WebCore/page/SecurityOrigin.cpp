@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2007-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -108,7 +108,7 @@ SecurityOrigin::SecurityOrigin(const URL& url)
     m_domain = m_host;
 
     if (m_port && isDefaultPortForProtocol(m_port.value(), m_protocol))
-        m_port = Nullopt;
+        m_port = std::nullopt;
 
     // By default, only local SecurityOrigins can load local resources.
     m_canLoadLocalResources = isLocal();
@@ -186,15 +186,15 @@ bool SecurityOrigin::isSecure(const URL& url)
     return false;
 }
 
-bool SecurityOrigin::canAccess(const SecurityOrigin* other) const
+bool SecurityOrigin::canAccess(const SecurityOrigin& other) const
 {
     if (m_universalAccess)
         return true;
 
-    if (this == other)
+    if (this == &other)
         return true;
 
-    if (isUnique() || other->isUnique())
+    if (isUnique() || other.isUnique())
         return false;
 
     // Here are two cases where we should permit access:
@@ -218,30 +218,30 @@ bool SecurityOrigin::canAccess(const SecurityOrigin* other) const
     // this is a security vulnerability.
 
     bool canAccess = false;
-    if (m_protocol == other->m_protocol) {
-        if (!m_domainWasSetInDOM && !other->m_domainWasSetInDOM) {
-            if (m_host == other->m_host && m_port == other->m_port)
+    if (m_protocol == other.m_protocol) {
+        if (!m_domainWasSetInDOM && !other.m_domainWasSetInDOM) {
+            if (m_host == other.m_host && m_port == other.m_port)
                 canAccess = true;
-        } else if (m_domainWasSetInDOM && other->m_domainWasSetInDOM) {
-            if (m_domain == other->m_domain)
+        } else if (m_domainWasSetInDOM && other.m_domainWasSetInDOM) {
+            if (m_domain == other.m_domain)
                 canAccess = true;
         }
     }
 
     if (canAccess && isLocal())
-       canAccess = passesFileCheck(other);
+        canAccess = passesFileCheck(other);
 
     return canAccess;
 }
 
-bool SecurityOrigin::passesFileCheck(const SecurityOrigin* other) const
+bool SecurityOrigin::passesFileCheck(const SecurityOrigin& other) const
 {
-    ASSERT(isLocal() && other->isLocal());
+    ASSERT(isLocal() && other.isLocal());
 
-    if (!m_enforceFilePathSeparation && !other->m_enforceFilePathSeparation)
+    if (!m_enforceFilePathSeparation && !other.m_enforceFilePathSeparation)
         return true;
 
-    return (m_filePath == other->m_filePath);
+    return (m_filePath == other.m_filePath);
 }
 
 bool SecurityOrigin::canRequest(const URL& url) const
@@ -262,7 +262,7 @@ bool SecurityOrigin::canRequest(const URL& url) const
 
     // We call isSameSchemeHostPort here instead of canAccess because we want
     // to ignore document.domain effects.
-    if (isSameSchemeHostPort(&targetOrigin.get()))
+    if (isSameSchemeHostPort(targetOrigin.get()))
         return true;
 
     if (SecurityPolicy::isAccessWhiteListed(this, &targetOrigin.get()))
@@ -271,9 +271,9 @@ bool SecurityOrigin::canRequest(const URL& url) const
     return false;
 }
 
-bool SecurityOrigin::canReceiveDragData(const SecurityOrigin* dragInitiator) const
+bool SecurityOrigin::canReceiveDragData(const SecurityOrigin& dragInitiator) const
 {
-    if (this == dragInitiator)
+    if (this == &dragInitiator)
         return true;
 
     return canAccess(dragInitiator);
@@ -303,6 +303,9 @@ bool SecurityOrigin::canDisplay(const URL& url) const
 {
     if (m_universalAccess)
         return true;
+
+    if (m_protocol == "file" && url.isLocalFile() && !filesHaveSameVolume(m_filePath, url.path()))
+        return false;
 
     if (isFeedWithNestedProtocolInHTTPFamily(url))
         return true;
@@ -342,7 +345,10 @@ bool SecurityOrigin::canAccessStorage(const SecurityOrigin* topOrigin, ShouldAll
     if (shouldAllowFromThirdParty == AlwaysAllowFromThirdParty)
         return true;
 
-    if ((m_storageBlockingPolicy == BlockThirdPartyStorage || topOrigin->m_storageBlockingPolicy == BlockThirdPartyStorage) && topOrigin->isThirdParty(this))
+    if (m_universalAccess)
+        return true;
+
+    if ((m_storageBlockingPolicy == BlockThirdPartyStorage || topOrigin->m_storageBlockingPolicy == BlockThirdPartyStorage) && !topOrigin->isSameOriginAs(*this))
         return false;
 
     return true;
@@ -357,18 +363,15 @@ SecurityOrigin::Policy SecurityOrigin::canShowNotifications() const
     return Ask;
 }
 
-bool SecurityOrigin::isThirdParty(const SecurityOrigin* child) const
+bool SecurityOrigin::isSameOriginAs(const SecurityOrigin& other) const
 {
-    if (child->m_universalAccess)
-        return false;
-
-    if (this == child)
-        return false;
-
-    if (isUnique() || child->isUnique())
+    if (this == &other)
         return true;
 
-    return !isSameSchemeHostPort(child);
+    if (isUnique() || other.isUnique())
+        return false;
+
+    return isSameSchemeHostPort(other);
 }
 
 void SecurityOrigin::grantLoadLocalResources()
@@ -486,11 +489,12 @@ Ref<SecurityOrigin> SecurityOrigin::createFromString(const String& originString)
     return SecurityOrigin::create(URL(URL(), originString));
 }
 
-Ref<SecurityOrigin> SecurityOrigin::create(const String& protocol, const String& host, Optional<uint16_t> port)
+Ref<SecurityOrigin> SecurityOrigin::create(const String& protocol, const String& host, std::optional<uint16_t> port)
 {
     String decodedHost = decodeURLEscapeSequences(host);
     auto origin = create(URL(URL(), protocol + "://" + host + "/"));
-    origin->m_port = port;
+    if (port && !isDefaultPortForProtocol(*port, protocol))
+        origin->m_port = port;
     return origin;
 }
 
@@ -499,7 +503,7 @@ bool SecurityOrigin::equal(const SecurityOrigin* other) const
     if (other == this)
         return true;
     
-    if (!isSameSchemeHostPort(other))
+    if (!isSameSchemeHostPort(*other))
         return false;
 
     if (m_domainWasSetInDOM != other->m_domainWasSetInDOM)
@@ -511,15 +515,15 @@ bool SecurityOrigin::equal(const SecurityOrigin* other) const
     return true;
 }
 
-bool SecurityOrigin::isSameSchemeHostPort(const SecurityOrigin* other) const 
+bool SecurityOrigin::isSameSchemeHostPort(const SecurityOrigin& other) const
 {
-    if (m_host != other->m_host)
+    if (m_host != other.m_host)
         return false;
 
-    if (m_protocol != other->m_protocol)
+    if (m_protocol != other.m_protocol)
         return false;
 
-    if (m_port != other->m_port)
+    if (m_port != other.m_port)
         return false;
 
     if (isLocal() && !passesFileCheck(other))

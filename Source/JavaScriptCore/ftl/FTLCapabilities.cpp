@@ -139,6 +139,7 @@ inline CapabilityLevel canCompile(Node* node)
     case StringFromCharCode:
     case AllocatePropertyStorage:
     case ReallocatePropertyStorage:
+    case NukeStructureAndSetButterfly:
     case GetTypedArrayByteOffset:
     case NotifyWrite:
     case StoreBarrier:
@@ -235,6 +236,8 @@ inline CapabilityLevel canCompile(Node* node)
     case MaterializeCreateActivation:
     case PhantomDirectArguments:
     case PhantomCreateRest:
+    case PhantomSpread:
+    case PhantomNewArrayWithSpread:
     case PhantomClonedArguments:
     case GetMyArgumentByVal:
     case GetMyArgumentByValOutOfBounds:
@@ -279,6 +282,7 @@ inline CapabilityLevel canCompile(Node* node)
     case CheckDOM:
     case CallDOM:
     case CallDOMGetter:
+    case ArraySlice:
         // These are OK.
         break;
 

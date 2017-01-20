@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2004, 2005, 2007, 2008, 2009, 2015 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003-2017 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -81,6 +81,12 @@ public:
 
     static const bool needsDestruction = false;
 
+    // Don't call this directly. Call JSC::subspaceFor<Type>(vm) instead.
+    // FIXME: Refer to Subspace by reference.
+    // https://bugs.webkit.org/show_bug.cgi?id=166988
+    template<typename CellType>
+    static Subspace* subspaceFor(VM&);
+
     static JSCell* seenMultipleCalleeObjects() { return bitwise_cast<JSCell*>(static_cast<uintptr_t>(1)); }
 
     enum CreatingEarlyCellTag { CreatingEarlyCell };
@@ -95,6 +101,7 @@ public:
     bool isString() const;
     bool isSymbol() const;
     bool isObject() const;
+    bool isAnyWasmCallee() const;
     bool isGetterSetter() const;
     bool isCustomGetterSetter() const;
     bool isProxy() const;
@@ -104,26 +111,11 @@ public:
     // Each cell has a built-in lock. Currently it's simply available for use if you need it. It's
     // a full-blown WTF::Lock. Note that this lock is currently used in JSArray and that lock's
     // ordering with the Structure lock is that the Structure lock must be acquired first.
-    void lockInternalLock();
-    void unlockInternalLock();
+    void lock();
+    bool tryLock();
+    void unlock();
+    bool isLocked() const;
     
-    class InternalLocker {
-    public:
-        InternalLocker(JSCell* cell)
-            : m_cell(cell)
-        {
-            m_cell->lockInternalLock();
-        }
-        
-        ~InternalLocker()
-        {
-            m_cell->unlockInternalLock();
-        }
-        
-    private:
-        JSCell* m_cell;
-    };
-
     JSType type() const;
     IndexingType indexingTypeAndMisc() const;
     IndexingType indexingType() const;
@@ -131,6 +123,7 @@ public:
     Structure* structure() const;
     Structure* structure(VM&) const;
     void setStructure(VM&, Structure*);
+    void setStructureIDDirectly(StructureID id) { m_structureID = id; }
     void clearStructure() { m_structureID = 0; }
 
     TypeInfo::InlineTypeFlags inlineTypeFlags() const { return m_flags; }
@@ -158,7 +151,7 @@ public:
     bool toBoolean(ExecState*) const;
     TriState pureToBoolean() const;
     JS_EXPORT_PRIVATE double toNumber(ExecState*) const;
-    JS_EXPORT_PRIVATE JSObject* toObject(ExecState*, JSGlobalObject*) const;
+    JSObject* toObject(ExecState*, JSGlobalObject*) const;
 
     void dump(PrintStream&) const;
     JS_EXPORT_PRIVATE static void dumpToStream(const JSCell*, PrintStream&);
@@ -167,6 +160,7 @@ public:
     JS_EXPORT_PRIVATE static size_t estimatedSize(JSCell*);
 
     static void visitChildren(JSCell*, SlotVisitor&);
+    static void visitOutputConstraints(JSCell*, SlotVisitor&);
 
     JS_EXPORT_PRIVATE static void heapSnapshot(JSCell*, HeapSnapshotBuilder&);
 
@@ -264,6 +258,8 @@ protected:
 private:
     friend class LLIntOffsetsExtractor;
 
+    JS_EXPORT_PRIVATE JSObject* toObjectSlow(ExecState*, JSGlobalObject*) const;
+
     StructureID m_structureID;
     IndexingType m_indexingTypeAndMisc; // DO NOT store to this field. Always CAS.
     JSType m_type;
@@ -299,6 +295,14 @@ inline To jsDynamicCast(JSValue from)
     if (LIKELY(from.isCell() && from.asCell()->inherits(std::remove_pointer<To>::type::info())))
         return static_cast<To>(from.asCell());
     return nullptr;
+}
+
+// FIXME: Refer to Subspace by reference.
+// https://bugs.webkit.org/show_bug.cgi?id=166988
+template<typename Type>
+inline Subspace* subspaceFor(VM& vm)
+{
+    return Type::template subspaceFor<Type>(vm);
 }
 
 } // namespace JSC

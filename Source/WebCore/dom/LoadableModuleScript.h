@@ -36,10 +36,10 @@ class LoadableModuleScript final : public LoadableScript, private CachedModuleSc
 public:
     virtual ~LoadableModuleScript();
 
-    static Ref<LoadableModuleScript> create(CachedModuleScript&);
+    static Ref<LoadableModuleScript> create(const String& nonce, const String& crossOriginMode, const String& charset, const AtomicString& initiatorName, bool isInUserAgentShadowTree);
 
     bool isLoaded() const final;
-    Optional<Error> error() const final;
+    std::optional<Error> error() const final;
     bool wasCanceled() const final;
 
     CachedModuleScript& moduleScript() { return m_moduleScript.get(); }
@@ -49,8 +49,11 @@ public:
 
     void setError(Error&&);
 
+    void load(Document&, const URL& rootURL);
+    void load(Document&, const ScriptSourceCode&);
+
 private:
-    LoadableModuleScript(CachedModuleScript&);
+    LoadableModuleScript(const String& nonce, const String& crossOriginMode, const String& charset, const AtomicString& initiatorName, bool isInUserAgentShadowTree, Ref<CachedModuleScript>&&);
 
     void notifyFinished(CachedModuleScript&) final;
 

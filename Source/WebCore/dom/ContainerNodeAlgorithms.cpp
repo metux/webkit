@@ -33,10 +33,10 @@
 
 namespace WebCore {
 
-void notifyNodeInsertedIntoTree(ContainerNode& insertionPoint, ContainerNode&, NodeVector& postInsertionNotificationTargets);
-void notifyNodeInsertedIntoDocument(ContainerNode& insertionPoint, Node&, NodeVector& postInsertionNotificationTargets);
-void notifyNodeRemovedFromTree(ContainerNode& insertionPoint, ContainerNode&);
-void notifyNodeRemovedFromDocument(ContainerNode& insertionPoint, Node&);
+static void notifyNodeInsertedIntoTree(ContainerNode& insertionPoint, ContainerNode&, NodeVector& postInsertionNotificationTargets);
+static void notifyNodeInsertedIntoDocument(ContainerNode& insertionPoint, Node&, NodeVector& postInsertionNotificationTargets);
+static void notifyNodeRemovedFromTree(ContainerNode& insertionPoint, ContainerNode&);
+static void notifyNodeRemovedFromDocument(ContainerNode& insertionPoint, Node&);
 
 static void notifyDescendantInsertedIntoDocument(ContainerNode& insertionPoint, ContainerNode& node, NodeVector& postInsertionNotificationTargets)
 {
@@ -219,7 +219,7 @@ void removeDetachedChildrenInContainer(ContainerNode& container)
         if (!next)
             tail = nullptr;
 
-        if (is<ContainerNode>(node))
+        if (is<ContainerNode>(*node))
             addChildNodesToDeletionQueue(head, tail, downcast<ContainerNode>(*node));
         
         delete node;

@@ -37,7 +37,6 @@
 #include "MediaList.h"
 #include "MediaQueryEvaluator.h"
 #include "RenderView.h"
-#include "Settings.h"
 #include "SizesAttributeParser.h"
 #include <wtf/MainThread.h>
 
@@ -147,6 +146,7 @@ public:
 
         auto request = std::make_unique<PreloadRequest>(initiatorFor(m_tagId), m_urlToLoad, predictedBaseURL, resourceType(), m_mediaAttribute, m_moduleScript);
         request->setCrossOriginMode(m_crossOriginMode);
+        request->setNonce(m_nonceAttribute);
 
         // According to the spec, the module tag ignores the "charset" attribute as the same to the worker's
         // importScript. But WebKit supports the "charset" for importScript intentionally. So to be consistent,
@@ -211,12 +211,10 @@ private:
             break;
         case TagId::Script:
             if (match(attributeName, typeAttr)) {
-                auto* settings = document.settings();
-                if (settings && settings->es6ModulesEnabled()) {
-                    m_moduleScript = equalLettersIgnoringASCIICase(attributeValue, "module") ? PreloadRequest::ModuleScript::Yes : PreloadRequest::ModuleScript::No;
-                    break;
-                }
-            }
+                m_moduleScript = equalLettersIgnoringASCIICase(attributeValue, "module") ? PreloadRequest::ModuleScript::Yes : PreloadRequest::ModuleScript::No;
+                break;
+            } else if (match(attributeName, nonceAttr))
+                m_nonceAttribute = attributeValue;
             processImageAndScriptAttribute(attributeName, attributeValue);
             break;
         case TagId::Link:
@@ -230,6 +228,8 @@ private:
                 m_charset = attributeValue;
             else if (match(attributeName, crossoriginAttr))
                 m_crossOriginMode = stripLeadingAndTrailingHTMLSpaces(attributeValue);
+            else if (match(attributeName, nonceAttr))
+                m_nonceAttribute = attributeValue;
             break;
         case TagId::Input:
             if (match(attributeName, srcAttr))
@@ -326,6 +326,7 @@ private:
     String m_crossOriginMode;
     bool m_linkIsStyleSheet;
     String m_mediaAttribute;
+    String m_nonceAttribute;
     String m_metaContent;
     bool m_metaIsViewport;
     bool m_inputIsImage;

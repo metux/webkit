@@ -42,6 +42,7 @@
 #include <JavaScriptCore/JSObjectRef.h>
 #include <JavaScriptCore/JSRetainPtr.h>
 #include <JavaScriptCore/TypedArrayInlines.h>
+#include <JavaScriptCore/VMInlines.h>
 #include <WebCore/LogInitialization.h>
 #include <cstring>
 #include <locale.h>
@@ -58,6 +59,8 @@
 #if PLATFORM(MAC) && !PLATFORM(IOS)
 #include <Carbon/Carbon.h>
 #endif
+
+FILE* testResult = stdout;
 
 const unsigned TestRunner::viewWidth = 800;
 const unsigned TestRunner::viewHeight = 600;
@@ -1778,6 +1781,15 @@ static JSValueRef imageCountInGeneralPasteboardCallback(JSContextRef context, JS
     return JSValueMakeNumber(context, controller->imageCountInGeneralPasteboard());
 }
 
+static JSValueRef setSpellCheckerLoggingEnabledCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    if (argumentCount < 1)
+        return JSValueMakeUndefined(context);
+    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
+    controller->setSpellCheckerLoggingEnabled(JSValueToBoolean(context, arguments[0]));
+    return JSValueMakeUndefined(context);
+}
+
 // Static Values
 
 static JSValueRef getTimeoutCallback(JSContextRef context, JSObjectRef thisObject, JSStringRef propertyName, JSValueRef* exception)
@@ -2224,6 +2236,7 @@ JSStaticFunction* TestRunner::staticFunctions()
         { "accummulateLogsForChannel", accummulateLogsForChannel, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "runUIScript", runUIScriptCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "imageCountInGeneralPasteboard", imageCountInGeneralPasteboardCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "setSpellCheckerLoggingEnabled", setSpellCheckerLoggingEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { 0, 0, 0 }
     };
 
@@ -2273,12 +2286,12 @@ void TestRunner::ignoreLegacyWebNotificationPermissionRequests()
 void TestRunner::waitToDumpWatchdogTimerFired()
 {
     const char* message = "FAIL: Timed out waiting for notifyDone to be called\n";
-    fprintf(stdout, "%s", message);
+    fprintf(testResult, "%s", message);
 
     auto accumulatedLogs = getAndResetAccumulatedLogs();
     if (!accumulatedLogs.isEmpty()) {
         const char* message = "Logs accumulated during test run:\n";
-        fprintf(stdout, "%s%s\n", message, accumulatedLogs.utf8().data());
+        fprintf(testResult, "%s%s\n", message, accumulatedLogs.utf8().data());
     }
 
     notifyDone();

@@ -146,7 +146,7 @@ inline bool Structure::hasIndexingHeader(const JSCell* cell) const
     if (hasIndexedProperties(indexingType()))
         return true;
     
-    if (!isTypedView(m_classInfo->typedArrayStorageType))
+    if (!isTypedView(typedArrayTypeForType(m_blob.type())))
         return false;
     
     return jsCast<const JSArrayBufferView*>(cell)->mode() == WastefulTypedArray;
@@ -243,6 +243,41 @@ inline WatchpointSet* Structure::propertyReplacementWatchpointSet(PropertyOffset
     return map->get(offset);
 }
 
+template<typename DetailsFunc>
+ALWAYS_INLINE bool Structure::checkOffsetConsistency(PropertyTable* propertyTable, const DetailsFunc& detailsFunc) const
+{
+    // We cannot reliably assert things about the property table in the concurrent
+    // compilation thread. It is possible for the table to be stolen and then have
+    // things added to it, which leads to the offsets being all messed up. We could
+    // get around this by grabbing a lock here, but I think that would be overkill.
+    if (isCompilationThread())
+        return true;
+    
+    unsigned totalSize = propertyTable->propertyStorageSize();
+    unsigned inlineOverflowAccordingToTotalSize = totalSize < m_inlineCapacity ? 0 : totalSize - m_inlineCapacity;
+
+    auto fail = [&] (const char* description) {
+        dataLog("Detected offset inconsistency: ", description, "!\n");
+        dataLog("this = ", RawPointer(this), "\n");
+        dataLog("m_offset = ", m_offset, "\n");
+        dataLog("m_inlineCapacity = ", m_inlineCapacity, "\n");
+        dataLog("propertyTable = ", RawPointer(propertyTable), "\n");
+        dataLog("numberOfSlotsForLastOffset = ", numberOfSlotsForLastOffset(m_offset, m_inlineCapacity), "\n");
+        dataLog("totalSize = ", totalSize, "\n");
+        dataLog("inlineOverflowAccordingToTotalSize = ", inlineOverflowAccordingToTotalSize, "\n");
+        dataLog("numberOfOutOfLineSlotsForLastOffset = ", numberOfOutOfLineSlotsForLastOffset(m_offset), "\n");
+        detailsFunc();
+        UNREACHABLE_FOR_PLATFORM();
+    };
+    
+    if (numberOfSlotsForLastOffset(m_offset, m_inlineCapacity) != totalSize)
+        fail("numberOfSlotsForLastOffset doesn't match totalSize");
+    if (inlineOverflowAccordingToTotalSize != numberOfOutOfLineSlotsForLastOffset(m_offset))
+        fail("inlineOverflowAccordingToTotalSize doesn't match numberOfOutOfLineSlotsForLastOffset");
+
+    return true;
+}
+
 ALWAYS_INLINE bool Structure::checkOffsetConsistency() const
 {
     PropertyTable* propertyTable = propertyTableOrNull();
@@ -258,12 +293,8 @@ ALWAYS_INLINE bool Structure::checkOffsetConsistency() const
     // get around this by grabbing a lock here, but I think that would be overkill.
     if (isCompilationThread())
         return true;
-    
-    RELEASE_ASSERT(numberOfSlotsForLastOffset(m_offset, m_inlineCapacity) == propertyTable->propertyStorageSize());
-    unsigned totalSize = propertyTable->propertyStorageSize();
-    RELEASE_ASSERT((totalSize < inlineCapacity() ? 0 : totalSize - inlineCapacity()) == numberOfOutOfLineSlotsForLastOffset(m_offset));
 
-    return true;
+    return checkOffsetConsistency(propertyTable, [] () { });
 }
 
 inline void Structure::checkConsistency()
@@ -285,14 +316,21 @@ inline void Structure::setObjectToStringValue(ExecState* exec, VM& vm, JSString*
     rareData()->setObjectToStringValue(exec, vm, this, value, toStringTagSymbolSlot);
 }
 
-template<typename Func>
+template<Structure::ShouldPin shouldPin, typename Func>
 inline PropertyOffset Structure::add(VM& vm, PropertyName propertyName, unsigned attributes, const Func& func)
 {
     PropertyTable* table = ensurePropertyTable(vm);
 
     GCSafeConcurrentJSLocker locker(m_lock, vm.heap);
-    
-    setPropertyTable(vm, table);
+
+    switch (shouldPin) {
+    case ShouldPin::Yes:
+        pin(locker, vm, table);
+        break;
+    case ShouldPin::No:
+        setPropertyTable(vm, table);
+        break;
+    }
     
     ASSERT(!JSC::isValidOffset(get(vm, propertyName)));
 
@@ -307,9 +345,9 @@ inline PropertyOffset Structure::add(VM& vm, PropertyName propertyName, unsigned
     PropertyOffset newLastOffset = m_offset;
     table->add(PropertyMapEntry(rep, newOffset, attributes), newLastOffset, PropertyTable::PropertyOffsetMayChange);
     
-    func(locker, newOffset, outOfLineCapacity(newLastOffset));
-    vm.heap.mutatorFence();
-    m_offset = newLastOffset;
+    func(locker, newOffset, newLastOffset);
+    
+    ASSERT(m_offset == newLastOffset);
 
     checkConsistency();
     return newOffset;
@@ -349,9 +387,7 @@ inline PropertyOffset Structure::remove(PropertyName propertyName, const Func& f
 template<typename Func>
 inline PropertyOffset Structure::addPropertyWithoutTransition(VM& vm, PropertyName propertyName, unsigned attributes, const Func& func)
 {
-    pin(vm, ensurePropertyTable(vm));
-    
-    return add(vm, propertyName, attributes, func);
+    return add<ShouldPin::Yes>(vm, propertyName, attributes, func);
 }
 
 template<typename Func>

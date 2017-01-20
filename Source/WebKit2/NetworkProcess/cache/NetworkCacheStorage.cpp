@@ -53,9 +53,9 @@ static double computeRecordWorth(FileTimes);
 struct Storage::ReadOperation {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    ReadOperation(const Key& key, const RetrieveCompletionHandler& completionHandler)
+    ReadOperation(const Key& key, RetrieveCompletionHandler&& completionHandler)
         : key(key)
-        , completionHandler(completionHandler)
+        , completionHandler(WTFMove(completionHandler))
     { }
 
     void cancel();
@@ -380,7 +380,7 @@ static bool decodeRecordMetaData(RecordMetaData& metaData, const Data& fileData)
 {
     bool success = false;
     fileData.apply([&metaData, &success](const uint8_t* data, size_t size) {
-        Decoder decoder(data, size);
+        WTF::Persistence::Decoder decoder(data, size);
         if (!decoder.decode(metaData.cacheStorageVersion))
             return false;
         if (!decoder.decode(metaData.key))
@@ -458,13 +458,14 @@ void Storage::readRecord(ReadOperation& readOperation, const Data& recordData)
         metaData.key,
         timeStamp,
         headerData,
-        bodyData
+        bodyData,
+        metaData.bodyHash
     });
 }
 
 static Data encodeRecordMetaData(const RecordMetaData& metaData)
 {
-    Encoder encoder;
+    WTF::Persistence::Encoder encoder;
 
     encoder << metaData.cacheStorageVersion;
     encoder << metaData.key;
@@ -480,7 +481,7 @@ static Data encodeRecordMetaData(const RecordMetaData& metaData)
     return Data(encoder.buffer(), encoder.bufferSize());
 }
 
-Optional<BlobStorage::Blob> Storage::storeBodyAsBlob(WriteOperation& writeOperation)
+std::optional<BlobStorage::Blob> Storage::storeBodyAsBlob(WriteOperation& writeOperation)
 {
     auto blobPath = blobPathForKey(writeOperation.record.key);
 
@@ -505,7 +506,7 @@ Optional<BlobStorage::Blob> Storage::storeBodyAsBlob(WriteOperation& writeOperat
     return blob;
 }
 
-Data Storage::encodeRecord(const Record& record, Optional<BlobStorage::Blob> blob)
+Data Storage::encodeRecord(const Record& record, std::optional<BlobStorage::Blob> blob)
 {
     ASSERT(!blob || bytesEqual(blob.value().data, record.body));
 
@@ -719,7 +720,7 @@ void Storage::dispatchWriteOperation(std::unique_ptr<WriteOperation> writeOperat
         ++writeOperation.activeCount;
 
         bool shouldStoreAsBlob = shouldStoreBodyAsBlob(writeOperation.record.body);
-        auto blob = shouldStoreAsBlob ? storeBodyAsBlob(writeOperation) : Nullopt;
+        auto blob = shouldStoreAsBlob ? storeBodyAsBlob(writeOperation) : std::nullopt;
 
         auto recordData = encodeRecord(writeOperation.record, blob);
 
@@ -804,7 +805,7 @@ void Storage::traverse(const String& type, TraverseFlags flags, TraverseHandler&
 {
     ASSERT(RunLoop::isMain());
     ASSERT(traverseHandler);
-    // Avoid non-thread safe std::function copies.
+    // Avoid non-thread safe Function copies.
 
     auto traverseOperationPtr = std::make_unique<TraverseOperation>(type, flags, WTFMove(traverseHandler));
     auto& traverseOperation = *traverseOperationPtr;
@@ -837,7 +838,8 @@ void Storage::traverse(const String& type, TraverseFlags flags, TraverseHandler&
                         metaData.key,
                         std::chrono::system_clock::time_point(metaData.epochRelativeTimeStamp),
                         headerData,
-                        { }
+                        { },
+                        metaData.bodyHash
                     };
                     RecordInfo info {
                         static_cast<size_t>(metaData.bodySize),
@@ -888,7 +890,7 @@ void Storage::setCapacity(size_t capacity)
     shrinkIfNeeded();
 }
 
-void Storage::clear(const String& type, std::chrono::system_clock::time_point modifiedSinceTime, std::function<void ()>&& completionHandler)
+void Storage::clear(const String& type, std::chrono::system_clock::time_point modifiedSinceTime, Function<void ()>&& completionHandler)
 {
     ASSERT(RunLoop::isMain());
     LOG(NetworkCacheStorage, "(NetworkProcess) clearing cache");

@@ -62,6 +62,10 @@
 #include "WebMediaSessionFocusManager.h"
 #endif
 
+#if USE(SOUP)
+#include <WebCore/SoupNetworkProxySettings.h>
+#endif
+
 #if PLATFORM(COCOA)
 OBJC_CLASS NSMutableDictionary;
 OBJC_CLASS NSObject;
@@ -70,6 +74,7 @@ OBJC_CLASS NSString;
 
 namespace API {
 class AutomationClient;
+class CustomProtocolManagerClient;
 class DownloadClient;
 class LegacyContextHistoryClient;
 class PageConfiguration;
@@ -78,7 +83,9 @@ class PageConfiguration;
 namespace WebKit {
 
 class DownloadProxy;
+class HighPerformanceGraphicsUsageSampler;
 class UIGamepad;
+class PerActivityStateCPUUsageSampler;
 class WebAutomationSession;
 class WebContextSupplement;
 class WebIconDatabase;
@@ -135,6 +142,9 @@ public:
     void setHistoryClient(std::unique_ptr<API::LegacyContextHistoryClient>);
     void setDownloadClient(std::unique_ptr<API::DownloadClient>);
     void setAutomationClient(std::unique_ptr<API::AutomationClient>);
+#if USE(SOUP)
+    void setCustomProtocolManagerClient(std::unique_ptr<API::CustomProtocolManagerClient>&&);
+#endif
 
     void setMaximumNumberOfProcesses(unsigned); // Can only be called when there are no processes running.
     unsigned maximumNumberOfProcesses() const { return !m_configuration->maximumProcessCount() ? UINT_MAX : m_configuration->maximumProcessCount(); }
@@ -177,6 +187,7 @@ public:
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     void setAdditionalPluginsDirectory(const String&);
+    void refreshPlugins();
 
     PluginInfoStore& pluginInfoStore() { return m_pluginInfoStore; }
 
@@ -215,6 +226,7 @@ public:
 
 #if USE(SOUP)
     void setInitialHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicy policy) { m_initialHTTPCookieAcceptPolicy = policy; }
+    void setNetworkProxySettings(const WebCore::SoupNetworkProxySettings&);
 #endif
     void setEnhancedAccessibility(bool);
     
@@ -224,6 +236,10 @@ public:
 
     API::LegacyContextHistoryClient& historyClient() { return *m_historyClient; }
     WebContextClient& client() { return m_client; }
+
+#if USE(SOUP)
+    API::CustomProtocolManagerClient& customProtocolManagerClient() const { return *m_customProtocolManagerClient; }
+#endif
 
     WebIconDatabase* iconDatabase() const { return m_iconDatabase.get(); }
 
@@ -243,6 +259,8 @@ public:
 
     void clearCachedCredentials();
     void terminateDatabaseProcess();
+
+    void reportWebContentCPUTime(int64_t cpuTime, uint64_t activityState);
 
     void allowSpecificHTTPSCertificateForHost(const WebCertificateInfo*, const String& host);
 
@@ -285,12 +303,12 @@ public:
     NetworkProcessProxy* networkProcess() { return m_networkProcess.get(); }
     void networkProcessCrashed(NetworkProcessProxy*);
 
-    void getNetworkProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>);
+    void getNetworkProcessConnection(Ref<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>&&);
 
 #if ENABLE(DATABASE_PROCESS)
     void ensureDatabaseProcess();
     DatabaseProcessProxy* databaseProcess() { return m_databaseProcess.get(); }
-    void getDatabaseProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetDatabaseProcessConnection::DelayedReply>);
+    void getDatabaseProcessConnection(Ref<Messages::WebProcessProxy::GetDatabaseProcessConnection::DelayedReply>&&);
     void databaseProcessCrashed(DatabaseProcessProxy*);
 #endif
 
@@ -436,6 +454,9 @@ private:
 
     void setAnyPageGroupMightHavePrivateBrowsingEnabled(bool);
 
+    void resolvePathsForSandboxExtensions();
+    void platformResolvePathsForSandboxExtensions();
+
     Ref<API::ProcessPoolConfiguration> m_configuration;
 
     IPC::MessageReceiverMap m_messageReceiverMap;
@@ -455,6 +476,9 @@ private:
     std::unique_ptr<API::AutomationClient> m_automationClient;
     std::unique_ptr<API::DownloadClient> m_downloadClient;
     std::unique_ptr<API::LegacyContextHistoryClient> m_historyClient;
+#if USE(SOUP)
+    std::unique_ptr<API::CustomProtocolManagerClient> m_customProtocolManagerClient;
+#endif
 
     RefPtr<WebAutomationSession> m_automationSession;
 
@@ -499,7 +523,8 @@ private:
     WebContextSupplementMap m_supplements;
 
 #if USE(SOUP)
-    HTTPCookieAcceptPolicy m_initialHTTPCookieAcceptPolicy;
+    HTTPCookieAcceptPolicy m_initialHTTPCookieAcceptPolicy { HTTPCookieAcceptPolicyOnlyFromMainDocumentDomain };
+    WebCore::SoupNetworkProxySettings m_networkProxySettings;
 #endif
 
 #if PLATFORM(MAC)
@@ -508,6 +533,9 @@ private:
     RetainPtr<NSObject> m_automaticSpellingCorrectionNotificationObserver;
     RetainPtr<NSObject> m_automaticQuoteSubstitutionNotificationObserver;
     RetainPtr<NSObject> m_automaticDashSubstitutionNotificationObserver;
+
+    std::unique_ptr<HighPerformanceGraphicsUsageSampler> m_highPerformanceGraphicsUsageSampler;
+    std::unique_ptr<PerActivityStateCPUUsageSampler> m_perActivityStateCPUUsageSampler;
 #endif
 
     String m_overrideIconDatabasePath;
@@ -530,6 +558,7 @@ private:
 
 #if USE(SOUP)
     bool m_ignoreTLSErrors { true };
+    HashSet<String, ASCIICaseInsensitiveHash> m_urlSchemesRegisteredForCustomProtocols;
 #endif
 
     bool m_memoryCacheDisabled;
@@ -562,6 +591,22 @@ private:
 #if PLATFORM(COCOA)
     bool m_cookieStoragePartitioningEnabled { false };
 #endif
+
+    struct Paths {
+        String injectedBundlePath;
+        String applicationCacheDirectory;
+        String webSQLDatabaseDirectory;
+        String mediaCacheDirectory;
+        String mediaKeyStorageDirectory;
+        String uiProcessBundleResourcePath;
+
+#if PLATFORM(IOS)
+        String cookieStorageDirectory;
+        String containerCachesDirectory;
+        String containerTemporaryDirectory;
+#endif
+    };
+    Paths m_resolvedPaths;
 };
 
 template<typename T>

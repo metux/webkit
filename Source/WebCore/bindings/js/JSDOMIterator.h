@@ -119,7 +119,7 @@ private:
 
     static void destroy(JSC::JSCell*);
 
-    Optional<typename DOMWrapped::Iterator> m_iterator;
+    std::optional<typename DOMWrapped::Iterator> m_iterator;
     IterationKind m_kind;
 };
 
@@ -225,7 +225,7 @@ template<typename JSIterator> JSC::JSValue iteratorForEach(JSC::ExecState& state
 template<typename JSWrapper, typename IteratorTraits>
 void JSDOMIterator<JSWrapper, IteratorTraits>::destroy(JSCell* cell)
 {
-    JSDOMIterator<JSWrapper, IteratorTraits>* thisObject = JSC::jsCast<JSDOMIterator<JSWrapper, IteratorTraits>*>(cell);
+    JSDOMIterator<JSWrapper, IteratorTraits>* thisObject = static_cast<JSDOMIterator<JSWrapper, IteratorTraits>*>(cell);
     thisObject->JSDOMIterator<JSWrapper, IteratorTraits>::~JSDOMIterator();
 }
 
@@ -236,7 +236,7 @@ JSC::JSValue JSDOMIterator<JSWrapper, IteratorTraits>::next(JSC::ExecState& stat
         auto iteratorValue = m_iterator->next();
         if (iteratorValue)
             return createIteratorResultObject(&state, asJS(state, iteratorValue), false);
-        m_iterator = Nullopt;
+        m_iterator = std::nullopt;
     }
     return createIteratorResultObject(&state, JSC::jsUndefined(), true);
 }

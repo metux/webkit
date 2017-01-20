@@ -42,7 +42,9 @@
       <sub name="User content" link="webkit2gtk-4.0-WebKitUserContent.html"/>
       <sub name="WebKitNotification" link="WebKitNotification.html"/>
       <sub name="WebKitNotificationPermissionRequest" link="WebKitNotificationPermissionRequest.html"/>
+      <sub name="WebKitSecurityOrigin" link="WebKitSecurityOrigin.html"/>
       <sub name="WebKitWebsiteDataManager" link="WebKitWebsiteDataManager.html"/>
+      <sub name="WebKitNetworkProxySettings" link="WebKitNetworkProxySettings.html"/>
     </sub>
     <sub name="Web Extensions" link="ch02.html">
       <sub name="WebKitWebExtension" link="WebKitWebExtension.html"/>
@@ -73,6 +75,7 @@
     <keyword type="function" name="webkit_web_context_get_web_process_count_limit ()" link="WebKitWebContext.html#webkit-web-context-get-web-process-count-limit" since="2.10"/>
     <keyword type="function" name="webkit_web_context_set_web_process_count_limit ()" link="WebKitWebContext.html#webkit-web-context-set-web-process-count-limit" since="2.10"/>
     <keyword type="function" name="webkit_web_context_clear_cache ()" link="WebKitWebContext.html#webkit-web-context-clear-cache"/>
+    <keyword type="function" name="webkit_web_context_set_network_proxy_settings ()" link="WebKitWebContext.html#webkit-web-context-set-network-proxy-settings" since="2.16"/>
     <keyword type="function" name="webkit_web_context_download_uri ()" link="WebKitWebContext.html#webkit-web-context-download-uri"/>
     <keyword type="function" name="webkit_web_context_get_cookie_manager ()" link="WebKitWebContext.html#webkit-web-context-get-cookie-manager"/>
     <keyword type="function" name="webkit_web_context_get_favicon_database ()" link="WebKitWebContext.html#webkit-web-context-get-favicon-database"/>
@@ -96,15 +99,18 @@
     <keyword type="function" name="webkit_web_context_allow_tls_certificate_for_host ()" link="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host" since="2.6"/>
     <keyword type="function" name="webkit_web_context_get_process_model ()" link="WebKitWebContext.html#webkit-web-context-get-process-model" since="2.4"/>
     <keyword type="function" name="webkit_web_context_set_process_model ()" link="WebKitWebContext.html#webkit-web-context-set-process-model" since="2.4"/>
+    <keyword type="function" name="webkit_web_context_initialize_notification_permissions ()" link="WebKitWebContext.html#webkit-web-context-initialize-notification-permissions" since="2.16"/>
     <keyword type="function" name="WebKitURISchemeRequestCallback ()" link="WebKitWebContext.html#WebKitURISchemeRequestCallback"/>
     <keyword type="function" name="webkit_web_context_register_uri_scheme ()" link="WebKitWebContext.html#webkit-web-context-register-uri-scheme"/>
     <keyword type="struct" name="struct WebKitWebContext" link="WebKitWebContext.html#WebKitWebContext-struct"/>
     <keyword type="enum" name="enum WebKitCacheModel" link="WebKitWebContext.html#WebKitCacheModel"/>
     <keyword type="enum" name="enum WebKitProcessModel" link="WebKitWebContext.html#WebKitProcessModel" since="2.4"/>
     <keyword type="enum" name="enum WebKitTLSErrorsPolicy" link="WebKitWebContext.html#WebKitTLSErrorsPolicy"/>
+    <keyword type="enum" name="enum WebKitNetworkProxyMode" link="WebKitWebContext.html#WebKitNetworkProxyMode" since="2.16"/>
     <keyword type="property" name="The “local-storage-directory” property" link="WebKitWebContext.html#WebKitWebContext--local-storage-directory"/>
     <keyword type="property" name="The “website-data-manager” property" link="WebKitWebContext.html#WebKitWebContext--website-data-manager"/>
     <keyword type="signal" name="The “download-started” signal" link="WebKitWebContext.html#WebKitWebContext-download-started"/>
+    <keyword type="signal" name="The “initialize-notification-permissions” signal" link="WebKitWebContext.html#WebKitWebContext-initialize-notification-permissions"/>
     <keyword type="signal" name="The “initialize-web-extensions” signal" link="WebKitWebContext.html#WebKitWebContext-initialize-web-extensions"/>
     <keyword type="function" name="webkit_web_view_new ()" link="WebKitWebView.html#webkit-web-view-new"/>
     <keyword type="function" name="webkit_web_view_new_with_context ()" link="WebKitWebView.html#webkit-web-view-new-with-context"/>
@@ -769,15 +775,27 @@
     <keyword type="function" name="webkit_notification_get_id ()" link="WebKitNotification.html#webkit-notification-get-id" since="2.8"/>
     <keyword type="function" name="webkit_notification_get_title ()" link="WebKitNotification.html#webkit-notification-get-title" since="2.8"/>
     <keyword type="function" name="webkit_notification_get_body ()" link="WebKitNotification.html#webkit-notification-get-body" since="2.8"/>
+    <keyword type="function" name="webkit_notification_get_tag ()" link="WebKitNotification.html#webkit-notification-get-tag" since="2.16"/>
     <keyword type="function" name="webkit_notification_close ()" link="WebKitNotification.html#webkit-notification-close" since="2.8"/>
     <keyword type="function" name="webkit_notification_clicked ()" link="WebKitNotification.html#webkit-notification-clicked" since="2.12"/>
     <keyword type="struct" name="struct WebKitNotification" link="WebKitNotification.html#WebKitNotification-struct"/>
     <keyword type="property" name="The “body” property" link="WebKitNotification.html#WebKitNotification--body"/>
     <keyword type="property" name="The “id” property" link="WebKitNotification.html#WebKitNotification--id"/>
+    <keyword type="property" name="The “tag” property" link="WebKitNotification.html#WebKitNotification--tag"/>
     <keyword type="property" name="The “title” property" link="WebKitNotification.html#WebKitNotification--title"/>
     <keyword type="signal" name="The “clicked” signal" link="WebKitNotification.html#WebKitNotification-clicked"/>
     <keyword type="signal" name="The “closed” signal" link="WebKitNotification.html#WebKitNotification-closed"/>
     <keyword type="struct" name="struct WebKitNotificationPermissionRequest" link="WebKitNotificationPermissionRequest.html#WebKitNotificationPermissionRequest-struct"/>
+    <keyword type="function" name="webkit_security_origin_new ()" link="WebKitSecurityOrigin.html#webkit-security-origin-new" since="2.16"/>
+    <keyword type="function" name="webkit_security_origin_new_for_uri ()" link="WebKitSecurityOrigin.html#webkit-security-origin-new-for-uri" since="2.16"/>
+    <keyword type="function" name="webkit_security_origin_ref ()" link="WebKitSecurityOrigin.html#webkit-security-origin-ref" since="2.16"/>
+    <keyword type="function" name="webkit_security_origin_unref ()" link="WebKitSecurityOrigin.html#webkit-security-origin-unref" since="2.16"/>
+    <keyword type="function" name="webkit_security_origin_get_protocol ()" link="WebKitSecurityOrigin.html#webkit-security-origin-get-protocol" since="2.16"/>
+    <keyword type="function" name="webkit_security_origin_get_host ()" link="WebKitSecurityOrigin.html#webkit-security-origin-get-host" since="2.16"/>
+    <keyword type="function" name="webkit_security_origin_get_port ()" link="WebKitSecurityOrigin.html#webkit-security-origin-get-port" since="2.16"/>
+    <keyword type="function" name="webkit_security_origin_is_opaque ()" link="WebKitSecurityOrigin.html#webkit-security-origin-is-opaque" since="2.16"/>
+    <keyword type="function" name="webkit_security_origin_to_string ()" link="WebKitSecurityOrigin.html#webkit-security-origin-to-string" since="2.16"/>
+    <keyword type="struct" name="WebKitSecurityOrigin" link="WebKitSecurityOrigin.html#WebKitSecurityOrigin-struct"/>
     <keyword type="function" name="webkit_website_data_manager_new ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-new" since="2.10"/>
     <keyword type="function" name="webkit_website_data_manager_get_base_data_directory ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-base-data-directory" since="2.10"/>
     <keyword type="function" name="webkit_website_data_manager_get_base_cache_directory ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-base-cache-directory" since="2.10"/>
@@ -794,6 +812,11 @@
     <keyword type="property" name="The “local-storage-directory” property" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--local-storage-directory"/>
     <keyword type="property" name="The “offline-application-cache-directory” property" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--offline-application-cache-directory"/>
     <keyword type="property" name="The “websql-directory” property" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--websql-directory"/>
+    <keyword type="function" name="webkit_network_proxy_settings_new ()" link="WebKitNetworkProxySettings.html#webkit-network-proxy-settings-new" since="2.16"/>
+    <keyword type="function" name="webkit_network_proxy_settings_copy ()" link="WebKitNetworkProxySettings.html#webkit-network-proxy-settings-copy" since="2.16"/>
+    <keyword type="function" name="webkit_network_proxy_settings_free ()" link="WebKitNetworkProxySettings.html#webkit-network-proxy-settings-free" since="2.16"/>
+    <keyword type="function" name="webkit_network_proxy_settings_add_proxy_for_scheme ()" link="WebKitNetworkProxySettings.html#webkit-network-proxy-settings-add-proxy-for-scheme" since="2.16"/>
+    <keyword type="struct" name="WebKitNetworkProxySettings" link="WebKitNetworkProxySettings.html#WebKitNetworkProxySettings-struct"/>
     <keyword type="function" name="WebKitWebExtensionInitializeFunction ()" link="WebKitWebExtension.html#WebKitWebExtensionInitializeFunction"/>
     <keyword type="function" name="WebKitWebExtensionInitializeWithUserDataFunction ()" link="WebKitWebExtension.html#WebKitWebExtensionInitializeWithUserDataFunction" since="2.4"/>
     <keyword type="function" name="webkit_web_extension_get_page ()" link="WebKitWebExtension.html#webkit-web-extension-get-page"/>
@@ -843,6 +866,9 @@
     <keyword type="constant" name="WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES" link="WebKitWebContext.html#WEBKIT-PROCESS-MODEL-MULTIPLE-SECONDARY-PROCESSES:CAPS"/>
     <keyword type="constant" name="WEBKIT_TLS_ERRORS_POLICY_IGNORE" link="WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-IGNORE:CAPS"/>
     <keyword type="constant" name="WEBKIT_TLS_ERRORS_POLICY_FAIL" link="WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-FAIL:CAPS"/>
+    <keyword type="constant" name="WEBKIT_NETWORK_PROXY_MODE_DEFAULT" link="WebKitWebContext.html#WEBKIT-NETWORK-PROXY-MODE-DEFAULT:CAPS"/>
+    <keyword type="constant" name="WEBKIT_NETWORK_PROXY_MODE_NO_PROXY" link="WebKitWebContext.html#WEBKIT-NETWORK-PROXY-MODE-NO-PROXY:CAPS"/>
+    <keyword type="constant" name="WEBKIT_NETWORK_PROXY_MODE_CUSTOM" link="WebKitWebContext.html#WEBKIT-NETWORK-PROXY-MODE-CUSTOM:CAPS"/>
     <keyword type="constant" name="WEBKIT_LOAD_STARTED" link="WebKitWebView.html#WEBKIT-LOAD-STARTED:CAPS"/>
     <keyword type="constant" name="WEBKIT_LOAD_REDIRECTED" link="WebKitWebView.html#WEBKIT-LOAD-REDIRECTED:CAPS"/>
     <keyword type="constant" name="WEBKIT_LOAD_COMMITTED" link="WebKitWebView.html#WEBKIT-LOAD-COMMITTED:CAPS"/>
