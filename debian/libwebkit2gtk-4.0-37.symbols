@@ -1507,10 +1507,17 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_navigation_type_get_type@Base 2.5.3
  webkit_network_error_get_type@Base 2.5.3
  webkit_network_error_quark@Base 2.5.3
+ webkit_network_proxy_mode_get_type@Base 2.15.3
+ webkit_network_proxy_settings_add_proxy_for_scheme@Base 2.15.3
+ webkit_network_proxy_settings_copy@Base 2.15.3
+ webkit_network_proxy_settings_free@Base 2.15.3
+ webkit_network_proxy_settings_get_type@Base 2.15.3
+ webkit_network_proxy_settings_new@Base 2.15.3
  webkit_notification_clicked@Base 2.12.0
  webkit_notification_close@Base 2.8.1
  webkit_notification_get_body@Base 2.8.1
  webkit_notification_get_id@Base 2.8.1
+ webkit_notification_get_tag@Base 2.15.3
  webkit_notification_get_title@Base 2.8.1
  webkit_notification_get_type@Base 2.8.1
  webkit_notification_permission_request_get_type@Base 2.8.1
@@ -1571,6 +1578,16 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_security_manager_uri_scheme_is_local@Base 2.5.3
  webkit_security_manager_uri_scheme_is_no_access@Base 2.5.3
  webkit_security_manager_uri_scheme_is_secure@Base 2.5.3
+ webkit_security_origin_get_host@Base 2.15.3
+ webkit_security_origin_get_port@Base 2.15.3
+ webkit_security_origin_get_protocol@Base 2.15.3
+ webkit_security_origin_get_type@Base 2.15.3
+ webkit_security_origin_is_opaque@Base 2.15.3
+ webkit_security_origin_new@Base 2.15.3
+ webkit_security_origin_new_for_uri@Base 2.15.3
+ webkit_security_origin_ref@Base 2.15.3
+ webkit_security_origin_to_string@Base 2.15.3
+ webkit_security_origin_unref@Base 2.15.3
  webkit_settings_get_allow_file_access_from_file_urls@Base 2.10.0
  webkit_settings_get_allow_modal_dialogs@Base 2.5.3
  webkit_settings_get_allow_universal_access_from_file_urls@Base 2.13.4
@@ -1743,6 +1760,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_web_context_get_type@Base 2.5.3
  webkit_web_context_get_web_process_count_limit@Base 2.10.0
  webkit_web_context_get_website_data_manager@Base 2.10.0
+ webkit_web_context_initialize_notification_permissions@Base 2.15.3
  webkit_web_context_new@Base 2.8.1
  webkit_web_context_new_with_website_data_manager@Base 2.10.0
  webkit_web_context_prefetch_dns@Base 2.5.3
@@ -1751,6 +1769,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_web_context_set_cache_model@Base 2.5.3
  webkit_web_context_set_disk_cache_directory@Base 2.5.3
  webkit_web_context_set_favicon_database_directory@Base 2.5.3
+ webkit_web_context_set_network_proxy_settings@Base 2.15.3
  webkit_web_context_set_preferred_languages@Base 2.5.3
  webkit_web_context_set_process_model@Base 2.5.3
  webkit_web_context_set_spell_checking_enabled@Base 2.5.3
