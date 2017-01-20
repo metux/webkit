@@ -860,6 +860,7 @@ private:
             break;
         }
             
+        case ArraySlice:
         case NewArrayWithSpread:
         case NewArray:
         case NewArrayWithSize:
@@ -1012,6 +1013,8 @@ private:
         case PhantomCreateActivation:
         case PhantomDirectArguments:
         case PhantomCreateRest:
+        case PhantomSpread:
+        case PhantomNewArrayWithSpread:
         case PhantomClonedArguments:
         case GetMyArgumentByVal:
         case GetMyArgumentByValOutOfBounds:
@@ -1103,6 +1106,7 @@ private:
         case LoadVarargs:
         case ForwardVarargs:
         case PutDynamicVar:
+        case NukeStructureAndSetButterfly:
             break;
             
         // This gets ignored because it only pretends to produce a value.

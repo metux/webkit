@@ -42,7 +42,6 @@
 #include "Document.h"
 #include "JSDOMWindow.h"
 #include "Logging.h"
-#include "Page.h"
 #include "SQLError.h"
 #include "SQLTransaction.h"
 #include "SQLTransactionCallback.h"
@@ -422,7 +421,7 @@ ExceptionOr<void> Database::performOpenAndVerify(bool shouldSetVersionInNewDatab
         return Exception { INVALID_STATE_ERR, "unable to open database, version mismatch, '" + m_expectedVersion + "' does not match the currentVersion of '" + currentVersion + "'" };
     }
 
-    m_sqliteDatabase.setAuthorizer(m_databaseAuthorizer.ptr());
+    m_sqliteDatabase.setAuthorizer(m_databaseAuthorizer.get());
 
     DatabaseTracker::singleton().addOpenDatabase(*this);
     m_opened = true;

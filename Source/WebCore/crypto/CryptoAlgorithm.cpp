@@ -42,7 +42,22 @@ void CryptoAlgorithm::decrypt(std::unique_ptr<CryptoAlgorithmParameters>&&, Ref<
     exceptionCallback(NOT_SUPPORTED_ERR);
 }
 
-void CryptoAlgorithm::generateKey(const std::unique_ptr<CryptoAlgorithmParameters>&&, bool, CryptoKeyUsageBitmap, KeyOrKeyPairCallback&&, ExceptionCallback&& exceptionCallback, ScriptExecutionContext&)
+void CryptoAlgorithm::sign(Ref<CryptoKey>&&, Vector<uint8_t>&&, VectorCallback&&, ExceptionCallback&& exceptionCallback, ScriptExecutionContext&, WorkQueue&)
+{
+    exceptionCallback(NOT_SUPPORTED_ERR);
+}
+
+void CryptoAlgorithm::verify(Ref<CryptoKey>&&, Vector<uint8_t>&&, Vector<uint8_t>&&, BoolCallback&&, ExceptionCallback&& exceptionCallback, ScriptExecutionContext&, WorkQueue&)
+{
+    exceptionCallback(NOT_SUPPORTED_ERR);
+}
+
+void CryptoAlgorithm::digest(Vector<uint8_t>&&, VectorCallback&&, ExceptionCallback&& exceptionCallback, ScriptExecutionContext&, WorkQueue&)
+{
+    exceptionCallback(NOT_SUPPORTED_ERR);
+}
+
+void CryptoAlgorithm::generateKey(const CryptoAlgorithmParameters&, bool, CryptoKeyUsageBitmap, KeyOrKeyPairCallback&&, ExceptionCallback&& exceptionCallback, ScriptExecutionContext&)
 {
     exceptionCallback(NOT_SUPPORTED_ERR);
 }
@@ -53,6 +68,16 @@ void CryptoAlgorithm::importKey(SubtleCrypto::KeyFormat, KeyData&&, const std::u
 }
 
 void CryptoAlgorithm::exportKey(SubtleCrypto::KeyFormat, Ref<CryptoKey>&&, KeyDataCallback&&, ExceptionCallback&& exceptionCallback)
+{
+    exceptionCallback(NOT_SUPPORTED_ERR);
+}
+
+void CryptoAlgorithm::wrapKey(Ref<CryptoKey>&&, Vector<uint8_t>&&, VectorCallback&&, ExceptionCallback&& exceptionCallback)
+{
+    exceptionCallback(NOT_SUPPORTED_ERR);
+}
+
+void CryptoAlgorithm::unwrapKey(Ref<CryptoKey>&&, Vector<uint8_t>&&, VectorCallback&&, ExceptionCallback&& exceptionCallback)
 {
     exceptionCallback(NOT_SUPPORTED_ERR);
 }

@@ -30,13 +30,11 @@
 
 #include "Logging.h"
 #include "NetworkCacheCoders.h"
-#include "NetworkCacheDecoder.h"
-#include "NetworkCacheEncoder.h"
 
 namespace WebKit {
 namespace NetworkCache {
 
-void SubresourceInfo::encode(Encoder& encoder) const
+void SubresourceInfo::encode(WTF::Persistence::Encoder& encoder) const
 {
     encoder << m_isTransient;
 
@@ -48,7 +46,7 @@ void SubresourceInfo::encode(Encoder& encoder) const
     encoder << m_requestHeaders;
 }
 
-bool SubresourceInfo::decode(Decoder& decoder, SubresourceInfo& info)
+bool SubresourceInfo::decode(WTF::Persistence::Decoder& decoder, SubresourceInfo& info)
 {
     if (!decoder.decode(info.m_isTransient))
         return false;
@@ -67,19 +65,19 @@ bool SubresourceInfo::decode(Decoder& decoder, SubresourceInfo& info)
 
 Storage::Record SubresourcesEntry::encodeAsStorageRecord() const
 {
-    Encoder encoder;
+    WTF::Persistence::Encoder encoder;
     encoder << m_subresources;
 
     encoder.encodeChecksum();
 
-    return { m_key, m_timeStamp, { encoder.buffer(), encoder.bufferSize() } , { } };
+    return { m_key, m_timeStamp, { encoder.buffer(), encoder.bufferSize() }, { }, { }};
 }
 
 std::unique_ptr<SubresourcesEntry> SubresourcesEntry::decodeStorageRecord(const Storage::Record& storageEntry)
 {
     auto entry = std::make_unique<SubresourcesEntry>(storageEntry);
 
-    Decoder decoder(storageEntry.header.data(), storageEntry.header.size());
+    WTF::Persistence::Decoder decoder(storageEntry.header.data(), storageEntry.header.size());
     if (!decoder.decode(entry->m_subresources))
         return nullptr;
 

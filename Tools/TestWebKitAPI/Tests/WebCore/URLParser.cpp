@@ -24,6 +24,7 @@
  */
 
 #include "config.h"
+#include "WTFStringUtilities.h"
 #include <WebCore/URLParser.h>
 #include <wtf/MainThread.h>
 #include <wtf/text/StringBuilder.h>
@@ -98,7 +99,7 @@ static void checkURL(const String& urlString, const ExpectedParts& parts, TestTa
     EXPECT_TRUE(eq(parts.user, url.user()));
     EXPECT_TRUE(eq(parts.password, url.pass()));
     EXPECT_TRUE(eq(parts.host, url.host()));
-    EXPECT_EQ(parts.port, url.port().valueOr(0));
+    EXPECT_EQ(parts.port, url.port().value_or(0));
     EXPECT_TRUE(eq(parts.path, url.path()));
     EXPECT_TRUE(eq(parts.query, url.query()));
     EXPECT_TRUE(eq(parts.fragment, url.fragmentIdentifier()));
@@ -108,7 +109,7 @@ static void checkURL(const String& urlString, const ExpectedParts& parts, TestTa
     EXPECT_TRUE(eq(parts.user, oldURL.user()));
     EXPECT_TRUE(eq(parts.password, oldURL.pass()));
     EXPECT_TRUE(eq(parts.host, oldURL.host()));
-    EXPECT_EQ(parts.port, oldURL.port().valueOr(0));
+    EXPECT_EQ(parts.port, oldURL.port().value_or(0));
     EXPECT_TRUE(eq(parts.path, oldURL.path()));
     EXPECT_TRUE(eq(parts.query, oldURL.query()));
     EXPECT_TRUE(eq(parts.fragment, oldURL.fragmentIdentifier()));
@@ -142,7 +143,7 @@ static void checkRelativeURL(const String& urlString, const String& baseURLStrin
     EXPECT_TRUE(eq(parts.user, url.user()));
     EXPECT_TRUE(eq(parts.password, url.pass()));
     EXPECT_TRUE(eq(parts.host, url.host()));
-    EXPECT_EQ(parts.port, url.port().valueOr(0));
+    EXPECT_EQ(parts.port, url.port().value_or(0));
     EXPECT_TRUE(eq(parts.path, url.path()));
     EXPECT_TRUE(eq(parts.query, url.query()));
     EXPECT_TRUE(eq(parts.fragment, url.fragmentIdentifier()));
@@ -152,7 +153,7 @@ static void checkRelativeURL(const String& urlString, const String& baseURLStrin
     EXPECT_TRUE(eq(parts.user, oldURL.user()));
     EXPECT_TRUE(eq(parts.password, oldURL.pass()));
     EXPECT_TRUE(eq(parts.host, oldURL.host()));
-    EXPECT_EQ(parts.port, oldURL.port().valueOr(0));
+    EXPECT_EQ(parts.port, oldURL.port().value_or(0));
     EXPECT_TRUE(eq(parts.path, oldURL.path()));
     EXPECT_TRUE(eq(parts.query, oldURL.query()));
     EXPECT_TRUE(eq(parts.fragment, oldURL.fragmentIdentifier()));
@@ -187,7 +188,7 @@ static void checkURLDifferences(const String& urlString, const ExpectedParts& pa
     EXPECT_TRUE(eq(partsNew.user, url.user()));
     EXPECT_TRUE(eq(partsNew.password, url.pass()));
     EXPECT_TRUE(eq(partsNew.host, url.host()));
-    EXPECT_EQ(partsNew.port, url.port().valueOr(0));
+    EXPECT_EQ(partsNew.port, url.port().value_or(0));
     EXPECT_TRUE(eq(partsNew.path, url.path()));
     EXPECT_TRUE(eq(partsNew.query, url.query()));
     EXPECT_TRUE(eq(partsNew.fragment, url.fragmentIdentifier()));
@@ -197,7 +198,7 @@ static void checkURLDifferences(const String& urlString, const ExpectedParts& pa
     EXPECT_TRUE(eq(partsOld.user, oldURL.user()));
     EXPECT_TRUE(eq(partsOld.password, oldURL.pass()));
     EXPECT_TRUE(eq(partsOld.host, oldURL.host()));
-    EXPECT_EQ(partsOld.port, oldURL.port().valueOr(0));
+    EXPECT_EQ(partsOld.port, oldURL.port().value_or(0));
     EXPECT_TRUE(eq(partsOld.path, oldURL.path()));
     EXPECT_TRUE(eq(partsOld.query, oldURL.query()));
     EXPECT_TRUE(eq(partsOld.fragment, oldURL.fragmentIdentifier()));
@@ -232,7 +233,7 @@ static void checkRelativeURLDifferences(const String& urlString, const String& b
     EXPECT_TRUE(eq(partsNew.user, url.user()));
     EXPECT_TRUE(eq(partsNew.password, url.pass()));
     EXPECT_TRUE(eq(partsNew.host, url.host()));
-    EXPECT_EQ(partsNew.port, url.port().valueOr(0));
+    EXPECT_EQ(partsNew.port, url.port().value_or(0));
     EXPECT_TRUE(eq(partsNew.path, url.path()));
     EXPECT_TRUE(eq(partsNew.query, url.query()));
     EXPECT_TRUE(eq(partsNew.fragment, url.fragmentIdentifier()));
@@ -242,7 +243,7 @@ static void checkRelativeURLDifferences(const String& urlString, const String& b
     EXPECT_TRUE(eq(partsOld.user, oldURL.user()));
     EXPECT_TRUE(eq(partsOld.password, oldURL.pass()));
     EXPECT_TRUE(eq(partsOld.host, oldURL.host()));
-    EXPECT_EQ(partsOld.port, oldURL.port().valueOr(0));
+    EXPECT_EQ(partsOld.port, oldURL.port().value_or(0));
     EXPECT_TRUE(eq(partsOld.path, oldURL.path()));
     EXPECT_TRUE(eq(partsOld.query, oldURL.query()));
     EXPECT_TRUE(eq(partsOld.fragment, oldURL.fragmentIdentifier()));
@@ -282,7 +283,7 @@ static void checkURL(const String& urlString, const TextEncoding& encoding, cons
     EXPECT_TRUE(eq(parts.user, url.user()));
     EXPECT_TRUE(eq(parts.password, url.pass()));
     EXPECT_TRUE(eq(parts.host, url.host()));
-    EXPECT_EQ(parts.port, url.port().valueOr(0));
+    EXPECT_EQ(parts.port, url.port().value_or(0));
     EXPECT_TRUE(eq(parts.path, url.path()));
     EXPECT_TRUE(eq(parts.query, url.query()));
     EXPECT_TRUE(eq(parts.fragment, url.fragmentIdentifier()));
@@ -308,7 +309,7 @@ static void checkURL(const String& urlString, const String& baseURLString, const
     EXPECT_TRUE(eq(parts.user, url.user()));
     EXPECT_TRUE(eq(parts.password, url.pass()));
     EXPECT_TRUE(eq(parts.host, url.host()));
-    EXPECT_EQ(parts.port, url.port().valueOr(0));
+    EXPECT_EQ(parts.port, url.port().value_or(0));
     EXPECT_TRUE(eq(parts.path, url.path()));
     EXPECT_TRUE(eq(parts.query, url.query()));
     EXPECT_TRUE(eq(parts.fragment, url.fragmentIdentifier()));
@@ -323,16 +324,6 @@ static void checkURL(const String& urlString, const String& baseURLString, const
             parts.isInvalid() ? invalidParts(urlStringWithTab) : parts,
             TestTabs::No);
     }
-}
-
-template<size_t length>
-static String utf16String(const char16_t (&url)[length])
-{
-    StringBuilder builder;
-    builder.reserveCapacity(length - 1);
-    for (size_t i = 0; i < length - 1; ++i)
-        builder.append(static_cast<UChar>(url[i]));
-    return builder.toString();
 }
 
 TEST_F(URLParserTest, Basic)
@@ -634,6 +625,11 @@ TEST_F(URLParserTest, ParseRelative)
         {"foo", "", "", "", 0, "", "", "", "foo://"},
         {"foo", "", "", "", 0, "//", "", "", "foo://"});
     checkRelativeURL(utf16String(u"#β"), "http://example.org/foo/bar", {"http", "", "", "example.org", 0, "/foo/bar", "", "%CE%B2", "http://example.org/foo/bar#%CE%B2"});
+    checkRelativeURL("index.html", "applewebdata://Host/", {"applewebdata", "", "", "Host", 0, "/index.html", "", "", "applewebdata://Host/index.html"});
+    checkRelativeURL("index.html", "applewebdata://Host", {"applewebdata", "", "", "Host", 0, "/index.html", "", "", "applewebdata://Host/index.html"});
+    checkRelativeURL("", "applewebdata://Host", {"applewebdata", "", "", "Host", 0, "", "", "", "applewebdata://Host"});
+    checkRelativeURL("?query", "applewebdata://Host", {"applewebdata", "", "", "Host", 0, "", "query", "", "applewebdata://Host?query"});
+    checkRelativeURL("#fragment", "applewebdata://Host", {"applewebdata", "", "", "Host", 0, "", "", "fragment", "applewebdata://Host#fragment"});
 
     // The checking of slashes in SpecialAuthoritySlashes needed to get this to pass contradicts what is in the spec,
     // but it is included in the web platform tests.

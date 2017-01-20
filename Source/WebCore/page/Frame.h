@@ -155,6 +155,8 @@ public:
     WEBCORE_EXPORT RenderView* contentRenderer() const; // Root of the render tree for the document contained in this frame.
     WEBCORE_EXPORT RenderWidget* ownerRenderer() const; // Renderer for the element that contains this frame.
 
+    bool documentIsBeingReplaced() const { return m_documentIsBeingReplaced; }
+
 // ======== All public functions below this point are candidates to move out of Frame into another class. ========
 
     void injectUserScripts(UserScriptInjectionTime);
@@ -162,7 +164,7 @@ public:
     WEBCORE_EXPORT String layerTreeAsText(LayerTreeFlags = 0) const;
     WEBCORE_EXPORT String trackedRepaintRectsAsText() const;
 
-    WEBCORE_EXPORT static Frame* frameForWidget(const Widget*);
+    WEBCORE_EXPORT static Frame* frameForWidget(const Widget&);
 
     Settings& settings() const { return *m_settings; }
 
@@ -318,6 +320,7 @@ private:
 
     int m_activeDOMObjectsAndAnimationsSuspendedCount;
     bool m_mainFrameWasDestroyed { false };
+    bool m_documentIsBeingReplaced { false };
 
 protected:
     std::unique_ptr<EventHandler> m_eventHandler;

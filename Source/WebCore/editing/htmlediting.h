@@ -114,7 +114,6 @@ Position previousVisuallyDistinctCandidate(const Position&);
 
 Position positionBeforeContainingSpecialElement(const Position&, HTMLElement** containingSpecialElement = nullptr);
 Position positionAfterContainingSpecialElement(const Position&, HTMLElement** containingSpecialElement = nullptr);
-Position positionOutsideContainingSpecialElement(const Position&, HTMLElement** containingSpecialElement = nullptr);
 
 Position firstPositionInOrBeforeNode(Node*);
 Position lastPositionInOrAfterNode(Node*);
@@ -200,7 +199,7 @@ const String& nonBreakingSpaceString();
 RenderBlock* rendererForCaretPainting(Node*);
 LayoutRect localCaretRectInRendererForCaretPainting(const VisiblePosition&, RenderBlock*&);
 LayoutRect localCaretRectInRendererForRect(LayoutRect&, Node*, RenderObject*, RenderBlock*&);
-IntRect absoluteBoundsForLocalCaretRect(RenderBlock* rendererForCaretPainting, const LayoutRect&);
+IntRect absoluteBoundsForLocalCaretRect(RenderBlock* rendererForCaretPainting, const LayoutRect&, bool* insideFixed = nullptr);
 
 // -------------------------------------------------------------------------
 

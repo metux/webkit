@@ -26,8 +26,6 @@
 #include "config.h"
 #include "ScriptedAnimationController.h"
 
-#if ENABLE(REQUEST_ANIMATION_FRAME)
-
 #include "DOMWindow.h"
 #include "DisplayRefreshMonitor.h"
 #include "DisplayRefreshMonitorManager.h"
@@ -115,12 +113,12 @@ bool ScriptedAnimationController::isThrottled() const
 #endif
 }
 
-ScriptedAnimationController::CallbackId ScriptedAnimationController::registerCallback(PassRefPtr<RequestAnimationFrameCallback> callback)
+ScriptedAnimationController::CallbackId ScriptedAnimationController::registerCallback(Ref<RequestAnimationFrameCallback>&& callback)
 {
     ScriptedAnimationController::CallbackId id = ++m_nextCallbackId;
     callback->m_firedOrCancelled = false;
     callback->m_id = id;
-    m_callbacks.append(callback);
+    m_callbacks.append(WTFMove(callback));
 
     InspectorInstrumentation::didRequestAnimationFrame(m_document, id);
 
@@ -253,7 +251,4 @@ RefPtr<DisplayRefreshMonitor> ScriptedAnimationController::createDisplayRefreshM
 }
 #endif
 
-
 }
-
-#endif

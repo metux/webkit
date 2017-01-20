@@ -96,6 +96,7 @@ private:
 
     Node::InsertionNotificationRequest insertedInto(ContainerNode& insertionPoint) override;
     void removedFrom(ContainerNode& insertionPoint) override;
+    void didMoveToNewDocument(Document& oldDocument) override;
 
     bool m_resetStyleInheritance { false };
     ShadowRootMode m_type { ShadowRootMode::UserAgent };
@@ -109,7 +110,7 @@ private:
 
 inline Element* ShadowRoot::activeElement() const
 {
-    return treeScope().focusedElement();
+    return treeScope().focusedElementInScope();
 }
 
 inline ShadowRoot* Node::shadowRoot() const

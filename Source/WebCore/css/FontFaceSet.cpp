@@ -133,7 +133,7 @@ void FontFaceSet::load(const String& font, const String& text, LoadPromise&& pro
     auto matchingFaces = matchingFacesResult.releaseReturnValue();
 
     if (matchingFaces.isEmpty()) {
-        promise.resolve(Vector<RefPtr<FontFace>>());
+        promise.resolve({ });
         return;
     }
 
@@ -204,7 +204,7 @@ void FontFaceSet::startedLoading()
 void FontFaceSet::completedLoading()
 {
     if (m_promise)
-        std::exchange(m_promise, Nullopt)->resolve(*this);
+        std::exchange(m_promise, std::nullopt)->resolve(*this);
     m_isReady = true;
 }
 

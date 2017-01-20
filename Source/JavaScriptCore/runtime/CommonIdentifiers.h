@@ -40,7 +40,6 @@
     macro(Date) \
     macro(DateTimeFormat) \
     macro(DocumentTimeline) \
-    macro(DOMIterator) \
     macro(Error) \
     macro(EvalError) \
     macro(Function) \
@@ -64,6 +63,8 @@
     macro(IDBVersionChangeEvent) \
     macro(Infinity) \
     macro(InputEvent) \
+    macro(IntersectionObserver) \
+    macro(IntersectionObserverEntry) \
     macro(Intl) \
     macro(JSON) \
     macro(Loader) \
@@ -76,8 +77,11 @@
     macro(MediaKeyStatusMap) \
     macro(MediaKeySystemAccess) \
     macro(MediaKeys) \
+    macro(MediaStreamEvent) \
     macro(ModernMediaControls) \
     macro(NaN) \
+    macro(NavigatorMediaDevices) \
+    macro(NavigatorUserMedia) \
     macro(Number) \
     macro(NumberFormat) \
     macro(Object) \
@@ -92,6 +96,14 @@
     macro(RegExp) \
     macro(Response) \
     macro(Request) \
+    macro(RTCDTMFToneChangeEvent) \
+    macro(RTCIceCandidate) \
+    macro(RTCPeerConnection) \
+    macro(RTCRtpReceiver) \
+    macro(RTCRtpSender) \
+    macro(RTCRtpTransceiver) \
+    macro(RTCSessionDescription) \
+    macro(RTCTrackEvent) \
     macro(Set)\
     macro(SetIterator)\
     macro(ShadowRoot) \

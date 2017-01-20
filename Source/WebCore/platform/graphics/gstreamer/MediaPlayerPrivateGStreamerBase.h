@@ -166,12 +166,9 @@ protected:
 
     virtual bool handleSyncMessage(GstMessage*);
 
-    void triggerDrain();
-
     void triggerRepaint(GstSample*);
     void repaint();
 
-    static void drainCallback(MediaPlayerPrivateGStreamerBase*);
     static void repaintCallback(MediaPlayerPrivateGStreamerBase*, GstSample*);
 
     void notifyPlayerOfVolumeChange();
@@ -208,6 +205,7 @@ protected:
 #endif
     mutable FloatSize m_videoSize;
     bool m_usingFallbackVideoSink;
+    bool m_renderingCanBeAccelerated { false };
 #if USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS_MULTIPROCESS)
     void updateTexture(BitmapTextureGL&, GstVideoInfo&);
 #endif

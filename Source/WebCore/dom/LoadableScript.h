@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "CachedScriptFetcher.h"
 #include <runtime/ConsoleTypes.h>
 #include <wtf/HashCountedSet.h>
 #include <wtf/RefCounted.h>
@@ -35,7 +36,7 @@ namespace WebCore {
 class LoadableScriptClient;
 class ScriptElement;
 
-class LoadableScript : public RefCounted<LoadableScript> {
+class LoadableScript : public CachedScriptFetcher {
 public:
     enum class ErrorType {
         CachedScript,
@@ -51,13 +52,13 @@ public:
 
     struct Error {
         ErrorType type;
-        Optional<ConsoleMessage> consoleMessage;
+        std::optional<ConsoleMessage> consoleMessage;
     };
 
     virtual ~LoadableScript() { }
 
     virtual bool isLoaded() const = 0;
-    virtual Optional<Error> error() const = 0;
+    virtual std::optional<Error> error() const = 0;
     virtual bool wasCanceled() const = 0;
 
     virtual void execute(ScriptElement&) = 0;
@@ -69,6 +70,11 @@ public:
     virtual bool isModuleScript() const { return false; }
 
 protected:
+    LoadableScript(const String& nonce, const String& crossOriginMode, const String& charset, const AtomicString& initiatorName, bool isInUserAgentShadowTree)
+        : CachedScriptFetcher(nonce, crossOriginMode, charset, initiatorName, isInUserAgentShadowTree)
+    {
+    }
+
     void notifyClientFinished();
 
 private:

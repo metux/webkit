@@ -41,7 +41,6 @@
 #include <JavaScriptCore/StrongInlines.h>
 #include <WebCore/DOMWrapperWorld.h>
 #include <WebCore/Frame.h>
-#include <WebCore/Page.h>
 #include <WebCore/ScriptController.h>
 #include <wtf/NeverDestroyed.h>
 
@@ -168,7 +167,7 @@ void NPRuntimeObjectMap::convertJSValueToNPVariant(ExecState* exec, JSValue valu
     }
 
     if (value.isString()) {
-        NPString npString = createNPString(value.toString(exec)->value(exec).utf8());
+        NPString npString = createNPString(asString(value)->value(exec).utf8());
         STRINGN_TO_NPVARIANT(npString.UTF8Characters, npString.UTF8Length, variant);
         return;
     }
@@ -193,7 +192,7 @@ bool NPRuntimeObjectMap::evaluate(NPObject* npObject, const String& scriptString
     JSLockHolder lock(exec);
     JSValue thisValue = getOrCreateJSObject(globalObject.get(), npObject);
 
-    JSValue resultValue = JSC::evaluate(exec, makeSource(scriptString), thisValue);
+    JSValue resultValue = JSC::evaluate(exec, makeSource(scriptString, { }), thisValue);
 
     convertJSValueToNPVariant(exec, resultValue, *result);
     return true;
@@ -300,7 +299,7 @@ void NPRuntimeObjectMap::addToInvalidationQueue(NPObject* npObject)
 
 void NPRuntimeObjectMap::finalize(JSC::Handle<JSC::Unknown> handle, void* context)
 {
-    JSNPObject* object = jsCast<JSNPObject*>(handle.get().asCell());
+    JSNPObject* object = static_cast<JSNPObject*>(handle.get().asCell());
     weakRemove(m_jsNPObjects, static_cast<NPObject*>(context), object);
     addToInvalidationQueue(object->leakNPObject());
 }

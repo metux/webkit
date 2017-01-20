@@ -228,7 +228,7 @@ public:
 #endif
 
 #if PLATFORM(COCOA)
-    virtual std::unique_ptr<WebCore::ValidationBubble> createValidationBubble(const String& message) = 0;
+    virtual Ref<WebCore::ValidationBubble> createValidationBubble(const String& message) = 0;
 #endif
 
 #if PLATFORM(COCOA)
@@ -249,7 +249,7 @@ public:
     virtual void showCorrectionPanel(WebCore::AlternativeTextType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings) = 0;
     virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingAlternativeText) = 0;
     virtual String dismissCorrectionPanelSoon(WebCore::ReasonForDismissingAlternativeText) = 0;
-    virtual void recordAutocorrectionResponse(WebCore::AutocorrectionResponseType, const String& replacedString, const String& replacementString) = 0;
+    virtual void recordAutocorrectionResponse(WebCore::AutocorrectionResponse, const String& replacedString, const String& replacementString) = 0;
     virtual void recommendedScrollbarStyleDidChange(WebCore::ScrollbarStyle) = 0;
     virtual void removeNavigationGestureSnapshot() = 0;
     virtual void handleControlledElementIDResponse(const String&) = 0;

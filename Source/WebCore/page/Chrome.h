@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2017 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
  * Copyright (C) 2012, Samsung Electronics. All rights reserved.
  *
@@ -28,9 +28,7 @@
 #include <wtf/RefPtr.h>
 
 #if PLATFORM(COCOA)
-#ifndef __OBJC__
-class NSView;
-#endif
+OBJC_CLASS NSView;
 #endif
 
 namespace WebCore {
@@ -87,9 +85,7 @@ public:
     void setCursor(const Cursor&) override;
     void setCursorHiddenUntilMouseMoves(bool) override;
 
-#if ENABLE(REQUEST_ANIMATION_FRAME)
     void scheduleAnimation() override;
-#endif
 
     PlatformDisplayID displayID() const override;
     void windowScreenDidChange(PlatformDisplayID) override;
@@ -158,8 +154,8 @@ public:
     std::unique_ptr<ColorChooser> createColorChooser(ColorChooserClient*, const Color& initialColor);
 #endif
 
-    void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
-    void loadIconForFiles(const Vector<String>&, FileIconLoader*);
+    void runOpenPanel(Frame&, FileChooser&);
+    void loadIconForFiles(const Vector<String>&, FileIconLoader&);
 
     void dispatchViewportPropertiesDidChange(const ViewportArguments&) const;
 

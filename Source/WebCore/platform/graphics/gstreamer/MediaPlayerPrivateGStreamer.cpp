@@ -272,7 +272,9 @@ void MediaPlayerPrivateGStreamer::load(const String& urlString)
 #if ENABLE(MEDIA_SOURCE)
 void MediaPlayerPrivateGStreamer::load(const String&, MediaSourcePrivateClient*)
 {
-    notImplemented();
+    // Properly fail so the global MediaPlayer tries to fallback to the next MediaPlayerPrivate.
+    m_networkState = MediaPlayer::FormatError;
+    m_player->networkStateChanged();
 }
 #endif
 
@@ -425,7 +427,7 @@ MediaTime MediaPlayerPrivateGStreamer::durationMediaTime() const
         return { };
 
     if (m_durationAtEOS)
-        return MediaTime::createWithFloat(m_durationAtEOS);
+        return MediaTime::createWithDouble(m_durationAtEOS);
 
     // The duration query would fail on a not-prerolled pipeline.
     if (GST_STATE(m_pipeline.get()) < GST_STATE_PAUSED)
@@ -2014,7 +2016,7 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
             g_object_set(m_pipeline.get(), "audio-filter", scale, nullptr);
     }
 
-    if (!m_player->client().mediaPlayerRenderingCanBeAccelerated(m_player)) {
+    if (!m_renderingCanBeAccelerated) {
         // If not using accelerated compositing, let GStreamer handle
         // the image-orientation tag.
         GstElement* videoFlip = gst_element_factory_make("videoflip", nullptr);

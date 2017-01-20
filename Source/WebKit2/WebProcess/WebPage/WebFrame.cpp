@@ -418,7 +418,7 @@ CertificateInfo WebFrame::certificateInfo() const
     if (!documentLoader)
         return { };
 
-    return documentLoader->response().certificateInfo().valueOrCompute([] { return CertificateInfo(); });
+    return valueOrCompute(documentLoader->response().certificateInfo(), [] { return CertificateInfo(); });
 }
 
 String WebFrame::innerText() const
@@ -482,7 +482,7 @@ bool WebFrame::allowsFollowingLink(const WebCore::URL& url) const
     if (!m_coreFrame)
         return true;
         
-    return m_coreFrame->document()->securityOrigin()->canDisplay(url);
+    return m_coreFrame->document()->securityOrigin().canDisplay(url);
 }
 
 JSGlobalContextRef WebFrame::jsContext()

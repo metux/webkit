@@ -57,16 +57,17 @@ public:
         std::chrono::system_clock::time_point timeStamp;
         Data header;
         Data body;
+        std::optional<SHA1::Digest> bodyHash;
     };
     // This may call completion handler synchronously on failure.
-    typedef std::function<bool (std::unique_ptr<Record>)> RetrieveCompletionHandler;
+    typedef Function<bool (std::unique_ptr<Record>)> RetrieveCompletionHandler;
     void retrieve(const Key&, unsigned priority, RetrieveCompletionHandler&&);
 
     typedef Function<void (const Data& mappedBody)> MappedBodyHandler;
     void store(const Record&, MappedBodyHandler&&);
 
     void remove(const Key&);
-    void clear(const String& type, std::chrono::system_clock::time_point modifiedSinceTime, std::function<void ()>&& completionHandler);
+    void clear(const String& type, std::chrono::system_clock::time_point modifiedSinceTime, Function<void ()>&& completionHandler);
 
     struct RecordInfo {
         size_t bodySize;
@@ -124,8 +125,8 @@ private:
     void dispatchPendingWriteOperations();
     void finishWriteOperation(WriteOperation&);
 
-    Optional<BlobStorage::Blob> storeBodyAsBlob(WriteOperation&);
-    Data encodeRecord(const Record&, Optional<BlobStorage::Blob>);
+    std::optional<BlobStorage::Blob> storeBodyAsBlob(WriteOperation&);
+    Data encodeRecord(const Record&, std::optional<BlobStorage::Blob>);
     void readRecord(ReadOperation&, const Data&);
 
     void updateFileModificationTime(const String& path);
@@ -179,7 +180,7 @@ private:
 };
 
 // FIXME: Remove, used by NetworkCacheStatistics only.
-using RecordFileTraverseFunction = std::function<void (const String& fileName, const String& hashString, const String& type, bool isBlob, const String& recordDirectoryPath)>;
+using RecordFileTraverseFunction = Function<void (const String& fileName, const String& hashString, const String& type, bool isBlob, const String& recordDirectoryPath)>;
 void traverseRecordsFiles(const String& recordsPath, const String& type, const RecordFileTraverseFunction&);
 
 }

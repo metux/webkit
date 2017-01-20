@@ -49,7 +49,7 @@ SymbolTableEntry& SymbolTableEntry::copySlow(const SymbolTableEntry& other)
 
 void SymbolTable::destroy(JSCell* cell)
 {
-    SymbolTable* thisObject = jsCast<SymbolTable*>(cell);
+    SymbolTable* thisObject = static_cast<SymbolTable*>(cell);
     thisObject->SymbolTable::~SymbolTable();
 }
 
@@ -101,11 +101,11 @@ void SymbolTable::visitChildren(JSCell* thisCell, SlotVisitor& visitor)
 {
     SymbolTable* thisSymbolTable = jsCast<SymbolTable*>(thisCell);
     
-    visitor.append(&thisSymbolTable->m_arguments);
-    visitor.append(&thisSymbolTable->m_singletonScope);
+    visitor.append(thisSymbolTable->m_arguments);
+    visitor.append(thisSymbolTable->m_singletonScope);
     
     if (thisSymbolTable->m_rareData)
-        visitor.append(&thisSymbolTable->m_rareData->m_codeBlock);
+        visitor.append(thisSymbolTable->m_rareData->m_codeBlock);
     
     // Save some memory. This is O(n) to rebuild and we do so on the fly.
     ConcurrentJSLocker locker(thisSymbolTable->m_lock);

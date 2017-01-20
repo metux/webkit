@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,22 +29,23 @@
 
 namespace JSC {
 
+// The CellState of a cell is a kind of hint about what the state of the cell is.
 enum class CellState : uint8_t {
-    // The object is either currently being scanned (anthracite) or it has finished being scanned
-    // (black). It could be scanned for the first time this GC, or the Nth time - if it's anthracite
-    // then the SlotVisitor knows. We explicitly say "anthracite or black" to emphasize the fact that
-    // this is no guarantee that we have finished scanning the object, unless you also know that all
-    // SlotVisitors are done.
-    AnthraciteOrBlack = 0,
+    // The object is either currently being scanned, or it has finished being scanned, or this
+    // is a full collection and it's actually a white object (you'd know because its mark bit
+    // would be clear).
+    PossiblyBlack = 0,
     
     // The object is in eden. During GC, this means that the object has not been marked yet.
-    NewWhite = 1,
+    DefinitelyWhite = 1,
 
-    // The object is grey - i.e. it will be scanned.
-    Grey = 2,
+    // This sorta means that the object is grey - i.e. it will be scanned. Or it could be white
+    // during a full collection if its mark bit is clear. That would happen if it had been black,
+    // got barriered, and we did a full collection.
+    PossiblyGrey = 2
 };
 
-static const unsigned blackThreshold = 0; // x <= blackThreshold means x is AnthraciteOrBlack.
+static const unsigned blackThreshold = 0; // x <= blackThreshold means x is PossiblyOldOrBlack.
 static const unsigned tautologicalThreshold = 100; // x <= tautologicalThreshold is always true.
 
 inline bool isWithinThreshold(CellState cellState, unsigned threshold)

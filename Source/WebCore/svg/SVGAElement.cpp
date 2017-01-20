@@ -25,7 +25,6 @@
 
 #include "Document.h"
 #include "EventHandler.h"
-#include "EventNames.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameLoaderTypes.h"
@@ -144,6 +143,8 @@ void SVGAElement::defaultEventHandler(Event& event)
 
             Frame* frame = document().frame();
             if (!frame)
+                return;
+            if (document().pageCacheState() != Document::NotInPageCache)
                 return;
             frame->loader().urlSelected(document().completeURL(url), target, &event, LockHistory::No, LockBackForwardList::No, MaybeSendReferrer, document().shouldOpenExternalURLsPolicyToPropagate());
             return;
