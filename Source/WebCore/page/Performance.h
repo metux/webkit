@@ -37,6 +37,8 @@
 #include "DOMWindowProperty.h"
 #include "EventTarget.h"
 #include "ExceptionOr.h"
+#include "GenericTaskQueue.h"
+#include <wtf/ListHashSet.h>
 
 namespace WebCore {
 
@@ -44,6 +46,7 @@ class Document;
 class LoadTiming;
 class PerformanceEntry;
 class PerformanceNavigation;
+class PerformanceObserver;
 class PerformanceTiming;
 class ResourceResponse;
 class URL;
@@ -67,18 +70,19 @@ public:
 
     void addResourceTiming(const String& initiatorName, Document*, const URL& originalURL, const ResourceResponse&, const LoadTiming&);
 
-    using RefCounted::ref;
-    using RefCounted::deref;
+    ExceptionOr<void> mark(const String& markName);
+    void clearMarks(const String& markName);
 
-#if ENABLE(USER_TIMING)
-    ExceptionOr<void> webkitMark(const String& markName);
-    void webkitClearMarks(const String& markName);
+    ExceptionOr<void> measure(const String& measureName, const String& startMark, const String& endMark);
+    void clearMeasures(const String& measureName);
 
-    ExceptionOr<void> webkitMeasure(const String& measureName, const String& startMark, const String& endMark);
-    void webkitClearMeasures(const String& measureName);
-#endif
+    void registerPerformanceObserver(PerformanceObserver&);
+    void unregisterPerformanceObserver(PerformanceObserver&);
 
     static double reduceTimeResolution(double seconds);
+
+    using RefCounted::ref;
+    using RefCounted::deref;
 
 private:
     explicit Performance(Frame&);
@@ -89,7 +93,9 @@ private:
     void refEventTarget() final { ref(); }
     void derefEventTarget() final { deref(); }
 
-    bool isResourceTimingBufferFull();
+    bool isResourceTimingBufferFull() const;
+
+    void queueEntry(PerformanceEntry&);
 
     mutable RefPtr<PerformanceNavigation> m_navigation;
     mutable RefPtr<PerformanceTiming> m_timing;
@@ -100,9 +106,10 @@ private:
 
     double m_referenceTime;
 
-#if ENABLE(USER_TIMING)
     std::unique_ptr<UserTiming> m_userTiming;
-#endif
+
+    GenericTaskQueue<Timer> m_performanceTimelineTaskQueue;
+    ListHashSet<RefPtr<PerformanceObserver>> m_observers;
 };
 
 }

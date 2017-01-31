@@ -25,9 +25,7 @@
 
 // This all-in-one cpp file cuts down on template bloat to allow us to build our Windows release build.
 
-#include "CachedModuleScript.cpp"
 #include "CachedModuleScriptLoader.cpp"
-#include "CallbackFunction.cpp"
 #include "DOMWrapperWorld.cpp"
 #include "GCController.cpp"
 #include "JSAnimationTimelineCustom.cpp"
@@ -47,6 +45,9 @@
 #include "JSSQLStatementErrorCallbackCustom.cpp"
 #include "JSCustomXPathNSResolver.cpp"
 #include "JSDOMBinding.cpp"
+#include "JSDOMBindingSecurity.cpp"
+#include "JSDOMConstructor.cpp"
+#include "JSDOMExceptionHandling.cpp"
 #include "JSDOMGlobalObject.cpp"
 #include "JSDOMGlobalObjectTask.cpp"
 #include "JSDOMPromise.cpp"
@@ -56,6 +57,7 @@
 #include "JSDOMWindowProperties.cpp"
 #include "JSDOMWindowShell.cpp"
 #include "JSDOMWrapper.cpp"
+#include "JSDOMWrapperCache.cpp"
 #include "JSDocumentCustom.cpp"
 #include "JSDocumentFragmentCustom.cpp"
 #include "JSElementCustom.cpp"

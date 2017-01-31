@@ -33,6 +33,7 @@
 #include "HitTestLocation.h"
 #include "HitTestRequest.h"
 #include "HitTestResult.h"
+#include "Hyphenation.h"
 #include "InlineTextBox.h"
 #include "LineWidth.h"
 #include "Logging.h"
@@ -76,15 +77,15 @@ enum AvoidanceReason_ : uint64_t {
     FlowHasUnsupportedUnderlineDecoration = 1LLU  << 11,
     FlowHasJustifiedNonLatinText          = 1LLU  << 12,
     FlowHasOverflowVisible                = 1LLU  << 13,
-    FlowIsNotLTR                          = 1LLU  << 14,
-    FlowHasLineBoxContainProperty         = 1LLU  << 15,
-    FlowIsNotTopToBottom                  = 1LLU  << 16,
-    FlowHasLineBreak                      = 1LLU  << 17,
-    FlowHasNonNormalUnicodeBiDi           = 1LLU  << 18,
-    FlowHasRTLOrdering                    = 1LLU  << 19,
-    FlowHasLineAlignEdges                 = 1LLU  << 20,
-    FlowHasLineSnap                       = 1LLU  << 21,
-    FlowHasHypensAuto                     = 1LLU  << 22,
+    FlowHasWebKitNBSPMode                 = 1LLU  << 14,
+    FlowIsNotLTR                          = 1LLU  << 15,
+    FlowHasLineBoxContainProperty         = 1LLU  << 16,
+    FlowIsNotTopToBottom                  = 1LLU  << 17,
+    FlowHasLineBreak                      = 1LLU  << 18,
+    FlowHasNonNormalUnicodeBiDi           = 1LLU  << 19,
+    FlowHasRTLOrdering                    = 1LLU  << 20,
+    FlowHasLineAlignEdges                 = 1LLU  << 21,
+    FlowHasLineSnap                       = 1LLU  << 22,
     FlowHasTextEmphasisFillOrMark         = 1LLU  << 23,
     FlowHasTextShadow                     = 1LLU  << 24,
     FlowHasPseudoFirstLine                = 1LLU  << 25,
@@ -96,22 +97,22 @@ enum AvoidanceReason_ : uint64_t {
     FlowHasNonAutoTrailingWord            = 1LLU  << 31,
     FlowHasSVGFont                        = 1LLU  << 32,
     FlowTextIsEmpty                       = 1LLU  << 33,
-    FlowTextHasNoBreakSpace               = 1LLU  << 34,
-    FlowTextHasSoftHyphen                 = 1LLU  << 35,
-    FlowTextHasDirectionCharacter         = 1LLU  << 36,
-    FlowIsMissingPrimaryFont              = 1LLU  << 37,
-    FlowFontIsMissingGlyph                = 1LLU  << 38,
-    FlowTextIsCombineText                 = 1LLU  << 39,
-    FlowTextIsRenderCounter               = 1LLU  << 40,
-    FlowTextIsRenderQuote                 = 1LLU  << 41,
-    FlowTextIsTextFragment                = 1LLU  << 42,
-    FlowTextIsSVGInlineText               = 1LLU  << 43,
-    FlowFontIsNotSimple                   = 1LLU  << 44,
-    FeatureIsDisabled                     = 1LLU  << 45,
-    FlowHasNoParent                       = 1LLU  << 46,
-    FlowHasNoChild                        = 1LLU  << 47,
-    FlowChildIsSelected                   = 1LLU  << 48,
-    FlowHasHangingPunctuation             = 1LLU  << 49,
+    FlowTextHasSoftHyphen                 = 1LLU  << 34,
+    FlowTextHasDirectionCharacter         = 1LLU  << 35,
+    FlowIsMissingPrimaryFont              = 1LLU  << 36,
+    FlowFontIsMissingGlyph                = 1LLU  << 37,
+    FlowTextIsCombineText                 = 1LLU  << 38,
+    FlowTextIsRenderCounter               = 1LLU  << 39,
+    FlowTextIsRenderQuote                 = 1LLU  << 40,
+    FlowTextIsTextFragment                = 1LLU  << 41,
+    FlowTextIsSVGInlineText               = 1LLU  << 42,
+    FlowFontIsNotSimple                   = 1LLU  << 43,
+    FeatureIsDisabled                     = 1LLU  << 44,
+    FlowHasNoParent                       = 1LLU  << 45,
+    FlowHasNoChild                        = 1LLU  << 46,
+    FlowChildIsSelected                   = 1LLU  << 47,
+    FlowHasHangingPunctuation             = 1LLU  << 48,
+    FlowFontHasOverflowGlyph              = 1LLU  << 49,
     EndOfReasons                          = 1LLU  << 50
 };
 const unsigned NoReason = 0;
@@ -136,7 +137,8 @@ enum class IncludeReasons { First , All };
 #endif
 
 template <typename CharacterType>
-static AvoidanceReasonFlags canUseForText(const CharacterType* text, unsigned length, const Font& font, bool textIsJustified, IncludeReasons includeReasons)
+static AvoidanceReasonFlags canUseForText(const CharacterType* text, unsigned length, const Font& font, std::optional<float> lineHeightConstraint,
+    bool textIsJustified, IncludeReasons includeReasons)
 {
     AvoidanceReasonFlags reasons = { };
     // FIXME: <textarea maxlength=0> generates empty text node.
@@ -156,9 +158,6 @@ static AvoidanceReasonFlags canUseForText(const CharacterType* text, unsigned le
                 SET_REASON_AND_RETURN_IF_NEEDED(FlowHasJustifiedNonLatinText, reasons, includeReasons);
         }
 
-        // These would be easy to support.
-        if (character == noBreakSpace)
-            SET_REASON_AND_RETURN_IF_NEEDED(FlowTextHasNoBreakSpace, reasons, includeReasons);
         if (character == softHyphen)
             SET_REASON_AND_RETURN_IF_NEEDED(FlowTextHasSoftHyphen, reasons, includeReasons);
 
@@ -169,17 +168,20 @@ static AvoidanceReasonFlags canUseForText(const CharacterType* text, unsigned le
             || direction == U_POP_DIRECTIONAL_FORMAT || direction == U_BOUNDARY_NEUTRAL)
             SET_REASON_AND_RETURN_IF_NEEDED(FlowTextHasDirectionCharacter, reasons, includeReasons);
 
-        if (!font.glyphForCharacter(character))
+        auto glyph = font.glyphForCharacter(character);
+        if (!glyph)
             SET_REASON_AND_RETURN_IF_NEEDED(FlowFontIsMissingGlyph, reasons, includeReasons);
+        if (lineHeightConstraint && font.boundsForGlyph(glyph).height() > *lineHeightConstraint)
+            SET_REASON_AND_RETURN_IF_NEEDED(FlowFontHasOverflowGlyph, reasons, includeReasons);
     }
     return reasons;
 }
 
-static AvoidanceReasonFlags canUseForText(const RenderText& textRenderer, const Font& font, bool textIsJustified, IncludeReasons includeReasons)
+static AvoidanceReasonFlags canUseForText(const RenderText& textRenderer, const Font& font, std::optional<float> lineHeightConstraint, bool textIsJustified, IncludeReasons includeReasons)
 {
     if (textRenderer.is8Bit())
-        return canUseForText(textRenderer.characters8(), textRenderer.textLength(), font, false, includeReasons);
-    return canUseForText(textRenderer.characters16(), textRenderer.textLength(), font, textIsJustified, includeReasons);
+        return canUseForText(textRenderer.characters8(), textRenderer.textLength(), font, lineHeightConstraint, false, includeReasons);
+    return canUseForText(textRenderer.characters16(), textRenderer.textLength(), font, lineHeightConstraint, textIsJustified, includeReasons);
 }
 
 static AvoidanceReasonFlags canUseForFontAndText(const RenderBlockFlow& flow, IncludeReasons includeReasons)
@@ -190,7 +192,9 @@ static AvoidanceReasonFlags canUseForFontAndText(const RenderBlockFlow& flow, In
     auto& primaryFont = style.fontCascade().primaryFont();
     if (primaryFont.isLoading())
         SET_REASON_AND_RETURN_IF_NEEDED(FlowIsMissingPrimaryFont, reasons, includeReasons);
-
+    std::optional<float> lineHeightConstraint;
+    if (style.lineBoxContain() & LineBoxContainGlyphs)
+        lineHeightConstraint = lineHeightFromFlow(flow).toFloat();
     bool flowIsJustified = style.textAlign() == JUSTIFY;
     for (const auto& textRenderer : childrenOfType<RenderText>(flow)) {
         if (textRenderer.isCombineText())
@@ -206,7 +210,7 @@ static AvoidanceReasonFlags canUseForFontAndText(const RenderBlockFlow& flow, In
         if (style.fontCascade().codePath(TextRun(textRenderer.text())) != FontCascade::Simple)
             SET_REASON_AND_RETURN_IF_NEEDED(FlowFontIsNotSimple, reasons, includeReasons);
 
-        auto textReasons = canUseForText(textRenderer, primaryFont, flowIsJustified, includeReasons);
+        auto textReasons = canUseForText(textRenderer, primaryFont, lineHeightConstraint, flowIsJustified, includeReasons);
         if (textReasons != NoReason)
             SET_REASON_AND_RETURN_IF_NEEDED(textReasons, reasons, includeReasons);
     }
@@ -225,7 +229,7 @@ static AvoidanceReasonFlags canUseForStyle(const RenderStyle& style, IncludeReas
         SET_REASON_AND_RETURN_IF_NEEDED(FlowHasOverflowVisible, reasons, includeReasons);
     if (!style.isLeftToRightDirection())
         SET_REASON_AND_RETURN_IF_NEEDED(FlowIsNotLTR, reasons, includeReasons);
-    if (style.lineBoxContain() != RenderStyle::initialLineBoxContain())
+    if (!(style.lineBoxContain() & LineBoxContainBlock))
         SET_REASON_AND_RETURN_IF_NEEDED(FlowHasLineBoxContainProperty, reasons, includeReasons);
     if (style.writingMode() != TopToBottomWritingMode)
         SET_REASON_AND_RETURN_IF_NEEDED(FlowIsNotTopToBottom, reasons, includeReasons);
@@ -239,8 +243,6 @@ static AvoidanceReasonFlags canUseForStyle(const RenderStyle& style, IncludeReas
         SET_REASON_AND_RETURN_IF_NEEDED(FlowHasLineAlignEdges, reasons, includeReasons);
     if (style.lineSnap() != LineSnapNone)
         SET_REASON_AND_RETURN_IF_NEEDED(FlowHasLineSnap, reasons, includeReasons);
-    if (style.hyphens() == HyphensAuto)
-        SET_REASON_AND_RETURN_IF_NEEDED(FlowHasHypensAuto, reasons, includeReasons);
     if (style.textEmphasisFill() != TextEmphasisFillFilled || style.textEmphasisMark() != TextEmphasisMarkNone)
         SET_REASON_AND_RETURN_IF_NEEDED(FlowHasTextEmphasisFillOrMark, reasons, includeReasons);
     if (style.textShadow())
@@ -257,6 +259,8 @@ static AvoidanceReasonFlags canUseForStyle(const RenderStyle& style, IncludeReas
         SET_REASON_AND_RETURN_IF_NEEDED(FlowHasBorderFitLines, reasons, includeReasons);
     if (style.lineBreak() != LineBreakAuto)
         SET_REASON_AND_RETURN_IF_NEEDED(FlowHasNonAutoLineBreak, reasons, includeReasons);
+    if (style.nbspMode() != NBNORMAL)
+        SET_REASON_AND_RETURN_IF_NEEDED(FlowHasWebKitNBSPMode, reasons, includeReasons);
 #if ENABLE(CSS_TRAILING_WORD)
     if (style.trailingWord() != TrailingWord::Auto)
         SET_REASON_AND_RETURN_IF_NEEDED(FlowHasNonAutoTrailingWord, reasons, includeReasons);
@@ -454,9 +458,9 @@ public:
         unsigned endPosition = fragment.isCollapsed() ? fragment.start() + 1 : fragment.end();
         // New line needs new run.
         if (!m_runsWidth)
-            runs.append(Run(fragment.start(), endPosition, m_runsWidth, m_runsWidth + fragment.width(), false));
+            runs.append(Run(fragment.start(), endPosition, m_runsWidth, m_runsWidth + fragment.width(), false, fragment.hasHyphen()));
         else {
-            const auto& lastFragment = m_fragments.last();
+            auto& lastFragment = m_fragments.last();
             // Advance last completed fragment when the previous fragment is all set (including multiple parts across renderers)
             if ((lastFragment.type() != fragment.type()) || !lastFragment.overlapsToNextRenderer())
                 m_lastCompleteFragment = lastFragment;
@@ -471,11 +475,13 @@ public:
                 return;
             }
             if (lastFragment.isLastInRenderer() || lastFragment.isCollapsed())
-                runs.append(Run(fragment.start(), endPosition, m_runsWidth, m_runsWidth + fragment.width(), false));
+                runs.append(Run(fragment.start(), endPosition, m_runsWidth, m_runsWidth + fragment.width(), false, fragment.hasHyphen()));
             else {
                 Run& lastRun = runs.last();
                 lastRun.end = endPosition;
                 lastRun.logicalRight += fragment.width();
+                ASSERT(!lastRun.hasHyphen);
+                lastRun.hasHyphen = fragment.hasHyphen();
             }
         }
         m_fragments.append(fragment);
@@ -555,7 +561,8 @@ private:
     // Having one character on the line does not necessarily mean it actually fits.
     // First character of the first fragment might be forced on to the current line even if it does not fit.
     bool m_firstCharacterFits { false };
-    Vector<TextFragmentIterator::TextFragment> m_fragments;
+    // FIXME: We don't actually need this for all the simple cases. Try to remove/make it optional.
+    Vector<TextFragmentIterator::TextFragment, 30> m_fragments;
 };
 
 class FragmentForwardIterator : public std::iterator<std::forward_iterator_tag, unsigned> {
@@ -615,6 +622,31 @@ static void updateLineConstrains(const RenderBlockFlow& flow, LineState& line, b
     line.setAvailableWidth(std::max<float>(0, logicalRightOffset - line.logicalLeftOffset()));
 }
 
+static std::optional<unsigned> hyphenPositionForFragment(unsigned splitPosition, TextFragmentIterator::TextFragment& fragmentToSplit,
+    const TextFragmentIterator& textFragmentIterator, float availableWidth)
+{
+    auto& style = textFragmentIterator.style();
+    bool shouldHyphenate = style.shouldHyphenate && (!style.hyphenLimitLines || fragmentToSplit.wrappingWithHyphenCounter() < *style.hyphenLimitLines);
+    if (!shouldHyphenate)
+        return std::nullopt;
+
+    if (!enoughWidthForHyphenation(availableWidth, style.font.pixelSize()))
+        return std::nullopt;
+
+    // We might be able to fit the hyphen at the split position.
+    auto splitPositionWithHyphen = splitPosition;
+    // Find a splitting position where hyphen surely fits.
+    unsigned start = fragmentToSplit.start();
+    auto leftSideWidth = textFragmentIterator.textWidth(start, splitPosition, 0);
+    while (leftSideWidth + style.hyphenStringWidth > availableWidth) {
+        if (--splitPositionWithHyphen <= start)
+            return std::nullopt; // No space for hyphen.
+        leftSideWidth -= textFragmentIterator.textWidth(splitPositionWithHyphen, splitPositionWithHyphen + 1, 0);
+    }
+    ASSERT(splitPositionWithHyphen > start);
+    return textFragmentIterator.lastHyphenPosition(fragmentToSplit, splitPositionWithHyphen + 1);
+}
+
 static TextFragmentIterator::TextFragment splitFragmentToFitLine(TextFragmentIterator::TextFragment& fragmentToSplit, float availableWidth, bool keepAtLeastOneCharacter, const TextFragmentIterator& textFragmentIterator)
 {
     // FIXME: add surrogate pair support.
@@ -624,8 +656,12 @@ static TextFragmentIterator::TextFragment splitFragmentToFitLine(TextFragmentIte
         return availableWidth < textFragmentIterator.textWidth(start, index + 1, 0);
     });
     unsigned splitPosition = (*it);
-    if (keepAtLeastOneCharacter && splitPosition == fragmentToSplit.start())
-        ++splitPosition;
+    // Does first character fit this line?
+    if (splitPosition == start) {
+        if (keepAtLeastOneCharacter)
+            ++splitPosition;
+    } else if (auto hyphenPosition = hyphenPositionForFragment(splitPosition, fragmentToSplit, textFragmentIterator, availableWidth))
+        return fragmentToSplit.splitWithHyphen(*hyphenPosition, textFragmentIterator);
     return fragmentToSplit.split(splitPosition, textFragmentIterator);
 }
 
@@ -737,8 +773,20 @@ static bool createLineRuns(LineState& line, const LineState& previousLine, Layou
                 line.appendFragmentAndCreateRunIfNeeded(fragment, runs);
                 break;
             }
-            // Non-breakable non-whitespace first fragment. Add it to the current line. -it overflows though.
             ASSERT(fragment.type() == TextFragmentIterator::TextFragment::NonWhitespace);
+            // Find out if this non-whitespace fragment has a hyphen where we can break.
+            if (style.shouldHyphenate) {
+                auto fragmentToSplit = fragment;
+                // Split and check if we actually ended up with a hyphen.
+                auto overflowFragment = splitFragmentToFitLine(fragmentToSplit, line.availableWidth() - line.width(), emptyLine, textFragmentIterator);
+                if (fragmentToSplit.hasHyphen()) {
+                    line.setOverflowedFragment(overflowFragment);
+                    line.appendFragmentAndCreateRunIfNeeded(fragmentToSplit, runs);
+                    break;
+                }
+                // No hyphen, no split.
+            }
+            // Non-breakable non-whitespace first fragment. Add it to the current line. -it overflows though.
             if (emptyLine) {
                 forceFragmentToLine(line, textFragmentIterator, runs, fragment);
                 break;
@@ -930,11 +978,14 @@ static void printReason(AvoidanceReason reason, TextStream& stream)
     case FlowHasOverflowVisible:
         stream << "overflow: visible";
         break;
+    case FlowHasWebKitNBSPMode:
+        stream << "-webkit-nbsp-mode: space";
+        break;
     case FlowIsNotLTR:
         stream << "dir is not LTR";
         break;
     case FlowHasLineBoxContainProperty:
-        stream << "line-box-contain property";
+        stream << "line-box-contain value indicates variable line height";
         break;
     case FlowIsNotTopToBottom:
         stream << "non top-to-bottom flow";
@@ -953,9 +1004,6 @@ static void printReason(AvoidanceReason reason, TextStream& stream)
         break;
     case FlowHasLineSnap:
         stream << "-webkit-line-snap property";
-        break;
-    case FlowHasHypensAuto:
-        stream << "hyphen: auto";
         break;
     case FlowHasTextEmphasisFillOrMark:
         stream << "text-emphasis (fill/mark)";
@@ -983,9 +1031,6 @@ static void printReason(AvoidanceReason reason, TextStream& stream)
         break;
     case FlowHasSVGFont:
         stream << "SVG font";
-        break;
-    case FlowTextHasNoBreakSpace:
-        stream << "No-break-space character";
         break;
     case FlowTextHasSoftHyphen:
         stream << "soft hyphen character";
@@ -1022,6 +1067,9 @@ static void printReason(AvoidanceReason reason, TextStream& stream)
         break;
     case FlowChildIsSelected:
         stream << "selected content";
+        break;
+    case FlowFontHasOverflowGlyph:
+        stream << "-webkit-line-box-contain: glyphs with overflowing text.";
         break;
     case FlowTextIsEmpty:
     case FlowHasNoChild:

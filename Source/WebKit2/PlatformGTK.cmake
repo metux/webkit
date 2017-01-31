@@ -270,6 +270,9 @@ list(APPEND WebKit2_SOURCES
     UIProcess/API/gtk/WebKitWebViewSessionState.cpp
     UIProcess/API/gtk/WebKitWebViewSessionState.h
     UIProcess/API/gtk/WebKitWebViewSessionStatePrivate.h
+    UIProcess/API/gtk/WebKitWebsiteData.cpp
+    UIProcess/API/gtk/WebKitWebsiteData.h
+    UIProcess/API/gtk/WebKitWebsiteDataPrivate.h
     UIProcess/API/gtk/WebKitWebsiteDataManager.cpp
     UIProcess/API/gtk/WebKitWebsiteDataManager.h
     UIProcess/API/gtk/WebKitWebsiteDataManagerPrivate.h
@@ -306,8 +309,8 @@ list(APPEND WebKit2_SOURCES
     UIProcess/gtk/AcceleratedBackingStoreWayland.cpp
     UIProcess/gtk/AcceleratedBackingStoreX11.cpp
     UIProcess/gtk/DragAndDropHandler.cpp
-    UIProcess/gtk/ExperimentalFeatures.cpp
     UIProcess/gtk/GestureController.cpp
+    UIProcess/gtk/HardwareAccelerationManager.cpp
     UIProcess/gtk/InputMethodFilter.cpp
     UIProcess/gtk/KeyBindingTranslator.cpp
     UIProcess/gtk/TextCheckerGtk.cpp
@@ -554,6 +557,7 @@ set(WebKit2GTK_INSTALLED_HEADERS
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitWebView.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitWebViewBase.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitWebViewSessionState.h
+    ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitWebsiteData.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitWebsiteDataManager.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitWindowProperties.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/webkit2.h

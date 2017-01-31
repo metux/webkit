@@ -85,6 +85,8 @@
 #include "IntRect.h"
 #include "InternalSettings.h"
 #include "Language.h"
+#include "LibWebRTCProvider.h"
+#include "LibWebRTCUtils.h"
 #include "MainFrame.h"
 #include "MallocStatistics.h"
 #include "MediaPlayer.h"
@@ -92,6 +94,7 @@
 #include "MemoryCache.h"
 #include "MemoryInfo.h"
 #include "MemoryPressureHandler.h"
+#include "MockLibWebRTCPeerConnection.h"
 #include "MockPageOverlay.h"
 #include "MockPageOverlayClient.h"
 #include "Page.h"
@@ -110,7 +113,6 @@
 #include "RenderView.h"
 #include "RenderedDocumentMarker.h"
 #include "ResourceLoadObserver.h"
-#include "RuntimeEnabledFeatures.h"
 #include "SVGPathStringBuilder.h"
 #include "SchemeRegistry.h"
 #include "ScriptedAnimationController.h"
@@ -451,13 +453,13 @@ Internals::Internals(Document& document)
 
 #if ENABLE(WEB_RTC)
     enableMockMediaEndpoint();
+    useMockRTCPeerConnectionFactory(String());
 #endif
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     if (document.page())
         document.page()->setMockMediaPlaybackTargetPickerEnabled(true);
 #endif
-    RuntimeEnabledFeatures::sharedFeatures().reset();
 
     if (contextDocument() && contextDocument()->frame()) {
         setAutomaticSpellingCorrectionEnabled(true);
@@ -1093,6 +1095,17 @@ void Internals::emulateRTCPeerConnectionPlatformEvent(RTCPeerConnection& connect
     connection.emulatePlatformEvent(action);
 }
 
+void Internals::useMockRTCPeerConnectionFactory(const String& testCase)
+{
+#if USE(LIBWEBRTC)
+    Document* document = contextDocument();
+    LibWebRTCProvider* provider = (document && document->page()) ? &document->page()->libWebRTCProvider() : nullptr;
+    WebCore::useMockRTCPeerConnectionFactory(provider, testCase);
+#else
+    UNUSED_PARAM(testCase);
+#endif
+}
+
 #endif
 
 #if ENABLE(MEDIA_STREAM)
@@ -1441,6 +1454,11 @@ String Internals::rangeAsText(const Range& range)
 Ref<Range> Internals::subrange(Range& range, int rangeLocation, int rangeLength)
 {
     return TextIterator::subrange(&range, rangeLocation, rangeLength);
+}
+
+RefPtr<Range> Internals::rangeOfStringNearLocation(const Range& searchRange, const String& text, unsigned targetOffset)
+{
+    return findClosestPlainText(searchRange, text, 0, targetOffset);
 }
 
 ExceptionOr<RefPtr<Range>> Internals::rangeForDictionaryLookupAtLocation(int x, int y)
@@ -3515,39 +3533,6 @@ String Internals::composedTreeAsText(Node& node)
     return WebCore::composedTreeAsText(downcast<ContainerNode>(node));
 }
 
-void Internals::setLinkPreloadSupport(bool enable)
-{
-    RuntimeEnabledFeatures::sharedFeatures().setLinkPreloadEnabled(enable);
-}
-
-#if ENABLE(CSS_GRID_LAYOUT)
-
-void Internals::setCSSGridLayoutEnabled(bool enable)
-{
-    RuntimeEnabledFeatures::sharedFeatures().setCSSGridLayoutEnabled(enable);
-}
-
-#endif
-
-#if ENABLE(WEBGL2)
-
-bool Internals::webGL2Enabled() const
-{
-    return RuntimeEnabledFeatures::sharedFeatures().webGL2Enabled();
-}
-
-void Internals::setWebGL2Enabled(bool enable)
-{
-    RuntimeEnabledFeatures::sharedFeatures().setWebGL2Enabled(enable);
-}
-
-#endif
-
-void Internals::setResourceTimingSupport(bool enable)
-{
-    RuntimeEnabledFeatures::sharedFeatures().setResourceTimingEnabled(enable);
-}
-
 bool Internals::isProcessingUserGesture()
 {
     return UserGestureIndicator::processingUserGesture();
@@ -3662,12 +3647,16 @@ Vector<String> Internals::accessKeyModifiers() const
     return accessKeyModifierStrings;
 }
 
-#if USE(QUICK_LOOK)
+#if PLATFORM(IOS)
 void Internals::setQuickLookPassword(const String& password)
 {
+#if USE(QUICK_LOOK)
     auto& quickLookHandleClient = MockQuickLookHandleClient::singleton();
     QuickLookHandle::setClientForTesting(&quickLookHandleClient);
     quickLookHandleClient.setPassword(password);
+#else
+    UNUSED_PARAM(password);
+#endif
 }
 #endif
 

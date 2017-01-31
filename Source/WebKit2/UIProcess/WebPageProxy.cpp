@@ -118,6 +118,7 @@
 #include <WebCore/FloatRect.h>
 #include <WebCore/FocusDirection.h>
 #include <WebCore/JSDOMBinding.h>
+#include <WebCore/JSDOMExceptionHandling.h>
 #include <WebCore/MIMETypeRegistry.h>
 #include <WebCore/RenderEmbeddedObject.h>
 #include <WebCore/SerializedCryptoKeyWrap.h>
@@ -816,10 +817,6 @@ void WebPageProxy::initializeWebPage()
 #endif
 
     process().send(Messages::WebProcess::CreateWebPage(m_pageID, creationParameters()), 0);
-
-#if PLATFORM(COCOA)
-    send(Messages::WebPage::SetSmartInsertDeleteEnabled(m_isSmartInsertDeleteEnabled));
-#endif
 
     m_needsToFinishInitializingWebPageAfterProcessLaunch = true;
     finishInitializingWebPageAfterProcessLaunch();
@@ -3171,6 +3168,7 @@ void WebPageProxy::didStartProvisionalLoadForFrame(uint64_t frameID, uint64_t na
 
     if (frame->isMainFrame()) {
         m_pageLoadState.didStartProvisionalLoad(transaction, url, unreachableURL);
+        m_pageClient.didStartProvisionalLoadForMainFrame();
         hideValidationMessage();
     }
 
@@ -3246,8 +3244,10 @@ void WebPageProxy::didFailProvisionalLoadForFrame(uint64_t frameID, const Securi
 
     auto transaction = m_pageLoadState.transaction();
 
-    if (frame->isMainFrame())
+    if (frame->isMainFrame()) {
         m_pageLoadState.didFailProvisionalLoad(transaction);
+        m_pageClient.didFailProvisionalLoadForMainFrame();
+    }
 
     frame->didFailProvisionalLoad();
 
@@ -3349,6 +3349,11 @@ void WebPageProxy::didCommitLoadForFrame(uint64_t frameID, uint64_t navigationID
             m_mainFramePluginHandlesPageScaleGesture = false;
         }
     }
+
+#if ENABLE(POINTER_LOCK)
+    if (frame->isMainFrame())
+        requestPointerUnlock();
+#endif
 
     m_pageLoadState.commitChanges();
     if (m_navigationClient) {
@@ -5164,43 +5169,28 @@ void WebPageProxy::machSendRightCallback(const MachSendRight& sendRight, uint64_
 }
 #endif
 
-void WebPageProxy::logDiagnosticMessage(const String& message, const String& description, bool shouldSample)
+void WebPageProxy::logDiagnosticMessage(const String& message, const String& description, WebCore::ShouldSample shouldSample)
 {
-    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample ? ShouldSample::Yes : ShouldSample::No))
+    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample))
         return;
 
-    logSampledDiagnosticMessage(message, description);
-}
-
-void WebPageProxy::logDiagnosticMessageWithResult(const String& message, const String& description, uint32_t result, bool shouldSample)
-{
-    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample ? ShouldSample::Yes : ShouldSample::No))
-        return;
-
-    logSampledDiagnosticMessageWithResult(message, description, static_cast<WebCore::DiagnosticLoggingResultType>(result));
-}
-
-void WebPageProxy::logDiagnosticMessageWithValue(const String& message, const String& description, const String& value, bool shouldSample)
-{
-    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample ? ShouldSample::Yes : ShouldSample::No))
-        return;
-
-    logSampledDiagnosticMessageWithValue(message, description, value);
-}
-
-void WebPageProxy::logSampledDiagnosticMessage(const String& message, const String& description)
-{
     m_diagnosticLoggingClient->logDiagnosticMessage(this, message, description);
 }
 
-void WebPageProxy::logSampledDiagnosticMessageWithResult(const String& message, const String& description, uint32_t result)
+void WebPageProxy::logDiagnosticMessageWithResult(const String& message, const String& description, uint32_t result, WebCore::ShouldSample shouldSample)
 {
+    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample))
+        return;
+
     m_diagnosticLoggingClient->logDiagnosticMessageWithResult(this, message, description, static_cast<WebCore::DiagnosticLoggingResultType>(result));
 }
 
-void WebPageProxy::logSampledDiagnosticMessageWithValue(const String& message, const String& description, const String& value)
+void WebPageProxy::logDiagnosticMessageWithValue(const String& message, const String& description, double value, unsigned significantFigures, ShouldSample shouldSample)
 {
-    m_diagnosticLoggingClient->logDiagnosticMessageWithValue(this, message, description, value);
+    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample))
+        return;
+
+    m_diagnosticLoggingClient->logDiagnosticMessageWithValue(this, message, description, String::number(value, significantFigures));
 }
 
 void WebPageProxy::rectForCharacterRangeCallback(const IntRect& rect, const EditingRange& actualRange, uint64_t callbackID)
@@ -5574,6 +5564,9 @@ WebPageCreationParameters WebPageProxy::creationParameters()
 #else
     parameters.appleMailPaginationQuirkEnabled = false;
 #endif
+#if PLATFORM(COCOA)
+    parameters.smartInsertDeleteEnabled = m_isSmartInsertDeleteEnabled;
+#endif
     parameters.shouldScaleViewToFitDocument = m_shouldScaleViewToFitDocument;
     parameters.userInterfaceLayoutDirection = m_pageClient.userInterfaceLayoutDirection();
     parameters.observedLayoutMilestones = m_observedLayoutMilestones;
@@ -5603,9 +5596,9 @@ void WebPageProxy::backForwardClear()
 
 #if ENABLE(GAMEPAD)
 
-void WebPageProxy::gamepadActivity(const Vector<GamepadData>& gamepadDatas)
+void WebPageProxy::gamepadActivity(const Vector<GamepadData>& gamepadDatas, bool shouldMakeGamepadsVisible)
 {
-    m_process->send(Messages::WebPage::GamepadActivity(gamepadDatas), m_pageID);
+    m_process->send(Messages::WebPage::GamepadActivity(gamepadDatas, shouldMakeGamepadsVisible), m_pageID);
 }
 
 #endif
@@ -5890,6 +5883,11 @@ void WebPageProxy::didBlockInsecurePluginVersion(const String& mimeType, const S
 bool WebPageProxy::willHandleHorizontalScrollEvents() const
 {
     return !m_canShortCircuitHorizontalWheelEvents;
+}
+
+void WebPageProxy::updateWebsitePolicies(const WebsitePolicies& websitePolicies)
+{
+    m_process->send(Messages::WebPage::UpdateWebsitePolicies(websitePolicies), m_pageID);
 }
 
 void WebPageProxy::didFinishLoadingDataForCustomContentProvider(const String& suggestedFilename, const IPC::DataReference& dataReference)
@@ -6477,16 +6475,6 @@ void WebPageProxy::requestControlledElementID() const
 #endif
 }
 
-void WebPageProxy::requestActiveNowPlayingSessionInfo()
-{
-    m_process->send(Messages::WebPage::RequestActiveNowPlayingSessionInfo(), m_pageID);
-}
-
-void WebPageProxy::handleActiveNowPlayingSessionInfoResponse(bool hasActiveSession, const String& title, double duration, double elapsedTime) const
-{
-    m_pageClient.handleActiveNowPlayingSessionInfoResponse(hasActiveSession, title, duration, elapsedTime);
-}
-
 void WebPageProxy::handleControlledElementIDResponse(const String& identifier) const
 {
     m_pageClient.handleControlledElementIDResponse(identifier);
@@ -6499,6 +6487,18 @@ bool WebPageProxy::isPlayingVideoInEnhancedFullscreen() const
 #else
     return false;
 #endif
+}
+#endif
+
+#if PLATFORM(COCOA)
+void WebPageProxy::requestActiveNowPlayingSessionInfo()
+{
+    m_process->send(Messages::WebPage::RequestActiveNowPlayingSessionInfo(), m_pageID);
+}
+
+void WebPageProxy::handleActiveNowPlayingSessionInfoResponse(bool hasActiveSession, const String& title, double duration, double elapsedTime) const
+{
+    m_pageClient.handleActiveNowPlayingSessionInfoResponse(hasActiveSession, title, duration, elapsedTime);
 }
 #endif
 
@@ -6521,6 +6521,11 @@ void WebPageProxy::focusedContentMediaElementDidChange(uint64_t elementID)
     focusManager->setFocusedMediaElement(*this, elementID);
 }
 #endif
+
+void WebPageProxy::didPlayMediaPreventedFromPlayingWithoutUserGesture()
+{
+    m_uiClient->didPlayMediaPreventedFromPlayingWithoutUserGesture(*this);
+}
 
 #if PLATFORM(MAC)
 void WebPageProxy::removeNavigationGestureSnapshot()
@@ -6708,7 +6713,7 @@ void WebPageProxy::getLoadDecisionForIcon(const WebCore::LinkIcon& icon, uint64_
     if (!m_iconLoadingClient)
         return;
 
-    m_iconLoadingClient->getLoadDecisionForIcon(icon, [this, protectedThis = Ref<WebPageProxy>(*this), loadIdentifier](std::function<void (API::Data*, CallbackBase::Error)> callbackFunction) {
+    m_iconLoadingClient->getLoadDecisionForIcon(icon, [this, protectedThis = RefPtr<WebPageProxy>(this), loadIdentifier](std::function<void (API::Data*, CallbackBase::Error)> callbackFunction) {
         if (!isValid()) {
             if (callbackFunction)
                 callbackFunction(nullptr, CallbackBase::Error::Unknown);
