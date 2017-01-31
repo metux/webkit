@@ -201,6 +201,7 @@ public:
     String rangeAsText(const Range&);
     Ref<Range> subrange(Range&, int rangeLocation, int rangeLength);
     ExceptionOr<RefPtr<Range>> rangeForDictionaryLookupAtLocation(int x, int y);
+    RefPtr<Range> rangeOfStringNearLocation(const Range&, const String&, unsigned);
 
     ExceptionOr<void> setDelegatesScrolling(bool enabled);
 
@@ -390,6 +391,7 @@ public:
     void enableMockMediaEndpoint();
     void enableMockRTCPeerConnectionHandler();
     void emulateRTCPeerConnectionPlatformEvent(RTCPeerConnection&, const String& action);
+    void useMockRTCPeerConnectionFactory(const String&);
 #endif
 
     String getImageSourceURL(Element&);
@@ -498,18 +500,6 @@ public:
 
     String composedTreeAsText(Node&);
     
-    void setLinkPreloadSupport(bool);
-    void setResourceTimingSupport(bool);
-
-#if ENABLE(CSS_GRID_LAYOUT)
-    void setCSSGridLayoutEnabled(bool);
-#endif
-
-#if ENABLE(WEBGL2)
-    bool webGL2Enabled() const;
-    void setWebGL2Enabled(bool);
-#endif
-
     bool isProcessingUserGesture();
 
     RefPtr<GCObservation> observeGC(JSC::JSValue);
@@ -531,7 +521,7 @@ public:
 
     Vector<String> accessKeyModifiers() const;
 
-#if USE(QUICK_LOOK)
+#if PLATFORM(IOS)
     void setQuickLookPassword(const String&);
 #endif
 

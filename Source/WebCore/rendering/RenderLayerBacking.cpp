@@ -107,7 +107,7 @@ RenderLayerBacking::RenderLayerBacking(RenderLayer& layer)
 {
     if (layer.isRootLayer()) {
         m_isMainFrameRenderViewLayer = renderer().frame().isMainFrame();
-        m_usingTiledCacheLayer = renderer().page().chrome().client().shouldUseTiledBackingForFrameView(renderer().frame().view());
+        m_usingTiledCacheLayer = renderer().page().chrome().client().shouldUseTiledBackingForFrameView(renderer().view().frameView());
     }
     
     createPrimaryGraphicsLayer();
@@ -813,12 +813,11 @@ LayoutRect RenderLayerBacking::computeParentGraphicsLayerRect(RenderLayer* compo
 
 #if PLATFORM(IOS)
     if (compositedAncestor->hasTouchScrollableOverflow()) {
+        LayoutRect ancestorCompositedBounds = ancestorBackingLayer->compositedBounds();
         auto& renderBox = downcast<RenderBox>(compositedAncestor->renderer());
-        LayoutRect paddingBox(renderBox.borderLeft(), renderBox.borderTop(),
-            renderBox.width() - renderBox.borderLeft() - renderBox.borderRight(),
-            renderBox.height() - renderBox.borderTop() - renderBox.borderBottom());
+        LayoutRect paddingBox(renderBox.borderLeft(), renderBox.borderTop(), renderBox.width() - renderBox.borderLeft() - renderBox.borderRight(), renderBox.height() - renderBox.borderTop() - renderBox.borderBottom());
         ScrollOffset scrollOffset = compositedAncestor->scrollOffset();
-        parentGraphicsLayerRect = LayoutRect((paddingBox.location() - toLayoutSize(scrollOffset)), paddingBox.size());
+        parentGraphicsLayerRect = LayoutRect((paddingBox.location() - toLayoutSize(ancestorCompositedBounds.location()) - toLayoutSize(scrollOffset)), paddingBox.size());
     }
 #else
     if (compositedAncestor->needsCompositedScrolling()) {
@@ -2213,6 +2212,10 @@ GraphicsLayer* RenderLayerBacking::childForSuperlayers() const
 
 bool RenderLayerBacking::paintsIntoWindow() const
 {
+#if USE(COORDINATED_GRAPHICS_THREADED)
+        return false;
+#endif
+
     if (m_usingTiledCacheLayer)
         return false;
 

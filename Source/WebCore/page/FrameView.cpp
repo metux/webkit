@@ -608,9 +608,6 @@ void FrameView::updateCanHaveScrollbars()
 
 Ref<Scrollbar> FrameView::createScrollbar(ScrollbarOrientation orientation)
 {
-    if (!frame().settings().allowCustomScrollbarInMainFrame() && frame().isMainFrame())
-        return ScrollView::createScrollbar(orientation);
-
     // FIXME: We need to update the scrollbar dynamically as documents change (or as doc elements and bodies get discovered that have custom styles).
     Document* doc = frame().document();
 
@@ -677,7 +674,7 @@ void FrameView::setContentsSize(const IntSize& size)
 
     updateScrollableAreaSet();
 
-    page->chrome().contentsSizeChanged(&frame(), size); // Notify only.
+    page->chrome().contentsSizeChanged(frame(), size); // Notify only.
 
     if (frame().isMainFrame()) {
         frame().mainFrame().pageOverlayController().didChangeDocumentSize();
@@ -1809,28 +1806,47 @@ void FrameView::removeViewportConstrainedObject(RenderElement* object)
 }
 
 // visualViewport and layoutViewport are both in content coordinates (unzoomed).
-LayoutPoint FrameView::computeLayoutViewportOrigin(const LayoutRect& visualViewport, const LayoutPoint& stableLayoutViewportOriginMin, const LayoutPoint& stableLayoutViewportOriginMax, const LayoutRect& layoutViewport)
+LayoutPoint FrameView::computeLayoutViewportOrigin(const LayoutRect& visualViewport, const LayoutPoint& stableLayoutViewportOriginMin, const LayoutPoint& stableLayoutViewportOriginMax, const LayoutRect& layoutViewport, ScrollBehaviorForFixedElements fixedBehavior)
 {
     LayoutPoint layoutViewportOrigin = layoutViewport.location();
+    bool allowRubberBanding = fixedBehavior == StickToViewportBounds;
 
     if (visualViewport.width() > layoutViewport.width())
         layoutViewportOrigin.setX(visualViewport.x());
     else {
-        if (visualViewport.x() < layoutViewport.x() || visualViewport.x() < stableLayoutViewportOriginMin.x())
+        bool rubberbandingAtLeft = allowRubberBanding && visualViewport.x() < stableLayoutViewportOriginMin.x();
+        bool rubberbandingAtRight = allowRubberBanding && (visualViewport.maxX() - layoutViewport.width()) > stableLayoutViewportOriginMax.x();
+
+        if (visualViewport.x() < layoutViewport.x() || rubberbandingAtLeft)
             layoutViewportOrigin.setX(visualViewport.x());
 
-        if (visualViewport.maxX() > layoutViewport.maxX() || (visualViewport.maxX() - layoutViewport.width()) > stableLayoutViewportOriginMax.x())
+        if (visualViewport.maxX() > layoutViewport.maxX() || rubberbandingAtRight)
             layoutViewportOrigin.setX(visualViewport.maxX() - layoutViewport.width());
+        
+        if (!rubberbandingAtLeft && layoutViewportOrigin.x() < stableLayoutViewportOriginMin.x())
+            layoutViewportOrigin.setX(stableLayoutViewportOriginMin.x());
+        
+        if (!rubberbandingAtRight && layoutViewportOrigin.x() > stableLayoutViewportOriginMax.x())
+            layoutViewportOrigin.setX(stableLayoutViewportOriginMax.x());
     }
 
     if (visualViewport.height() > layoutViewport.height())
         layoutViewportOrigin.setY(visualViewport.y());
     else {
-        if (visualViewport.y() < layoutViewport.y() || visualViewport.y() < stableLayoutViewportOriginMin.y())
+        bool rubberbandingAtTop = allowRubberBanding && visualViewport.y() < stableLayoutViewportOriginMin.y();
+        bool rubberbandingAtBottom = allowRubberBanding && (visualViewport.maxY() - layoutViewport.height()) > stableLayoutViewportOriginMax.y();
+
+        if (visualViewport.y() < layoutViewport.y() || rubberbandingAtTop)
             layoutViewportOrigin.setY(visualViewport.y());
 
-        if (visualViewport.maxY() > layoutViewport.maxY() || (visualViewport.maxY() - layoutViewport.height()) > stableLayoutViewportOriginMax.y())
+        if (visualViewport.maxY() > layoutViewport.maxY() || rubberbandingAtBottom)
             layoutViewportOrigin.setY(visualViewport.maxY() - layoutViewport.height());
+        
+        if (!rubberbandingAtTop && layoutViewportOrigin.y() < stableLayoutViewportOriginMin.y())
+            layoutViewportOrigin.setY(stableLayoutViewportOriginMin.y());
+        
+        if (!rubberbandingAtBottom && layoutViewportOrigin.y() > stableLayoutViewportOriginMax.y())
+            layoutViewportOrigin.setY(stableLayoutViewportOriginMax.y());
     }
 
     return layoutViewportOrigin;
@@ -1895,7 +1911,7 @@ void FrameView::updateLayoutViewport()
     LOG_WITH_STREAM(Scrolling, stream << "visualViewport: " << visualViewportRect());
     LOG_WITH_STREAM(Scrolling, stream << "scroll positions: min: " << unscaledMinimumScrollPosition() << " max: "<< unscaledMaximumScrollPosition());
 
-    LayoutPoint newLayoutViewportOrigin = computeLayoutViewportOrigin(visualViewportRect(), minStableLayoutViewportOrigin(), maxStableLayoutViewportOrigin(), layoutViewport);
+    LayoutPoint newLayoutViewportOrigin = computeLayoutViewportOrigin(visualViewportRect(), minStableLayoutViewportOrigin(), maxStableLayoutViewportOrigin(), layoutViewport, scrollBehaviorForFixedElements());
     if (newLayoutViewportOrigin != m_layoutViewportOrigin) {
         setBaseLayoutViewportOrigin(newLayoutViewportOrigin);
         LOG_WITH_STREAM(Scrolling, stream << "layoutViewport changed to " << layoutViewportRect());
@@ -1937,16 +1953,19 @@ LayoutRect FrameView::layoutViewportRect() const
 // On iOS, pageScaleFactor is always 1 here, and we never have headers and footers.
 LayoutRect FrameView::visibleDocumentRect(const FloatRect& visibleContentRect, float headerHeight, float footerHeight, const FloatSize& totalContentsSize, float pageScaleFactor)
 {
-    FloatRect visibleDocumentRect = visibleContentRect;
-
     float contentsHeight = totalContentsSize.height() - headerHeight - footerHeight;
 
-    float visibleScaledDocumentTop = std::max<float>(visibleContentRect.y() - headerHeight, 0);
-    float visibleScaledDocumentBottom = std::min<float>(visibleContentRect.maxY() - headerHeight, contentsHeight);
+    float rubberBandTop = std::min<float>(visibleContentRect.y(), 0);
+    float visibleScaledDocumentTop = std::max<float>(visibleContentRect.y() - headerHeight, 0) + rubberBandTop;
+    
+    float rubberBandBottom = std::min<float>((totalContentsSize.height() - visibleContentRect.y()) - visibleContentRect.height(), 0);
+    float visibleScaledDocumentBottom = std::min<float>(visibleContentRect.maxY() - headerHeight, contentsHeight) + rubberBandBottom;
 
+    FloatRect visibleDocumentRect = visibleContentRect;
     visibleDocumentRect.setY(visibleScaledDocumentTop);
     visibleDocumentRect.setHeight(std::max<float>(visibleScaledDocumentBottom - visibleScaledDocumentTop, 0));
     visibleDocumentRect.scale(1 / pageScaleFactor);
+    
     return LayoutRect(visibleDocumentRect);
 }
 

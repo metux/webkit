@@ -246,7 +246,8 @@ RegisterID* TemplateStringNode::emitBytecode(BytecodeGenerator& generator, Regis
 {
     if (dst == generator.ignoredResult())
         return nullptr;
-    return generator.emitLoad(dst, JSValue(generator.addStringConstant(cooked())));
+    ASSERT(cooked());
+    return generator.emitLoad(dst, JSValue(generator.addStringConstant(*cooked())));
 }
 
 // ------------------------------ TemplateLiteralNode -----------------------------------
@@ -265,7 +266,8 @@ RegisterID* TemplateLiteralNode::emitBytecode(BytecodeGenerator& generator, Regi
     TemplateExpressionListNode* templateExpression = m_templateExpressions;
     for (; templateExpression; templateExpression = templateExpression->next(), templateString = templateString->next()) {
         // Evaluate TemplateString.
-        if (!templateString->value()->cooked().isEmpty()) {
+        ASSERT(templateString->value()->cooked());
+        if (!templateString->value()->cooked()->isEmpty()) {
             temporaryRegisters.append(generator.newTemporary());
             generator.emitNode(temporaryRegisters.last().get(), templateString->value());
         }
@@ -277,7 +279,8 @@ RegisterID* TemplateLiteralNode::emitBytecode(BytecodeGenerator& generator, Regi
     }
 
     // Evaluate tail TemplateString.
-    if (!templateString->value()->cooked().isEmpty()) {
+    ASSERT(templateString->value()->cooked());
+    if (!templateString->value()->cooked()->isEmpty()) {
         temporaryRegisters.append(generator.newTemporary());
         generator.emitNode(temporaryRegisters.last().get(), templateString->value());
     }
@@ -3681,6 +3684,7 @@ RegisterID* ClassExprNode::emitBytecode(BytecodeGenerator& generator, RegisterID
     }
 
     RefPtr<RegisterID> constructor;
+    bool needsHomeObject = false;
 
     // FIXME: Make the prototype non-configurable & non-writable.
     if (m_constructorExpression) {
@@ -3690,11 +3694,13 @@ RegisterID* ClassExprNode::emitBytecode(BytecodeGenerator& generator, RegisterID
         metadata->setClassSource(m_classSource);
         constructor = generator.emitNode(dst, m_constructorExpression);
         if (m_classHeritage) {
+            needsHomeObject = true;
             RefPtr<RegisterID> isDerivedConstructor = generator.newTemporary();
             generator.emitUnaryOp(op_not, isDerivedConstructor.get(),
                 generator.emitUnaryOp(op_eq_null, isDerivedConstructor.get(), superclass.get()));
             generator.emitDirectPutById(constructor.get(), generator.propertyNames().builtinNames().isDerivedConstructorPrivateName(), isDerivedConstructor.get(), PropertyNode::Unknown);
-        }
+        } else if (metadata->superBinding() == SuperBinding::Needed)
+            needsHomeObject = true;
     } else {
         if (m_classHeritage) {
             constructor = generator.finalDestination(dst);
@@ -3749,9 +3755,10 @@ RegisterID* ClassExprNode::emitBytecode(BytecodeGenerator& generator, RegisterID
         generator.emitDirectPutById(constructor.get(), generator.propertyNames().underscoreProto, superclass.get(), PropertyNode::Unknown);
         generator.emitLabel(superclassIsNullLabel.get());
         generator.emitDirectPutById(prototype.get(), generator.propertyNames().underscoreProto, protoParent.get(), PropertyNode::Unknown);
-
-        emitPutHomeObject(generator, constructor.get(), prototype.get());
     }
+
+    if (needsHomeObject)
+        emitPutHomeObject(generator, constructor.get(), prototype.get());
 
     RefPtr<RegisterID> constructorNameRegister = generator.emitLoad(nullptr, propertyNames.constructor);
     generator.emitCallDefineProperty(prototype.get(), constructorNameRegister.get(), constructor.get(), nullptr, nullptr,

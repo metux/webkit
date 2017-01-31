@@ -51,16 +51,17 @@ class RootObject;
 
 namespace WebCore {
 
-class CachedModuleScript;
 class CachedScriptFetcher;
 class Frame;
 class HTMLDocument;
 class HTMLPlugInElement;
-class SecurityOrigin;
+class LoadableModuleScript;
 class ScriptSourceCode;
+class SecurityOrigin;
 class Widget;
+struct ExceptionDetails;
 
-typedef HashMap<void*, RefPtr<JSC::Bindings::RootObject>> RootObjectMap;
+using RootObjectMap = HashMap<void*, RefPtr<JSC::Bindings::RootObject>>;
 
 enum ReasonForCallingCanExecuteScripts {
     AboutToExecuteScript,
@@ -114,13 +115,13 @@ public:
     JSC::JSValue evaluate(const ScriptSourceCode&, ExceptionDetails* = nullptr);
     JSC::JSValue evaluateInWorld(const ScriptSourceCode&, DOMWrapperWorld&, ExceptionDetails* = nullptr);
 
-    void loadModuleScriptInWorld(CachedModuleScript&, const String& moduleName, CachedScriptFetcher&, DOMWrapperWorld&);
-    void loadModuleScript(CachedModuleScript&, const String& moduleName, CachedScriptFetcher&);
-    void loadModuleScriptInWorld(CachedModuleScript&, const ScriptSourceCode&, CachedScriptFetcher&, DOMWrapperWorld&);
-    void loadModuleScript(CachedModuleScript&, const ScriptSourceCode&, CachedScriptFetcher&);
+    void loadModuleScriptInWorld(LoadableModuleScript&, const String& moduleName, DOMWrapperWorld&);
+    void loadModuleScript(LoadableModuleScript&, const String& moduleName);
+    void loadModuleScriptInWorld(LoadableModuleScript&, const ScriptSourceCode&, DOMWrapperWorld&);
+    void loadModuleScript(LoadableModuleScript&, const ScriptSourceCode&);
 
-    JSC::JSValue linkAndEvaluateModuleScriptInWorld(CachedModuleScript& , DOMWrapperWorld&);
-    JSC::JSValue linkAndEvaluateModuleScript(CachedModuleScript&);
+    JSC::JSValue linkAndEvaluateModuleScriptInWorld(LoadableModuleScript& , DOMWrapperWorld&);
+    JSC::JSValue linkAndEvaluateModuleScript(LoadableModuleScript&);
 
     JSC::JSValue evaluateModule(const URL&, JSC::JSModuleRecord&, DOMWrapperWorld&);
     JSC::JSValue evaluateModule(const URL&, JSC::JSModuleRecord&);
@@ -181,7 +182,7 @@ public:
 
 private:
     WEBCORE_EXPORT JSDOMWindowShell* initScript(DOMWrapperWorld&);
-    void setupModuleScriptHandlers(CachedModuleScript&, JSC::JSInternalPromise&, DOMWrapperWorld&);
+    void setupModuleScriptHandlers(LoadableModuleScript&, JSC::JSInternalPromise&, DOMWrapperWorld&);
 
     void disconnectPlatformScriptObjects();
 

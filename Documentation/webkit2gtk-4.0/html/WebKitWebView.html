@@ -85,6 +85,14 @@
 </tr>
 <tr>
 <td class="function_type">
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebView.html#webkit-web-view-is-ephemeral" title="webkit_web_view_is_ephemeral ()">webkit_web_view_is_ephemeral</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
 <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="returnvalue">WebKitWebContext</span></a> *
 </td>
 <td class="function_name">
@@ -691,6 +699,11 @@
 </tr>
 <tr>
 <td class="property_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
+<td class="property_name"><a class="link" href="WebKitWebView.html#WebKitWebView--is-ephemeral" title="The “is-ephemeral” property">is-ephemeral</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
 <td class="property_name"><a class="link" href="WebKitWebView.html#WebKitWebView--is-loading" title="The “is-loading” property">is-loading</a></td>
 <td class="property_flags">Read</td>
 </tr>
@@ -1134,6 +1147,39 @@ in the view by the user content manager.</p>
 <p> The newly created <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> widget</p>
 </div>
 <p class="since">Since: <a class="link" href="api-index-2-6.html#api-index-2.6">2.6</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-view-is-ephemeral"></a><h3>webkit_web_view_is_ephemeral ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
+webkit_web_view_is_ephemeral (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);</pre>
+<p>Get whether a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> is ephemeral. To create an ephemeral <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> you need to
+use <a href="../gobject/gobject-The-Base-Object-Type.html#g-object-new"><code class="function">g_object_new()</code></a> and pass is-ephemeral propery with <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> value. See
+<a class="link" href="WebKitWebView.html#WebKitWebView--is-ephemeral" title="The “is-ephemeral” property"><span class="type">“is-ephemeral”</span></a> for more details.
+If <em class="parameter"><code>web_view</code></em>
+ was created with a ephemeral <a class="link" href="WebKitWebView.html#WebKitWebView--related-view" title="The “related-view” property"><span class="type">“related-view”</span></a> or an
+ephemeral <a class="link" href="WebKitWebView.html#WebKitWebView--web-context" title="The “web-context” property"><span class="type">“web-context”</span></a> it will also be ephemeral.</p>
+<div class="refsect3">
+<a name="webkit-web-view-is-ephemeral.parameters"></a><h4>Parameters</h4>
+<div class="informaltable"><table class="informaltable" width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>web_view</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3">
+<a name="webkit-web-view-is-ephemeral.returns"></a><h4>Returns</h4>
+<p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if <em class="parameter"><code>web_view</code></em>
+is ephemeral or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</p>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-16.html#api-index-2.16">2.16</a></p>
 </div>
 <hr>
 <div class="refsect2">
@@ -4327,6 +4373,21 @@ and child documents.</p>
 <p>The favicon currently associated to the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>.
 See <a class="link" href="WebKitWebView.html#webkit-web-view-get-favicon" title="webkit_web_view_get_favicon ()"><code class="function">webkit_web_view_get_favicon()</code></a> for more details.</p>
 <p>Flags: Read</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebView--is-ephemeral"></a><h3>The <code class="literal">“is-ephemeral”</code> property</h3>
+<pre class="programlisting">  “is-ephemeral”             <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
+<p>Whether the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> is ephemeral. An ephemeral web view never writes
+website data to the client storage, no matter what <a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a>
+its context is using. This is normally used to implement private browsing mode.
+This is a <a href="../gobject/gobject-GParamSpec.html#G-PARAM-CONSTRUCT-ONLY:CAPS"><code class="literal">G_PARAM_CONSTRUCT_ONLY</code></a> property, so you have to create a ephemeral
+<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> and it can't be changed. Note that all <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s
+created with an ephemeral <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> will be ephemeral automatically.
+See also <a class="link" href="WebKitWebContext.html#webkit-web-context-new-ephemeral" title="webkit_web_context_new_ephemeral ()"><code class="function">webkit_web_context_new_ephemeral()</code></a>.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p>Default value: FALSE</p>
+<p class="since">Since: <a class="link" href="api-index-2-16.html#api-index-2.16">2.16</a></p>
 </div>
 <hr>
 <div class="refsect2">

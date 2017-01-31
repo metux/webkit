@@ -262,7 +262,7 @@ bool SubresourceLoader::shouldCreateQuickLookHandleForResponse(const ResourceRes
     if (m_resource->type() != CachedResource::MainResource)
         return false;
 
-    if (m_documentLoader->quickLookHandle())
+    if (m_quickLookHandle)
         return false;
 
     return QuickLookHandle::shouldCreateForMIMEType(response.mimeType());
@@ -277,7 +277,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
 
 #if USE(QUICK_LOOK)
     if (shouldCreateQuickLookHandleForResponse(response)) {
-        m_documentLoader->setQuickLookHandle(QuickLookHandle::create(*this, response));
+        m_quickLookHandle = QuickLookHandle::create(*this, response);
         return;
     }
 #endif
@@ -356,7 +356,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
 void SubresourceLoader::didReceiveData(const char* data, unsigned length, long long encodedDataLength, DataPayloadType dataPayloadType)
 {
 #if USE(QUICK_LOOK)
-    if (auto quickLookHandle = m_documentLoader->quickLookHandle()) {
+    if (auto quickLookHandle = m_quickLookHandle.get()) {
         if (quickLookHandle->didReceiveData(data, length))
             return;
     }
@@ -368,7 +368,7 @@ void SubresourceLoader::didReceiveData(const char* data, unsigned length, long l
 void SubresourceLoader::didReceiveBuffer(Ref<SharedBuffer>&& buffer, long long encodedDataLength, DataPayloadType dataPayloadType)
 {
 #if USE(QUICK_LOOK)
-    if (auto quickLookHandle = m_documentLoader->quickLookHandle()) {
+    if (auto quickLookHandle = m_quickLookHandle.get()) {
         if (quickLookHandle->didReceiveBuffer(buffer.get()))
             return;
     }
@@ -455,7 +455,7 @@ static void logResourceLoaded(Frame* frame, CachedResource::Type type)
         resourceType = DiagnosticLoggingKeys::otherKey();
         break;
     }
-    frame->page()->diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceKey(), DiagnosticLoggingKeys::loadedKey(), resourceType, ShouldSample::Yes);
+    frame->page()->diagnosticLoggingClient().logDiagnosticMessage(DiagnosticLoggingKeys::resourceLoadedKey(), resourceType, ShouldSample::Yes);
 }
 
 bool SubresourceLoader::checkResponseCrossOriginAccessControl(const ResourceResponse& response, String& errorDescription)
@@ -513,7 +513,7 @@ bool SubresourceLoader::checkRedirectionCrossOriginAccessControl(const ResourceR
 void SubresourceLoader::didFinishLoading(double finishTime)
 {
 #if USE(QUICK_LOOK)
-    if (auto quickLookHandle = m_documentLoader->quickLookHandle()) {
+    if (auto quickLookHandle = m_quickLookHandle.get()) {
         if (quickLookHandle->didFinishLoading())
             return;
     }
@@ -540,8 +540,10 @@ void SubresourceLoader::didFinishLoading(double finishTime)
     m_loadTiming.setResponseEnd(responseEndTime);
 
 #if ENABLE(WEB_TIMING)
-    if (m_documentLoader->cachedResourceLoader().document() && RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled())
-        m_documentLoader->cachedResourceLoader().resourceTimingInformation().addResourceTiming(m_resource, *m_documentLoader->cachedResourceLoader().document(), m_resource->loader()->loadTiming());
+    if (RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled()) {
+        if (Document* document = m_documentLoader->cachedResourceLoader().document())
+            m_documentLoader->cachedResourceLoader().resourceTimingInformation().addResourceTiming(m_resource, *document, m_resource->loader()->loadTiming());
+    }
 #endif
 
     m_state = Finishing;
@@ -562,7 +564,7 @@ void SubresourceLoader::didFinishLoading(double finishTime)
 void SubresourceLoader::didFail(const ResourceError& error)
 {
 #if USE(QUICK_LOOK)
-    if (auto quickLookHandle = m_documentLoader->quickLookHandle())
+    if (auto quickLookHandle = m_quickLookHandle.get())
         quickLookHandle->didFail();
 #endif
 

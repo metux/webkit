@@ -145,8 +145,10 @@
 #include <WebCore/HistoryItem.h>
 #include <WebCore/HitTestResult.h>
 #include <WebCore/InspectorController.h>
+#include <WebCore/JSDOMExceptionHandling.h>
 #include <WebCore/JSDOMWindow.h>
 #include <WebCore/KeyboardEvent.h>
+#include <WebCore/LibWebRTCProvider.h>
 #include <WebCore/MIMETypeRegistry.h>
 #include <WebCore/MainFrame.h>
 #include <WebCore/MouseEvent.h>
@@ -236,10 +238,6 @@
 #include <wtf/RefCountedLeakCounter.h>
 #endif
 
-#if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
-#include "LayerTreeHost.h"
-#endif
-
 #if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
 #include "CoordinatedLayerTreeHostMessages.h"
 #endif
@@ -313,9 +311,9 @@ private:
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, webPageCounter, ("WebPage"));
 
-Ref<WebPage> WebPage::create(uint64_t pageID, const WebPageCreationParameters& parameters)
+Ref<WebPage> WebPage::create(uint64_t pageID, WebPageCreationParameters&& parameters)
 {
-    Ref<WebPage> page = adoptRef(*new WebPage(pageID, parameters));
+    Ref<WebPage> page = adoptRef(*new WebPage(pageID, WTFMove(parameters)));
 
     if (page->pageGroup()->isVisibleToInjectedBundle() && WebProcess::singleton().injectedBundle())
         WebProcess::singleton().injectedBundle()->didCreatePage(page.ptr());
@@ -323,7 +321,7 @@ Ref<WebPage> WebPage::create(uint64_t pageID, const WebPageCreationParameters& p
     return page;
 }
 
-WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
+WebPage::WebPage(uint64_t pageID, WebPageCreationParameters&& parameters)
     : m_pageID(pageID)
     , m_viewSize(parameters.viewSize)
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
@@ -373,7 +371,11 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     Settings::setShouldManageAudioSessionCategory(true);
 #endif
 
-    PageConfiguration pageConfiguration(makeUniqueRef<WebEditorClient>(this), WebSocketProvider::create());
+    PageConfiguration pageConfiguration(
+        makeUniqueRef<WebEditorClient>(this),
+        WebSocketProvider::create(),
+        makeUniqueRef<WebCore::LibWebRTCProvider>()
+    );
     pageConfiguration.chromeClient = new WebChromeClient(*this);
 #if ENABLE(CONTEXT_MENUS)
     pageConfiguration.contextMenuClient = new WebContextMenuClient(this);
@@ -553,10 +555,11 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 
 #if PLATFORM(COCOA)
     m_page->settings().setContentDispositionAttachmentSandboxEnabled(true);
+    setSmartInsertDeleteEnabled(parameters.smartInsertDeleteEnabled);
 #endif
 }
 
-void WebPage::reinitializeWebPage(const WebPageCreationParameters& parameters)
+void WebPage::reinitializeWebPage(WebPageCreationParameters&& parameters)
 {
     if (m_activityState != parameters.activityState)
         setActivityState(parameters.activityState, false, Vector<uint64_t>());
@@ -1423,8 +1426,7 @@ void WebPage::sendViewportAttributesChanged(const ViewportArguments& viewportArg
     setFixedLayoutSize(roundedIntSize(attr.layoutSize));
 
 #if USE(COORDINATED_GRAPHICS_THREADED)
-    if (m_drawingArea->layerTreeHost())
-        m_drawingArea->layerTreeHost()->didChangeViewportProperties(attr);
+    m_drawingArea->didChangeViewportAttributes(WTFMove(attr));
 #else
     send(Messages::WebPageProxy::DidChangeViewportProperties(attr));
 #endif
@@ -1582,8 +1584,7 @@ void WebPage::scalePage(double scale, const IntPoint& origin)
         pluginView->pageScaleFactorDidChange();
 
 #if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
-    if (m_drawingArea->layerTreeHost())
-        m_drawingArea->layerTreeHost()->deviceOrPageScaleFactorChanged();
+    m_drawingArea->deviceOrPageScaleFactorChanged();
 #endif
 
     send(Messages::WebPageProxy::PageScaleFactorDidChange(scale));
@@ -1660,8 +1661,7 @@ void WebPage::setDeviceScaleFactor(float scaleFactor)
     }
 
 #if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
-    if (m_drawingArea->layerTreeHost())
-        m_drawingArea->layerTreeHost()->deviceOrPageScaleFactorChanged();
+    m_drawingArea->deviceOrPageScaleFactorChanged();
 #endif
 }
 
@@ -1745,8 +1745,8 @@ void WebPage::viewportPropertiesDidChange(const ViewportArguments& viewportArgum
     if (view && view->useFixedLayout())
         sendViewportAttributesChanged(viewportArguments);
 #if USE(COORDINATED_GRAPHICS_THREADED)
-    else if (auto* layerTreeHost = m_drawingArea->layerTreeHost())
-        layerTreeHost->didChangeViewportProperties(ViewportAttributes());
+    else
+        m_drawingArea->didChangeViewportAttributes(ViewportAttributes());
 #endif
 #endif
 
@@ -2832,9 +2832,10 @@ void WebPage::getSelectionAsWebArchiveData(uint64_t callbackID)
 
 void WebPage::getSelectionOrContentsAsString(uint64_t callbackID)
 {
-    String resultString = m_mainFrame->selectionAsString();
+    WebFrame* focusedOrMainFrame = WebFrame::fromCoreFrame(m_page->focusController().focusedOrMainFrame());
+    String resultString = focusedOrMainFrame->selectionAsString();
     if (resultString.isEmpty())
-        resultString = m_mainFrame->contentsAsString();
+        resultString = focusedOrMainFrame->contentsAsString();
     send(Messages::WebPageProxy::StringCallback(resultString, callbackID));
 }
 
@@ -2989,6 +2990,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 #endif
     settings.setLocalFileContentSniffingEnabled(store.getBoolValueForKey(WebPreferencesKey::localFileContentSniffingEnabledKey()));
     settings.setUsesPageCache(store.getBoolValueForKey(WebPreferencesKey::usesPageCacheKey()));
+    settings.setAllowsPageCacheWithWindowOpener(store.getBoolValueForKey(WebPreferencesKey::allowsPageCacheWithWindowOpenerKey()));
     settings.setPageCacheSupportsPlugins(store.getBoolValueForKey(WebPreferencesKey::pageCacheSupportsPluginsKey()));
     settings.setAuthorAndUserStylesEnabled(store.getBoolValueForKey(WebPreferencesKey::authorAndUserStylesEnabledKey()));
     settings.setPaginateDuringLayoutEnabled(store.getBoolValueForKey(WebPreferencesKey::paginateDuringLayoutEnabledKey()));
@@ -3232,6 +3234,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 
     // Experimental Features.
 
+    RuntimeEnabledFeatures::sharedFeatures().setLinkPreloadEnabled(store.getBoolValueForKey(WebPreferencesKey::linkPreloadEnabledKey()));
+
 #if ENABLE(CSS_GRID_LAYOUT)
     RuntimeEnabledFeatures::sharedFeatures().setCSSGridLayoutEnabled(store.getBoolValueForKey(WebPreferencesKey::cssGridLayoutEnabledKey()));
 #endif
@@ -3258,6 +3262,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 #if ENABLE(INTERSECTION_OBSERVER)
     RuntimeEnabledFeatures::sharedFeatures().setIntersectionObserverEnabled(store.getBoolValueForKey(WebPreferencesKey::intersectionObserverEnabledKey()));
 #endif
+
+    RuntimeEnabledFeatures::sharedFeatures().setUserTimingEnabled(store.getBoolValueForKey(WebPreferencesKey::userTimingEnabledKey()));
 
     bool processSuppressionEnabled = store.getBoolValueForKey(WebPreferencesKey::pageVisibilityBasedProcessSuppressionEnabledKey());
     if (m_processSuppressionEnabled != processSuppressionEnabled) {
@@ -3521,6 +3527,9 @@ void WebPage::performDragControllerAction(uint64_t action, const WebCore::DragDa
         m_pendingDropSandboxExtension = nullptr;
 
         m_pendingDropExtensionsForFileUpload.clear();
+#if ENABLE(DATA_INTERACTION)
+        send(Messages::WebPageProxy::DidPerformDataInteractionControllerOperation());
+#endif
         break;
     }
 
@@ -5459,6 +5468,11 @@ void WebPage::reportUsedFeatures()
     m_loaderClient.featuresUsedInPage(this, namedFeatures);
 }
 
+void WebPage::updateWebsitePolicies(const WebsitePolicies&)
+{
+    // FIXME: Update the website policies in m_page.
+}
+
 unsigned WebPage::extendIncrementalRenderingSuppression()
 {
     unsigned token = m_maximumRenderingSuppressionToken + 1;
@@ -5689,9 +5703,9 @@ void WebPage::setUserInterfaceLayoutDirection(uint32_t direction)
 
 #if ENABLE(GAMEPAD)
 
-void WebPage::gamepadActivity(const Vector<GamepadData>& gamepadDatas)
+void WebPage::gamepadActivity(const Vector<GamepadData>& gamepadDatas, bool shouldMakeGamepadsVisible)
 {
-    WebGamepadProvider::singleton().gamepadActivity(gamepadDatas);
+    WebGamepadProvider::singleton().gamepadActivity(gamepadDatas, shouldMakeGamepadsVisible);
 }
 
 #endif

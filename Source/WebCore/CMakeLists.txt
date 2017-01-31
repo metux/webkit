@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8.12)
 include(WebKitCommon)
 set_property(DIRECTORY . PROPERTY FOLDER "WebCore")
+add_subdirectory(PAL/pal)
 
 set(WebCore_INCLUDE_DIRECTORIES
     "${CMAKE_BINARY_DIR}"
@@ -87,6 +88,7 @@ set(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/opentype"
     "${WEBCORE_DIR}/platform/graphics/transforms"
     "${WEBCORE_DIR}/platform/mediastream"
+    "${WEBCORE_DIR}/platform/mediastream/libwebrtc"
     "${WEBCORE_DIR}/platform/mock"
     "${WEBCORE_DIR}/platform/mock/mediasource"
     "${WEBCORE_DIR}/platform/network"
@@ -599,6 +601,9 @@ set(WebCore_NON_SVG_IDL_FILES
     page/PerformanceEntry.idl
     page/PerformanceMark.idl
     page/PerformanceMeasure.idl
+    page/PerformanceObserver.idl
+    page/PerformanceObserverCallback.idl
+    page/PerformanceObserverEntryList.idl
     page/PerformanceNavigation.idl
     page/PerformanceResourceTiming.idl
     page/PerformanceTiming.idl
@@ -1065,10 +1070,8 @@ set(WebCore_SOURCES
     animation/KeyframeEffect.cpp
     animation/WebAnimation.cpp
 
-    bindings/js/CachedModuleScript.cpp
     bindings/js/CachedModuleScriptLoader.cpp
     bindings/js/CachedScriptFetcher.cpp
-    bindings/js/CallbackFunction.cpp
     bindings/js/CommonVM.cpp
     bindings/js/DOMWrapperWorld.cpp
     bindings/js/GCController.cpp
@@ -1099,6 +1102,9 @@ set(WebCore_SOURCES
     bindings/js/JSCustomEventCustom.cpp
     bindings/js/JSCustomXPathNSResolver.cpp
     bindings/js/JSDOMBinding.cpp
+    bindings/js/JSDOMBindingSecurity.cpp
+    bindings/js/JSDOMConstructor.cpp
+    bindings/js/JSDOMExceptionHandling.cpp
     bindings/js/JSDOMGlobalObject.cpp
     bindings/js/JSDOMGlobalObjectTask.cpp
     bindings/js/JSDOMPromise.cpp
@@ -1108,6 +1114,7 @@ set(WebCore_SOURCES
     bindings/js/JSDOMWindowProperties.cpp
     bindings/js/JSDOMWindowShell.cpp
     bindings/js/JSDOMWrapper.cpp
+    bindings/js/JSDOMWrapperCache.cpp
     bindings/js/JSDocumentCustom.cpp
     bindings/js/JSDocumentFragmentCustom.cpp
     bindings/js/JSElementCustom.cpp
@@ -1473,6 +1480,7 @@ set(WebCore_SOURCES
     dom/Range.cpp
     dom/ScopedEventQueue.cpp
     dom/ScriptElement.cpp
+    dom/ScriptElementCachedScriptFetcher.cpp
     dom/ScriptExecutionContext.cpp
     dom/ScriptRunner.cpp
     dom/ScriptableDocumentParser.cpp
@@ -1988,6 +1996,8 @@ set(WebCore_SOURCES
     page/PerformanceLogging.cpp
     page/PerformanceMonitor.cpp
     page/PerformanceNavigation.cpp
+    page/PerformanceObserver.cpp
+    page/PerformanceObserverEntryList.cpp
     page/PerformanceResourceTiming.cpp
     page/PerformanceTiming.cpp
     page/PerformanceUserTiming.cpp
@@ -2359,6 +2369,7 @@ set(WebCore_SOURCES
     rendering/FixedTableLayout.cpp
     rendering/FloatingObjects.cpp
     rendering/FlowThreadController.cpp
+    rendering/Grid.cpp
     rendering/HitTestLocation.cpp
     rendering/HitTestResult.cpp
     rendering/HitTestingTransformState.cpp
@@ -2945,6 +2956,7 @@ set(WebCore_PLUG_INS_RESOURCES
 set(WebCore_LIBRARIES
     ${ICU_LIBRARIES}
     JavaScriptCore${DEBUG_SUFFIX}
+    PAL${DEBUG_SUFFIX}
 )
 
 if (ENABLE_LEGACY_ENCRYPTED_MEDIA)
