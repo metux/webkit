@@ -18,7 +18,7 @@ Index: webkitgtk/Source/JavaScriptCore/CMakeLists.txt
 ===================================================================
 --- webkitgtk.orig/Source/JavaScriptCore/CMakeLists.txt
 +++ webkitgtk/Source/JavaScriptCore/CMakeLists.txt
-@@ -1465,6 +1465,7 @@ endif ()
+@@ -1467,6 +1467,7 @@ endif ()
  
  if (WTF_CPU_ARM)
  elseif (WTF_CPU_ARM64)
