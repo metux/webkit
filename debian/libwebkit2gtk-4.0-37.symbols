@@ -1444,6 +1444,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_get_major_version@Base 2.5.3
  webkit_get_micro_version@Base 2.5.3
  webkit_get_minor_version@Base 2.5.3
+ webkit_hardware_acceleration_policy_get_type@Base 2.15.4
  webkit_hit_test_result_context_get_type@Base 2.5.3
  webkit_hit_test_result_context_is_editable@Base 2.5.3
  webkit_hit_test_result_context_is_image@Base 2.5.3
@@ -1625,6 +1626,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_settings_get_enable_write_console_messages_to_stdout@Base 2.5.3
  webkit_settings_get_enable_xss_auditor@Base 2.5.3
  webkit_settings_get_fantasy_font_family@Base 2.5.3
+ webkit_settings_get_hardware_acceleration_policy@Base 2.15.4
  webkit_settings_get_javascript_can_access_clipboard@Base 2.5.3
  webkit_settings_get_javascript_can_open_windows_automatically@Base 2.5.3
  webkit_settings_get_load_icons_ignoring_image_load_setting@Base 2.5.3
@@ -1678,6 +1680,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_settings_set_enable_write_console_messages_to_stdout@Base 2.5.3
  webkit_settings_set_enable_xss_auditor@Base 2.5.3
  webkit_settings_set_fantasy_font_family@Base 2.5.3
+ webkit_settings_set_hardware_acceleration_policy@Base 2.15.4
  webkit_settings_set_javascript_can_access_clipboard@Base 2.5.3
  webkit_settings_set_javascript_can_open_windows_automatically@Base 2.5.3
  webkit_settings_set_load_icons_ignoring_image_load_setting@Base 2.5.3
@@ -1761,7 +1764,9 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_web_context_get_web_process_count_limit@Base 2.10.0
  webkit_web_context_get_website_data_manager@Base 2.10.0
  webkit_web_context_initialize_notification_permissions@Base 2.15.3
+ webkit_web_context_is_ephemeral@Base 2.15.4
  webkit_web_context_new@Base 2.8.1
+ webkit_web_context_new_ephemeral@Base 2.15.4
  webkit_web_context_new_with_website_data_manager@Base 2.10.0
  webkit_web_context_prefetch_dns@Base 2.5.3
  webkit_web_context_register_uri_scheme@Base 2.5.3
@@ -1843,6 +1848,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_web_view_go_forward@Base 2.5.3
  webkit_web_view_go_to_back_forward_list_item@Base 2.5.3
  webkit_web_view_is_editable@Base 2.8.1
+ webkit_web_view_is_ephemeral@Base 2.15.4
  webkit_web_view_is_loading@Base 2.5.3
  webkit_web_view_is_playing_audio@Base 2.8.1
  webkit_web_view_load_alternate_html@Base 2.5.3
@@ -1879,6 +1885,14 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_web_view_set_zoom_level@Base 2.5.3
  webkit_web_view_stop_loading@Base 2.5.3
  webkit_web_view_try_close@Base 2.12.0
+ webkit_website_data_get_name@Base 2.15.4
+ webkit_website_data_get_size@Base 2.15.4
+ webkit_website_data_get_type@Base 2.15.4
+ webkit_website_data_get_types@Base 2.15.4
+ webkit_website_data_manager_clear@Base 2.15.4
+ webkit_website_data_manager_clear_finish@Base 2.15.4
+ webkit_website_data_manager_fetch@Base 2.15.4
+ webkit_website_data_manager_fetch_finish@Base 2.15.4
  webkit_website_data_manager_get_base_cache_directory@Base 2.10.0
  webkit_website_data_manager_get_base_data_directory@Base 2.10.0
  webkit_website_data_manager_get_disk_cache_directory@Base 2.10.0
@@ -1887,7 +1901,14 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_website_data_manager_get_offline_application_cache_directory@Base 2.10.0
  webkit_website_data_manager_get_type@Base 2.10.0
  webkit_website_data_manager_get_websql_directory@Base 2.10.0
+ webkit_website_data_manager_is_ephemeral@Base 2.15.4
  webkit_website_data_manager_new@Base 2.10.0
+ webkit_website_data_manager_new_ephemeral@Base 2.15.4
+ webkit_website_data_manager_remove@Base 2.15.4
+ webkit_website_data_manager_remove_finish@Base 2.15.4
+ webkit_website_data_ref@Base 2.15.4
+ webkit_website_data_types_get_type@Base 2.15.4
+ webkit_website_data_unref@Base 2.15.4
  webkit_window_properties_get_fullscreen@Base 2.5.3
  webkit_window_properties_get_geometry@Base 2.5.3
  webkit_window_properties_get_locationbar_visible@Base 2.5.3
