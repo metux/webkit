@@ -1,6 +1,7 @@
 webkit2gtk (2.15.90-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Refresh all patches.
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 21 Feb 2017 10:44:50 +0200
 
