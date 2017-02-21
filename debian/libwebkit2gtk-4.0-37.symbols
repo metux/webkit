@@ -1539,6 +1539,10 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_policy_decision_use@Base 2.5.3
  webkit_policy_error_get_type@Base 2.5.3
  webkit_policy_error_quark@Base 2.5.3
+ webkit_print_custom_widget_get_title@Base 2.15.90
+ webkit_print_custom_widget_get_type@Base 2.15.90
+ webkit_print_custom_widget_get_widget@Base 2.15.90
+ webkit_print_custom_widget_new@Base 2.15.90
  webkit_print_error_get_type@Base 2.5.3
  webkit_print_error_quark@Base 2.5.3
  webkit_print_operation_get_page_setup@Base 2.5.3
@@ -1842,6 +1846,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_web_view_get_type@Base 2.5.3
  webkit_web_view_get_uri@Base 2.5.3
  webkit_web_view_get_user_content_manager@Base 2.5.3
+ webkit_web_view_get_website_data_manager@Base 2.15.90
  webkit_web_view_get_window_properties@Base 2.5.3
  webkit_web_view_get_zoom_level@Base 2.5.3
  webkit_web_view_go_back@Base 2.5.3
@@ -1895,6 +1900,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_website_data_manager_fetch_finish@Base 2.15.4
  webkit_website_data_manager_get_base_cache_directory@Base 2.10.0
  webkit_website_data_manager_get_base_data_directory@Base 2.10.0
+ webkit_website_data_manager_get_cookie_manager@Base 2.15.90
  webkit_website_data_manager_get_disk_cache_directory@Base 2.10.0
  webkit_website_data_manager_get_indexeddb_directory@Base 2.10.0
  webkit_website_data_manager_get_local_storage_directory@Base 2.10.0
