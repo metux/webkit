@@ -140,10 +140,8 @@
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicStringHash.h>
 
-#if ENABLE(CSS_GRID_LAYOUT)
 #include "CSSGridLineNamesValue.h"
 #include "CSSGridTemplateAreasValue.h"
-#endif
 
 #if ENABLE(DASHBOARD_SUPPORT)
 #include "DashboardRegion.h"
@@ -232,7 +230,7 @@ StyleResolver::StyleResolver(Document& document)
     : m_matchedPropertiesCacheAdditionsSinceLastSweep(0)
     , m_matchedPropertiesCacheSweepTimer(*this, &StyleResolver::sweepMatchedPropertiesCache)
     , m_document(document)
-    , m_matchAuthorAndUserStyles(m_document.settings() ? m_document.settings()->authorAndUserStylesEnabled() : true)
+    , m_matchAuthorAndUserStyles(m_document.settings().authorAndUserStylesEnabled())
 #if ENABLE(CSS_DEVICE_ADAPTATION)
     , m_viewportStyleResolver(ViewportStyleResolver::create(&document))
 #endif
@@ -682,12 +680,8 @@ std::unique_ptr<RenderStyle> StyleResolver::defaultStyleForElement()
 {
     m_state.setStyle(RenderStyle::createPtr());
     // Make sure our fonts are initialized if we don't inherit them from our parent style.
-    initializeFontStyle(documentSettings());
-    if (documentSettings())
-        m_state.style()->fontCascade().update(&document().fontSelector());
-    else
-        m_state.style()->fontCascade().update(nullptr);
-
+    initializeFontStyle();
+    m_state.style()->fontCascade().update(&document().fontSelector());
     return m_state.takeStyle();
 }
 
@@ -721,9 +715,7 @@ static EDisplay equivalentBlockDisplay(const RenderStyle& style, const Document&
     case BOX:
     case FLEX:
     case WEBKIT_FLEX:
-#if ENABLE(CSS_GRID_LAYOUT)
     case GRID:
-#endif
         return display;
 
     case LIST_ITEM:
@@ -738,10 +730,8 @@ static EDisplay equivalentBlockDisplay(const RenderStyle& style, const Document&
     case INLINE_FLEX:
     case WEBKIT_INLINE_FLEX:
         return FLEX;
-#if ENABLE(CSS_GRID_LAYOUT)
     case INLINE_GRID:
         return GRID;
-#endif
 
     case INLINE:
     case COMPACT:
@@ -921,7 +911,7 @@ void StyleResolver::adjustRenderStyle(RenderStyle& style, const RenderStyle& par
             || style.hasBlendMode()
             || style.hasIsolation()
             || style.position() == StickyPosition
-            || (style.position() == FixedPosition && documentSettings() && documentSettings()->fixedPositionCreatesStackingContext())
+            || (style.position() == FixedPosition && settings().fixedPositionCreatesStackingContext())
             || style.hasFlowFrom()
             || style.willChangeCreatesStackingContext())
             style.setZIndex(0);
@@ -1503,6 +1493,11 @@ inline bool StyleResolver::isValidCueStyleProperty(CSSPropertyID id)
     case CSSPropertyTextDecoration:
     case CSSPropertyTextShadow:
     case CSSPropertyBorderStyle:
+    case CSSPropertyPaintOrder:
+    case CSSPropertyStrokeLinejoin:
+    case CSSPropertyStrokeLinecap:
+    case CSSPropertyWebkitTextStrokeColor:
+    case CSSPropertyWebkitTextStrokeWidth:
         return true;
     default:
         break;
@@ -1740,9 +1735,8 @@ void StyleResolver::checkForGenericFamilyChange(RenderStyle* style, const Render
     if (CSSValueID sizeIdentifier = childFont.keywordSizeAsIdentifier())
         size = Style::fontSizeForKeyword(sizeIdentifier, childFont.useFixedDefaultSize(), document());
     else {
-        Settings* settings = documentSettings();
-        float fixedScaleFactor = (settings && settings->defaultFixedFontSize() && settings->defaultFontSize())
-            ? static_cast<float>(settings->defaultFixedFontSize()) / settings->defaultFontSize()
+        float fixedScaleFactor = (settings().defaultFixedFontSize() && settings().defaultFontSize())
+            ? static_cast<float>(settings().defaultFixedFontSize()) / settings().defaultFontSize()
             : 1;
         size = parentFont.useFixedDefaultSize() ?
                 childFont.specifiedSize() / fixedScaleFactor :
@@ -1754,11 +1748,10 @@ void StyleResolver::checkForGenericFamilyChange(RenderStyle* style, const Render
     style->setFontDescription(newFontDescription);
 }
 
-void StyleResolver::initializeFontStyle(Settings* settings)
+void StyleResolver::initializeFontStyle()
 {
     FontCascadeDescription fontDescription;
-    if (settings)
-        fontDescription.setRenderingMode(settings->fontRenderingMode());
+    fontDescription.setRenderingMode(settings().fontRenderingMode());
     fontDescription.setOneFamily(standardFamily);
     fontDescription.setKeywordSizeFromIdentifier(CSSValueMedium);
     setFontSize(fontDescription, Style::fontSizeForKeyword(CSSValueMedium, false, document()));

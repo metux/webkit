@@ -391,8 +391,7 @@ private:
 
 #if ENABLE(DRAG_SUPPORT)
     bool dispatchDragEvent(const AtomicString& eventType, Element& target, const PlatformMouseEvent&, DataTransfer*);
-
-    void freeDataTransfer();
+    void invalidateDataTransfer();
 
     bool handleDrag(const MouseEventWithHitTestResults&, CheckDragHysteresis);
 #endif
@@ -443,7 +442,8 @@ private:
     void updateSelectionForMouseDrag(const HitTestResult&);
 #endif
 
-    void updateLastScrollbarUnderMouse(Scrollbar*, bool);
+    enum class SetOrClearLastScrollbar { Clear, Set };
+    void updateLastScrollbarUnderMouse(Scrollbar*, SetOrClearLastScrollbar);
     
     void setFrameWasScrolledByUser();
 
@@ -490,8 +490,6 @@ private:
 #if ENABLE(DRAG_SUPPORT)
     LayoutPoint m_dragStartPosition;
 #endif
-
-    bool m_panScrollButtonPressed { false };
 
     Timer m_hoverTimer;
 
@@ -583,7 +581,6 @@ private:
 #endif
 
     double m_maxMouseMovedDuration { 0 };
-    PlatformEvent::Type m_baseEventType { PlatformEvent::NoType };
     bool m_didStartDrag { false };
     bool m_isHandlingWheelEvent { false };
 

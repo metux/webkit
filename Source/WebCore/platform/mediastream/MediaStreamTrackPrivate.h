@@ -98,9 +98,10 @@ private:
     // RealtimeMediaSourceObserver
     void sourceStopped() final;
     void sourceMutedChanged() final;
+    void sourceEnabledChanged() final;
     void sourceSettingsChanged() final;
     bool preventSourceFromStopping() final;
-    void sourceHasMoreMediaData(MediaSample&) final;
+    void videoSampleAvailable(MediaSample&) final;
 
     Vector<Observer*> m_observers;
     Ref<RealtimeMediaSource> m_source;

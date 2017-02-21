@@ -36,10 +36,9 @@ public:
     }
 
 private:
-    bool startLoading(CustomProtocolManagerProxy& manager, uint64_t customProtocolID, const ResourceRequest& request) override
+    void startLoading(CustomProtocolManagerProxy& manager, uint64_t customProtocolID, const ResourceRequest& request) override
     {
         webkitWebContextStartLoadingCustomProtocol(m_webContext, customProtocolID, request, manager);
-        return true;
     }
 
     void stopLoading(CustomProtocolManagerProxy&, uint64_t customProtocolID) override
@@ -57,6 +56,5 @@ private:
 
 void attachCustomProtocolManagerClientToContext(WebKitWebContext* webContext)
 {
-    auto* processPool = webkitWebContextGetProcessPool(webContext);
-    processPool->setCustomProtocolManagerClient(std::make_unique<CustomProtocolManagerClient>(webContext));
+    webkitWebContextGetProcessPool(webContext).setCustomProtocolManagerClient(std::make_unique<CustomProtocolManagerClient>(webContext));
 }

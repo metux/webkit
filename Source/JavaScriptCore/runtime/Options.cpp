@@ -28,6 +28,7 @@
 
 #include "LLIntCommon.h"
 #include "LLIntData.h"
+#include "SigillCrashAnalyzer.h"
 #include <algorithm>
 #include <limits>
 #include <math.h>
@@ -142,6 +143,10 @@ bool Options::isAvailable(Options::ID id, Options::Availability availability)
 #endif
 #if !defined(NDEBUG)
     if (id == maxSingleAllocationSizeID)
+        return true;
+#endif
+#if OS(DARWIN)
+    if (id == useSigillCrashAnalyzerID)
         return true;
 #endif
     return false;
@@ -311,9 +316,9 @@ static void overrideDefaults()
     if (WTF::numberOfProcessorCores() < 4) {
         Options::maximumMutatorUtilization() = 0.6;
         Options::concurrentGCMaxHeadroom() = 1.4;
-        Options::concurrentGCPeriodMS() = 10;
-    } else
-        Options::useStochasticMutatorScheduler() = true;
+        Options::minimumGCPauseMS() = 1;
+        Options::gcIncrementScale() = 1;
+    }
 }
 
 static void recomputeDependentOptions()
@@ -429,6 +434,14 @@ static void recomputeDependentOptions()
     else
         fastSetMaxSingleAllocationSize(std::numeric_limits<size_t>::max());
 #endif
+
+    if (Options::useZombieMode()) {
+        Options::sweepSynchronously() = true;
+        Options::scribbleFreeCells() = true;
+    }
+
+    if (Options::useSigillCrashAnalyzer())
+        enableSigillCrashAnalyzer();
 }
 
 void Options::initialize()

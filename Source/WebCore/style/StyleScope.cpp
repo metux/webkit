@@ -117,7 +117,7 @@ void Scope::clearResolver()
 
 Scope& Scope::forNode(Node& node)
 {
-    ASSERT(node.inDocument());
+    ASSERT(node.isConnected());
     auto* shadowRoot = node.containingShadowRoot();
     if (shadowRoot)
         return shadowRoot->styleScope();
@@ -170,7 +170,7 @@ void Scope::setSelectedStylesheetSetName(const String& name)
 }
 
 // This method is called whenever a top-level stylesheet has finished loading.
-void Scope::removePendingSheet(RemovePendingSheetNotificationType notification)
+void Scope::removePendingSheet()
 {
     // Make sure we knew this sheet was pending, and that our count isn't out of sync.
     ASSERT(m_pendingStyleSheetCount > 0);
@@ -178,11 +178,6 @@ void Scope::removePendingSheet(RemovePendingSheetNotificationType notification)
     m_pendingStyleSheetCount--;
     if (m_pendingStyleSheetCount)
         return;
-
-    if (notification == RemovePendingSheetNotifyLater) {
-        m_document.setNeedsNotifyRemoveAllPendingStylesheet();
-        return;
-    }
 
     didChangeActiveStyleSheetCandidates();
 
@@ -192,7 +187,7 @@ void Scope::removePendingSheet(RemovePendingSheetNotificationType notification)
 
 void Scope::addStyleSheetCandidateNode(Node& node, bool createdByParser)
 {
-    if (!node.inDocument())
+    if (!node.isConnected())
         return;
     
     // Until the <body> exists, we have no choice but to compare document positions,
@@ -231,7 +226,7 @@ void Scope::removeStyleSheetCandidateNode(Node& node)
 
 void Scope::collectActiveStyleSheets(Vector<RefPtr<StyleSheet>>& sheets)
 {
-    if (m_document.settings() && !m_document.settings()->authorAndUserStylesEnabled())
+    if (!m_document.settings().authorAndUserStylesEnabled())
         return;
 
     for (auto& node : m_styleSheetCandidateNodes) {

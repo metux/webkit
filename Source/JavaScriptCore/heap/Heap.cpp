@@ -259,6 +259,7 @@ Heap::Heap(VM* vm, HeapType heapType)
     , m_deprecatedExtraMemorySize(0)
     , m_machineThreads(this)
     , m_collectorSlotVisitor(std::make_unique<SlotVisitor>(*this))
+    , m_mutatorSlotVisitor(std::make_unique<SlotVisitor>(*this))
     , m_mutatorMarkStack(std::make_unique<MarkStackArray>())
     , m_raceMarkStack(std::make_unique<MarkStackArray>())
     , m_constraintSet(std::make_unique<MarkingConstraintSet>())
@@ -305,16 +306,17 @@ Heap::Heap(VM* vm, HeapType heapType)
         m_verifier = std::make_unique<HeapVerifier>(this, Options::numberOfGCCyclesToRecordForVerification());
     
     m_collectorSlotVisitor->optimizeForStoppedMutator();
-    
+
     LockHolder locker(*m_threadLock);
     m_thread = adoptRef(new Thread(locker, *this));
 }
 
 Heap::~Heap()
 {
-    for (auto& slotVisitor : m_parallelSlotVisitors)
-        slotVisitor->clearMarkStacks();
-    m_collectorSlotVisitor->clearMarkStacks();
+    forEachSlotVisitor(
+        [&] (SlotVisitor& visitor) {
+            visitor.clearMarkStacks();
+        });
     m_mutatorMarkStack->clear();
     m_raceMarkStack->clear();
     
@@ -537,6 +539,11 @@ void Heap::markToFixpoint(double gcStartTime)
 
     beginMarking();
 
+    forEachSlotVisitor(
+        [&] (SlotVisitor& visitor) {
+            visitor.didStartMarking();
+        });
+
     m_parallelMarkersShouldExit = false;
 
     m_helperClient.setFunction(
@@ -551,6 +558,8 @@ void Heap::markToFixpoint(double gcStartTime)
                     if (Options::optimizeParallelSlotVisitorsForStoppedMutator())
                         newVisitor->optimizeForStoppedMutator();
                     
+                    newVisitor->didStartMarking();
+                    
                     slotVisitor = newVisitor.get();
                     m_parallelSlotVisitors.append(WTFMove(newVisitor));
                 } else
@@ -561,7 +570,6 @@ void Heap::markToFixpoint(double gcStartTime)
 
             {
                 ParallelModeEnabler parallelModeEnabler(*slotVisitor);
-                slotVisitor->didStartMarking();
                 slotVisitor->drainFromShared(SlotVisitor::SlaveDrain);
             }
 
@@ -572,7 +580,7 @@ void Heap::markToFixpoint(double gcStartTime)
         });
 
     SlotVisitor& slotVisitor = *m_collectorSlotVisitor;
-    slotVisitor.didStartMarking();
+
     m_constraintSet->didStartMarking();
     
     m_scheduler->beginCollection();
@@ -653,6 +661,10 @@ void Heap::markToFixpoint(double gcStartTime)
             double thisPauseMS = (MonotonicTime::now() - m_stopTime).milliseconds();
             dataLog("p=", thisPauseMS, "ms (max ", maxPauseMS(thisPauseMS), ")...]\n");
         }
+
+        // Forgive the mutator for its past failures to keep up.
+        // FIXME: Figure out if moving this to different places results in perf changes.
+        m_incrementBalance = 0;
         
         resumeTheWorld();
         
@@ -795,9 +807,7 @@ void Heap::removeDeadHeapSnapshotNodes(HeapProfiler& heapProfiler)
 void Heap::updateObjectCounts(double gcStartTime)
 {
     if (Options::logGC() == GCLogging::Verbose) {
-        size_t visitCount = m_collectorSlotVisitor->visitCount();
-        visitCount += threadVisitCount();
-        dataLogF("\nNumber of live Objects after GC %lu, took %.6f secs\n", static_cast<unsigned long>(visitCount), WTF::monotonicallyIncreasingTime() - gcStartTime);
+        dataLogF("\nNumber of live Objects after GC %lu, took %.6f secs\n", static_cast<unsigned long>(visitCount()), WTF::monotonicallyIncreasingTime() - gcStartTime);
     }
     
     if (m_collectionScope == CollectionScope::Full)
@@ -810,10 +820,10 @@ void Heap::updateObjectCounts(double gcStartTime)
 
 void Heap::endMarking()
 {
-    m_collectorSlotVisitor->reset();
-
-    for (auto& parallelVisitor : m_parallelSlotVisitors)
-        parallelVisitor->reset();
+    forEachSlotVisitor(
+        [&] (SlotVisitor& visitor) {
+            visitor.reset();
+        });
 
     assertSharedMarkStacksEmpty();
     m_weakReferenceHarvesters.removeAll();
@@ -1019,6 +1029,21 @@ void Heap::addToRememberedSet(const JSCell* constCell)
     m_mutatorMarkStack->append(cell);
 }
 
+void Heap::sweepSynchronously()
+{
+    double before = 0;
+    if (Options::logGC()) {
+        dataLog("[Full sweep: ", capacity() / 1024, "kb ");
+        before = currentTimeMS();
+    }
+    m_objectSpace.sweep();
+    m_objectSpace.shrink();
+    if (Options::logGC()) {
+        double after = currentTimeMS();
+        dataLog("=> ", capacity() / 1024, "kb, ", after - before, "ms] ");
+    }
+}
+
 void Heap::collectAllGarbage()
 {
     if (!m_isSafeToCollect)
@@ -1029,18 +1054,12 @@ void Heap::collectAllGarbage()
     DeferGCForAWhile deferGC(*this);
     if (UNLIKELY(Options::useImmortalObjects()))
         sweeper()->willFinishSweeping();
-    else {
-        double before = 0;
-        if (Options::logGC()) {
-            dataLog("[Full sweep: ", capacity() / 1024, "kb ");
-            before = currentTimeMS();
-        }
-        m_objectSpace.sweep();
-        m_objectSpace.shrink();
-        if (Options::logGC()) {
-            double after = currentTimeMS();
-            dataLog("=> ", capacity() / 1024, "kb, ", after - before, "ms]\n");
-        }
+
+    bool alreadySweptInCollectSync = Options::sweepSynchronously();
+    if (!alreadySweptInCollectSync) {
+        sweepSynchronously();
+        if (Options::logGC())
+            dataLog("\n");
     }
     m_objectSpace.assertNoUnswept();
 
@@ -1570,6 +1589,12 @@ void Heap::notifyThreadStopping(const LockHolder&)
 
 void Heap::finalize()
 {
+    MonotonicTime before;
+    if (Options::logGC()) {
+        before = MonotonicTime::now();
+        dataLog("[GC: finalize ");
+    }
+    
     {
         HelpingGCScope helpingGCScope(*this);
         deleteUnmarkedCompiledCode();
@@ -1579,6 +1604,14 @@ void Heap::finalize()
     
     if (HasOwnPropertyCache* cache = vm()->hasOwnPropertyCache())
         cache->clear();
+
+    if (Options::sweepSynchronously())
+        sweepSynchronously();
+
+    if (Options::logGC()) {
+        MonotonicTime after = MonotonicTime::now();
+        dataLog((after - before).milliseconds(), "ms]\n");
+    }
 }
 
 Heap::Ticket Heap::requestCollection(std::optional<CollectionScope> scope)
@@ -1705,11 +1738,6 @@ void Heap::notifyIncrementalSweeper()
     m_sweeper->startSweeping();
 }
 
-NEVER_INLINE void Heap::didExceedMaxLiveSize()
-{
-    CRASH();
-}
-
 void Heap::updateAllocationLimits()
 {
     static const bool verbose = false;
@@ -1741,9 +1769,6 @@ void Heap::updateAllocationLimits()
 
     if (verbose)
         dataLog("extraMemorySize() = ", extraMemorySize(), ", currentHeapSize = ", currentHeapSize, "\n");
-
-    if (m_maxLiveSize && currentHeapSize > m_maxLiveSize)
-        didExceedMaxLiveSize();
     
     if (Options::gcMaxHeapSize() && currentHeapSize > Options::gcMaxHeapSize())
         HeapStatistics::exitWithFailure();
@@ -1816,9 +1841,6 @@ void Heap::didFinishCollection(double gcStartTime)
     if (Options::recordGCPauseTimes())
         HeapStatistics::recordGCPauseTime(gcStartTime, gcEndTime);
 
-    if (Options::useZombieMode())
-        zombifyDeadObjects();
-
     if (Options::dumpObjectStatistics())
         HeapStatistics::dumpObjectStatistics(this);
 
@@ -1871,6 +1893,7 @@ void Heap::didAllocate(size_t bytes)
     if (m_edenActivityCallback)
         m_edenActivityCallback->didAllocate(m_bytesAllocatedThisCycle + m_bytesAbandonedSinceLastFullCollect);
     m_bytesAllocatedThisCycle += bytes;
+    performIncrement(bytes);
 }
 
 bool Heap::isValidAllocation(size_t)
@@ -1917,36 +1940,6 @@ void Heap::collectAllGarbageIfNotDoneRecently()
 
     m_fullActivityCallback->setDidSyncGCRecently();
     collectAllGarbage();
-}
-
-class Zombify : public MarkedBlock::VoidFunctor {
-public:
-    inline void visit(HeapCell* cell) const
-    {
-        void** current = reinterpret_cast_ptr<void**>(cell);
-
-        // We want to maintain zapped-ness because that's how we know if we've called 
-        // the destructor.
-        if (cell->isZapped())
-            current++;
-
-        void* limit = static_cast<void*>(reinterpret_cast<char*>(cell) + cell->cellSize());
-        for (; current < limit; current++)
-            *current = zombifiedBits;
-    }
-    IterationStatus operator()(HeapCell* cell, HeapCell::Kind) const
-    {
-        visit(cell);
-        return IterationStatus::Continue;
-    }
-};
-
-void Heap::zombifyDeadObjects()
-{
-    // Sweep now because destructors will crash once we're zombified.
-    m_objectSpace.sweep();
-    HeapIterationScope iterationScope(*this);
-    m_objectSpace.forEachDeadCell(iterationScope, Zombify());
 }
 
 bool Heap::shouldDoFullCollection(std::optional<CollectionScope> scope) const
@@ -1996,24 +1989,23 @@ bool Heap::sweepNextLogicallyEmptyWeakBlock()
     return true;
 }
 
-size_t Heap::threadVisitCount()
-{       
-    unsigned long result = 0;
-    for (auto& parallelVisitor : m_parallelSlotVisitors)
-        result += parallelVisitor->visitCount();
+size_t Heap::visitCount()
+{
+    size_t result = 0;
+    forEachSlotVisitor(
+        [&] (SlotVisitor& visitor) {
+            result += visitor.visitCount();
+        });
     return result;
 }
 
 size_t Heap::bytesVisited()
 {
-    return m_collectorSlotVisitor->bytesVisited() + threadBytesVisited();
-}
-
-size_t Heap::threadBytesVisited()
-{       
     size_t result = 0;
-    for (auto& parallelVisitor : m_parallelSlotVisitors)
-        result += parallelVisitor->bytesVisited();
+    forEachSlotVisitor(
+        [&] (SlotVisitor& visitor) {
+            result += visitor.bytesVisited();
+        });
     return result;
 }
 
@@ -2022,6 +2014,11 @@ void Heap::forEachCodeBlockImpl(const ScopedLambda<bool(CodeBlock*)>& func)
     // We don't know the full set of CodeBlocks until compilation has terminated.
     completeAllJITPlans();
 
+    return m_codeBlocks->iterate(func);
+}
+
+void Heap::forEachCodeBlockIgnoringJITPlansImpl(const ScopedLambda<bool(CodeBlock*)>& func)
+{
     return m_codeBlocks->iterate(func);
 }
 
@@ -2374,6 +2371,7 @@ void Heap::forEachSlotVisitor(const Func& func)
 {
     auto locker = holdLock(m_parallelSlotVisitorLock);
     func(*m_collectorSlotVisitor);
+    func(*m_mutatorSlotVisitor);
     for (auto& slotVisitor : m_parallelSlotVisitors)
         func(*slotVisitor);
 }
@@ -2383,5 +2381,43 @@ void Heap::setMutatorShouldBeFenced(bool value)
     m_mutatorShouldBeFenced = value;
     m_barrierThreshold = value ? tautologicalThreshold : blackThreshold;
 }
+
+void Heap::performIncrement(size_t bytes)
+{
+    if (!m_objectSpace.isMarking())
+        return;
+
+    m_incrementBalance += bytes * Options::gcIncrementScale();
+
+    // Save ourselves from crazy. Since this is an optimization, it's OK to go back to any consistent
+    // state when the double goes wild.
+    if (std::isnan(m_incrementBalance) || std::isinf(m_incrementBalance))
+        m_incrementBalance = 0;
     
+    if (m_incrementBalance < static_cast<double>(Options::gcIncrementBytes()))
+        return;
+
+    double targetBytes = m_incrementBalance;
+    if (targetBytes <= 0)
+        return;
+    targetBytes = std::min(targetBytes, Options::gcIncrementMaxBytes());
+
+    MonotonicTime before;
+    if (Options::logGC()) {
+        dataLog("[GC: increment t=", targetBytes / 1024, "kb ");
+        before = MonotonicTime::now();
+    }
+
+    SlotVisitor& slotVisitor = *m_mutatorSlotVisitor;
+    ParallelModeEnabler parallelModeEnabler(slotVisitor);
+    size_t bytesVisited = slotVisitor.performIncrementOfDraining(static_cast<size_t>(targetBytes));
+    // incrementBalance may go negative here because it'll remember how many bytes we overshot.
+    m_incrementBalance -= bytesVisited;
+
+    if (Options::logGC()) {
+        MonotonicTime after = MonotonicTime::now();
+        dataLog("p=", (after - before).milliseconds(), "ms b=", m_incrementBalance / 1024, "kb]\n");
+    }
+}
+
 } // namespace JSC

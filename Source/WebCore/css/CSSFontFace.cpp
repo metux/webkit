@@ -73,7 +73,7 @@ void CSSFontFace::appendSources(CSSFontFace& fontFace, CSSValueList& srcList, Do
         fontFaceElement = item.svgFontFaceElement();
 #endif
         if (!item.isLocal()) {
-            Settings* settings = document ? document->settings() : nullptr;
+            const Settings* settings = document ? &document->settings() : nullptr;
             bool allowDownloading = foundSVGFont || (settings && settings->downloadableBinaryFontsEnabled());
             if (allowDownloading && item.isSupportedFormat() && document) {
                 if (CachedFont* cachedFont = item.cachedFont(document, foundSVGFont, isInitiatingElementInUserAgentShadowTree))
@@ -517,7 +517,7 @@ void CSSFontFace::fontLoaded(CSSFontFaceSource&)
 
 bool CSSFontFace::webFontsShouldAlwaysFallBack() const
 {
-    return m_fontSelector && m_fontSelector->document() && m_fontSelector->document()->settings() && m_fontSelector->document()->settings()->webFontsAlwaysFallBack();
+    return m_fontSelector && m_fontSelector->document() && m_fontSelector->document()->settings().webFontsAlwaysFallBack();
 }
 
 size_t CSSFontFace::pump()
@@ -597,7 +597,7 @@ RefPtr<Font> CSSFontFace::font(const FontDescription& fontDescription, bool synt
             fontIsLoading = true;
             if (status() == Status::TimedOut)
                 continue;
-            return Font::create(FontCache::singleton().lastResortFallbackFont(fontDescription)->platformData(), true, true);
+            return Font::create(FontCache::singleton().lastResortFallbackFontForEveryCharacter(fontDescription)->platformData(), true, true);
         case CSSFontFaceSource::Status::Success:
             if (RefPtr<Font> result = source->font(fontDescription, syntheticBold, syntheticItalic, m_featureSettings, m_variantSettings))
                 return result;

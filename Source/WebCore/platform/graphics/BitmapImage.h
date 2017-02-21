@@ -116,10 +116,6 @@ public:
     GdkPixbuf* getGdkPixbuf() override;
 #endif
 
-#if PLATFORM(EFL)
-    Evas_Object* getEvasObject(Evas*) override;
-#endif
-
     WEBCORE_EXPORT NativeImagePtr nativeImage(const GraphicsContext* = nullptr) override;
     NativeImagePtr nativeImageForCurrentFrame(const GraphicsContext* = nullptr) override;
 #if USE(CG)
@@ -189,6 +185,13 @@ private:
     void startTimer(double delay);
     bool isBitmapImage() const override { return true; }
     void dump(TextStream&) const override;
+
+    // Animated images over a certain size are considered large enough that we'll only hang on to one frame at a time.
+#if !PLATFORM(IOS)
+    static const unsigned LargeAnimationCutoff = 5242880;
+#else
+    static const unsigned LargeAnimationCutoff = 2097152;
+#endif
 
     mutable ImageSource m_source;
 

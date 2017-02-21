@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -128,7 +128,6 @@ private:
     void platformTerminate();
 
     void lowMemoryHandler(WebCore::Critical);
-    void platformLowMemoryHandler(WebCore::Critical);
 
     // ChildProcess
     void initializeProcess(const ChildProcessInitializationParameters&) override;
@@ -141,7 +140,6 @@ private:
     void didReceiveMessage(IPC::Connection&, IPC::Decoder&) override;
     void didReceiveSyncMessage(IPC::Connection&, IPC::Decoder&, std::unique_ptr<IPC::Encoder>&) override;
     void didClose(IPC::Connection&) override;
-    void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
 
     // DownloadManager::Client
     void didCreateDownload() override;
@@ -216,6 +214,10 @@ private:
 
     HashMap<uint64_t, Function<void ()>> m_sandboxExtensionForBlobsCompletionHandlers;
     HashMap<uint64_t, Ref<NetworkResourceLoader>> m_waitingNetworkResourceLoaders;
+
+#if ENABLE(WEB_RTC)
+    bool m_webRTCEnabled { false };
+#endif
 
 #if PLATFORM(COCOA)
     void platformInitializeNetworkProcessCocoa(const NetworkProcessCreationParameters&);

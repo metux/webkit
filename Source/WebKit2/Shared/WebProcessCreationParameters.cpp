@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,20 +35,6 @@
 namespace WebKit {
 
 WebProcessCreationParameters::WebProcessCreationParameters()
-    : shouldAlwaysUseComplexTextCodePath(false)
-    , shouldEnableMemoryPressureReliefLogging(false)
-    , shouldUseFontSmoothing(true)
-    , defaultRequestTimeoutInterval(INT_MAX)
-#if PLATFORM(COCOA)
-    , shouldEnableJIT(false)
-    , shouldEnableFTLJIT(false)
-#endif
-    , memoryCacheDisabled(false)
-#if ENABLE(SERVICE_CONTROLS)
-    , hasImageServices(false)
-    , hasSelectionServices(false)
-    , hasRichContentServices(false)
-#endif
 {
 }
 
@@ -78,6 +64,9 @@ void WebProcessCreationParameters::encode(IPC::Encoder& encoder) const
 #endif
     encoder << mediaKeyStorageDirectory;
     encoder << mediaKeyStorageDirectoryExtensionHandle;
+#if ENABLE(MEDIA_STREAM)
+    encoder << audioCaptureExtensionHandle;
+#endif
     encoder << shouldUseTestingNetworkSession;
     encoder << urlSchemesRegisteredAsEmptyDocument;
     encoder << urlSchemesRegisteredAsSecure;
@@ -88,16 +77,13 @@ void WebProcessCreationParameters::encode(IPC::Encoder& encoder) const
     encoder << urlSchemesRegisteredAsDisplayIsolated;
     encoder << urlSchemesRegisteredAsCORSEnabled;
     encoder << urlSchemesRegisteredAsAlwaysRevalidated;
-#if ENABLE(CACHE_PARTITIONING)
     encoder << urlSchemesRegisteredAsCachePartitioned;
-#endif
     encoder.encodeEnum(cacheModel);
     encoder << shouldAlwaysUseComplexTextCodePath;
     encoder << shouldEnableMemoryPressureReliefLogging;
     encoder << shouldSuppressMemoryPressureHandler;
     encoder << shouldUseFontSmoothing;
     encoder << resourceLoadStatisticsEnabled;
-    encoder << urlParserEnabled;
     encoder << fontWhitelist;
     encoder << iconDatabaseEnabled;
     encoder << terminationTimeout;
@@ -194,6 +180,10 @@ bool WebProcessCreationParameters::decode(IPC::Decoder& decoder, WebProcessCreat
         return false;
     if (!decoder.decode(parameters.mediaKeyStorageDirectoryExtensionHandle))
         return false;
+#if ENABLE(MEDIA_STREAM)
+    if (!decoder.decode(parameters.audioCaptureExtensionHandle))
+        return false;
+#endif
     if (!decoder.decode(parameters.shouldUseTestingNetworkSession))
         return false;
     if (!decoder.decode(parameters.urlSchemesRegisteredAsEmptyDocument))
@@ -214,10 +204,8 @@ bool WebProcessCreationParameters::decode(IPC::Decoder& decoder, WebProcessCreat
         return false;
     if (!decoder.decode(parameters.urlSchemesRegisteredAsAlwaysRevalidated))
         return false;
-#if ENABLE(CACHE_PARTITIONING)
     if (!decoder.decode(parameters.urlSchemesRegisteredAsCachePartitioned))
         return false;
-#endif
     if (!decoder.decodeEnum(parameters.cacheModel))
         return false;
     if (!decoder.decode(parameters.shouldAlwaysUseComplexTextCodePath))
@@ -229,8 +217,6 @@ bool WebProcessCreationParameters::decode(IPC::Decoder& decoder, WebProcessCreat
     if (!decoder.decode(parameters.shouldUseFontSmoothing))
         return false;
     if (!decoder.decode(parameters.resourceLoadStatisticsEnabled))
-        return false;
-    if (!decoder.decode(parameters.urlParserEnabled))
         return false;
     if (!decoder.decode(parameters.fontWhitelist))
         return false;

@@ -88,6 +88,7 @@
 #include "TextIterator.h"
 #include "UserGestureIndicator.h"
 #include "UserTypingGestureIndicator.h"
+#include "ValidationMessageClient.h"
 #include "VisibleUnits.h"
 #include "WheelEvent.h"
 #include "WheelEventDeltaFilter.h"
@@ -450,7 +451,6 @@ void EventHandler::clear()
     m_originatingTouchPointTargetKey = 0;
 #endif
     m_maxMouseMovedDuration = 0;
-    m_baseEventType = PlatformEvent::NoType;
     m_didStartDrag = false;
 }
 
@@ -1622,6 +1622,13 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& platformMouse
         return true;
     }
 
+#if ENABLE(POINTER_LOCK)
+    if (m_frame.page()->pointerLockController().isLocked()) {
+        m_frame.page()->pointerLockController().dispatchLockedMouseEvent(platformMouseEvent, eventNames().mousedownEvent);
+        return true;
+    }
+#endif
+
     if (m_frame.mainFrame().pageOverlayController().handleMouseEvent(platformMouseEvent))
         return true;
 
@@ -1670,17 +1677,23 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& platformMouse
     m_mousePressNode = mouseEvent.targetNode();
     m_frame.document()->setFocusNavigationStartingNode(mouseEvent.targetNode());
 
-    RefPtr<Frame> subframe = subframeForHitTestResult(mouseEvent);
-    if (subframe && passMousePressEventToSubframe(mouseEvent, subframe.get())) {
-        // Start capturing future events for this frame.  We only do this if we didn't clear
-        // the m_mousePressed flag, which may happen if an AppKit widget entered a modal event loop.
-        m_capturesDragging = subframe->eventHandler().capturesDragging();
-        if (m_mousePressed && m_capturesDragging) {
-            m_capturingMouseEventsElement = subframe->ownerElement();
-            m_eventHandlerWillResetCapturingMouseEventsElement = true;
+    Scrollbar* scrollbar = scrollbarForMouseEvent(mouseEvent, m_frame.view());
+    updateLastScrollbarUnderMouse(scrollbar, SetOrClearLastScrollbar::Set);
+    bool passedToScrollbar = scrollbar && passMousePressEventToScrollbar(mouseEvent, scrollbar);
+
+    if (!passedToScrollbar) {
+        RefPtr<Frame> subframe = subframeForHitTestResult(mouseEvent);
+        if (subframe && passMousePressEventToSubframe(mouseEvent, subframe.get())) {
+            // Start capturing future events for this frame. We only do this if we didn't clear
+            // the m_mousePressed flag, which may happen if an AppKit widget entered a modal event loop.
+            m_capturesDragging = subframe->eventHandler().capturesDragging();
+            if (m_mousePressed && m_capturesDragging) {
+                m_capturingMouseEventsElement = subframe->ownerElement();
+                m_eventHandlerWillResetCapturingMouseEventsElement = true;
+            }
+            invalidateClick();
+            return true;
         }
-        invalidateClick();
-        return true;
     }
 
 #if ENABLE(PAN_SCROLLING)
@@ -1739,10 +1752,6 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& platformMouse
             mouseEvent = m_frame.document()->prepareMouseEvent(HitTestRequest(), documentPoint, platformMouseEvent);
     }
 
-    Scrollbar* scrollbar = scrollbarForMouseEvent(mouseEvent, m_frame.view());
-    updateLastScrollbarUnderMouse(scrollbar, true);
-
-    bool passedToScrollbar = scrollbar && passMousePressEventToScrollbar(mouseEvent, scrollbar);
     if (!swallowEvent) {
         if (passedToScrollbar)
             swallowEvent = true;
@@ -1761,6 +1770,13 @@ bool EventHandler::handleMouseDoubleClickEvent(const PlatformMouseEvent& platfor
     m_frame.selection().setCaretBlinkingSuspended(false);
 
     UserGestureIndicator gestureIndicator(ProcessingUserGesture, m_frame.document());
+
+#if ENABLE(POINTER_LOCK)
+    if (m_frame.page()->pointerLockController().isLocked()) {
+        m_frame.page()->pointerLockController().dispatchLockedMouseEvent(platformMouseEvent, eventNames().mouseupEvent);
+        return true;
+    }
+#endif
 
     // We get this instead of a second mouse-up 
     m_mousePressed = false;
@@ -1856,7 +1872,14 @@ bool EventHandler::handleMouseMoveEvent(const PlatformMouseEvent& platformMouseE
 
     Ref<Frame> protectedFrame(m_frame);
     RefPtr<FrameView> protector(m_frame.view());
-    
+
+#if ENABLE(POINTER_LOCK)
+    if (m_frame.page()->pointerLockController().isLocked()) {
+        m_frame.page()->pointerLockController().dispatchLockedMouseEvent(platformMouseEvent, eventNames().mousemoveEvent);
+        return true;
+    }
+#endif
+
     setLastKnownMousePosition(platformMouseEvent);
 
     if (m_hoverTimer.isActive())
@@ -1910,7 +1933,7 @@ bool EventHandler::handleMouseMoveEvent(const PlatformMouseEvent& platformMouseE
         m_resizeLayer->resize(platformMouseEvent, m_offsetFromResizeCorner);
     else {
         Scrollbar* scrollbar = mouseEvent.scrollbar();
-        updateLastScrollbarUnderMouse(scrollbar, !m_mousePressed);
+        updateLastScrollbarUnderMouse(scrollbar, m_mousePressed ? SetOrClearLastScrollbar::Clear : SetOrClearLastScrollbar::Set);
 
         // On iOS, our scrollbars are managed by UIKit.
 #if !PLATFORM(IOS)
@@ -1938,7 +1961,9 @@ bool EventHandler::handleMouseMoveEvent(const PlatformMouseEvent& platformMouseE
         // node to be detached from its FrameView, in which case the event should not be passed.
         if (newSubframe->view())
             swallowEvent |= passMouseMoveEventToSubframe(mouseEvent, newSubframe.get(), hoveredNode);
-    } else {
+    }
+
+    if (!newSubframe || mouseEvent.scrollbar()) {
 #if ENABLE(CURSOR_SUPPORT)
         if (auto* view = m_frame.view())
             updateCursor(*view, mouseEvent.hitTestResult(), platformMouseEvent.shiftKey());
@@ -1989,6 +2014,13 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& platformMou
     RefPtr<FrameView> protector(m_frame.view());
 
     m_frame.selection().setCaretBlinkingSuspended(false);
+
+#if ENABLE(POINTER_LOCK)
+    if (m_frame.page()->pointerLockController().isLocked()) {
+        m_frame.page()->pointerLockController().dispatchLockedMouseEvent(platformMouseEvent, eventNames().mouseupEvent);
+        return true;
+    }
+#endif
 
     if (m_frame.mainFrame().pageOverlayController().handleMouseEvent(platformMouseEvent))
         return true;
@@ -2067,6 +2099,17 @@ bool EventHandler::handleMouseForceEvent(const PlatformMouseEvent& event)
 {
     Ref<Frame> protectedFrame(m_frame);
     RefPtr<FrameView> protector(m_frame.view());
+
+#if ENABLE(POINTER_LOCK)
+    if (m_frame.page()->pointerLockController().isLocked()) {
+        m_frame.page()->pointerLockController().dispatchLockedMouseEvent(event, eventNames().webkitmouseforcechangedEvent);
+        if (event.type() == PlatformEvent::MouseForceDown)
+            m_frame.page()->pointerLockController().dispatchLockedMouseEvent(event, eventNames().webkitmouseforcedownEvent);
+        if (event.type() == PlatformEvent::MouseForceUp)
+            m_frame.page()->pointerLockController().dispatchLockedMouseEvent(event, eventNames().webkitmouseforceupEvent);
+        return true;
+    }
+#endif
 
     setLastKnownMousePosition(event);
 
@@ -2673,6 +2716,13 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& event)
     if (!view)
         return false;
 
+#if ENABLE(POINTER_LOCK)
+    if (m_frame.page()->pointerLockController().isLocked()) {
+        m_frame.page()->pointerLockController().dispatchLockedWheelEvent(event);
+        return true;
+    }
+#endif
+
     m_isHandlingWheelEvent = true;
     setFrameWasScrolledByUser();
 
@@ -2694,7 +2744,7 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& event)
     // FIXME: It should not be necessary to do this mutation here.
     // Instead, the handlers should know convert vertical scrolls appropriately.
     PlatformWheelEvent adjustedEvent = event;
-    if (m_baseEventType == PlatformEvent::NoType && shouldTurnVerticalTicksIntoHorizontal(result, event))
+    if (shouldTurnVerticalTicksIntoHorizontal(result, event))
         adjustedEvent = event.copyTurningVerticalTicksIntoHorizontalTicks();
 
     platformRecordWheelEvent(adjustedEvent);
@@ -3055,6 +3105,13 @@ bool EventHandler::keyEvent(const PlatformKeyboardEvent& initialKeyEvent)
     }
 #endif
 
+    if (initialKeyEvent.type() == PlatformEvent::KeyDown && initialKeyEvent.windowsVirtualKeyCode() == VK_ESCAPE) {
+        if (auto* page = m_frame.page()) {
+            if (auto* validationMessageClient = page->validationMessageClient())
+                validationMessageClient->hideAnyValidationMessage();
+        }
+    }
+
 #if ENABLE(FULLSCREEN_API)
     if (m_frame.document()->webkitIsFullScreen()) {
         if (initialKeyEvent.type() == PlatformEvent::KeyDown && initialKeyEvent.windowsVirtualKeyCode() == VK_ESCAPE) {
@@ -3372,7 +3429,7 @@ bool EventHandler::dragHysteresisExceeded(const FloatPoint& dragViewportLocation
     return mouseMovementExceedsThreshold(dragViewportLocation, threshold);
 }
     
-void EventHandler::freeDataTransfer()
+void EventHandler::invalidateDataTransfer()
 {
     if (!dragState().dataTransfer)
         return;
@@ -3391,7 +3448,7 @@ void EventHandler::dragSourceEndedAt(const PlatformMouseEvent& event, DragOperat
         // For now we don't care if event handler cancels default behavior, since there is no default behavior.
         dispatchDragSrcEvent(eventNames().dragendEvent, event);
     }
-    freeDataTransfer();
+    invalidateDataTransfer();
     dragState().source = nullptr;
     // In case the drag was ended due to an escape key press we need to ensure
     // that consecutive mousemove events don't reinitiate the drag and drop.
@@ -3401,7 +3458,7 @@ void EventHandler::dragSourceEndedAt(const PlatformMouseEvent& event, DragOperat
 void EventHandler::updateDragStateAfterEditDragIfNeeded(Element& rootEditableElement)
 {
     // If inserting the dragged contents removed the drag source, we still want to fire dragend at the root editable element.
-    if (dragState().source && !dragState().source->inDocument())
+    if (dragState().source && !dragState().source->isConnected())
         dragState().source = &rootEditableElement;
 }
 
@@ -3507,7 +3564,7 @@ bool EventHandler::handleDrag(const MouseEventWithHitTestResults& event, CheckDr
     DragOperation srcOp = DragOperationNone;      
     
     // This does work only if we missed a dragEnd. Do it anyway, just to make sure the old dataTransfer gets numbed.
-    freeDataTransfer();
+    invalidateDataTransfer();
 
     dragState().dataTransfer = createDraggingDataTransfer();
     
@@ -3523,7 +3580,10 @@ bool EventHandler::handleDrag(const MouseEventWithHitTestResults& event, CheckDr
                 // The renderer has disappeared, this can happen if the onStartDrag handler has hidden
                 // the element in some way.  In this case we just kill the drag.
                 m_mouseDownMayStartDrag = false;
-                goto cleanupDrag;
+                invalidateDataTransfer();
+                dragState().source = nullptr;
+
+                return true;
             }
         } 
         
@@ -3561,10 +3621,9 @@ bool EventHandler::handleDrag(const MouseEventWithHitTestResults& event, CheckDr
         }
     } 
 
-cleanupDrag:
     if (!m_mouseDownMayStartDrag) {
         // Something failed to start the drag, clean up.
-        freeDataTransfer();
+        invalidateDataTransfer();
         dragState().source = nullptr;
     }
     
@@ -3621,7 +3680,7 @@ bool EventHandler::isKeyboardOptionTab(KeyboardEvent& event)
 
 bool EventHandler::eventInvertsTabsToLinksClientCallResult(KeyboardEvent& event)
 {
-#if PLATFORM(COCOA) || PLATFORM(EFL)
+#if PLATFORM(COCOA)
     return isKeyboardOptionTab(event);
 #else
     UNUSED_PARAM(event);
@@ -3772,9 +3831,8 @@ bool EventHandler::passMousePressEventToScrollbar(MouseEventWithHitTestResults& 
     return scrollbar->mouseDown(mouseEvent.event());
 }
 
-// If scrollbar (under mouse) is different from last, send a mouse exited. Set
-// last to scrollbar if setLast is true; else set last to nullptr.
-void EventHandler::updateLastScrollbarUnderMouse(Scrollbar* scrollbar, bool setLast)
+// If scrollbar (under mouse) is different from last, send a mouse exited.
+void EventHandler::updateLastScrollbarUnderMouse(Scrollbar* scrollbar, SetOrClearLastScrollbar setOrClear)
 {
     if (m_lastScrollbarUnderMouse != scrollbar) {
         // Send mouse exited to the old scrollbar.
@@ -3782,12 +3840,10 @@ void EventHandler::updateLastScrollbarUnderMouse(Scrollbar* scrollbar, bool setL
             m_lastScrollbarUnderMouse->mouseExited();
 
         // Send mouse entered if we're setting a new scrollbar.
-        if (scrollbar && setLast)
+        if (scrollbar && setOrClear == SetOrClearLastScrollbar::Set) {
             scrollbar->mouseEntered();
-
-        if (setLast && scrollbar)
             m_lastScrollbarUnderMouse = scrollbar->createWeakPtr();
-        else
+        } else
             m_lastScrollbarUnderMouse = nullptr;
     }
 }

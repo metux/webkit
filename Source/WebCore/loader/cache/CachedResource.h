@@ -45,7 +45,7 @@ class CachedResourceClient;
 class CachedResourceHandleBase;
 class CachedResourceLoader;
 class CachedResourceRequest;
-class InspectorResource;
+class LoadTiming;
 class MemoryCache;
 class SecurityOrigin;
 class SharedBuffer;
@@ -58,7 +58,6 @@ class TextResourceDecoder;
 class CachedResource {
     WTF_MAKE_NONCOPYABLE(CachedResource); WTF_MAKE_FAST_ALLOCATED;
     friend class MemoryCache;
-    friend class InspectorResource;
 
 public:
     enum Type {
@@ -114,9 +113,7 @@ public:
     const ResourceRequest& resourceRequest() const { return m_resourceRequest; }
     ResourceRequest& resourceRequest() { return m_resourceRequest; }
     const URL& url() const { return m_resourceRequest.url();}
-#if ENABLE(CACHE_PARTITIONING)
     const String& cachePartition() const { return m_resourceRequest.cachePartition(); }
-#endif
     SessionID sessionID() const { return m_sessionID; }
     Type type() const { return m_type; }
 
@@ -208,6 +205,7 @@ public:
     void loadFrom(const CachedResource&);
 
     SecurityOrigin* origin() const { return m_origin.get(); }
+    AtomicString initiatorName() const { return m_initiatorName; }
 
     bool canDelete() const { return !hasClients() && !m_loader && !m_preloadCount && !m_handleCount && !m_resourceToRevalidate && !m_proxyResource; }
     bool hasOneHandle() const { return m_handleCount == 1; }
@@ -232,6 +230,8 @@ public:
     bool isPreloaded() const { return m_preloadCount; }
     void increasePreloadCount() { ++m_preloadCount; }
     void decreasePreloadCount() { ASSERT(m_preloadCount); --m_preloadCount; }
+    bool isLinkPreload() { return m_isLinkPreload; }
+    void setLinkPreload() { m_isLinkPreload = true; }
 
     void registerHandle(CachedResourceHandleBase*);
     WEBCORE_EXPORT void unregisterHandle(CachedResourceHandleBase*);
@@ -320,6 +320,7 @@ private:
 
     ResourceError m_error;
     RefPtr<SecurityOrigin> m_origin;
+    AtomicString m_initiatorName;
 
     double m_lastDecodedAccessTime { 0 }; // Used as a "thrash guard" in the cache
     double m_loadFinishTime { 0 };
@@ -336,6 +337,7 @@ private:
 
     bool m_inCache { false };
     bool m_loading { false };
+    bool m_isLinkPreload { false };
 
     bool m_switchingClientsToRevalidatedResource { false };
 

@@ -202,9 +202,12 @@ typedef const char* optionString;
     v(double, maximumMutatorUtilization, 0.7, Normal, nullptr) \
     v(double, concurrentGCMaxHeadroom, 1.5, Normal, nullptr) \
     v(double, concurrentGCPeriodMS, 2, Normal, nullptr) \
-    v(bool, useStochasticMutatorScheduler, false, Normal, nullptr) \
+    v(bool, useStochasticMutatorScheduler, true, Normal, nullptr) \
     v(double, minimumGCPauseMS, 0.3, Normal, nullptr) \
     v(double, gcPauseScale, 0.3, Normal, nullptr) \
+    v(double, gcIncrementBytes, 10000, Normal, nullptr) \
+    v(double, gcIncrementMaxBytes, 100000, Normal, nullptr) \
+    v(double, gcIncrementScale, 0, Normal, nullptr) \
     v(bool, scribbleFreeCells, false, Normal, nullptr) \
     v(double, sizeClassProgression, 1.4, Normal, nullptr) \
     v(unsigned, largeAllocationCutoff, 100000, Normal, nullptr) \
@@ -225,7 +228,6 @@ typedef const char* optionString;
     v(bool, clobberAllRegsInFTLICSlowPath, !ASSERT_DISABLED, Normal, nullptr) \
     v(bool, useAccessInlining, true, Normal, nullptr) \
     v(unsigned, maxAccessVariantListSize, 8, Normal, nullptr) \
-    v(unsigned, megamorphicLoadCost, 999, Normal, nullptr) /* This used to be 10, but we're temporarily testing what happens when the feature is disabled. */\
     v(bool, usePolyvariantDevirtualization, true, Normal, nullptr) \
     v(bool, usePolymorphicAccessInlining, true, Normal, nullptr) \
     v(bool, usePolymorphicCallInlining, true, Normal, nullptr) \
@@ -339,8 +341,9 @@ typedef const char* optionString;
     v(bool, forceWeakRandomSeed, false, Normal, nullptr) \
     v(unsigned, forcedWeakRandomSeed, 0, Normal, nullptr) \
     \
-    v(bool, useZombieMode, false, Normal, "debugging option to scribble over dead objects with 0xdeadbeef") \
+    v(bool, useZombieMode, false, Normal, "debugging option to scribble over dead objects with 0xbadbeef0") \
     v(bool, useImmortalObjects, false, Normal, "debugging option to keep all objects alive forever") \
+    v(bool, sweepSynchronously, false, Normal, "debugging option to sweep all dead objects synchronously at GC end before resuming mutator") \
     v(bool, dumpObjectStatistics, false, Normal, nullptr) \
     v(unsigned, maxSingleAllocationSize, 0, Configurable, "debugging option to limit individual allocations to a max size (0 = limit not set, N = limit size in bytes)") \
     \
@@ -364,6 +367,7 @@ typedef const char* optionString;
     v(unsigned, samplingProfilerTopFunctionsCount, 12, Normal, "Number of top functions to report when using the command line interface.") \
     v(unsigned, samplingProfilerTopBytecodesCount, 40, Normal, "Number of top bytecodes to report when using the command line interface.") \
     v(optionString, samplingProfilerPath, nullptr, Normal, "The path to the directory to write sampiling profiler output to. This probably will not work with WK2 unless the path is in the whitelist.") \
+    v(bool, sampleCCode, false, Normal, "Causes the sampling profiler to record profiling data for C frames.") \
     \
     v(bool, alwaysGeneratePCToCodeOriginMap, false, Normal, "This will make sure we always generate a PCToCodeOriginMap for JITed code.") \
     \
@@ -395,6 +399,7 @@ typedef const char* optionString;
     \
     v(bool, useDollarVM, false, Restricted, "installs the $vm debugging tool in global objects") \
     v(optionString, functionOverrides, nullptr, Restricted, "file with debugging overrides for function bodies") \
+    v(bool, useSigillCrashAnalyzer, false, Configurable, "logs data about SIGILL crashes") \
     \
     v(unsigned, watchdog, 0, Normal, "watchdog timeout (0 = Disabled, N = a timeout period of N milliseconds)") \
     \

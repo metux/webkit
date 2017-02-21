@@ -10,6 +10,7 @@ set(WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/NetworkProcess/FileAPI"
     "${WEBKIT2_DIR}/NetworkProcess/cache"
     "${WEBKIT2_DIR}/NetworkProcess/capture"
+    "${WEBKIT2_DIR}/NetworkProcess/webrtc"
     "${WEBKIT2_DIR}/Platform"
     "${WEBKIT2_DIR}/Platform/IPC"
     "${WEBKIT2_DIR}/PluginProcess"
@@ -65,6 +66,7 @@ set(WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/WebProcess/MediaCache"
     "${WEBKIT2_DIR}/WebProcess/MediaStream"
     "${WEBKIT2_DIR}/WebProcess/Network"
+    "${WEBKIT2_DIR}/WebProcess/Network/webrtc"
     "${WEBKIT2_DIR}/WebProcess/Notifications"
     "${WEBKIT2_DIR}/WebProcess/OriginData"
     "${WEBKIT2_DIR}/WebProcess/Plugins"
@@ -283,6 +285,7 @@ set(WebKit2_SOURCES
     UIProcess/ResponsivenessTimer.cpp
     UIProcess/StatisticsRequest.cpp
     UIProcess/TextCheckerCompletion.cpp
+    UIProcess/UnresponsiveWebProcessTerminator.cpp
     UIProcess/UserMediaPermissionCheckProxy.cpp
     UIProcess/UserMediaPermissionRequestManagerProxy.cpp
     UIProcess/UserMediaPermissionRequestProxy.cpp
@@ -417,6 +420,8 @@ set(WebKit2_SOURCES
 
     UIProcess/Launcher/ProcessLauncher.cpp
 
+    UIProcess/Network/CustomProtocols/CustomProtocolManagerProxy.cpp
+
     UIProcess/Network/NetworkProcessProxy.cpp
 
     UIProcess/Notifications/NotificationPermissionRequest.cpp
@@ -471,7 +476,6 @@ set(WebKit2_SOURCES
     WebProcess/InjectedBundle/InjectedBundleHitTestResult.cpp
     WebProcess/InjectedBundle/InjectedBundleNavigationAction.cpp
     WebProcess/InjectedBundle/InjectedBundlePageContextMenuClient.cpp
-    WebProcess/InjectedBundle/InjectedBundlePageDiagnosticLoggingClient.cpp
     WebProcess/InjectedBundle/InjectedBundlePageEditorClient.cpp
     WebProcess/InjectedBundle/InjectedBundlePageFormClient.cpp
     WebProcess/InjectedBundle/InjectedBundlePageFullScreenClient.cpp
@@ -593,6 +597,10 @@ set(WebKit2_MESSAGES_IN_FILES
     NetworkProcess/NetworkProcess.messages.in
     NetworkProcess/NetworkResourceLoader.messages.in
 
+    NetworkProcess/webrtc/NetworkRTCMonitor.messages.in
+    NetworkProcess/webrtc/NetworkRTCProvider.messages.in
+    NetworkProcess/webrtc/NetworkRTCSocket.messages.in
+
     PluginProcess/PluginControllerProxy.messages.in
     PluginProcess/PluginProcess.messages.in
     PluginProcess/WebProcessConnection.messages.in
@@ -648,6 +656,10 @@ set(WebKit2_MESSAGES_IN_FILES
     WebProcess/Geolocation/WebGeolocationManager.messages.in
 
     WebProcess/IconDatabase/WebIconDatabaseProxy.messages.in
+
+    WebProcess/Network/webrtc/WebRTCMonitor.messages.in
+    WebProcess/Network/webrtc/WebRTCResolver.messages.in
+    WebProcess/Network/webrtc/WebRTCSocket.messages.in
 
     WebProcess/Network/NetworkProcessConnection.messages.in
     WebProcess/Network/WebResourceLoader.messages.in

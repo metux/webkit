@@ -181,8 +181,8 @@ static Ref<InspectorObject> buildObjectForHeaders(const HTTPHeaderMap& headers)
 
 Ref<Inspector::Protocol::Network::ResourceTiming> InspectorNetworkAgent::buildObjectForTiming(const NetworkLoadTiming& timing, ResourceLoader& resourceLoader)
 {
-    double monotonicTime = resourceLoader.loadTiming().startTime();
-    double startTimeInInspector = m_environment.executionStopwatch()->elapsedTimeSinceMonotonicTime(monotonicTime);
+    MonotonicTime startTime = resourceLoader.loadTiming().startTime();
+    double startTimeInInspector = m_environment.executionStopwatch()->elapsedTimeSince(startTime);
 
     return Inspector::Protocol::Network::ResourceTiming::create()
         .setStartTime(startTimeInInspector)
@@ -391,7 +391,7 @@ void InspectorNetworkAgent::didFinishLoading(unsigned long identifier, DocumentL
 
     m_resourcesData->maybeDecodeDataToContent(requestId);
 
-    double elapsedFinishTime = finishTime ? m_environment.executionStopwatch()->elapsedTimeSinceMonotonicTime(finishTime) : timestamp();
+    double elapsedFinishTime = finishTime ? m_environment.executionStopwatch()->elapsedTimeSince(MonotonicTime::fromRawSeconds(finishTime)) : timestamp();
 
     String sourceMappingURL;
     NetworkResourcesData::ResourceData const* resourceData = m_resourcesData->data(requestId);
@@ -502,8 +502,8 @@ void InspectorNetworkAgent::didScheduleStyleRecalculation(Document& document)
 
 RefPtr<Inspector::Protocol::Network::Initiator> InspectorNetworkAgent::buildInitiatorObject(Document* document)
 {
-    RefPtr<ScriptCallStack> stackTrace = createScriptCallStack(JSMainThreadExecState::currentState(), ScriptCallStack::maxCallStackSizeToCapture);
-    if (stackTrace && stackTrace->size() > 0) {
+    Ref<ScriptCallStack> stackTrace = createScriptCallStack(JSMainThreadExecState::currentState(), ScriptCallStack::maxCallStackSizeToCapture);
+    if (stackTrace->size() > 0) {
         auto initiatorObject = Inspector::Protocol::Network::Initiator::create()
             .setType(Inspector::Protocol::Network::Initiator::Type::Script)
             .release();

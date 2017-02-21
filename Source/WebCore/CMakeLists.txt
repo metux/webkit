@@ -211,7 +211,6 @@ set(WebCore_NON_SVG_IDL_FILES
 
     Modules/mediastream/DOMURLMediaStream.idl
     Modules/mediastream/DoubleRange.idl
-    Modules/mediastream/HTMLMediaElementMediaStream.idl
     Modules/mediastream/LongRange.idl
     Modules/mediastream/MediaDeviceInfo.idl
     Modules/mediastream/MediaDevices.idl
@@ -239,7 +238,6 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/mediastream/RTCRtpTransceiver.idl
     Modules/mediastream/RTCSessionDescription.idl
     Modules/mediastream/RTCStatsReport.idl
-    Modules/mediastream/RTCStatsResponse.idl
     Modules/mediastream/RTCTrackEvent.idl
 
     Modules/navigatorcontentutils/NavigatorContentUtils.idl
@@ -565,7 +563,6 @@ set(WebCore_NON_SVG_IDL_FILES
     html/TextMetrics.idl
     html/TimeRanges.idl
     html/URLSearchParams.idl
-    html/URLUtils.idl
     html/ValidityState.idl
     html/VoidCallback.idl
 
@@ -587,6 +584,7 @@ set(WebCore_NON_SVG_IDL_FILES
     page/DOMWindow.idl
     page/EventSource.idl
     page/GlobalCrypto.idl
+    page/GlobalPerformance.idl
     page/History.idl
     page/IntersectionObserver.idl
     page/IntersectionObserverCallback.idl
@@ -897,7 +895,6 @@ set(WebCore_SOURCES
     Modules/mediasource/VideoPlaybackQuality.cpp
 
     Modules/mediastream/DOMURLMediaStream.cpp
-    Modules/mediastream/HTMLMediaElementMediaStream.cpp
     Modules/mediastream/MediaConstraintsImpl.cpp
     Modules/mediastream/MediaDeviceInfo.cpp
     Modules/mediastream/MediaDevices.cpp
@@ -925,7 +922,6 @@ set(WebCore_SOURCES
     Modules/mediastream/RTCRtpTransceiver.cpp
     Modules/mediastream/RTCSessionDescription.cpp
     Modules/mediastream/RTCStatsReport.cpp
-    Modules/mediastream/RTCStatsResponse.cpp
     Modules/mediastream/RTCTrackEvent.cpp
     Modules/mediastream/SDPProcessor.cpp
     Modules/mediastream/UserMediaController.cpp
@@ -1084,6 +1080,9 @@ set(WebCore_SOURCES
     bindings/js/JSCSSRuleCustom.cpp
     bindings/js/JSCSSRuleListCustom.cpp
     bindings/js/JSCSSStyleDeclarationCustom.cpp
+    bindings/js/JSDOMConvertDate.cpp
+    bindings/js/JSDOMConvertNumbers.cpp
+    bindings/js/JSDOMConvertStrings.cpp
     bindings/js/JSDOMIterator.cpp
     bindings/js/JSFontFaceCustom.cpp
     bindings/js/JSFontFaceSetCustom.cpp
@@ -1101,9 +1100,10 @@ set(WebCore_SOURCES
     bindings/js/JSCustomElementRegistryCustom.cpp
     bindings/js/JSCustomEventCustom.cpp
     bindings/js/JSCustomXPathNSResolver.cpp
-    bindings/js/JSDOMBinding.cpp
     bindings/js/JSDOMBindingSecurity.cpp
-    bindings/js/JSDOMConstructor.cpp
+    bindings/js/JSDOMBuiltinConstructorBase.cpp
+    bindings/js/JSDOMConstructorBase.cpp
+    bindings/js/JSDOMConstructorWithDocument.cpp
     bindings/js/JSDOMExceptionHandling.cpp
     bindings/js/JSDOMGlobalObject.cpp
     bindings/js/JSDOMGlobalObjectTask.cpp
@@ -1186,7 +1186,6 @@ set(WebCore_SOURCES
     bindings/js/JSXMLHttpRequestCustom.cpp
     bindings/js/JSXPathNSResolverCustom.cpp
     bindings/js/JSXPathResultCustom.cpp
-    bindings/js/JSXSLTProcessorCustom.cpp
     bindings/js/ReadableStreamDefaultController.cpp
     bindings/js/ScheduledAction.cpp
     bindings/js/ScriptCachedFrameData.cpp
@@ -1321,7 +1320,7 @@ set(WebCore_SOURCES
     css/MediaList.cpp
     css/MediaQuery.cpp
     css/MediaQueryEvaluator.cpp
-    css/MediaQueryExp.cpp
+    css/MediaQueryExpression.cpp
     css/MediaQueryList.cpp
     css/MediaQueryMatcher.cpp
     css/PageRuleCollector.cpp
@@ -1839,6 +1838,7 @@ set(WebCore_SOURCES
     inspector/TimelineRecordFactory.cpp
     inspector/WebConsoleAgent.cpp
     inspector/WebDebuggerAgent.cpp
+    inspector/WebHeapAgent.cpp
     inspector/WebInjectedScriptHost.cpp
     inspector/WebInjectedScriptManager.cpp
     inspector/WorkerConsoleAgent.cpp
@@ -1883,6 +1883,7 @@ set(WebCore_SOURCES
     loader/ResourceLoadStatistics.cpp
     loader/ResourceLoadStatisticsStore.cpp
     loader/ResourceLoader.cpp
+    loader/ResourceTiming.cpp
     loader/ResourceTimingInformation.cpp
     loader/SinkDocument.cpp
     loader/SubframeLoader.cpp
@@ -2027,7 +2028,7 @@ set(WebCore_SOURCES
     page/WorkerNavigator.cpp
 
     page/animation/AnimationBase.cpp
-    page/animation/AnimationController.cpp
+    page/animation/CSSAnimationController.cpp
     page/animation/CSSPropertyAnimation.cpp
     page/animation/CompositeAnimation.cpp
     page/animation/ImplicitAnimation.cpp
@@ -2092,6 +2093,7 @@ set(WebCore_SOURCES
     platform/MainThreadSharedTimer.cpp
     platform/MemoryPressureHandler.cpp
     platform/NotImplemented.cpp
+    platform/PasteboardWriterData.cpp
     platform/PlatformSpeechSynthesisUtterance.cpp
     platform/PlatformSpeechSynthesisVoice.cpp
     platform/PlatformSpeechSynthesizer.cpp
@@ -2164,6 +2166,7 @@ set(WebCore_SOURCES
 
     platform/graphics/BitmapImage.cpp
     platform/graphics/Color.cpp
+    platform/graphics/ComplexTextController.cpp
     platform/graphics/CrossfadeGeneratedImage.cpp
     platform/graphics/DisplayRefreshMonitorClient.cpp
     platform/graphics/ExtendedColor.cpp

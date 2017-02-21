@@ -31,12 +31,6 @@
 #define DEFAULT_WEBKIT_TABSTOLINKS_ENABLED false
 #endif
 
-#if PLATFORM(EFL)
-#define DEFAULT_SELECTION_PAINTING_WITHOUT_SELECTION_GAPS_ENABLED true
-#else
-#define DEFAULT_SELECTION_PAINTING_WITHOUT_SELECTION_GAPS_ENABLED false
-#endif
-
 #if ENABLE(SMOOTH_SCROLLING)
 #define DEFAULT_WEBKIT_SCROLL_ANIMATOR_ENABLED true
 #else
@@ -137,7 +131,6 @@
     macro(WebArchiveDebugModeEnabled, webArchiveDebugModeEnabled, Bool, bool, false, "", "") \
     macro(LocalFileContentSniffingEnabled, localFileContentSniffingEnabled, Bool, bool, false, "", "") \
     macro(UsesPageCache, usesPageCache, Bool, bool, true, "", "") \
-    macro(AllowsPageCacheWithWindowOpener, allowsPageCacheWithWindowOpener, Bool, bool, false, "", "") \
     macro(PageCacheSupportsPlugins, pageCacheSupportsPlugins, Bool, bool, true, "", "") \
     macro(AuthorAndUserStylesEnabled, authorAndUserStylesEnabled, Bool, bool, true, "", "") \
     macro(PaginateDuringLayoutEnabled, paginateDuringLayoutEnabled, Bool, bool, false, "", "") \
@@ -213,7 +206,6 @@
     macro(SubpixelCSSOMElementMetricsEnabled, subpixelCSSOMElementMetricsEnabled, Bool, bool, false, "", "") \
     macro(UseGiantTiles, useGiantTiles, Bool, bool, false, "", "") \
     macro(MediaStreamEnabled, mediaStreamEnabled, Bool, bool, false, "", "") \
-    macro(PeerConnectionEnabled, peerConnectionEnabled, Bool, bool, false, "", "") \
     macro(UseLegacyTextAlignPositionedElementBehavior, useLegacyTextAlignPositionedElementBehavior, Bool, bool, false, "", "") \
     macro(SpatialNavigationEnabled, spatialNavigationEnabled, Bool, bool, false, "", "") \
     macro(MediaSourceEnabled, mediaSourceEnabled, Bool, bool, true, "", "") \
@@ -235,7 +227,7 @@
     macro(ShadowDOMEnabled, shadowDOMEnabled, Bool, bool, true, "Shadow DOM", "HTML Shadow DOM prototype") \
     macro(FetchAPIEnabled, fetchAPIEnabled, Bool, bool, true, "", "") \
     macro(DownloadAttributeEnabled, downloadAttributeEnabled, Bool, bool, true, "", "") \
-    macro(SelectionPaintingWithoutSelectionGapsEnabled, selectionPaintingWithoutSelectionGapsEnabled, Bool, bool, DEFAULT_SELECTION_PAINTING_WITHOUT_SELECTION_GAPS_ENABLED, "", "") \
+    macro(SelectionPaintingWithoutSelectionGapsEnabled, selectionPaintingWithoutSelectionGapsEnabled, Bool, bool, false, "", "") \
     macro(ApplePayEnabled, applePayEnabled, Bool, bool, false, "", "") \
     macro(ApplePayCapabilityDisclosureAllowed, applePayCapabilityDisclosureAllowed, Bool, bool, true, "", "") \
     macro(VisualViewportEnabled, visualViewportEnabled, Bool, bool, true, "", "") \
@@ -248,6 +240,7 @@
     macro(InteractiveFormValidationEnabled, interactiveFormValidationEnabled, Bool, bool, DEFAULT_HTML_INTERACTIVE_FORM_VALIDATION_ENABLED, "HTML Interactive Form Validation", "HTML interactive form validation") \
     macro(ShouldSuppressKeyboardInputDuringProvisionalNavigation, shouldSuppressKeyboardInputDuringProvisionalNavigation, Bool, bool, false, "", "") \
     macro(CSSGridLayoutEnabled, cssGridLayoutEnabled, Bool, bool, true, "CSS Grid", "CSS Grid Layout Module support") \
+    macro(ResourceTimingEnabled, resourceTimingEnabled, Bool, bool, false, "Resource Timing", "Enable ResourceTiming API") \
     \
 
 #define FOR_EACH_WEBKIT_DOUBLE_PREFERENCE(macro) \
@@ -318,6 +311,7 @@
     macro(LinkPreloadEnabled, linkPreloadEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "Link Preload", "Link preload support") \
     macro(ModernMediaControlsEnabled, modernMediaControlsEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "Modern Media Controls", "Use modern media controls look") \
     macro(InputEventsEnabled, inputEventsEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "Input Events", "Enable InputEvents support") \
+    macro(PeerConnectionEnabled, peerConnectionEnabled, Bool, bool, false, "WebRTC", "Enable WebRTC API") \
     macro(SubtleCryptoEnabled, subtleCryptoEnabled, Bool, bool, DEFAULT_EXPERIMENTAL_FEATURES_ENABLED, "SubtleCrypto", "Enable SubtleCrypto support") \
     macro(UserTimingEnabled, userTimingEnabled, Bool, bool, false, "User Timing", "Enable UserTiming API") \
     macro(WebAnimationsEnabled, webAnimationsEnabled, Bool, bool, false, "Web Animations", "Web Animations prototype") \
@@ -345,7 +339,7 @@
     macro(PictographFontFamily, pictographFontFamily, String, String, "Apple Color Emoji", "", "") \
     \
 
-#elif PLATFORM(GTK) || PLATFORM(EFL)
+#elif PLATFORM(GTK)
 
 #define FOR_EACH_WEBKIT_FONT_FAMILY_PREFERENCE(macro) \
     macro(StandardFontFamily, standardFontFamily, String, String, "Times", "", "") \

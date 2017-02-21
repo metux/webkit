@@ -465,14 +465,14 @@ user_function (<a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><
                <a href="../glib/glib-Pointer-Arrays.html#GPtrArray"><span class="type">GPtrArray</span></a>     *elements,
                <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)</pre>
 <p>Emitted after form elements (or form associated elements) are associated to a particular web
-page. Useful to implement form autofilling with web pages where form fields are dynamically
-added (as many JS frameworks do). This might be emitted multiple times for the same web page.</p>
+page. This is useful to implement form autofilling for web pages where form fields are added
+dynamically. This signal might be emitted multiple times for the same web page.</p>
 <p>Note that this signal could be also emitted when form controls are moved between forms. In
-those cases the <em class="parameter"><code>elements</code></em>
+that case, the <em class="parameter"><code>elements</code></em>
  array carries the list of those elements which have moved.</p>
-<p>In any case the members of the <em class="parameter"><code>elements</code></em>
- array will be alive during signal emission so
-clients should take a reference to keep them alive.</p>
+<p>Clients should take a reference to the members of the <em class="parameter"><code>elements</code></em>
+ array if it is desired to
+keep them alive after the signal handler returns.</p>
 <div class="refsect3">
 <a name="WebKitWebPage-form-controls-associated.parameters"></a><h4>Parameters</h4>
 <div class="informaltable"><table class="informaltable" width="100%" border="0">

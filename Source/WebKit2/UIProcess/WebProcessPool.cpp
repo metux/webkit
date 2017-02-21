@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -61,6 +61,7 @@
 #include "WebNotificationManagerProxy.h"
 #include "WebPageGroup.h"
 #include "WebPreferences.h"
+#include "WebPreferencesKeys.h"
 #include "WebProcessCreationParameters.h"
 #include "WebProcessMessages.h"
 #include "WebProcessPoolMessages.h"
@@ -148,6 +149,12 @@ static WebsiteDataStore::Configuration legacyWebsiteDataStoreConfiguration(API::
     return configuration;
 }
 
+static HashSet<String, ASCIICaseInsensitiveHash>& globalURLSchemesWithCustomProtocolHandlers()
+{
+    static NeverDestroyed<HashSet<String, ASCIICaseInsensitiveHash>> set;
+    return set;
+}
+
 WebProcessPool::WebProcessPool(API::ProcessPoolConfiguration& configuration)
     : m_configuration(configuration.copy())
     , m_haveInitialEmptyProcess(false)
@@ -156,9 +163,7 @@ WebProcessPool::WebProcessPool(API::ProcessPoolConfiguration& configuration)
     , m_automationClient(std::make_unique<API::AutomationClient>())
     , m_downloadClient(std::make_unique<API::DownloadClient>())
     , m_historyClient(std::make_unique<API::LegacyContextHistoryClient>())
-#if USE(SOUP)
     , m_customProtocolManagerClient(std::make_unique<API::CustomProtocolManagerClient>())
-#endif
     , m_visitedLinkStore(VisitedLinkStore::create())
     , m_visitedLinksPopulated(false)
     , m_plugInAutoStartProvider(this)
@@ -185,10 +190,8 @@ WebProcessPool::WebProcessPool(API::ProcessPoolConfiguration& configuration)
     for (auto& scheme : m_configuration->alwaysRevalidatedURLSchemes())
         m_schemesToRegisterAsAlwaysRevalidated.add(scheme);
 
-#if ENABLE(CACHE_PARTITIONING)
     for (const auto& urlScheme : m_configuration->cachePartitionedURLSchemes())
         m_schemesToRegisterAsCachePartitioned.add(urlScheme);
-#endif
 
     platformInitialize();
 
@@ -301,6 +304,14 @@ void WebProcessPool::setAutomationClient(std::unique_ptr<API::AutomationClient> 
         m_automationClient = WTFMove(automationClient);
 }
 
+void WebProcessPool::setCustomProtocolManagerClient(std::unique_ptr<API::CustomProtocolManagerClient>&& customProtocolManagerClient)
+{
+    if (!customProtocolManagerClient)
+        m_customProtocolManagerClient = std::make_unique<API::CustomProtocolManagerClient>();
+    else
+        m_customProtocolManagerClient = WTFMove(customProtocolManagerClient);
+}
+
 void WebProcessPool::setMaximumNumberOfProcesses(unsigned maximumNumberOfProcesses)
 {
     // Guard against API misuse.
@@ -354,6 +365,12 @@ NetworkProcessProxy& WebProcessPool::ensureNetworkProcess()
     parameters.diskCacheSizeOverride = m_configuration->diskCacheSizeOverride();
     parameters.canHandleHTTPSServerTrustEvaluation = m_canHandleHTTPSServerTrustEvaluation;
 
+    for (auto& scheme : globalURLSchemesWithCustomProtocolHandlers())
+        parameters.urlSchemesRegisteredForCustomProtocols.append(scheme);
+
+    for (auto& scheme : m_urlSchemesRegisteredForCustomProtocols)
+        parameters.urlSchemesRegisteredForCustomProtocols.append(scheme);
+
     parameters.diskCacheDirectory = m_configuration->diskCacheDirectory();
     if (!parameters.diskCacheDirectory.isEmpty())
         SandboxExtension::createHandleForReadWriteDirectory(parameters.diskCacheDirectory, parameters.diskCacheDirectoryExtensionHandle);
@@ -382,8 +399,6 @@ NetworkProcessProxy& WebProcessPool::ensureNetworkProcess()
 
     parameters.shouldUseTestingNetworkSession = m_shouldUseTestingNetworkSession;
 
-    parameters.urlParserEnabled = URLParser::enabled();
-    
     // Add any platform specific parameters
     platformInitializeNetworkProcess(parameters);
 
@@ -550,8 +565,6 @@ WebProcessProxy& WebProcessPool::createNewWebProcess()
 
     WebProcessCreationParameters parameters;
 
-    parameters.urlParserEnabled = URLParser::enabled();
-    
     parameters.injectedBundlePath = m_resolvedPaths.injectedBundlePath;
     if (!parameters.injectedBundlePath.isEmpty())
         SandboxExtension::createHandleWithoutResolvingPath(parameters.injectedBundlePath, SandboxExtension::ReadOnly, parameters.injectedBundlePathExtensionHandle);
@@ -588,9 +601,7 @@ WebProcessProxy& WebProcessPool::createNewWebProcess()
     copyToVector(m_schemesToRegisterAsDisplayIsolated, parameters.urlSchemesRegisteredAsDisplayIsolated);
     copyToVector(m_schemesToRegisterAsCORSEnabled, parameters.urlSchemesRegisteredAsCORSEnabled);
     copyToVector(m_schemesToRegisterAsAlwaysRevalidated, parameters.urlSchemesRegisteredAsAlwaysRevalidated);
-#if ENABLE(CACHE_PARTITIONING)
     copyToVector(m_schemesToRegisterAsCachePartitioned, parameters.urlSchemesRegisteredAsCachePartitioned);
-#endif
 
     parameters.shouldAlwaysUseComplexTextCodePath = m_alwaysUsesComplexTextCodePath;
     parameters.shouldUseFontSmoothing = m_shouldUseFontSmoothing;
@@ -966,12 +977,6 @@ void WebProcessPool::registerURLSchemeAsCORSEnabled(const String& urlScheme)
     sendToAllProcesses(Messages::WebProcess::RegisterURLSchemeAsCORSEnabled(urlScheme));
 }
 
-HashSet<String, ASCIICaseInsensitiveHash>& WebProcessPool::globalURLSchemesWithCustomProtocolHandlers()
-{
-    static NeverDestroyed<HashSet<String, ASCIICaseInsensitiveHash>> set;
-    return set;
-}
-
 void WebProcessPool::registerGlobalURLSchemeAsHavingCustomProtocolHandlers(const String& urlScheme)
 {
     if (!urlScheme)
@@ -992,13 +997,11 @@ void WebProcessPool::unregisterGlobalURLSchemeAsHavingCustomProtocolHandlers(con
         processPool->unregisterSchemeForCustomProtocol(urlScheme);
 }
 
-#if ENABLE(CACHE_PARTITIONING)
 void WebProcessPool::registerURLSchemeAsCachePartitioned(const String& urlScheme)
 {
     m_schemesToRegisterAsCachePartitioned.add(urlScheme);
     sendToAllProcesses(Messages::WebProcess::RegisterURLSchemeAsCachePartitioned(urlScheme));
 }
-#endif
 
 void WebProcessPool::setCacheModel(CacheModel cacheModel)
 {
@@ -1366,17 +1369,14 @@ void WebProcessPool::setPlugInAutoStartOriginsFilteringOutEntriesAddedAfterTime(
 
 void WebProcessPool::registerSchemeForCustomProtocol(const String& scheme)
 {
-#if USE(SOUP)
-    m_urlSchemesRegisteredForCustomProtocols.add(scheme);
-#endif
+    if (!globalURLSchemesWithCustomProtocolHandlers().contains(scheme))
+        m_urlSchemesRegisteredForCustomProtocols.add(scheme);
     sendToNetworkingProcess(Messages::CustomProtocolManager::RegisterScheme(scheme));
 }
 
 void WebProcessPool::unregisterSchemeForCustomProtocol(const String& scheme)
 {
-#if USE(SOUP)
     m_urlSchemesRegisteredForCustomProtocols.remove(scheme);
-#endif
     sendToNetworkingProcess(Messages::CustomProtocolManager::UnregisterScheme(scheme));
 }
 
