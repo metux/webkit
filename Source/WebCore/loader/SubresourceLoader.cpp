@@ -29,6 +29,7 @@
 #include "config.h"
 #include "SubresourceLoader.h"
 
+#include "CachedRawResource.h"
 #include "CachedResourceLoader.h"
 #include "CrossOriginAccessControl.h"
 #include "DiagnosticLoggingClient.h"
@@ -42,10 +43,10 @@
 #include "MemoryCache.h"
 #include "Page.h"
 #include "ResourceLoadObserver.h"
+#include "ResourceTiming.h"
 #include "RuntimeEnabledFeatures.h"
 #include <wtf/Ref.h>
 #include <wtf/RefCountedLeakCounter.h>
-#include <wtf/SetForScope.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
 
@@ -377,7 +378,7 @@ void SubresourceLoader::didReceiveBuffer(Ref<SharedBuffer>&& buffer, long long e
     didReceiveDataOrBuffer(nullptr, 0, WTFMove(buffer), encodedDataLength, dataPayloadType);
 }
 
-void SubresourceLoader::didReceiveDataOrBuffer(const char* data, int length, RefPtr<SharedBuffer>&& prpBuffer, long long encodedDataLength, DataPayloadType dataPayloadType)
+void SubresourceLoader::didReceiveDataOrBuffer(const char* data, int length, RefPtr<SharedBuffer>&& buffer, long long encodedDataLength, DataPayloadType dataPayloadType)
 {
     if (m_resource->response().httpStatusCode() >= 400 && !m_resource->shouldIgnoreHTTPStatusCodeErrors())
         return;
@@ -387,9 +388,8 @@ void SubresourceLoader::didReceiveDataOrBuffer(const char* data, int length, Ref
     // Reference the object in this method since the additional processing can do
     // anything including removing the last reference to this object; one example of this is 3266216.
     Ref<SubresourceLoader> protectedThis(*this);
-    RefPtr<SharedBuffer> buffer = prpBuffer;
-    
-    ResourceLoader::didReceiveDataOrBuffer(data, length, WTFMove(buffer), encodedDataLength, dataPayloadType);
+
+    ResourceLoader::didReceiveDataOrBuffer(data, length, buffer.copyRef(), encodedDataLength, dataPayloadType);
 
     if (!m_loadingMultipartContent) {
         if (auto* resourceData = this->resourceData())
@@ -524,37 +524,37 @@ void SubresourceLoader::didFinishLoading(double finishTime)
     ASSERT(!reachedTerminalState());
     ASSERT(!m_resource->resourceToRevalidate());
     // FIXME (129394): We should cancel the load when a decode error occurs instead of continuing the load to completion.
-    ASSERT(!m_resource->errorOccurred() || m_resource->status() == CachedResource::DecodeError);
+    ASSERT(!m_resource->errorOccurred() || m_resource->status() == CachedResource::DecodeError || !m_resource->isLoading());
     LOG(ResourceLoading, "Received '%s'.", m_resource->url().string().latin1().data());
     logResourceLoaded(m_frame.get(), m_resource->type());
 
     Ref<SubresourceLoader> protectedThis(*this);
     CachedResourceHandle<CachedResource> protectResource(m_resource);
 
-    // FIXME: The finishTime that is passed in is from the NetworkProcess and is more accurate.
+    // FIXME: <https://webkit.org/b/168351> [Resource Timing] Gather timing information with reliable responseEnd time
+    // The finishTime that is passed in is from the NetworkProcess and is more accurate.
     // However, all other load times are generated from the web process or offsets.
     // Mixing times from different processes can cause the finish time to be earlier than
-    // the response received time due to inter-process communication lag.
+    // the response received time due to inter-process communication lag. This could be solved
+    // by gathering NetworkLoadTiming information at completion time instead of at
+    // didReceiveResponse time.
     UNUSED_PARAM(finishTime);
-    double responseEndTime = monotonicallyIncreasingTime();
+    MonotonicTime responseEndTime = MonotonicTime::now();
     m_loadTiming.setResponseEnd(responseEndTime);
 
 #if ENABLE(WEB_TIMING)
-    if (RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled()) {
-        if (Document* document = m_documentLoader->cachedResourceLoader().document())
-            m_documentLoader->cachedResourceLoader().resourceTimingInformation().addResourceTiming(m_resource, *document, m_resource->loader()->loadTiming());
-    }
+    reportResourceTiming();
 #endif
 
     m_state = Finishing;
-    m_resource->setLoadFinishTime(responseEndTime); // FIXME: Users of the loadFinishTime should use the LoadTiming struct instead.
+    m_resource->setLoadFinishTime(responseEndTime.secondsSinceEpoch().seconds()); // FIXME: Users of the loadFinishTime should use the LoadTiming struct instead.
     m_resource->finishLoading(resourceData());
 
     if (wasCancelled())
         return;
     m_resource->finish();
     ASSERT(!reachedTerminalState());
-    didFinishLoadingOnePart(responseEndTime);
+    didFinishLoadingOnePart(responseEndTime.secondsSinceEpoch().seconds());
     notifyDone();
     if (reachedTerminalState())
         return;
@@ -639,9 +639,9 @@ void SubresourceLoader::notifyDone()
 
     m_requestCountTracker = std::nullopt;
 #if PLATFORM(IOS)
-    m_documentLoader->cachedResourceLoader().loadDone(m_resource, m_state != CancelledWhileInitializing);
+    m_documentLoader->cachedResourceLoader().loadDone(m_state != CancelledWhileInitializing);
 #else
-    m_documentLoader->cachedResourceLoader().loadDone(m_resource);
+    m_documentLoader->cachedResourceLoader().loadDone();
 #endif
     if (reachedTerminalState())
         return;
@@ -660,5 +660,36 @@ void SubresourceLoader::releaseResources()
     m_resource = nullptr;
     ResourceLoader::releaseResources();
 }
+
+#if ENABLE(WEB_TIMING)
+void SubresourceLoader::reportResourceTiming()
+{
+    if (!RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled())
+        return;
+
+    if (!ResourceTimingInformation::shouldAddResourceTiming(*m_resource))
+        return;
+
+    Document* document = m_documentLoader->cachedResourceLoader().document();
+    if (!document)
+        return;
+    
+    SecurityOrigin& origin = m_origin ? *m_origin : document->securityOrigin();
+    ResourceTiming resourceTiming = ResourceTiming::fromLoad(*m_resource, m_resource->initiatorName(), m_loadTiming, origin);
+
+    // Worker resources loaded here are all CachedRawResources loaded through WorkerThreadableLoader.
+    // Pass the ResourceTiming information on so that WorkerThreadableLoader may add them to the
+    // Worker's Performance object.
+    if (options().initiatorContext == InitiatorContext::Worker) {
+        ASSERT(m_origin);
+        ASSERT(is<CachedRawResource>(m_resource));
+        downcast<CachedRawResource>(*m_resource).finishedTimingForWorkerLoad(WTFMove(resourceTiming));
+        return;
+    }
+
+    ASSERT(options().initiatorContext == InitiatorContext::Document);
+    m_documentLoader->cachedResourceLoader().resourceTimingInformation().addResourceTiming(*m_resource, *document, WTFMove(resourceTiming));
+}
+#endif
 
 }

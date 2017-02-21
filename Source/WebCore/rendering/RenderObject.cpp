@@ -28,8 +28,7 @@
 #include "RenderObject.h"
 
 #include "AXObjectCache.h"
-#include "AnimationController.h"
-#include "EventHandler.h"
+#include "CSSAnimationController.h"
 #include "FloatQuad.h"
 #include "FlowThreadController.h"
 #include "FrameSelection.h"
@@ -1548,6 +1547,12 @@ void RenderObject::destroy()
         return;
     }
     delete this;
+}
+
+Position RenderObject::positionForPoint(const LayoutPoint& point)
+{
+    // FIXME: This should just create a Position object instead (webkit.org/b/168566). 
+    return positionForPoint(point, nullptr).deepEquivalent();
 }
 
 VisiblePosition RenderObject::positionForPoint(const LayoutPoint&, const RenderRegion*)

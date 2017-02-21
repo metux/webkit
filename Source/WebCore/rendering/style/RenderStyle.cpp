@@ -208,11 +208,7 @@ RenderStyle RenderStyle::replace(RenderStyle&& newStyle)
 
 bool RenderStyle::isCSSGridLayoutEnabled()
 {
-#if ENABLE(CSS_GRID_LAYOUT)
     return RuntimeEnabledFeatures::sharedFeatures().isCSSGridLayoutEnabled();
-#else
-    return false;
-#endif
 }
 
 static StyleSelfAlignmentData resolvedSelfAlignment(const StyleSelfAlignmentData& value, ItemPosition normalValueBehavior)
@@ -583,11 +579,9 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
             }
         }
 
-#if ENABLE(CSS_GRID_LAYOUT)
         if (m_rareNonInheritedData->grid != other.m_rareNonInheritedData->grid
             || m_rareNonInheritedData->gridItem != other.m_rareNonInheritedData->gridItem)
             return true;
-#endif
 
 #if ENABLE(DASHBOARD_SUPPORT)
         // If regions change, trigger a relayout to re-calc regions.
@@ -913,6 +907,12 @@ StyleDifference RenderStyle::diff(const RenderStyle& other, unsigned& changedCon
         if (svgChange == StyleDifferenceLayout)
             return svgChange;
     }
+
+    // These properties affect the cached stroke bounding box rects.
+    if (m_rareInheritedData->capStyle != other.m_rareInheritedData->capStyle
+        || m_rareInheritedData->joinStyle != other.m_rareInheritedData->joinStyle
+        || m_rareInheritedData->strokeWidth != other.m_rareInheritedData->strokeWidth)
+        return StyleDifferenceLayout;
 
     if (changeRequiresLayout(other, changedContextSensitiveProperties))
         return StyleDifferenceLayout;
@@ -2216,5 +2216,46 @@ void RenderStyle::setDashboardRegion(int type, const String& label, Length&& top
 }
 
 #endif
+
+Vector<PaintType, 3> RenderStyle::paintTypesForPaintOrder() const
+{
+    Vector<PaintType, 3> paintOrder;
+    switch (this->paintOrder()) {
+    case PaintOrderNormal:
+        FALLTHROUGH;
+    case PaintOrderFill:
+        paintOrder.append(PaintTypeFill);
+        paintOrder.append(PaintTypeStroke);
+        paintOrder.append(PaintTypeMarkers);
+        break;
+    case PaintOrderFillMarkers:
+        paintOrder.append(PaintTypeFill);
+        paintOrder.append(PaintTypeMarkers);
+        paintOrder.append(PaintTypeStroke);
+        break;
+    case PaintOrderStroke:
+        paintOrder.append(PaintTypeStroke);
+        paintOrder.append(PaintTypeFill);
+        paintOrder.append(PaintTypeMarkers);
+        break;
+    case PaintOrderStrokeMarkers:
+        paintOrder.append(PaintTypeStroke);
+        paintOrder.append(PaintTypeMarkers);
+        paintOrder.append(PaintTypeFill);
+        break;
+    case PaintOrderMarkers:
+        paintOrder.append(PaintTypeMarkers);
+        paintOrder.append(PaintTypeFill);
+        paintOrder.append(PaintTypeStroke);
+        break;
+    case PaintOrderMarkersStroke:
+        paintOrder.append(PaintTypeMarkers);
+        paintOrder.append(PaintTypeStroke);
+        paintOrder.append(PaintTypeFill);
+        break;
+    };
+    return paintOrder;
+}
+
 
 } // namespace WebCore

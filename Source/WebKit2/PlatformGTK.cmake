@@ -74,7 +74,6 @@ list(APPEND WebKit2_SOURCES
     Shared/gtk/ProcessExecutablePathGtk.cpp
     Shared/gtk/WebContextMenuItemGtk.cpp
     Shared/gtk/WebEventFactory.cpp
-    Shared/gtk/WebKit2InitializeGTK.cpp
     Shared/gtk/WebSelectionData.cpp
 
     Shared/linux/WebMemorySamplerLinux.cpp
@@ -88,9 +87,12 @@ list(APPEND WebKit2_SOURCES
     UIProcess/DefaultUndoController.cpp
     UIProcess/DrawingAreaProxyImpl.cpp
     UIProcess/LegacySessionStateCodingNone.cpp
+    UIProcess/WebResourceLoadStatisticsManager.cpp
     UIProcess/WebResourceLoadStatisticsStore.cpp
     UIProcess/WebTextChecker.cpp
     UIProcess/WebTextCheckerClient.cpp
+
+    UIProcess/API/C/WKResourceLoadStatisticsManager.cpp
 
     UIProcess/API/C/cairo/WKIconDatabaseCairo.cpp
 
@@ -208,6 +210,9 @@ list(APPEND WebKit2_SOURCES
     UIProcess/API/gtk/WebKitPolicyDecision.cpp
     UIProcess/API/gtk/WebKitPolicyDecision.h
     UIProcess/API/gtk/WebKitPolicyDecisionPrivate.h
+    UIProcess/API/gtk/WebKitPrintCustomWidget.cpp
+    UIProcess/API/gtk/WebKitPrintCustomWidget.h
+    UIProcess/API/gtk/WebKitPrintCustomWidgetPrivate.h
     UIProcess/API/gtk/WebKitPrintOperation.cpp
     UIProcess/API/gtk/WebKitPrintOperation.h
     UIProcess/API/gtk/WebKitPrintOperationPrivate.h
@@ -288,8 +293,6 @@ list(APPEND WebKit2_SOURCES
     UIProcess/Launcher/gtk/ProcessLauncherGtk.cpp
 
     UIProcess/linux/MemoryPressureMonitor.cpp
-
-    UIProcess/Network/CustomProtocols/soup/CustomProtocolManagerProxySoup.cpp
 
     UIProcess/Plugins/gtk/PluginInfoCache.cpp
 
@@ -539,6 +542,7 @@ set(WebKit2GTK_INSTALLED_HEADERS
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitPermissionRequest.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitPlugin.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitPolicyDecision.h
+    ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitPrintCustomWidget.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitPrintOperation.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitResponsePolicyDecision.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitScriptDialog.h
@@ -1109,7 +1113,6 @@ if (ENABLE_PLUGIN_PROCESS_GTK2)
         Shared/gtk/NativeWebWheelEventGtk.cpp
         Shared/gtk/ProcessExecutablePathGtk.cpp
         Shared/gtk/WebEventFactory.cpp
-        Shared/gtk/WebKit2InitializeGTK.cpp
 
         Shared/soup/WebCoreArgumentCodersSoup.cpp
 

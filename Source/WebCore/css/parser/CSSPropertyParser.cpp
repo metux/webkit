@@ -155,10 +155,12 @@ static bool isAppleLegacyCssValueKeyword(const char* valueKeyword, unsigned leng
 {
     static const char applePrefix[] = "-apple-";
     static const char appleSystemPrefix[] = "-apple-system";
+    static const char applePayPrefix[] = "-apple-pay";
     static const char* appleWirelessPlaybackTargetActive = getValueName(CSSValueAppleWirelessPlaybackTargetActive);
     
     return hasPrefix(valueKeyword, length, applePrefix)
     && !hasPrefix(valueKeyword, length, appleSystemPrefix)
+    && !hasPrefix(valueKeyword, length, applePayPrefix)
     && !WTF::equal(reinterpret_cast<const LChar*>(valueKeyword), reinterpret_cast<const LChar*>(appleWirelessPlaybackTargetActive), length);
 }
 
@@ -1771,11 +1773,11 @@ static RefPtr<CSSValue> consumeTransformValue(CSSParserTokenRange& range, CSSPar
     RefPtr<CSSValue> parsedValue;
     switch (functionId) {
     case CSSValueRotate:
-    case CSSValueRotatex:
-    case CSSValueRotatey:
-    case CSSValueRotatez:
-    case CSSValueSkewx:
-    case CSSValueSkewy:
+    case CSSValueRotateX:
+    case CSSValueRotateY:
+    case CSSValueRotateZ:
+    case CSSValueSkewX:
+    case CSSValueSkewY:
     case CSSValueSkew:
         parsedValue = consumeAngle(args, cssParserMode, UnitlessQuirk::Forbid);
         if (!parsedValue)
@@ -1787,9 +1789,9 @@ static RefPtr<CSSValue> consumeTransformValue(CSSParserTokenRange& range, CSSPar
                 return nullptr;
         }
         break;
-    case CSSValueScalex:
-    case CSSValueScaley:
-    case CSSValueScalez:
+    case CSSValueScaleX:
+    case CSSValueScaleY:
+    case CSSValueScaleZ:
     case CSSValueScale:
         parsedValue = consumeNumber(args, ValueRangeAll);
         if (!parsedValue)
@@ -1805,8 +1807,8 @@ static RefPtr<CSSValue> consumeTransformValue(CSSParserTokenRange& range, CSSPar
         if (!consumePerspective(args, cssParserMode, transformValue))
             return nullptr;
         break;
-    case CSSValueTranslatex:
-    case CSSValueTranslatey:
+    case CSSValueTranslateX:
+    case CSSValueTranslateY:
     case CSSValueTranslate:
         parsedValue = consumeLengthOrPercent(args, cssParserMode, ValueRangeAll);
         if (!parsedValue)
@@ -1818,7 +1820,7 @@ static RefPtr<CSSValue> consumeTransformValue(CSSParserTokenRange& range, CSSPar
                 return nullptr;
         }
         break;
-    case CSSValueTranslatez:
+    case CSSValueTranslateZ:
         parsedValue = consumeLength(args, cssParserMode, ValueRangeAll);
         break;
     case CSSValueMatrix:
@@ -2789,7 +2791,6 @@ static RefPtr<CSSPrimitiveValue> consumeBackgroundSize(CSSPropertyID property, C
     return createPrimitiveValuePair(horizontal.releaseNonNull(), vertical.releaseNonNull(), property == CSSPropertyWebkitBackgroundSize ? Pair::IdenticalValueEncoding::Coalesce : Pair::IdenticalValueEncoding::DoNotCoalesce);
 }
 
-#if ENABLE(CSS_GRID_LAYOUT)
 static RefPtr<CSSValueList> consumeGridAutoFlow(CSSParserTokenRange& range)
 {
     RefPtr<CSSPrimitiveValue> rowOrColumnValue = consumeIdent<CSSValueRow, CSSValueColumn>(range);
@@ -2806,7 +2807,6 @@ static RefPtr<CSSValueList> consumeGridAutoFlow(CSSParserTokenRange& range)
         parsedValues->append(denseAlgorithm.releaseNonNull());
     return parsedValues;
 }
-#endif
 
 static RefPtr<CSSValue> consumeBackgroundComponent(CSSPropertyID property, CSSParserTokenRange& range, const CSSParserContext& context)
 {
@@ -2877,7 +2877,6 @@ static RefPtr<CSSValue> consumeCommaSeparatedBackgroundComponent(CSSPropertyID p
     return result;
 }
 
-#if ENABLE(CSS_GRID_LAYOUT)
 static RefPtr<CSSPrimitiveValue> consumeSelfPositionKeyword(CSSParserTokenRange& range)
 {
     CSSValueID id = range.peek().id();
@@ -3298,7 +3297,6 @@ static RefPtr<CSSValue> consumeGridTemplateAreas(CSSParserTokenRange& range)
     ASSERT(columnCount);
     return CSSGridTemplateAreasValue::create(gridAreaMap, rowCount, columnCount);
 }
-#endif
 
 #if ENABLE(CSS_REGIONS)
 static RefPtr<CSSValue> consumeFlowProperty(CSSParserTokenRange& range)
@@ -3792,11 +3790,9 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
     case CSSPropertyWebkitAnimationTrigger:
 #endif
         return consumeAnimationPropertyList(property, m_range, m_context);
-#if ENABLE(CSS_GRID_LAYOUT)
     case CSSPropertyGridColumnGap:
     case CSSPropertyGridRowGap:
         return consumeLength(m_range, m_context.mode, ValueRangeNonNegative);
-#endif
     case CSSPropertyShapeMargin:
         return consumeLengthOrPercent(m_range, m_context.mode, ValueRangeNonNegative);
     case CSSPropertyShapeImageThreshold:
@@ -4010,7 +4006,6 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
     case CSSPropertyWebkitMaskRepeatX:
     case CSSPropertyWebkitMaskRepeatY:
         return nullptr;
-#if ENABLE(CSS_GRID_LAYOUT)
     case CSSPropertyAlignItems:
         if (!m_context.cssGridLayoutEnabled)
             return nullptr;
@@ -4049,7 +4044,6 @@ RefPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID property, CSS
         if (!m_context.cssGridLayoutEnabled)
             return nullptr;
         return consumeGridAutoFlow(m_range);
-#endif
 #if ENABLE(CSS_REGIONS)
     case CSSPropertyWebkitFlowInto:
     case CSSPropertyWebkitFlowFrom:
@@ -4993,7 +4987,6 @@ bool CSSPropertyParser::consumeBackgroundShorthand(const StylePropertyShorthand&
     return true;
 }
 
-#if ENABLE(CSS_GRID_LAYOUT)
 // FIXME-NEWPARSER: Hack to work around the fact that we aren't using CSSCustomIdentValue
 // for stuff yet. This can be replaced by CSSValue::isCustomIdentValue() once we switch
 // to using CSSCustomIdentValue everywhere.
@@ -5260,7 +5253,6 @@ bool CSSPropertyParser::consumeGridShorthand(bool important)
     
     return true;
 }
-#endif
 
 bool CSSPropertyParser::parseShorthand(CSSPropertyID property, bool important)
 {
@@ -5423,7 +5415,6 @@ bool CSSPropertyParser::parseShorthand(CSSPropertyID property, bool important)
         return consumeTransformOrigin(important);
     case CSSPropertyPerspectiveOrigin:
         return consumePerspectiveOrigin(important);
-#if ENABLE(CSS_GRID_LAYOUT)
     case CSSPropertyGridGap: {
         RefPtr<CSSValue> rowGap = consumeLength(m_range, m_context.mode, ValueRangeNonNegative);
         RefPtr<CSSValue> columnGap = consumeLength(m_range, m_context.mode, ValueRangeNonNegative);
@@ -5444,7 +5435,6 @@ bool CSSPropertyParser::parseShorthand(CSSPropertyID property, bool important)
         return consumeGridTemplateShorthand(CSSPropertyGridTemplate, important);
     case CSSPropertyGrid:
         return consumeGridShorthand(important);
-#endif
     case CSSPropertyWebkitMarquee:
         return consumeShorthandGreedily(webkitMarqueeShorthand(), important);
     default:

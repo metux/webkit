@@ -57,6 +57,7 @@ IntPoint computeFirstRunLocation(const RenderObject&, const Layout&);
 
 Vector<IntRect> collectAbsoluteRects(const RenderObject&, const Layout&, const LayoutPoint& accumulatedOffset);
 Vector<FloatQuad> collectAbsoluteQuads(const RenderObject&, const Layout&, bool* wasFixed);
+unsigned textOffsetForPoint(const LayoutPoint&, const RenderText&, const Layout&);
 
 LayoutUnit lineHeightFromFlow(const RenderBlockFlow&);
 LayoutUnit baselineFromFlow(const RenderBlockFlow&);
@@ -71,7 +72,12 @@ namespace SimpleLineLayout {
 
 inline LayoutUnit computeFlowHeight(const RenderBlockFlow& flow, const Layout& layout)
 {
-    return lineHeightFromFlow(flow) * layout.lineCount();
+    auto flowHeight = lineHeightFromFlow(flow) * layout.lineCount();
+    if (!layout.isPaginated())
+        return flowHeight;
+    for (auto& strutEntry : layout.struts())
+        flowHeight += strutEntry.offset;
+    return flowHeight;
 }
 
 inline LayoutUnit computeFlowFirstLineBaseline(const RenderBlockFlow& flow, const Layout& layout)

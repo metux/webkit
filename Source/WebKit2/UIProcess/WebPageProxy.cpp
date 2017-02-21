@@ -136,10 +136,6 @@
 #include "RemoteScrollingCoordinatorProxy.h"
 #endif
 
-#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
-#include "CoordinatedLayerTreeHostProxyMessages.h"
-#endif
-
 #if ENABLE(VIBRATION)
 #include "WebVibrationProxy.h"
 #endif
@@ -343,6 +339,7 @@ WebPageProxy::WebPageProxy(PageClient& pageClient, WebProcessProxy& process, uin
     , m_websiteDataStore(m_configuration->websiteDataStore()->websiteDataStore())
     , m_mainFrame(nullptr)
     , m_userAgent(standardUserAgent())
+    , m_overrideContentSecurityPolicy { m_configuration->overrideContentSecurityPolicy() }
     , m_treatsSHA1CertificatesAsInsecure(m_configuration->treatsSHA1SignedCertificatesAsInsecure())
 #if ENABLE(FULLSCREEN_API)
     , m_fullscreenClient(std::make_unique<API::FullscreenClient>())
@@ -715,6 +712,7 @@ void WebPageProxy::reattachToWebProcess()
     ASSERT(m_process->state() == WebProcessProxy::State::Terminated);
 
     m_isValid = true;
+    m_wasKilledForBeingUnresponsiveWhileInBackground = false;
     m_process->removeWebPage(m_pageID);
     m_process->removeMessageReceiver(Messages::WebPageProxy::messageReceiverName(), m_pageID);
 
@@ -1516,14 +1514,30 @@ void WebPageProxy::viewDidEnterWindow()
     }
 }
 
+void WebPageProxy::reloadAfterBeingKilledInBackground()
+{
+    ASSERT(!isValid());
+
+    RELEASE_LOG_IF_ALLOWED("%p - Reloading tab that was killed in the background", this);
+
+    // Only report as a crash if the page was ever visible, otherwise silently reload.
+    if (m_hasEverBeenVisible)
+        processDidCrash();
+    else
+        reattachToWebProcessForReload();
+}
+
 void WebPageProxy::dispatchActivityStateChange()
 {
 #if PLATFORM(COCOA)
     m_activityStateChangeDispatcher->invalidate();
 #endif
 
-    if (!isValid())
+    if (!isValid()) {
+        if (m_potentiallyChangedActivityStateFlags & ActivityState::IsVisible && m_wasKilledForBeingUnresponsiveWhileInBackground)
+            reloadAfterBeingKilledInBackground();
         return;
+    }
 
     // If the visibility state may have changed, then so may the visually idle & occluded agnostic state.
     if (m_potentiallyChangedActivityStateFlags & ActivityState::IsVisible)
@@ -1555,16 +1569,25 @@ void WebPageProxy::dispatchActivityStateChange()
     // This must happen after the SetActivityState message is sent, to ensure the page visibility event can fire.
     updateThrottleState();
 
-    // If we've started the responsiveness timer as part of telling the web process to update the backing store
-    // state, it might not send back a reply (since it won't paint anything if the web page is hidden) so we
-    // stop the unresponsiveness timer here.
-    if ((changed & ActivityState::IsVisible) && !isViewVisible())
-        m_process->responsivenessTimer().stop();
-
 #if ENABLE(POINTER_LOCK)
-    if (((changed & ActivityState::IsVisible) && !isViewVisible()) || ((changed & ActivityState::WindowIsActive) && !m_pageClient.isViewWindowActive()))
+    if (((changed & ActivityState::IsVisible) && !isViewVisible()) || ((changed & ActivityState::WindowIsActive) && !m_pageClient.isViewWindowActive())
+        || ((changed & ActivityState::IsFocused) && !(m_activityState & ActivityState::IsFocused)))
         requestPointerUnlock();
 #endif
+
+    if (changed & ActivityState::IsVisible) {
+        if (isViewVisible()) {
+            m_hasEverBeenVisible = true;
+            m_visiblePageToken = m_process->visiblePageToken();
+        } else {
+            m_visiblePageToken = nullptr;
+
+            // If we've started the responsiveness timer as part of telling the web process to update the backing store
+            // state, it might not send back a reply (since it won't paint anything if the web page is hidden) so we
+            // stop the unresponsiveness timer here.
+            m_process->responsivenessTimer().stop();
+        }
+    }
 
     if (changed & ActivityState::IsInWindow) {
         if (isInWindow())
@@ -1818,6 +1841,12 @@ void WebPageProxy::dragEnded(const IntPoint& clientPosition, const IntPoint& glo
     if (!isValid())
         return;
     m_process->send(Messages::WebPage::DragEnded(clientPosition, globalPosition, operation), m_pageID);
+}
+    
+void WebPageProxy::dragCancelled()
+{
+    if (isValid())
+        m_process->send(Messages::WebPage::DragCancelled(), m_pageID);
 }
 #endif // ENABLE(DRAG_SUPPORT)
 
@@ -2365,7 +2394,7 @@ void WebPageProxy::setCustomTextEncodingName(const String& encodingName)
     m_process->send(Messages::WebPage::SetCustomTextEncodingName(encodingName), m_pageID);
 }
 
-void WebPageProxy::terminateProcess()
+void WebPageProxy::terminateProcess(TerminationReason terminationReason)
 {
     // NOTE: This uses a check of m_isValid rather than calling isValid() since
     // we want this to run even for pages being closed or that already closed.
@@ -2374,6 +2403,7 @@ void WebPageProxy::terminateProcess()
 
     m_process->requestTermination();
     resetStateAfterProcessExited();
+    m_wasKilledForBeingUnresponsiveWhileInBackground = terminationReason == TerminationReason::UnresponsiveWhileInBackground;
 }
 
 SessionState WebPageProxy::sessionState(const std::function<bool (WebBackForwardListItem&)>& filter) const
@@ -4097,31 +4127,6 @@ void WebPageProxy::runBeforeUnloadConfirmPanel(const String& message, uint64_t f
     m_uiClient->runBeforeUnloadConfirmPanel(this, message, frame, [reply](bool result) { reply->send(result); });
 }
 
-#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
-void WebPageProxy::pageDidRequestScroll(const IntPoint& point)
-{
-    m_pageClient.pageDidRequestScroll(point);
-}
-
-void WebPageProxy::pageTransitionViewportReady()
-{
-    m_pageClient.pageTransitionViewportReady();
-}
-
-void WebPageProxy::didRenderFrame(const WebCore::IntSize& contentsSize, const WebCore::IntRect& coveredRect)
-{
-    m_pageClient.didRenderFrame(contentsSize, coveredRect);
-}
-
-void WebPageProxy::commitPageTransitionViewport()
-{
-    if (!isValid())
-        return;
-
-    process().send(Messages::WebPage::CommitPageTransitionViewport(), m_pageID);
-}
-#endif
-
 void WebPageProxy::didChangeViewportProperties(const ViewportAttributes& attr)
 {
     m_pageClient.didChangeViewportProperties(attr);
@@ -5193,6 +5198,14 @@ void WebPageProxy::logDiagnosticMessageWithValue(const String& message, const St
     m_diagnosticLoggingClient->logDiagnosticMessageWithValue(this, message, description, String::number(value, significantFigures));
 }
 
+void WebPageProxy::logDiagnosticMessageWithEnhancedPrivacy(const String& message, const String& description, ShouldSample shouldSample)
+{
+    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample))
+        return;
+
+    m_diagnosticLoggingClient->logDiagnosticMessageWithEnhancedPrivacy(this, message, description);
+}
+
 void WebPageProxy::rectForCharacterRangeCallback(const IntRect& rect, const EditingRange& actualRange, uint64_t callbackID)
 {
     MESSAGE_CHECK(actualRange.isValid());
@@ -5402,6 +5415,7 @@ void WebPageProxy::resetState(ResetStateReason resetStateReason)
 #endif
 
 #if PLATFORM(IOS)
+    m_firstLayerTreeTransactionIdAfterDidCommitLoad = 0;
     m_lastVisibleContentRectUpdate = VisibleContentRectUpdateInfo();
     m_dynamicViewportSizeUpdateWaitingForTarget = false;
     m_dynamicViewportSizeUpdateWaitingForLayerTreeCommit = false;
@@ -5460,6 +5474,7 @@ void WebPageProxy::resetStateAfterProcessExited()
     m_activityToken = nullptr;
 #endif
     m_pageIsUserObservableCount = nullptr;
+    m_visiblePageToken = nullptr;
 
     m_isValid = false;
     m_isPageSuspended = false;
@@ -5570,6 +5585,7 @@ WebPageCreationParameters WebPageProxy::creationParameters()
     parameters.shouldScaleViewToFitDocument = m_shouldScaleViewToFitDocument;
     parameters.userInterfaceLayoutDirection = m_pageClient.userInterfaceLayoutDirection();
     parameters.observedLayoutMilestones = m_observedLayoutMilestones;
+    parameters.overrideContentSecurityPolicy = m_overrideContentSecurityPolicy;
 
     return parameters;
 }
@@ -6771,7 +6787,8 @@ void WebPageProxy::requestPointerLock()
     ASSERT(!m_isPointerLockPending);
     ASSERT(!m_isPointerLocked);
     m_isPointerLockPending = true;
-    if (!isViewVisible()) {
+
+    if (!isViewVisible() || !(m_activityState & ActivityState::IsFocused)) {
         didDenyPointerLock();
         return;
     }

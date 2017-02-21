@@ -58,6 +58,8 @@ public:
 
         unsigned start() const;
         unsigned end() const;
+        float logicalLeft() const;
+        float logicalRight() const;
 
         FloatRect rect() const;
         float expansion() const;
@@ -113,6 +115,7 @@ public:
 
     Range<Iterator> rangeForRect(const LayoutRect&) const;
     Range<Iterator> rangeForRenderer(const RenderObject&) const;
+    Iterator runForPoint(const LayoutPoint&) const;
 
 private:
     enum class IndexType { First, Last };
@@ -173,6 +176,16 @@ inline unsigned RunResolver::Run::end() const
     return m_iterator.simpleRun().end;
 }
 
+inline float RunResolver::Run::logicalLeft() const
+{
+    return m_iterator.simpleRun().logicalLeft;
+}
+
+inline float RunResolver::Run::logicalRight() const
+{
+    return m_iterator.simpleRun().logicalRight;
+}
+
 inline float RunResolver::Run::expansion() const
 {
     return m_iterator.simpleRun().expansion;
@@ -206,7 +219,15 @@ inline RunResolver::Iterator& RunResolver::Iterator::operator++()
 inline float RunResolver::Run::computeBaselinePosition() const
 {
     auto& resolver = m_iterator.resolver();
-    return resolver.m_lineHeight * lineIndex() + resolver.m_baseline + resolver.m_borderAndPaddingBefore;
+    auto offset = resolver.m_borderAndPaddingBefore + resolver.m_lineHeight * lineIndex();
+    if (!resolver.m_layout.isPaginated())
+        return offset + resolver.m_baseline;
+    for (auto& strutEntry : resolver.m_layout.struts()) {
+        if (strutEntry.lineBreak > lineIndex())
+            break;
+        offset += strutEntry.offset;
+    }
+    return offset + resolver.m_baseline;
 }
 
 inline RunResolver::Iterator& RunResolver::Iterator::operator--()
