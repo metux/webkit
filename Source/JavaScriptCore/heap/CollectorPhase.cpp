@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Intel Corporation. All rights reserved.
+ * Copyright (C) 2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,27 +23,62 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef EGLHelper_h
-#define EGLHelper_h
+#include "config.h"
+#include "CollectorPhase.h"
 
-#if USE(EGL)
+#include <wtf/PrintStream.h>
 
-#include <opengl/GLDefs.h>
+namespace JSC {
 
-namespace WebCore {
-
-class EGLHelper {
-public:
-    static EGLDisplay eglDisplay();
-    static EGLDisplay currentDisplay();
-    static void resolveEGLBindings();
-    static void createEGLImage(EGLImageKHR*, GLenum, const EGLClientBuffer, const EGLint* = 0);
-    static void destroyEGLImage(const EGLImageKHR);
-    static void imageTargetTexture2DOES(const EGLImageKHR);
-};
-
+bool worldShouldBeSuspended(CollectorPhase phase)
+{
+    switch (phase) {
+    case CollectorPhase::NotRunning:
+    case CollectorPhase::Concurrent:
+        return false;
+        
+    case CollectorPhase::Begin:
+    case CollectorPhase::Fixpoint:
+    case CollectorPhase::Reloop:
+    case CollectorPhase::End:
+        return true;
+    }
+    
+    RELEASE_ASSERT_NOT_REACHED();
+    return false;
 }
 
-#endif
+} // namespace JSC
 
-#endif
+namespace WTF {
+
+using namespace JSC;
+
+void printInternal(PrintStream& out, JSC::CollectorPhase phase)
+{
+    switch (phase) {
+    case CollectorPhase::NotRunning:
+        out.print("NotRunning");
+        return;
+    case CollectorPhase::Begin:
+        out.print("Begin");
+        return;
+    case CollectorPhase::Fixpoint:
+        out.print("Fixpoint");
+        return;
+    case CollectorPhase::Concurrent:
+        out.print("Concurrent");
+        return;
+    case CollectorPhase::Reloop:
+        out.print("Reloop");
+        return;
+    case CollectorPhase::End:
+        out.print("End");
+        return;
+    }
+    
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+} // namespace WTF
+

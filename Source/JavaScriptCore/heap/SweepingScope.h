@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Intel Corporation. All rights reserved.
+ * Copyright (C) 2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,51 +23,30 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef X11Helper_h
-#define X11Helper_h
+#pragma once
 
-#include "IntRect.h"
+#include "Heap.h"
 
-#if USE(EGL)
-#include <opengl/GLDefs.h>
-#endif
+namespace JSC {
 
-#if USE(GRAPHICS_SURFACE) && USE(GLX)
-#include <X11/extensions/Xcomposite.h>
-#include <X11/extensions/Xrender.h>
-#else
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#endif
-
-namespace WebCore {
-
-class X11Helper {
+class SweepingScope {
 public:
-    static void createPixmap(Pixmap*, const XVisualInfo&, const IntSize& = IntSize(1, 1));
-    static void createOffScreenWindow(uint32_t*, const XVisualInfo&, const IntSize& = IntSize(1, 1));
-#if USE(EGL)
-    static void createPixmap(Pixmap*, const EGLint, bool, const IntSize&  = IntSize(1, 1));
-    static void createOffScreenWindow(uint32_t*, const EGLint, bool, const IntSize& = IntSize(1, 1));
-#endif
-    static void destroyWindow(const uint32_t);
-    static void destroyPixmap(const uint32_t);
-    static void resizeWindow(const IntRect&, const uint32_t);
-    static bool isXRenderExtensionSupported();
-    static Display* nativeDisplay();
-    static Window offscreenRootWindow();
-};
-
-class ScopedXPixmapCreationErrorHandler {
-public:
-    ScopedXPixmapCreationErrorHandler();
-    ~ScopedXPixmapCreationErrorHandler();
-    bool isValidOperation() const;
+    SweepingScope(Heap& heap)
+        : m_heap(heap)
+        , m_oldState(m_heap.m_mutatorState)
+    {
+        m_heap.m_mutatorState = MutatorState::Sweeping;
+    }
+    
+    ~SweepingScope()
+    {
+        m_heap.m_mutatorState = m_oldState;
+    }
 
 private:
-    XErrorHandler m_previousErrorHandler;
+    Heap& m_heap;
+    MutatorState m_oldState;
 };
 
-}
+} // namespace JSC
 
-#endif

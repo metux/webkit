@@ -75,7 +75,8 @@ public:
 
     void append(JSValue v)
     {
-        if (m_size >= m_capacity || mallocBase())
+        ASSERT(m_size <= m_capacity);
+        if (m_size == m_capacity || mallocBase())
             return slowAppend(v);
 
         slotFor(m_size) = JSValue::encode(v);
