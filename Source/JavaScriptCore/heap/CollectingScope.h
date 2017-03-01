@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Intel Corporation. All rights reserved.
+ * Copyright (C) 2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,33 +23,30 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef EGLContext_h
-#define EGLContext_h
+#pragma once
 
-#if USE(EGL)
+#include "Heap.h"
 
-#include "GLPlatformContext.h"
+namespace JSC {
 
-namespace WebCore {
-
-class EGLOffScreenContext : public GLPlatformContext {
-
+class CollectingScope {
 public:
-    EGLOffScreenContext();
-    virtual ~EGLOffScreenContext();
-    bool initialize(GLPlatformSurface*, PlatformContext) override;
-    bool platformMakeCurrent(GLPlatformSurface*) override;
-    void platformReleaseCurrent() override;
-    void destroy() override;
-    bool isCurrentContext() const override;
+    CollectingScope(Heap& heap)
+        : m_heap(heap)
+        , m_oldState(m_heap.m_mutatorState)
+    {
+        m_heap.m_mutatorState = MutatorState::Collecting;
+    }
+    
+    ~CollectingScope()
+    {
+        m_heap.m_mutatorState = m_oldState;
+    }
 
 private:
-    void freeResources();
-    EGLDisplay m_display;
+    Heap& m_heap;
+    MutatorState m_oldState;
 };
 
-}
+} // namespace JSC
 
-#endif
-
-#endif

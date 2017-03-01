@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,29 +25,28 @@
 
 #pragma once
 
-#include "JSExportMacros.h"
-#include <wtf/Vector.h>
+#include "Heap.h"
 
 namespace JSC {
 
-class Heap;
-
-class HeapStatistics {
+class RunningScope {
 public:
-    NO_RETURN static void exitWithFailure();
-    JS_EXPORT_PRIVATE static void reportSuccess();
-
-    static void initialize();
-    static void recordGCPauseTime(double start, double end);
-
-    static void dumpObjectStatistics(Heap*);
+    RunningScope(Heap& heap)
+        : m_heap(heap)
+        , m_oldState(m_heap.m_mutatorState)
+    {
+        m_heap.m_mutatorState = MutatorState::Running;
+    }
+    
+    ~RunningScope()
+    {
+        m_heap.m_mutatorState = m_oldState;
+    }
 
 private:
-    static void logStatistics();
-    static Vector<double>* s_pauseTimeStarts;
-    static Vector<double>* s_pauseTimeEnds;
-    static double s_startTime;
-    static double s_endTime;
+    Heap& m_heap;
+    MutatorState m_oldState;
 };
 
 } // namespace JSC
+

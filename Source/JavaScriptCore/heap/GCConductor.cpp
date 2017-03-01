@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Intel Corporation. All rights reserved.
+ * Copyright (C) 2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,49 +23,44 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef EGLConfigSelector_h
-#define EGLConfigSelector_h
+#include "config.h"
+#include "GCConductor.h"
 
-#if USE(EGL)
+#include <wtf/PrintStream.h>
 
-#include <opengl/GLDefs.h>
-#include <opengl/GLPlatformSurface.h>
-#include <wtf/Noncopyable.h>
+namespace JSC {
 
-namespace WebCore {
-#if PLATFORM(X11)
-typedef VisualID NativeVisualId;
-#endif
-
-class EGLConfigSelector {
-    WTF_MAKE_NONCOPYABLE(EGLConfigSelector);
-public:
-    EGLConfigSelector(GLPlatformSurface::SurfaceAttributes);
-    virtual ~EGLConfigSelector();
-    virtual EGLConfig pixmapContextConfig();
-    virtual EGLConfig surfaceContextConfig();
-    EGLint nativeVisualId(const EGLConfig&) const;
-    GLPlatformSurface::SurfaceAttributes attributes() const;
-    void reset();
-#if PLATFORM(X11)
-    virtual EGLConfig surfaceClientConfig(NativeVisualId);
-#endif
-
-private:
-#if PLATFORM(X11)
-    EGLConfig findMatchingConfigWithVisualId(NativeVisualId);
-#endif
-    EGLConfig createConfig(EGLint expectedSurfaceType);
-
-protected:
-    EGLConfig m_pixmapFBConfig;
-    EGLConfig m_surfaceContextFBConfig;
-    unsigned m_attributes : 3;
-    EGLDisplay m_sharedDisplay;
-};
-
+const char* gcConductorShortName(GCConductor conn)
+{
+    switch (conn) {
+    case GCConductor::Mutator:
+        return "M";
+    case GCConductor::Collector:
+        return "C";
+    }
+    
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
-#endif
+} // namespace JSC
 
-#endif
+namespace WTF {
+
+using namespace JSC;
+
+void printInternal(PrintStream& out, GCConductor conn)
+{
+    switch (conn) {
+    case GCConductor::Mutator:
+        out.print("Mutator");
+        return;
+    case GCConductor::Collector:
+        out.print("Collector");
+        return;
+    }
+    
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+} // namespace WTF
+

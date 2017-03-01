@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Intel Corporation. All rights reserved.
+ * Copyright (C) 2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,32 +23,27 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef GLXContext_h
-#define GLXContext_h
+#pragma once
 
-#if USE(GLX)
+namespace JSC {
 
-#include "GLPlatformContext.h"
-
-namespace WebCore {
-
-class GLXOffScreenContext : public GLPlatformContext {
-
-public:
-    GLXOffScreenContext();
-    virtual ~GLXOffScreenContext();
-    bool initialize(GLPlatformSurface*, PlatformContext) override;
-    bool platformMakeCurrent(GLPlatformSurface*) override;
-    void platformReleaseCurrent() override;
-    void destroy() override;
-    bool isCurrentContext() const override;
-
-private:
-    void freeResources();
+// Either the mutator has the conn (https://en.wikipedia.org/wiki/Conn_(nautical)), meaning that the
+// mutator will incrementally drive the collector when it calls into slow paths; or the collector has the
+// conn, meaning that the collector thread will drive the collector.
+enum class GCConductor : uint8_t {
+    Mutator,
+    Collector
 };
 
-}
+const char* gcConductorShortName(GCConductor officer);
 
-#endif // GLXCURRENTCONTEXWRAPPER_H
+} // namespace JSC
 
-#endif
+namespace WTF {
+
+class PrintStream;
+
+void printInternal(PrintStream&, JSC::GCConductor);
+
+} // namespace WTF
+

@@ -80,7 +80,7 @@ void MarkedArgumentBuffer::expandCapacity(int newCapacity)
     ASSERT(m_capacity < newCapacity);
     size_t size = (Checked<size_t>(newCapacity) * sizeof(EncodedJSValue)).unsafeGet();
     EncodedJSValue* newBuffer = static_cast<EncodedJSValue*>(fastMalloc(size));
-    for (int i = 0; i < m_capacity; ++i) {
+    for (int i = 0; i < m_size; ++i) {
         newBuffer[i] = m_buffer[i];
         addMarkSet(JSValue::decode(m_buffer[i]));
     }
@@ -94,7 +94,8 @@ void MarkedArgumentBuffer::expandCapacity(int newCapacity)
 
 void MarkedArgumentBuffer::slowAppend(JSValue v)
 {
-    if (m_size >= m_capacity)
+    ASSERT(m_size <= m_capacity);
+    if (m_size == m_capacity)
         expandCapacity();
 
     slotFor(m_size) = JSValue::encode(v);

@@ -2373,6 +2373,7 @@ set(WebCore_SOURCES
     rendering/FloatingObjects.cpp
     rendering/FlowThreadController.cpp
     rendering/Grid.cpp
+    rendering/GridTrackSizingAlgorithm.cpp
     rendering/HitTestLocation.cpp
     rendering/HitTestResult.cpp
     rendering/HitTestingTransformState.cpp
@@ -2476,8 +2477,10 @@ set(WebCore_SOURCES
     rendering/ScrollAlignment.cpp
     rendering/SelectionSubtreeRoot.cpp
     rendering/SimpleLineLayout.cpp
+    rendering/SimpleLineLayoutCoverage.cpp
     rendering/SimpleLineLayoutFlowContents.cpp
     rendering/SimpleLineLayoutFunctions.cpp
+    rendering/SimpleLineLayoutPagination.cpp
     rendering/SimpleLineLayoutResolver.cpp
     rendering/SimpleLineLayoutTextFragmentIterator.cpp
     rendering/TextDecorationPainter.cpp

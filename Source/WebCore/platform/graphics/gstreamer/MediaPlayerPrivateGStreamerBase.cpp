@@ -268,7 +268,7 @@ static std::pair<Vector<GRefPtr<GstEvent>>, Vector<String>> extractEventsAndSyst
     ASSERT(streamEncryptionAllowedSystems);
     Vector<String> streamEncryptionAllowedSystemsVector;
     unsigned i;
-    for (i = 0; !streamEncryptionAllowedSystems[i]; ++i)
+    for (i = 0; streamEncryptionAllowedSystems[i]; ++i)
         streamEncryptionAllowedSystemsVector.append(streamEncryptionAllowedSystems[i]);
 
     const GValue* streamEncryptionEventsList = gst_structure_get_value(structure, "stream-encryption-events");
@@ -704,7 +704,7 @@ void MediaPlayerPrivateGStreamerBase::pushTextureToCompositor()
         if (UNLIKELY(!m_context3D))
             m_context3D = GraphicsContext3D::create(GraphicsContext3DAttributes(), nullptr, GraphicsContext3D::RenderToCurrentGLContext);
 
-        RefPtr<BitmapTexture> texture = adoptRef(new BitmapTextureGL(m_context3D));
+        auto texture = BitmapTextureGL::create(*m_context3D);
         texture->reset(size, GST_VIDEO_INFO_HAS_ALPHA(&videoInfo) ? BitmapTexture::SupportsAlpha : BitmapTexture::NoFlag);
         buffer = std::make_unique<TextureMapperPlatformLayerBuffer>(WTFMove(texture));
     }
@@ -1239,7 +1239,7 @@ void MediaPlayerPrivateGStreamerBase::keyAdded()
 void MediaPlayerPrivateGStreamerBase::handleProtectionEvent(GstEvent* event)
 {
     if (m_handledProtectionEvents.contains(GST_EVENT_SEQNUM(event))) {
-        GST_TRACE("event %u already handled", GST_EVENT_SEQNUM(event));
+        GST_DEBUG("event %u already handled", GST_EVENT_SEQNUM(event));
         m_handledProtectionEvents.remove(GST_EVENT_SEQNUM(event));
         return;
     }

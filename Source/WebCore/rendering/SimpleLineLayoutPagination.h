@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2017 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,28 +25,15 @@
 
 #pragma once
 
-#include "Heap.h"
+namespace WebCore {
 
-namespace JSC {
+class RenderBlockFlow;
 
-class HelpingGCScope {
-public:
-    HelpingGCScope(Heap& heap)
-        : m_heap(heap)
-        , m_oldState(m_heap.m_mutatorState)
-    {
-        m_heap.m_mutatorState = MutatorState::HelpingGC;
-    }
+namespace SimpleLineLayout {
+
+class Layout;
     
-    ~HelpingGCScope()
-    {
-        m_heap.m_mutatorState = m_oldState;
-    }
+void adjustLinePositionsForPagination(Layout&, RenderBlockFlow&);
 
-private:
-    Heap& m_heap;
-    MutatorState m_oldState;
-};
-
-} // namespace JSC
-
+}
+}
