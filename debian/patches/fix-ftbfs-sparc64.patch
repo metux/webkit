@@ -52,7 +52,7 @@ Index: webkitgtk/Source/JavaScriptCore/CMakeLists.txt
 ===================================================================
 --- webkitgtk.orig/Source/JavaScriptCore/CMakeLists.txt
 +++ webkitgtk/Source/JavaScriptCore/CMakeLists.txt
-@@ -1482,6 +1482,7 @@ elseif (WTF_CPU_S390)
+@@ -1483,6 +1483,7 @@ elseif (WTF_CPU_S390)
  elseif (WTF_CPU_S390X)
  elseif (WTF_CPU_MIPS)
  elseif (WTF_CPU_SH4)
