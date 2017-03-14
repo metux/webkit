@@ -309,8 +309,8 @@ private:
     
     bool isMainFrameRenderViewLayer() const;
     
-    bool paintsNonDirectCompositedBoxDecoration() const;
-    bool paintsChildren() const;
+    bool paintsBoxDecorations() const;
+    bool paintsChildRenderers() const;
 
     // Returns true if this compositing layer has no visible content.
     bool isSimpleContainerCompositingLayer() const;
@@ -321,13 +321,15 @@ private:
     void updateImageContents();
 
     Color rendererBackgroundColor() const;
+
+    void updateDirectlyCompositedBoxDecorations(bool isSimpleContainer, bool& didUpdateContentsRect);
     void updateDirectlyCompositedBackgroundColor(bool isSimpleContainer, bool& didUpdateContentsRect);
     void updateDirectlyCompositedBackgroundImage(bool isSimpleContainer, bool& didUpdateContentsRect);
-    void updateDirectlyCompositedContents(bool isSimpleContainer, bool& didUpdateContentsRect);
 
     void resetContentsRect();
 
     bool isPaintDestinationForDescendantLayers() const;
+    bool hasVisibleNonCompositedDescendants() const;
 
     bool shouldClipCompositedBounds() const;
 
