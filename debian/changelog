@@ -1,4 +1,4 @@
-webkit2gtk (2.15.92-1) UNRELEASED; urgency=medium
+webkit2gtk (2.15.92-1) experimental; urgency=medium
 
   * New upstream release.
   * debian/patches/fix-ftbfs-x32.patch:
@@ -7,7 +7,7 @@ webkit2gtk (2.15.92-1) UNRELEASED; urgency=medium
     + Remove webkit2gtk-4.0.devhelp2.gz -> webkit2gtk.devhelp2.gz symlink
       as it is now obsolete (see upstream bug #139369).
 
- -- Alberto Garcia <berto@igalia.com>  Fri, 03 Mar 2017 12:00:10 +0200
+ -- Alberto Garcia <berto@igalia.com>  Tue, 14 Mar 2017 11:31:31 +0200
 
 webkit2gtk (2.15.91-1) experimental; urgency=medium
 
