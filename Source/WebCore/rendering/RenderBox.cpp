@@ -57,6 +57,7 @@
 #include "RenderIterator.h"
 #include "RenderLayer.h"
 #include "RenderLayerCompositor.h"
+#include "RenderMultiColumnFlowThread.h"
 #include "RenderNamedFlowFragment.h"
 #include "RenderNamedFlowThread.h"
 #include "RenderTableCell.h"
@@ -2293,6 +2294,21 @@ LayoutRect RenderBox::computeRectForRepaint(const LayoutRect& rect, const Render
         adjustedRect.expand(locationOffset - flooredLocationOffset);
         locationOffset = flooredLocationOffset;
     }
+
+    if (is<RenderMultiColumnFlowThread>(this)) {
+        // We won't normally run this code. Only when the repaintContainer is null (i.e., we're trying
+        // to get the rect in view coordinates) will we come in here, since normally repaintContainer
+        // will be set and we'll stop at the flow thread. This case is mainly hit by the check for whether
+        // or not images should animate.
+        // FIXME: Just as with offsetFromContainer, we aren't really handling objects that span
+        // multiple columns properly.
+        LayoutPoint physicalPoint(flipForWritingMode(adjustedRect.location()));
+        if (auto* region = downcast<RenderMultiColumnFlowThread>(*this).physicalTranslationFromFlowToRegion((physicalPoint))) {
+            adjustedRect.setLocation(region->flipForWritingMode(physicalPoint));
+            return region->computeRectForRepaint(adjustedRect, repaintContainer, context);
+        }
+    }
+
     LayoutPoint topLeft = adjustedRect.location();
     topLeft.move(locationOffset);
 
@@ -2426,10 +2442,6 @@ void RenderBox::computeLogicalWidthInRegion(LogicalExtentComputedValues& compute
     // Width calculations
     if (treatAsReplaced) {
         computedValues.m_extent = logicalWidthLength.value() + borderAndPaddingLogicalWidth();
-    } else if (parent()->isRenderGrid() && style().logicalWidth().isAuto() && style().logicalMinWidth().isAuto() && style().overflowX() == OVISIBLE && containerWidthInInlineDirection < minPreferredLogicalWidth()) {
-        // TODO (lajava) Move this logic to the LayoutGrid class.
-        // Implied minimum size of Grid items.
-        computedValues.m_extent = constrainLogicalWidthInRegionByMinMax(minPreferredLogicalWidth(), containerWidthInInlineDirection, cb);
     } else {
         LayoutUnit preferredWidth = computeLogicalWidthInRegionUsing(MainOrPreferredSize, styleToUse.logicalWidth(), containerWidthInInlineDirection, cb, region);
         computedValues.m_extent = constrainLogicalWidthInRegionByMinMax(preferredWidth, containerWidthInInlineDirection, cb, region);
@@ -2829,13 +2841,7 @@ RenderBox::LogicalExtentComputedValues RenderBox::computeLogicalHeight(LayoutUni
         // FIXME: Account for block-flow in flexible boxes.
         // https://bugs.webkit.org/show_bug.cgi?id=46418
         if (hasOverrideLogicalContentHeight() && (parent()->isFlexibleBoxIncludingDeprecated() || parent()->isRenderGrid())) {
-            LayoutUnit contentHeight = overrideLogicalContentHeight();
-            if (parent()->isRenderGrid() && style().logicalHeight().isAuto() && style().logicalMinHeight().isAuto() && style().overflowX() == OVISIBLE) {
-                LayoutUnit intrinsicContentHeight = computedValues.m_extent - borderAndPaddingLogicalHeight();
-                if (auto minContentHeight = computeContentLogicalHeight(MinSize, Length(MinContent), intrinsicContentHeight))
-                    contentHeight = std::max(contentHeight, constrainContentBoxLogicalHeightByMinMax(minContentHeight.value(), intrinsicContentHeight));
-            }
-            h = Length(contentHeight, Fixed);
+            h = Length(overrideLogicalContentHeight(), Fixed);
         } else if (treatAsReplaced)
             h = Length(computeReplacedLogicalHeight(), Fixed);
         else {

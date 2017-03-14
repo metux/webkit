@@ -606,12 +606,12 @@ bool RenderLayerBacking::updateConfiguration()
             m_graphicsLayer->setReplicatedByLayer(reflectionLayer);
         }
     } else
-        m_graphicsLayer->setReplicatedByLayer(0);
+        m_graphicsLayer->setReplicatedByLayer(nullptr);
 
     if (!m_owningLayer.isRootLayer()) {
         bool isSimpleContainer = isSimpleContainerCompositingLayer();
         bool didUpdateContentsRect = false;
-        updateDirectlyCompositedContents(isSimpleContainer, didUpdateContentsRect);
+        updateDirectlyCompositedBoxDecorations(isSimpleContainer, didUpdateContentsRect);
     } else
         updateRootLayerConfiguration();
     
@@ -1096,14 +1096,14 @@ void RenderLayerBacking::updateAfterDescendants()
         bool didUpdateContentsRect = false;
         // FIXME: this duplicates work we did in updateConfiguration().
         isSimpleContainer = isSimpleContainerCompositingLayer();
-        updateDirectlyCompositedContents(isSimpleContainer, didUpdateContentsRect);
+        updateDirectlyCompositedBoxDecorations(isSimpleContainer, didUpdateContentsRect);
         if (!didUpdateContentsRect && m_graphicsLayer->usesContentsLayer())
             resetContentsRect();
     }
 
     updateDrawsContent(isSimpleContainer);
 
-    m_graphicsLayer->setContentsVisible(m_owningLayer.hasVisibleContent() || isPaintDestinationForDescendantLayers());
+    m_graphicsLayer->setContentsVisible(m_owningLayer.hasVisibleContent() || hasVisibleNonCompositedDescendants());
     if (m_scrollingLayer) {
         m_scrollingLayer->setContentsVisible(renderer().style().visibility() == VISIBLE);
         m_scrollingLayer->setUserInteractionEnabled(renderer().style().pointerEvents() != PE_NONE);
@@ -1180,7 +1180,7 @@ void RenderLayerBacking::adjustAncestorCompositingBoundsForFlowThread(LayoutRect
     }
 }
 
-void RenderLayerBacking::updateDirectlyCompositedContents(bool isSimpleContainer, bool& didUpdateContentsRect)
+void RenderLayerBacking::updateDirectlyCompositedBoxDecorations(bool isSimpleContainer, bool& didUpdateContentsRect)
 {
     if (!m_owningLayer.hasVisibleContent())
         return;
@@ -1270,7 +1270,7 @@ void RenderLayerBacking::updateDrawsContent(bool isSimpleContainer)
         bool hasNonScrollingPaintedContent = m_owningLayer.hasVisibleContent() && m_owningLayer.hasVisibleBoxDecorationsOrBackground();
         m_graphicsLayer->setDrawsContent(hasNonScrollingPaintedContent);
 
-        bool hasScrollingPaintedContent = m_owningLayer.hasVisibleContent() && (renderer().hasBackground() || paintsChildren());
+        bool hasScrollingPaintedContent = m_owningLayer.hasVisibleContent() && (renderer().hasBackground() || paintsChildRenderers());
         m_scrollingContentsLayer->setDrawsContent(hasScrollingPaintedContent);
         return;
     }
@@ -1709,8 +1709,11 @@ static inline bool hasVisibleBoxDecorations(const RenderStyle& style)
     return style.hasVisibleBorder() || style.hasBorderRadius() || style.hasOutline() || style.hasAppearance() || style.boxShadow() || style.hasFilter();
 }
 
-static bool canCreateTiledImage(const RenderStyle& style)
+static bool canDirectlyCompositeBackgroundBackgroundImage(const RenderStyle& style)
 {
+    if (!GraphicsLayer::supportsContentsTiling())
+        return false;
+
     auto& fillLayer = style.backgroundLayers();
     if (fillLayer.next())
         return false;
@@ -1738,7 +1741,7 @@ static bool canCreateTiledImage(const RenderStyle& style)
     return true;
 }
 
-static bool hasVisibleBoxDecorationsOrBackgroundImage(const RenderStyle& style)
+static bool hasPaintedBoxDecorationsOrBackgroundImage(const RenderStyle& style)
 {
     if (hasVisibleBoxDecorations(style))
         return true;
@@ -1746,7 +1749,7 @@ static bool hasVisibleBoxDecorationsOrBackgroundImage(const RenderStyle& style)
     if (!style.hasBackgroundImage())
         return false;
 
-    return !GraphicsLayer::supportsContentsTiling() || !canCreateTiledImage(style);
+    return !canDirectlyCompositeBackgroundBackgroundImage(style);
 }
 
 static inline bool hasPerspectiveOrPreserves3D(const RenderStyle& style)
@@ -1832,7 +1835,7 @@ void RenderLayerBacking::updateRootLayerConfiguration()
     }
 }
 
-static bool supportsDirectBoxDecorationsComposition(const RenderLayerModelObject& renderer)
+static bool supportsDirectlyCompositedBoxDecorations(const RenderLayerModelObject& renderer)
 {
     if (!GraphicsLayer::supportsBackgroundColorContent())
         return false;
@@ -1841,7 +1844,7 @@ static bool supportsDirectBoxDecorationsComposition(const RenderLayerModelObject
     if (renderer.hasClip())
         return false;
 
-    if (hasVisibleBoxDecorationsOrBackgroundImage(style))
+    if (hasPaintedBoxDecorationsOrBackgroundImage(style))
         return false;
 
     // FIXME: We can't create a directly composited background if this
@@ -1859,15 +1862,15 @@ static bool supportsDirectBoxDecorationsComposition(const RenderLayerModelObject
     return true;
 }
 
-bool RenderLayerBacking::paintsNonDirectCompositedBoxDecoration() const
+bool RenderLayerBacking::paintsBoxDecorations() const
 {
     if (!m_owningLayer.hasVisibleBoxDecorations())
         return false;
 
-    return !supportsDirectBoxDecorationsComposition(renderer());
+    return !supportsDirectlyCompositedBoxDecorations(renderer());
 }
 
-bool RenderLayerBacking::paintsChildren() const
+bool RenderLayerBacking::paintsChildRenderers() const
 {
     if (m_owningLayer.hasVisibleContent() && m_owningLayer.hasNonEmptyChildRenderers())
         return true;
@@ -1906,7 +1909,7 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
     if (renderer().isTextControl())
         return false;
 
-    if (paintsNonDirectCompositedBoxDecoration() || paintsChildren())
+    if (paintsBoxDecorations() || paintsChildRenderers())
         return false;
 
     if (renderer().style().backgroundClip() == TextFillBox)
@@ -1926,7 +1929,7 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
         
         // Reject anything that has a border, a border-radius or outline,
         // or is not a simple background (no background, or solid color).
-        if (hasVisibleBoxDecorationsOrBackgroundImage(rootObject->style()))
+        if (hasPaintedBoxDecorationsOrBackgroundImage(rootObject->style()))
             return false;
         
         // Now look at the body's renderer.
@@ -1937,14 +1940,16 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
         if (!bodyRenderer)
             return false;
         
-        if (hasVisibleBoxDecorationsOrBackgroundImage(bodyRenderer->style()))
+        if (hasPaintedBoxDecorationsOrBackgroundImage(bodyRenderer->style()))
             return false;
     }
 
     return true;
 }
 
-static bool descendantLayerPaintsIntoAncestor(RenderLayer& parent)
+enum class LayerTraversal { Continue, Stop };
+
+static LayerTraversal traverseVisibleNonCompositedDescendantLayers(RenderLayer& parent, std::function<LayerTraversal (const RenderLayer&)> layerFunc)
 {
     // FIXME: We shouldn't be called with a stale z-order lists. See bug 85512.
     parent.updateLayerListsIfNeeded();
@@ -1953,49 +1958,75 @@ static bool descendantLayerPaintsIntoAncestor(RenderLayer& parent)
     LayerListMutationDetector mutationChecker(&parent);
 #endif
 
-    if (Vector<RenderLayer*>* normalFlowList = parent.normalFlowList()) {
-        size_t listSize = normalFlowList->size();
-        for (size_t i = 0; i < listSize; ++i) {
-            RenderLayer* curLayer = normalFlowList->at(i);
-            if (!compositedWithOwnBackingStore(*curLayer)
-                && (curLayer->isVisuallyNonEmpty() || descendantLayerPaintsIntoAncestor(*curLayer)))
-                return true;
+    if (auto* normalFlowList = parent.normalFlowList()) {
+        for (auto* childLayer : *normalFlowList) {
+            if (compositedWithOwnBackingStore(*childLayer))
+                continue;
+
+            if (layerFunc(*childLayer) == LayerTraversal::Stop)
+                return LayerTraversal::Stop;
+            
+            if (traverseVisibleNonCompositedDescendantLayers(*childLayer, layerFunc) == LayerTraversal::Stop)
+                return LayerTraversal::Stop;
         }
     }
 
     if (parent.isStackingContainer()) {
         if (!parent.hasVisibleDescendant())
-            return false;
+            return LayerTraversal::Continue;
 
         // Use the m_hasCompositingDescendant bit to optimize?
-        if (Vector<RenderLayer*>* negZOrderList = parent.negZOrderList()) {
-            size_t listSize = negZOrderList->size();
-            for (size_t i = 0; i < listSize; ++i) {
-                RenderLayer* curLayer = negZOrderList->at(i);
-                if (!compositedWithOwnBackingStore(*curLayer)
-                    && (curLayer->isVisuallyNonEmpty() || descendantLayerPaintsIntoAncestor(*curLayer)))
-                    return true;
+        if (auto* negZOrderList = parent.negZOrderList()) {
+            for (auto* childLayer : *negZOrderList) {
+                if (compositedWithOwnBackingStore(*childLayer))
+                    continue;
+
+                if (layerFunc(*childLayer) == LayerTraversal::Stop)
+                    return LayerTraversal::Stop;
+
+                if (traverseVisibleNonCompositedDescendantLayers(*childLayer, layerFunc) == LayerTraversal::Stop)
+                    return LayerTraversal::Stop;
             }
         }
 
-        if (Vector<RenderLayer*>* posZOrderList = parent.posZOrderList()) {
-            size_t listSize = posZOrderList->size();
-            for (size_t i = 0; i < listSize; ++i) {
-                RenderLayer* curLayer = posZOrderList->at(i);
-                if (!compositedWithOwnBackingStore(*curLayer)
-                    && (curLayer->isVisuallyNonEmpty() || descendantLayerPaintsIntoAncestor(*curLayer)))
-                    return true;
+        if (auto* posZOrderList = parent.posZOrderList()) {
+            for (auto* childLayer : *posZOrderList) {
+                if (compositedWithOwnBackingStore(*childLayer))
+                    continue;
+
+                if (layerFunc(*childLayer) == LayerTraversal::Stop)
+                    return LayerTraversal::Stop;
+
+                if (traverseVisibleNonCompositedDescendantLayers(*childLayer, layerFunc) == LayerTraversal::Stop)
+                    return LayerTraversal::Stop;
             }
         }
     }
 
-    return false;
+    return LayerTraversal::Continue;
 }
 
 // Conservative test for having no rendered children.
 bool RenderLayerBacking::isPaintDestinationForDescendantLayers() const
 {
-    return descendantLayerPaintsIntoAncestor(m_owningLayer);
+    bool hasPaintingDescendant = false;
+    traverseVisibleNonCompositedDescendantLayers(m_owningLayer, [&hasPaintingDescendant](const RenderLayer& layer) {
+        hasPaintingDescendant = layer.isVisuallyNonEmpty();
+        return hasPaintingDescendant ? LayerTraversal::Stop : LayerTraversal::Continue;
+    });
+
+    return hasPaintingDescendant;
+}
+
+bool RenderLayerBacking::hasVisibleNonCompositedDescendants() const
+{
+    bool hasVisibleDescendant = false;
+    traverseVisibleNonCompositedDescendantLayers(m_owningLayer, [&hasVisibleDescendant](const RenderLayer& layer) {
+        hasVisibleDescendant = layer.hasVisibleContent();
+        return hasVisibleDescendant ? LayerTraversal::Stop : LayerTraversal::Continue;
+    });
+
+    return hasVisibleDescendant;
 }
 
 bool RenderLayerBacking::containsPaintedContent(bool isSimpleContainer) const
@@ -2058,7 +2089,7 @@ void RenderLayerBacking::contentChanged(ContentChangeType changeType)
         return;
     }
 
-    if ((changeType == BackgroundImageChanged) && canCreateTiledImage(renderer().style()))
+    if ((changeType == BackgroundImageChanged) && canDirectlyCompositeBackgroundBackgroundImage(renderer().style()))
         updateGeometry();
 
     if ((changeType == MaskImageChanged) && m_maskLayer) {

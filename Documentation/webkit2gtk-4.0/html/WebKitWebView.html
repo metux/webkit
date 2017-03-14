@@ -4645,6 +4645,22 @@ or build its own context menu.</p>
  signal because showing the proposed context menu is the default behaviour.
 </p></li>
 </ul></div>
+<p>The <em class="parameter"><code>event</code></em>
+ is expected to be one of the following types:</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>
+a <a href="../gdk3/gdk3-Event-Structures.html#GdkEventButton"><span class="type">GdkEventButton</span></a> of type <a href="../gdk3/gdk3-Events.html#GDK-BUTTON-PRESS:CAPS"><code class="literal">GDK_BUTTON_PRESS</code></a> when the context menu
+was triggered with mouse.
+</p></li>
+<li class="listitem"><p>
+a <a href="../gdk3/gdk3-Event-Structures.html#GdkEventKey"><span class="type">GdkEventKey</span></a> of type <a href="../gdk3/gdk3-Events.html#GDK-KEY-PRESS:CAPS"><code class="literal">GDK_KEY_PRESS</code></a> if the keyboard was used to show
+the menu.
+</p></li>
+<li class="listitem"><p>
+a generic <a href="../gdk3/gdk3-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a> of type <a href="../gdk3/gdk3-Events.html#GDK-NOTHING:CAPS"><code class="literal">GDK_NOTHING</code></a> when the <span class="type">“popup-menu”</span>
+signal was used to show the context menu.
+</p></li>
+</ul></div>
 <p>If the signal handler returns <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> the context menu represented by <em class="parameter"><code>context_menu</code></em>
 
 will be shown, if it return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> the context menu will not be shown.</p>
