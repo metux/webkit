@@ -1,6 +1,10 @@
 webkit2gtk (2.16.1-1) UNRELEASED; urgency=medium
 
   * New upstream release (Closes: #853705).
+  * debian/control:
+    + Downgrade libwebkit2gtk-4.0-37-gtk2 from Recommends to Suggests,
+      since most apps that depend on webkit2gtk don't need this.
+      (Closes: #858839)
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 04 Apr 2017 15:48:44 +0300
 
