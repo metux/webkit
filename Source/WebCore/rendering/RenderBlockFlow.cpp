@@ -36,7 +36,6 @@
 #include "LayoutRepainter.h"
 #include "Logging.h"
 #include "RenderCombineText.h"
-#include "RenderFlowThread.h"
 #include "RenderInline.h"
 #include "RenderIterator.h"
 #include "RenderLayer.h"
@@ -46,6 +45,7 @@
 #include "RenderMultiColumnFlowThread.h"
 #include "RenderMultiColumnSet.h"
 #include "RenderNamedFlowFragment.h"
+#include "RenderNamedFlowThread.h"
 #include "RenderTableCell.h"
 #include "RenderText.h"
 #include "RenderView.h"
@@ -119,6 +119,7 @@ RenderBlockFlow::RenderBlockFlow(Document& document, RenderStyle&& style)
 
 RenderBlockFlow::~RenderBlockFlow()
 {
+    // Do not add any code here. Add it to willBeDestroyed() instead.
 }
 
 void RenderBlockFlow::createMultiColumnFlowThread()
@@ -153,7 +154,7 @@ void RenderBlockFlow::willBeDestroyed()
     // properly dirty line boxes that they are removed from. Effects that do :before/:after only on hover could crash otherwise.
     destroyLeftoverChildren();
 
-    if (!documentBeingDestroyed()) {
+    if (!renderTreeBeingDestroyed()) {
         if (firstRootBox()) {
             // We can't wait for RenderBox::destroy to clear the selection,
             // because by then we will have nuked the line boxes.
@@ -175,7 +176,7 @@ void RenderBlockFlow::willBeDestroyed()
 
     m_lineBoxes.deleteLineBoxes();
 
-    removeFromUpdateScrollInfoAfterLayoutTransaction();
+    blockWillBeDestroyed();
 
     // NOTE: This jumps down to RenderBox, bypassing RenderBlock since it would do duplicate work.
     RenderBox::willBeDestroyed();
@@ -876,7 +877,7 @@ void RenderBlockFlow::determineLogicalLeftPositionForChild(RenderBox& child, App
         
     // Some objects (e.g., tables, horizontal rules, overflow:auto blocks) avoid floats. They need
     // to shift over as necessary to dodge any floats that might get in the way.
-    if (child.avoidsFloats() && containsFloats() && !flowThreadContainingBlock())
+    if (child.avoidsFloats() && containsFloats() && !is<RenderNamedFlowThread>(flowThreadContainingBlock()))
         newPosition += computeStartPositionDeltaForChildAvoidingFloats(child, marginStartForChild(child));
 
     setLogicalLeftForChild(child, style().isLeftToRightDirection() ? newPosition : totalAvailableLogicalWidth - newPosition - logicalWidthForChild(child), applyDelta);
@@ -2064,6 +2065,10 @@ void RenderBlockFlow::styleDidChange(StyleDifference diff, const RenderStyle* ol
         parentBlock->markAllDescendantsWithFloatsForLayout();
         parentBlock->markSiblingsWithFloatsForLayout();
     }
+    // Fresh floats need to be reparented if they actually belong to the previous anonymous block.
+    // It copies the logic of RenderBlock::addChildIgnoringContinuation
+    if (noLongerAffectsParentBlock() && style().isFloating() && previousSibling() && previousSibling()->isAnonymousBlock())
+        downcast<RenderBoxModelObject>(*parent()).moveChildTo(&downcast<RenderBoxModelObject>(*previousSibling()), this);
 
     if (auto fragment = renderNamedFlowFragment())
         fragment->setStyle(RenderNamedFlowFragment::createStyle(style()));
@@ -2141,8 +2146,11 @@ void RenderBlockFlow::addFloatsToNewParent(RenderBlockFlow& toBlockFlow) const
     if (!toBlockFlow.m_floatingObjects)
         toBlockFlow.createFloatingObjects();
 
-    for (auto& floatingObject : m_floatingObjects->set())
+    for (auto& floatingObject : m_floatingObjects->set()) {
+        if (toBlockFlow.containsFloat(floatingObject->renderer()))
+            continue;
         toBlockFlow.m_floatingObjects->add(floatingObject->cloneForNewParent());
+    }
 }
 
 void RenderBlockFlow::moveAllChildrenIncludingFloatsTo(RenderBlock& toBlock, bool fullRemoveInsert)
@@ -3920,7 +3928,7 @@ void RenderBlockFlow::addChild(RenderObject* newChild, RenderObject* beforeChild
 
 void RenderBlockFlow::removeChild(RenderObject& oldChild)
 {
-    if (!documentBeingDestroyed()) {
+    if (!renderTreeBeingDestroyed()) {
         RenderFlowThread* flowThread = multiColumnFlowThread();
         if (flowThread && flowThread != &oldChild)
             flowThread->flowThreadRelativeWillBeRemoved(oldChild);

@@ -960,6 +960,9 @@ private:
         case IsTypedArrayView:
             compileIsTypedArrayView();
             break;
+        case ParseInt:
+            compileParseInt();
+            break;
         case TypeOf:
             compileTypeOf();
             break;
@@ -1072,6 +1075,9 @@ private:
             break;
         case ToLowerCase:
             compileToLowerCase();
+            break;
+        case NumberToStringWithRadix:
+            compileNumberToStringWithRadix();
             break;
         case CheckDOM:
             compileCheckDOM();
@@ -2556,7 +2562,8 @@ private:
             LValue value = lowInt52(m_node->child1());
             CheckValue* result = m_out.speculateSub(m_out.int64Zero, value);
             blessSpeculation(result, Int52Overflow, noValue(), nullptr, m_origin);
-            speculate(NegativeZero, noValue(), 0, m_out.isZero64(result));
+            if (shouldCheckNegativeZero(m_node->arithMode()))
+                speculate(NegativeZero, noValue(), 0, m_out.isZero64(result));
             setInt52(result);
             break;
         }
@@ -4421,6 +4428,7 @@ private:
             for (unsigned i = 0; i < m_node->numChildren(); ++i) {
                 if (bitVector->get(i)) {
                     Edge use = m_graph.varArgChild(m_node, i);
+                    CheckValue* lengthCheck = nullptr;
                     if (use->op() == PhantomSpread) {
                         RELEASE_ASSERT(use->child1()->op() == PhantomCreateRest);
                         InlineCallFrame* inlineCallFrame = use->child1()->origin.semantic.inlineCallFrame;
@@ -4428,11 +4436,13 @@ private:
                         LValue spreadLength = cachedSpreadLengths.ensure(inlineCallFrame, [&] () {
                             return getSpreadLengthFromInlineCallFrame(inlineCallFrame, numberOfArgumentsToSkip);
                         }).iterator->value;
-                        length = m_out.add(length, spreadLength);
+                        lengthCheck = m_out.speculateAdd(length, spreadLength);
                     } else {
                         LValue fixedArray = lowCell(use);
-                        length = m_out.add(length, m_out.load32(fixedArray, m_heaps.JSFixedArray_size));
+                        lengthCheck = m_out.speculateAdd(length, m_out.load32(fixedArray, m_heaps.JSFixedArray_size));
                     }
+                    blessSpeculation(lengthCheck, Overflow, noValue(), nullptr, m_origin);
+                    length = lengthCheck;
                 }
             }
 
@@ -4898,10 +4908,13 @@ private:
         }
             
         case CellUse:
+        case NotCellUse:
         case UntypedUse: {
             LValue value;
             if (m_node->child1().useKind() == CellUse)
                 value = lowCell(m_node->child1());
+            else if (m_node->child1().useKind() == NotCellUse)
+                value = lowNotCell(m_node->child1());
             else
                 value = lowJSValue(m_node->child1());
             
@@ -4912,6 +4925,8 @@ private:
             LValue isCellPredicate;
             if (m_node->child1().useKind() == CellUse)
                 isCellPredicate = m_out.booleanTrue;
+            else if (m_node->child1().useKind() == NotCellUse)
+                isCellPredicate = m_out.booleanFalse;
             else
                 isCellPredicate = this->isCell(value, provenType(m_node->child1()));
             m_out.branch(isCellPredicate, unsure(isCell), unsure(notString));
@@ -4938,6 +4953,18 @@ private:
             setJSValue(m_out.phi(Int64, simpleResult, convertedResult));
             return;
         }
+
+        case Int32Use:
+            setJSValue(vmCall(Int64, m_out.operation(operationInt32ToStringWithValidRadix), m_callFrame, lowInt32(m_node->child1()), m_out.constInt32(10)));
+            return;
+
+        case Int52RepUse:
+            setJSValue(vmCall(Int64, m_out.operation(operationInt52ToStringWithValidRadix), m_callFrame, lowStrictInt52(m_node->child1()), m_out.constInt32(10)));
+            return;
+
+        case DoubleRepUse:
+            setJSValue(vmCall(Int64, m_out.operation(operationDoubleToStringWithValidRadix), m_callFrame, lowDouble(m_node->child1()), m_out.constInt32(10)));
+            return;
             
         default:
             DFG_CRASH(m_graph, m_node, "Bad use kind");
@@ -8214,6 +8241,25 @@ private:
         setBoolean(m_out.phi(Int32, fastResult, slowResult));
     }
 
+    void compileParseInt()
+    {
+        RELEASE_ASSERT(m_node->child1().useKind() == UntypedUse || m_node->child1().useKind() == StringUse);
+        LValue result;
+        if (m_node->child2()) {
+            LValue radix = lowInt32(m_node->child2());
+            if (m_node->child1().useKind() == UntypedUse)
+                result = vmCall(Int64, m_out.operation(operationParseIntGeneric), m_callFrame, lowJSValue(m_node->child1()), radix);
+            else
+                result = vmCall(Int64, m_out.operation(operationParseIntString), m_callFrame, lowString(m_node->child1()), radix);
+        } else {
+            if (m_node->child1().useKind() == UntypedUse)
+                result = vmCall(Int64, m_out.operation(operationParseIntNoRadixGeneric), m_callFrame, lowJSValue(m_node->child1()));
+            else
+                result = vmCall(Int64, m_out.operation(operationParseIntStringNoRadix), m_callFrame, lowString(m_node->child1()));
+        }
+        setJSValue(result);
+    }
+
     void compileOverridesHasInstance()
     {
         FrozenValue* defaultHasInstanceFunction = m_node->cellOperand();
@@ -9850,6 +9896,30 @@ private:
 
         m_out.appendTo(continuation, lastNext);
         setJSValue(m_out.phi(pointerType(), fastResult, slowResult));
+    }
+
+    void compileNumberToStringWithRadix()
+    {
+        bool validRadixIsGuaranteed = false;
+        if (m_node->child2()->isInt32Constant()) {
+            int32_t radix = m_node->child2()->asInt32();
+            if (radix >= 2 && radix <= 36)
+                validRadixIsGuaranteed = true;
+        }
+
+        switch (m_node->child1().useKind()) {
+        case Int32Use:
+            setJSValue(vmCall(pointerType(), m_out.operation(validRadixIsGuaranteed ? operationInt32ToStringWithValidRadix : operationInt32ToString), m_callFrame, lowInt32(m_node->child1()), lowInt32(m_node->child2())));
+            break;
+        case Int52RepUse:
+            setJSValue(vmCall(pointerType(), m_out.operation(validRadixIsGuaranteed ? operationInt52ToStringWithValidRadix : operationInt52ToString), m_callFrame, lowStrictInt52(m_node->child1()), lowInt32(m_node->child2())));
+            break;
+        case DoubleRepUse:
+            setJSValue(vmCall(pointerType(), m_out.operation(validRadixIsGuaranteed ? operationDoubleToStringWithValidRadix : operationDoubleToString), m_callFrame, lowDouble(m_node->child1()), lowInt32(m_node->child2())));
+            break;
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+        }
     }
 
     void compileResolveScope()
@@ -12095,6 +12165,13 @@ private:
         DFG_CRASH(m_graph, m_node, "Value not defined");
         return 0;
     }
+
+    LValue lowNotCell(Edge edge)
+    {
+        LValue result = lowJSValue(edge, ManualOperandSpeculation);
+        FTL_TYPE_CHECK(jsValueValue(result), edge, ~SpecCell, isCell(result));
+        return result;
+    }
     
     LValue lowStorage(Edge edge)
     {
@@ -12498,6 +12575,13 @@ private:
     void speculateCell(Edge edge)
     {
         lowCell(edge);
+    }
+
+    void speculateNotCell(Edge edge)
+    {
+        if (!m_interpreter.needsTypeCheck(edge))
+            return;
+        lowNotCell(edge);
     }
     
     void speculateCellOrOther(Edge edge)
@@ -13015,15 +13099,6 @@ private:
         m_out.jump(continuation);
         
         m_out.appendTo(continuation, lastNext);
-    }
-    
-    void speculateNotCell(Edge edge)
-    {
-        if (!m_interpreter.needsTypeCheck(edge))
-            return;
-        
-        LValue value = lowJSValue(edge, ManualOperandSpeculation);
-        typeCheck(jsValueValue(value), edge, ~SpecCell, isCell(value));
     }
     
     void speculateOther(Edge edge)

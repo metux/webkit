@@ -3120,6 +3120,71 @@ void SpeculativeJIT::compileCheckTypeInfoFlags(Node* node)
     noResult(node);
 }
 
+void SpeculativeJIT::compileParseInt(Node* node)
+{
+    RELEASE_ASSERT(node->child1().useKind() == UntypedUse || node->child1().useKind() == StringUse);
+
+    GPRFlushedCallResult resultPayload(this);
+    GPRReg resultPayloadGPR = resultPayload.gpr();
+#if USE(JSVALUE64)
+    JSValueRegs resultRegs(resultPayloadGPR);
+#else
+    GPRFlushedCallResult2 resultTag(this);
+    GPRReg resultTagGPR = resultTag.gpr();
+    JSValueRegs resultRegs(resultTagGPR, resultPayloadGPR);
+#endif
+
+    if (node->child2()) {
+        SpeculateInt32Operand radix(this, node->child2());
+        GPRReg radixGPR = radix.gpr();
+        if (node->child1().useKind() == UntypedUse) {
+            JSValueOperand value(this, node->child1());
+
+            flushRegisters();
+#if USE(JSVALUE64)
+            callOperation(operationParseIntGeneric, resultRegs.gpr(), value.gpr(), radixGPR);
+#else
+            callOperation(operationParseIntGeneric, resultRegs, value.jsValueRegs(), radixGPR);
+#endif
+            m_jit.exceptionCheck();
+        } else {
+            SpeculateCellOperand value(this, node->child1());
+            GPRReg valueGPR = value.gpr();
+            speculateString(node->child1(), valueGPR);
+
+            flushRegisters();
+#if USE(JSVALUE64)
+            callOperation(operationParseIntString, resultRegs.gpr(), valueGPR, radixGPR);
+#else
+            callOperation(operationParseIntString, resultRegs, valueGPR, radixGPR);
+#endif
+            m_jit.exceptionCheck();
+        }
+    } else {
+        if (node->child1().useKind() == UntypedUse) {
+            JSValueOperand value(this, node->child1());
+
+            flushRegisters();
+#if USE(JSVALUE64)
+            callOperation(operationParseIntNoRadixGeneric, resultRegs.gpr(), value.jsValueRegs());
+#else
+            callOperation(operationParseIntNoRadixGeneric, resultRegs, value.jsValueRegs());
+#endif
+            m_jit.exceptionCheck();
+        } else {
+            SpeculateCellOperand value(this, node->child1());
+            GPRReg valueGPR = value.gpr();
+            speculateString(node->child1(), valueGPR);
+
+            flushRegisters();
+            callOperation(operationParseIntStringNoRadix, resultRegs, valueGPR);
+            m_jit.exceptionCheck();
+        }
+    }
+
+    jsValueResult(resultRegs, node);
+}
+
 void SpeculativeJIT::compileInstanceOf(Node* node)
 {
     if (node->child1().useKind() == UntypedUse) {
@@ -7054,7 +7119,7 @@ void SpeculativeJIT::compileNewArrayWithSpread(Node* node)
                     Edge use = m_jit.graph().varArgChild(node, i);
                     SpeculateCellOperand fixedArray(this, use);
                     GPRReg fixedArrayGPR = fixedArray.gpr();
-                    m_jit.add32(MacroAssembler::Address(fixedArrayGPR, JSFixedArray::offsetOfSize()), lengthGPR);
+                    speculationCheck(Overflow, JSValueRegs(), nullptr, m_jit.branchAdd32(MacroAssembler::Overflow, MacroAssembler::Address(fixedArrayGPR, JSFixedArray::offsetOfSize()), lengthGPR));
                 }
             }
 
@@ -7844,8 +7909,73 @@ GPRReg SpeculativeJIT::temporaryRegisterForPutByVal(GPRTemporary& temporary, Arr
     return temporary.gpr();
 }
 
-void SpeculativeJIT::compileToStringOrCallStringConstructorOnCell(Node* node)
+void SpeculativeJIT::compileToStringOrCallStringConstructor(Node* node)
 {
+    switch (node->child1().useKind()) {
+    case NotCellUse: {
+        JSValueOperand op1(this, node->child1(), ManualOperandSpeculation);
+        JSValueRegs op1Regs = op1.jsValueRegs();
+
+        GPRFlushedCallResult result(this);
+        GPRReg resultGPR = result.gpr();
+
+        speculateNotCell(node->child1(), op1Regs);
+
+        flushRegisters();
+
+        if (node->op() == ToString)
+            callOperation(operationToString, resultGPR, op1Regs);
+        else {
+            ASSERT(node->op() == CallStringConstructor);
+            callOperation(operationCallStringConstructor, resultGPR, op1Regs);
+        }
+        m_jit.exceptionCheck();
+        cellResult(resultGPR, node);
+        return;
+    }
+
+    case UntypedUse: {
+        JSValueOperand op1(this, node->child1());
+        JSValueRegs op1Regs = op1.jsValueRegs();
+        GPRReg op1PayloadGPR = op1Regs.payloadGPR();
+
+        GPRFlushedCallResult result(this);
+        GPRReg resultGPR = result.gpr();
+
+        flushRegisters();
+
+        JITCompiler::Jump done;
+        if (node->child1()->prediction() & SpecString) {
+            JITCompiler::Jump slowPath1 = m_jit.branchIfNotCell(op1.jsValueRegs());
+            JITCompiler::Jump slowPath2 = m_jit.branchIfNotString(op1PayloadGPR);
+            m_jit.move(op1PayloadGPR, resultGPR);
+            done = m_jit.jump();
+            slowPath1.link(&m_jit);
+            slowPath2.link(&m_jit);
+        }
+        if (node->op() == ToString)
+            callOperation(operationToString, resultGPR, op1Regs);
+        else {
+            ASSERT(node->op() == CallStringConstructor);
+            callOperation(operationCallStringConstructor, resultGPR, op1Regs);
+        }
+        m_jit.exceptionCheck();
+        if (done.isSet())
+            done.link(&m_jit);
+        cellResult(resultGPR, node);
+        return;
+    }
+
+    case Int32Use:
+    case Int52RepUse:
+    case DoubleRepUse:
+        compileToStringOrCallStringConstructorOnNumber(node);
+        return;
+
+    default:
+        break;
+    }
+
     SpeculateCellOperand op1(this, node->child1());
     GPRReg op1GPR = op1.gpr();
     
@@ -7915,6 +8045,92 @@ void SpeculativeJIT::compileToStringOrCallStringConstructorOnCell(Node* node)
         break;
     }
         
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+    }
+}
+
+void SpeculativeJIT::compileToStringOrCallStringConstructorOnNumber(Node* node)
+{
+    auto callToString = [&] (auto operation, GPRReg resultGPR, auto valueReg) {
+        flushRegisters();
+        callOperation(operation, resultGPR, valueReg, CCallHelpers::TrustedImm32(10));
+        m_jit.exceptionCheck();
+        cellResult(resultGPR, node);
+    };
+
+    switch (node->child1().useKind()) {
+    case Int32Use: {
+        SpeculateStrictInt32Operand value(this, node->child1());
+        GPRFlushedCallResult result(this);
+        callToString(operationInt32ToStringWithValidRadix, result.gpr(), value.gpr());
+        break;
+    }
+
+#if USE(JSVALUE64)
+    case Int52RepUse: {
+        SpeculateStrictInt52Operand value(this, node->child1());
+        GPRFlushedCallResult result(this);
+        callToString(operationInt52ToStringWithValidRadix, result.gpr(), value.gpr());
+        break;
+    }
+#endif
+
+    case DoubleRepUse: {
+        SpeculateDoubleOperand value(this, node->child1());
+        GPRFlushedCallResult result(this);
+        callToString(operationDoubleToStringWithValidRadix, result.gpr(), value.fpr());
+        break;
+    }
+
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+    }
+}
+
+void SpeculativeJIT::compileNumberToStringWithRadix(Node* node)
+{
+    bool validRadixIsGuaranteed = false;
+    if (node->child2()->isInt32Constant()) {
+        int32_t radix = node->child2()->asInt32();
+        if (radix >= 2 && radix <= 36)
+            validRadixIsGuaranteed = true;
+    }
+
+    auto callToString = [&] (auto operation, GPRReg resultGPR, auto valueReg, GPRReg radixGPR) {
+        flushRegisters();
+        callOperation(operation, resultGPR, valueReg, radixGPR);
+        m_jit.exceptionCheck();
+        cellResult(resultGPR, node);
+    };
+
+    switch (node->child1().useKind()) {
+    case Int32Use: {
+        SpeculateStrictInt32Operand value(this, node->child1());
+        SpeculateStrictInt32Operand radix(this, node->child2());
+        GPRFlushedCallResult result(this);
+        callToString(validRadixIsGuaranteed ? operationInt32ToStringWithValidRadix : operationInt32ToString, result.gpr(), value.gpr(), radix.gpr());
+        break;
+    }
+
+#if USE(JSVALUE64)
+    case Int52RepUse: {
+        SpeculateStrictInt52Operand value(this, node->child1());
+        SpeculateStrictInt32Operand radix(this, node->child2());
+        GPRFlushedCallResult result(this);
+        callToString(validRadixIsGuaranteed ? operationInt52ToStringWithValidRadix : operationInt52ToString, result.gpr(), value.gpr(), radix.gpr());
+        break;
+    }
+#endif
+
+    case DoubleRepUse: {
+        SpeculateDoubleOperand value(this, node->child1());
+        SpeculateStrictInt32Operand radix(this, node->child2());
+        GPRFlushedCallResult result(this);
+        callToString(validRadixIsGuaranteed ? operationDoubleToStringWithValidRadix : operationDoubleToString, result.gpr(), value.fpr(), radix.gpr());
+        break;
+    }
+
     default:
         RELEASE_ASSERT_NOT_REACHED();
     }
@@ -8454,13 +8670,18 @@ void SpeculativeJIT::speculateSymbol(Edge edge)
     speculateSymbol(edge, operand.gpr());
 }
 
+void SpeculativeJIT::speculateNotCell(Edge edge, JSValueRegs regs)
+{
+    DFG_TYPE_CHECK(regs, edge, ~SpecCell, m_jit.branchIfCell(regs));
+}
+
 void SpeculativeJIT::speculateNotCell(Edge edge)
 {
     if (!needsTypeCheck(edge, ~SpecCell))
         return;
     
     JSValueOperand operand(this, edge, ManualOperandSpeculation); 
-    typeCheck(operand.jsValueRegs(), edge, ~SpecCell, m_jit.branchIfCell(operand.jsValueRegs()));
+    speculateNotCell(edge, operand.jsValueRegs());
 }
 
 void SpeculativeJIT::speculateOther(Edge edge)

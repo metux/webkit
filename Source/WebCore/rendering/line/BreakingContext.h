@@ -662,7 +662,7 @@ inline void ensureCharacterGetsLineBox(LineWhitespaceCollapsingState& lineWhites
     lineWhitespaceCollapsingState.stopIgnoringSpaces(InlineIterator(0, textParagraphSeparator.renderer(), textParagraphSeparator.offset()));
 }
 
-inline void tryHyphenating(RenderText& text, const FontCascade& font, const AtomicString& localeIdentifier, unsigned consecutiveHyphenatedLines, int consecutiveHyphenatedLinesLimit, int minimumPrefixLimit, int minimumSuffixLimit, unsigned lastSpace, unsigned pos, float xPos, int availableWidth, bool isFixedPitch, bool collapseWhiteSpace, int lastSpaceWordSpacing, InlineIterator& lineBreak, std::optional<unsigned> nextBreakable, bool& hyphenated)
+inline void tryHyphenating(RenderText& text, const FontCascade& font, const AtomicString& localeIdentifier, unsigned consecutiveHyphenatedLines, int consecutiveHyphenatedLinesLimit, int minimumPrefixLimit, int minimumSuffixLimit, unsigned lastSpace, unsigned pos, float xPos, float availableWidth, bool isFixedPitch, bool collapseWhiteSpace, int lastSpaceWordSpacing, InlineIterator& lineBreak, std::optional<unsigned> nextBreakable, bool& hyphenated)
 {
     // Map 'hyphenate-limit-{before,after}: auto;' to 2.
     unsigned minimumPrefixLength;
@@ -684,7 +684,7 @@ inline void tryHyphenating(RenderText& text, const FontCascade& font, const Atom
     if (consecutiveHyphenatedLinesLimit >= 0 && consecutiveHyphenatedLines >= static_cast<unsigned>(consecutiveHyphenatedLinesLimit))
         return;
 
-    int hyphenWidth = measureHyphenWidth(text, font);
+    float hyphenWidth = measureHyphenWidth(text, font);
 
     float maxPrefixWidth = availableWidth - xPos - hyphenWidth - lastSpaceWordSpacing;
     if (!enoughWidthForHyphenation(maxPrefixWidth, font.pixelSize()))
@@ -794,7 +794,8 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
     float lastSpaceWordSpacing = 0;
     float wordSpacingForWordMeasurement = 0;
 
-    float wrapW = m_width.uncommittedWidth() + inlineLogicalWidth(m_current.renderer(), !m_appliedStartWidth, true);
+    float wrapWidthOffset = m_width.uncommittedWidth() + inlineLogicalWidth(m_current.renderer(), !m_appliedStartWidth, true);
+    float wrapW = wrapWidthOffset;
     float charWidth = 0;
     bool breakNBSP = m_autoWrap && m_currentStyle->nbspMode() == SPACE;
     // Auto-wrapping text should wrap in the middle of a word only if it could not wrap before the word,
@@ -1028,7 +1029,8 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
 
             if (m_autoWrap && betweenWords) {
                 commitLineBreakAtCurrentWidth(renderObject, m_current.offset(), m_current.nextBreakablePosition());
-                wrapW = 0;
+                wrapWidthOffset = 0;
+                wrapW = wrapWidthOffset;
                 // Auto-wrapping text should not wrap in the middle of a word once it has had an
                 // opportunity to break after a word.
                 breakWords = false;
@@ -1060,7 +1062,12 @@ inline bool BreakingContext::handleText(WordMeasurements& wordMeasurements, bool
                     m_trailingObjects.updateWhitespaceCollapsingTransitionsForTrailingBoxes(m_lineWhitespaceCollapsingState, InlineIterator(), TrailingObjects::DoNotCollapseFirstSpace);
                 }
             }
-            
+            // Measuring the width of complex text character-by-character, rather than measuring it all together,
+            // could produce considerably different width values.
+            if (!renderText.canUseSimpleFontCodePath() && midWordBreak && m_width.fitsOnLine()) {
+                midWordBreak = false;
+                wrapW = wrapWidthOffset + additionalTempWidth;
+            }
             isLineEmpty = m_lineInfo.isEmpty();
         } else {
             if (m_ignoringSpaces) {

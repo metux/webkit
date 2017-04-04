@@ -144,6 +144,11 @@ RenderBox::RenderBox(Document& document, RenderStyle&& style, BaseTypeFlags base
 
 RenderBox::~RenderBox()
 {
+    // Do not add any code here. Add it to willBeDestroyed() instead.
+}
+
+void RenderBox::willBeDestroyed()
+{
     if (frame().eventHandler().autoscrollRenderer() == this)
         frame().eventHandler().stopAutoscrollTimer(true);
 
@@ -157,6 +162,8 @@ RenderBox::~RenderBox()
 
     view().unscheduleLazyRepaint(*this);
     removeControlStatesForRenderer(*this);
+    
+    RenderBoxModelObject::willBeDestroyed();
 }
 
 RenderRegion* RenderBox::clampToStartAndEndRegions(RenderRegion* region) const
@@ -210,8 +217,8 @@ LayoutRect RenderBox::borderBoxRectInRegion(RenderRegion* region, RenderBoxRegio
     if (!region)
         return borderBoxRect();
 
-    RenderFlowThread* flowThread = flowThreadContainingBlock();
-    if (!flowThread)
+    auto* flowThread = flowThreadContainingBlock();
+    if (!is<RenderNamedFlowThread>(flowThread))
         return borderBoxRect();
 
     RenderRegion* startRegion = nullptr;
@@ -278,7 +285,7 @@ void RenderBox::removeFloatingOrPositionedChildFromBlockLists()
 {
     ASSERT(isFloatingOrOutOfFlowPositioned());
 
-    if (documentBeingDestroyed())
+    if (renderTreeBeingDestroyed())
         return;
 
     if (isFloating()) {
@@ -2191,7 +2198,7 @@ void RenderBox::deleteLineBoxWrapper()
     if (!m_inlineBoxWrapper)
         return;
     
-    if (!documentBeingDestroyed())
+    if (!renderTreeBeingDestroyed())
         m_inlineBoxWrapper->removeFromParent();
     delete m_inlineBoxWrapper;
     m_inlineBoxWrapper = nullptr;
@@ -2710,7 +2717,7 @@ RenderBoxRegionInfo* RenderBox::renderBoxRegionInfo(RenderRegion* region, Render
     // FIXME: For now we limit this computation to normal RenderBlocks. Future patches will expand
     // support to cover all boxes.
     RenderFlowThread* flowThread = flowThreadContainingBlock();
-    if (isRenderFlowThread() || !flowThread || !canHaveBoxInfoInRegion() || flowThread->style().writingMode() != style().writingMode())
+    if (isRenderFlowThread() || !is<RenderNamedFlowThread>(flowThread) || !canHaveBoxInfoInRegion() || flowThread->style().writingMode() != style().writingMode())
         return nullptr;
 
     LogicalExtentComputedValues computedValues;
@@ -3114,7 +3121,7 @@ LayoutUnit RenderBox::computeReplacedLogicalWidthUsing(SizeType widthType, Lengt
     return 0;
 }
 
-LayoutUnit RenderBox::computeReplacedLogicalHeight() const
+LayoutUnit RenderBox::computeReplacedLogicalHeight(std::optional<LayoutUnit>) const
 {
     return computeReplacedLogicalHeightRespectingMinMaxHeight(computeReplacedLogicalHeightUsing(MainOrPreferredSize, style().logicalHeight()));
 }

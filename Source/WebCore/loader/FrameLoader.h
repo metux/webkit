@@ -345,7 +345,7 @@ private:
     void setState(FrameState);
 
     void closeOldDataSources();
-    void prepareForCachedPageRestore();
+    void willRestoreFromCachedPage();
 
     bool shouldReloadToHandleUnreachableURL(DocumentLoader*);
 
@@ -385,6 +385,8 @@ private:
     void dispatchGlobalObjectAvailableInAllWorlds();
 
     void applyShouldOpenExternalURLsPolicyToNewDocumentLoader(DocumentLoader&, ShouldOpenExternalURLsPolicy propagatedPolicy);
+
+    bool isNavigationAllowed() const;
 
     Frame& m_frame;
     FrameLoaderClient& m_client;

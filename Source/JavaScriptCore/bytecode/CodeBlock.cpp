@@ -1840,6 +1840,7 @@ CodeBlock::CodeBlock(VM* vm, Structure* structure, CopyParsedBlockTag, CodeBlock
     , m_isStrictMode(other.m_isStrictMode)
     , m_codeType(other.m_codeType)
     , m_unlinkedCode(*other.m_vm, this, other.m_unlinkedCode.get())
+    , m_numberOfArgumentsToSkip(other.m_numberOfArgumentsToSkip)
     , m_hasDebuggerStatement(false)
     , m_steppingMode(SteppingModeDisabled)
     , m_numBreakpoints(0)
@@ -2327,7 +2328,8 @@ void CodeBlock::finishCreation(VM& vm, ScriptExecutable* ownerExecutable, Unlink
         case op_create_rest: {
             int numberOfArgumentsToSkip = instructions[i + 3].u.operand;
             ASSERT_UNUSED(numberOfArgumentsToSkip, numberOfArgumentsToSkip >= 0);
-            ASSERT_WITH_MESSAGE(numberOfArgumentsToSkip == numParameters() - 1, "We assume that this is true when rematerializing the rest parameter during OSR exit in the FTL JIT.");
+            // This is used when rematerializing the rest parameter during OSR exit in the FTL JIT.");
+            m_numberOfArgumentsToSkip = numberOfArgumentsToSkip;
             break;
         }
 

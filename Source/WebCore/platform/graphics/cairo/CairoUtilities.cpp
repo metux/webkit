@@ -39,6 +39,7 @@
 #include "RefPtrCairo.h"
 #include "Region.h"
 #include <wtf/Assertions.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/Vector.h>
 
 #if ENABLE(ACCELERATED_2D_CANVAS)
@@ -46,6 +47,14 @@
 #endif
 
 namespace WebCore {
+
+#if USE(FREETYPE) && !PLATFORM(GTK)
+const cairo_font_options_t* getDefaultCairoFontOptions()
+{
+    static NeverDestroyed<cairo_font_options_t*> options = cairo_font_options_create();
+    return options;
+}
+#endif
 
 void copyContextProperties(cairo_t* srcCr, cairo_t* dstCr)
 {
@@ -108,7 +117,7 @@ void appendRegionToCairoContext(cairo_t* to, const cairo_region_t* region)
     }
 }
 
-cairo_operator_t toCairoOperator(CompositeOperator op)
+static cairo_operator_t toCairoCompositeOperator(CompositeOperator op)
 {
     switch (op) {
     case CompositeClear:
@@ -143,11 +152,12 @@ cairo_operator_t toCairoOperator(CompositeOperator op)
         return CAIRO_OPERATOR_SOURCE;
     }
 }
-cairo_operator_t toCairoOperator(BlendMode blendOp)
+
+cairo_operator_t toCairoOperator(CompositeOperator op, BlendMode blendOp)
 {
     switch (blendOp) {
     case BlendModeNormal:
-        return CAIRO_OPERATOR_OVER;
+        return toCairoCompositeOperator(op);
     case BlendModeMultiply:
         return CAIRO_OPERATOR_MULTIPLY;
     case BlendModeScreen:

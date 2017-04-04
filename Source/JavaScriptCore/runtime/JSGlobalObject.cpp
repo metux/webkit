@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009, 2014-2017 Apple Inc. All rights reserved.
+ * Copyright (C) 2007-2017 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich (cwzwarich@uwaterloo.ca)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -80,7 +80,6 @@
 #include "JSDataViewPrototype.h"
 #include "JSDollarVM.h"
 #include "JSDollarVMPrototype.h"
-#include "JSFixedArray.h"
 #include "JSFunction.h"
 #include "JSGeneratorFunction.h"
 #include "JSGenericTypedArrayViewConstructorInlines.h"
@@ -576,7 +575,7 @@ void JSGlobalObject::init(VM& vm)
     }
     m_proxyRevokeStructure.set(vm, this, ProxyRevoke::createStructure(vm, this, m_functionPrototype.get()));
 
-    m_parseIntFunction.set(vm, this, JSFunction::create(vm, this, 2, vm.propertyNames->parseInt.string(), globalFuncParseInt, NoIntrinsic));
+    m_parseIntFunction.set(vm, this, JSFunction::create(vm, this, 2, vm.propertyNames->parseInt.string(), globalFuncParseInt, ParseIntIntrinsic));
     putDirectWithoutTransition(vm, vm.propertyNames->parseInt, m_parseIntFunction.get(), DontEnum);
     
     m_arrayBufferPrototype.set(vm, this, JSArrayBufferPrototype::create(vm, this, JSArrayBufferPrototype::createStructure(vm, this, m_objectPrototype.get()), ArrayBufferSharingMode::Default));

@@ -1753,6 +1753,17 @@ private:
             break;
         }
 
+        case NumberToStringWithRadix: {
+            if (node->child1()->shouldSpeculateInt32())
+                fixEdge<Int32Use>(node->child1());
+            else if (enableInt52() && node->child1()->shouldSpeculateAnyInt())
+                fixEdge<Int52RepUse>(node->child1());
+            else
+                fixEdge<DoubleRepUse>(node->child1());
+            fixEdge<Int32Use>(node->child2());
+            break;
+        }
+
         case DefineAccessorProperty: {
             fixEdge<CellUse>(m_graph.varArgChild(node, 0));
             Edge& propertyEdge = m_graph.varArgChild(node, 1);
@@ -1790,6 +1801,24 @@ private:
 
         case Call: {
             attemptToMakeCallDOM(node);
+            break;
+        }
+
+        case ParseInt: {
+            if (node->child1()->shouldSpeculateInt32() && !node->child2()) {
+                fixEdge<Int32Use>(node->child1());
+                node->convertToIdentity();
+                break;
+            }
+
+            if (node->child1()->shouldSpeculateString()) {
+                fixEdge<StringUse>(node->child1());
+                node->clearFlags(NodeMustGenerate);
+            }
+
+            if (node->child2())
+                fixEdge<Int32Use>(node->child2());
+
             break;
         }
 
@@ -2208,6 +2237,34 @@ private:
         
         if (node->child1()->shouldSpeculateCell()) {
             fixEdge<CellUse>(node->child1());
+            return;
+        }
+
+        if (node->child1()->shouldSpeculateInt32()) {
+            fixEdge<Int32Use>(node->child1());
+            node->clearFlags(NodeMustGenerate);
+            return;
+        }
+
+        if (enableInt52() && node->child1()->shouldSpeculateAnyInt()) {
+            fixEdge<Int52RepUse>(node->child1());
+            node->clearFlags(NodeMustGenerate);
+            return;
+        }
+
+        if (node->child1()->shouldSpeculateNumber()) {
+            fixEdge<DoubleRepUse>(node->child1());
+            node->clearFlags(NodeMustGenerate);
+            return;
+        }
+
+        // ToString(Symbol) throws an error. So if the child1 can include Symbols,
+        // we need to care about it in the clobberize. In the following case,
+        // since NotCellUse edge filter is used and this edge filters Symbols,
+        // we can say that ToString never throws an error!
+        if (node->child1()->shouldSpeculateNotCell()) {
+            fixEdge<NotCellUse>(node->child1());
+            node->clearFlags(NodeMustGenerate);
             return;
         }
     }

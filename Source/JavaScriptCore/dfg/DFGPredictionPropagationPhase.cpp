@@ -354,8 +354,10 @@ private:
             case Array::Double:
                 if (arrayMode.isOutOfBounds())
                     changed |= mergePrediction(node->getHeapPrediction() | SpecDoubleReal);
-                else
+                else if (node->getHeapPrediction() & SpecNonIntAsDouble)
                     changed |= mergePrediction(SpecDoubleReal);
+                else
+                    changed |= mergePrediction(SpecAnyIntAsDouble);
                 break;
             case Array::Float32Array:
             case Array::Float64Array:
@@ -403,7 +405,7 @@ private:
                 }
 
                 if (node->child1()->shouldSpeculateNumber()) {
-                    changed |= mergePrediction(SpecAnyInt);
+                    changed |= mergePrediction(SpecBytecodeNumber);
                     break;
                 }
 
@@ -897,6 +899,7 @@ private:
         case StringCharAt:
         case CallStringConstructor:
         case ToString:
+        case NumberToStringWithRadix:
         case MakeRope:
         case StrCat: {
             setPrediction(SpecString);
@@ -964,6 +967,14 @@ private:
         }
         case ToIndexString: {
             setPrediction(SpecString);
+            break;
+        }
+        case ParseInt: {
+            // We expect this node to almost always produce an int32. However,
+            // it's possible it produces NaN or integers out of int32 range. We
+            // rely on the heap prediction since the parseInt() call profiled
+            // its result.
+            setPrediction(m_currentNode->getHeapPrediction());
             break;
         }
 
