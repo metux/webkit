@@ -458,7 +458,11 @@ void Heap::reportExtraMemoryAllocatedSlowCase(size_t size)
 
 void Heap::deprecatedReportExtraMemorySlowCase(size_t size)
 {
-    m_deprecatedExtraMemorySize += size;
+    // FIXME: Change this to use SaturatedArithmetic when available.
+    // https://bugs.webkit.org/show_bug.cgi?id=170411
+    Checked<size_t, RecordOverflow> checkedNewSize = m_deprecatedExtraMemorySize;
+    checkedNewSize += size;
+    m_deprecatedExtraMemorySize = UNLIKELY(checkedNewSize.hasOverflowed()) ? std::numeric_limits<size_t>::max() : checkedNewSize.unsafeGet();
     reportExtraMemoryAllocatedSlowCase(size);
 }
 
@@ -706,7 +710,15 @@ size_t Heap::objectCount()
 
 size_t Heap::extraMemorySize()
 {
-    return m_extraMemorySize + m_deprecatedExtraMemorySize + m_arrayBuffers.size();
+    // FIXME: Change this to use SaturatedArithmetic when available.
+    // https://bugs.webkit.org/show_bug.cgi?id=170411
+    Checked<size_t, RecordOverflow> checkedTotal = m_extraMemorySize;
+    checkedTotal += m_deprecatedExtraMemorySize;
+    checkedTotal += m_arrayBuffers.size();
+    size_t total = UNLIKELY(checkedTotal.hasOverflowed()) ? std::numeric_limits<size_t>::max() : checkedTotal.unsafeGet();
+
+    ASSERT(m_objectSpace.capacity() >= m_objectSpace.size());
+    return std::min(total, std::numeric_limits<size_t>::max() - m_objectSpace.capacity());
 }
 
 size_t Heap::size()
@@ -1936,7 +1948,7 @@ Heap::Ticket Heap::requestCollection(std::optional<CollectionScope> scope)
     // right now. This is an optimization that prevents the collector thread from ever starting in most
     // cases.
     ASSERT(m_lastServedTicket <= m_lastGrantedTicket);
-    if (m_lastServedTicket == m_lastGrantedTicket) {
+    if ((m_lastServedTicket == m_lastGrantedTicket) && (m_currentPhase == CollectorPhase::NotRunning)) {
         if (false)
             dataLog("Taking the conn.\n");
         m_worldState.exchangeOr(mutatorHasConnBit);
@@ -2087,6 +2099,11 @@ void Heap::updateAllocationLimits()
     // It's up to the user to ensure that extraMemorySize() ends up corresponding to allocation-time
     // extra memory reporting.
     currentHeapSize += extraMemorySize();
+    if (!ASSERT_DISABLED) {
+        Checked<size_t, RecordOverflow> checkedCurrentHeapSize = m_totalBytesVisited;
+        checkedCurrentHeapSize += extraMemorySize();
+        ASSERT(!checkedCurrentHeapSize.hasOverflowed() && checkedCurrentHeapSize.unsafeGet() == currentHeapSize);
+    }
 
     if (verbose)
         dataLog("extraMemorySize() = ", extraMemorySize(), ", currentHeapSize = ", currentHeapSize, "\n");
@@ -2358,7 +2375,12 @@ void Heap::reportExtraMemoryVisited(size_t size)
     
     for (;;) {
         size_t oldSize = *counter;
-        if (WTF::atomicCompareExchangeWeakRelaxed(counter, oldSize, oldSize + size))
+        // FIXME: Change this to use SaturatedArithmetic when available.
+        // https://bugs.webkit.org/show_bug.cgi?id=170411
+        Checked<size_t, RecordOverflow> checkedNewSize = oldSize;
+        checkedNewSize += size;
+        size_t newSize = UNLIKELY(checkedNewSize.hasOverflowed()) ? std::numeric_limits<size_t>::max() : checkedNewSize.unsafeGet();
+        if (WTF::atomicCompareExchangeWeakRelaxed(counter, oldSize, newSize))
             return;
     }
 }

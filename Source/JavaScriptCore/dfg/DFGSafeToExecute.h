@@ -269,6 +269,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ProfileType:
     case ProfileControlFlow:
     case CheckTypeInfoFlags:
+    case ParseInt:
     case OverridesHasInstance:
     case InstanceOf:
     case InstanceOfCustom:
@@ -287,6 +288,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ToPrimitive:
     case ToString:
     case ToNumber:
+    case NumberToStringWithRadix:
     case SetFunctionName:
     case StrCat:
     case CallStringConstructor:

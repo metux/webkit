@@ -178,6 +178,7 @@ bool doesGC(Graph& graph, Node* node)
     case ToNumber:
     case ToString:
     case CallStringConstructor:
+    case NumberToStringWithRadix:
     case In:
     case HasOwnProperty:
     case Jump:
@@ -310,6 +311,7 @@ bool doesGC(Graph& graph, Node* node)
     case CallDOMGetter:
     case CallDOM:
     case ArraySlice:
+    case ParseInt: // We might resolve a rope even though we don't clobber anything.
         return true;
         
     case MultiPutByOffset:

@@ -279,10 +279,12 @@ inline CapabilityLevel canCompile(Node* node)
     case DefineDataProperty:
     case DefineAccessorProperty:
     case ToLowerCase:
+    case NumberToStringWithRadix:
     case CheckDOM:
     case CallDOM:
     case CallDOMGetter:
     case ArraySlice:
+    case ParseInt:
         // These are OK.
         break;
 

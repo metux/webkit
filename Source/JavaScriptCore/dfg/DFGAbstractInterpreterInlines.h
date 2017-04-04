@@ -475,7 +475,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             break;
         }
         
-        forNode(node).setType(SpecInt32Only);
+        forNode(node).setType(SpecAnyInt);
         break;
     }
         
@@ -1858,6 +1858,10 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                 m_graph.registerStructure(m_graph.globalObjectFor(node->origin.semantic)->stringObjectStructure()));
             break;
         case StringOrStringObjectUse:
+        case Int32Use:
+        case Int52RepUse:
+        case DoubleRepUse:
+        case NotCellUse:
             break;
         case CellUse:
         case UntypedUse:
@@ -1870,6 +1874,11 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         forNode(node).set(m_graph, m_vm.stringStructure.get());
         break;
     }
+
+    case NumberToStringWithRadix:
+        clobberWorld(node->origin.semantic, clobberLimit);
+        forNode(node).set(m_graph, m_graph.m_vm.stringStructure.get());
+        break;
         
     case NewStringObject: {
         ASSERT(node->structure()->classInfo() == StringObject::info());
@@ -2927,6 +2936,29 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case CheckTierUpAtReturn:
     case CheckTypeInfoFlags:
         break;
+
+    case ParseInt: {
+        AbstractValue value = forNode(node->child1());
+        if (value.m_type && !(value.m_type & ~SpecInt32Only)) {
+            JSValue radix;
+            if (!node->child2())
+                radix = jsNumber(0);
+            else
+                radix = forNode(node->child2()).m_value;
+
+            if (radix.isNumber()
+                && (radix.asNumber() == 0 || radix.asNumber() == 10)) {
+                m_state.setFoundConstants(true);
+                forNode(node).setType(SpecInt32Only);
+                break;
+            }
+        }
+
+        if (node->child1().useKind() == UntypedUse)
+            clobberWorld(node->origin.semantic, clobberLimit);
+        forNode(node).setType(m_graph, SpecBytecodeNumber);
+        break;
+    }
 
     case CreateRest:
         if (!m_graph.isWatchingHavingABadTimeWatchpoint(node)) {
