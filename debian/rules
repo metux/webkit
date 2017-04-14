@@ -62,6 +62,12 @@ endif
 	dh $@ --parallel --with gir
 
 override_dh_auto_configure:
+	echo "GCC:"
+	gcc -v || true
+	echo "G++:"
+	g++ -v || true
+	echo "CC"
+	cc -v || true
 	CFLAGS="$(CFLAGS) $(CPPFLAGS)" \
 	CXXFLAGS="$(CFLAGS) $(CPPFLAGS)" \
 	LDFLAGS="$(LDFLAGS)" \
