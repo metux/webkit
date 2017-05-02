@@ -12,7 +12,7 @@ LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS) -Wl,--as-needed
 
 DEBHELPER_VERSION = $(shell dpkg-query -W -f='$${source:Version}' debhelper)
 
-EXTRA_CMAKE_ARGUMENTS =
+EXTRA_CMAKE_ARGUMENTS = -DENABLE_GEOLOCATION=OFF
 
 # Sacrifice speed in order to make it more likely resource limits
 # won't be hit.
